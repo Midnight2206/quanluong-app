@@ -1,0 +1,4 @@
+version: 1
+display_name: Backend Error Handling
+short_description: Domain errors, HTTP mapping, and centralized error middleware
+default_prompt: Build or refactor backend error handling with explicit error types, centralized HTTP mapping, and stable failure payloads.

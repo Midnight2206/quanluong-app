@@ -1,0 +1,561 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum UserRegistrationStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum UnitEntityForkKind {
+  JOB_TITLE
+  LTTP_COMMODITY
+  LTTP_PRICE_TABLE
+}
+
+/// Đơn vị có kho dữ liệu private riêng hoặc kế thừa private của cấp trên gần nhất có kho độc lập.
+enum UnitDataIsolation {
+  INDEPENDENT
+  INHERIT_PRIVATE
+}
+
+/// Phụ lục I / II Thông tư mức tiền ăn (đồng/người/ngày) — dữ liệu công khai, superadmin chỉnh sửa.
+enum MealAllowanceRateType {
+  an_tieu_chuan
+  an_them
+}
+
+/// Buổi chấm cơm trong ngày (sổ theo tháng).
+enum MealRosterMealPeriod {
+  sang
+  trua
+  chieu
+}
+
+model MealAllowanceRate {
+  id                     Int                     @id @default(autoincrement())
+  doiTuong               String                  @db.Text
+  mucTienAn              Int
+  type                   MealAllowanceRateType
+  sortOrder              Int                     @default(0)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  mealRosterEntries         MealRosterEntry[]
+  unitSelectedMealRates     UnitSelectedMealRate[]
+  unitMealPeriodSplits      UnitMealPeriodSplit[]
+  mealRosterDayMarks        MealRosterDayMark[]
+  mealRosterDayExtraMarks   MealRosterDayExtraMark[]
+
+  @@index([type, sortOrder])
+}
+
+/// Một khoảng thời gian áp dụng `policy` cho `unitId`. Đổi chế độ nhiều lần → chuỗi [validFrom, validTo); `validTo` null = còn hiệu lực.
+model UnitDataPolicyPeriod {
+  id        Int               @id @default(autoincrement())
+  unitId    Int
+  policy    UnitDataIsolation
+  validFrom DateTime
+  validTo   DateTime?
+  note      String?           @db.VarChar(500)
+  createdAt DateTime          @default(now())
+  unit      Unit              @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, validFrom])
+  @@index([unitId, validTo])
+}
+
+/// Gán quyền đọc private của owner cho consumer (theo loại dữ liệu / bản ghi), bổ sung cho fork có sẵn.
+model UnitPrivateDataShareGrant {
+  id             Int       @id @default(autoincrement())
+  ownerUnitId    Int
+  consumerUnitId Int
+  dataKind       String    @db.VarChar(64)
+  recordId       Int?
+  validFrom      DateTime
+  validTo        DateTime?
+  createdAt      DateTime  @default(now())
+  ownerUnit      Unit      @relation("ShareGrantOwner", fields: [ownerUnitId], references: [id], onDelete: Cascade)
+  consumerUnit   Unit      @relation("ShareGrantConsumer", fields: [consumerUnitId], references: [id], onDelete: Cascade)
+
+  @@index([consumerUnitId, dataKind, validFrom])
+  @@index([ownerUnitId, dataKind])
+}
+
+/// Ánh xạ nguồn → đơn vị đích → bản ghi đích: tránh áp trùng cùng một bản ghi nguồn xuống một đơn vị nhiều lần; hỗ trợ đồng bộ lại khi nguồn thay đổi.
+model UnitEntityFork {
+  id              Int                 @id @default(autoincrement())
+  kind            UnitEntityForkKind
+  sourceRecordId  Int
+  sourceUnitId    Int
+  targetUnitId    Int
+  targetRecordId  Int
+  appliedByUserId Int?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  sourceUnit      Unit                @relation("UnitEntityForkSource", fields: [sourceUnitId], references: [id], onDelete: Cascade)
+  targetUnit      Unit                @relation("UnitEntityForkTarget", fields: [targetUnitId], references: [id], onDelete: Cascade)
+  appliedBy       User?               @relation(fields: [appliedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([kind, sourceRecordId, targetUnitId])
+  @@index([targetUnitId, kind])
+  @@index([sourceUnitId])
+  @@index([appliedByUserId])
+}
+
+model User {
+  id             Int           @id @default(autoincrement())
+  username       String        @unique
+  email          String        @unique
+  password       String
+  typeId         Int
+  unitId         Int?
+  assignedUnitId Int?
+  jobTitleId     Int?
+  isActive       Boolean       @default(true)
+  registrationStatus           UserRegistrationStatus @default(APPROVED)
+  registrationReviewedAt       DateTime?
+  registrationReviewNote       String?                @db.VarChar(500)
+  registrationReviewedById   Int?
+  emailVerifiedAt            DateTime?
+  emailVerificationTokenHash String?   @unique @db.VarChar(64)
+  emailVerificationExpiresAt DateTime?
+  passwordResetTokenHash     String?   @unique @db.VarChar(64)
+  passwordResetExpiresAt     DateTime?
+  googleRefreshToken         String?     @db.Text
+  googleDriveFolderId        String?     @db.VarChar(128)
+  deletedAt      DateTime?
+  lastLoginAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  type                    Type          @relation(fields: [typeId], references: [id])
+  unit                    Unit?         @relation(fields: [unitId], references: [id])
+  assignedUnit            AssignedUnit? @relation(fields: [assignedUnitId], references: [id])
+  jobTitle                JobTitle?     @relation(fields: [jobTitleId], references: [id], onDelete: SetNull)
+  registrationReviewer    User?         @relation("RegistrationReview", fields: [registrationReviewedById], references: [id], onDelete: SetNull)
+  reviewedRegistrations   User[]        @relation("RegistrationReview")
+  unitEntityForksApplied  UnitEntityFork[]
+  profile                 Profile?
+  refreshTokens           RefreshToken[]
+  chatMessagesSent        ChatMessage[] @relation("ChatMessageSender")
+  chatMessagesReceived    ChatMessage[] @relation("ChatMessageRecipient")
+  chatDirectReadAsOwner   ChatDirectReadState[] @relation("ChatReadOwner")
+  chatDirectReadAsPeer    ChatDirectReadState[] @relation("ChatReadPeer")
+  chatGroupsCreated       ChatGroup[]
+  chatGroupMembers        ChatGroupMember[]
+  chatGroupMessagesSent   ChatGroupMessage[]
+
+  @@index([typeId])
+  @@index([unitId])
+  @@index([assignedUnitId])
+  @@index([jobTitleId])
+  @@index([deletedAt])
+  @@index([registrationStatus])
+}
+
+/// Tin nhắn 1–1 realtime (Socket.io); lưu DB để tải lại lịch sử.
+model ChatMessage {
+  id          Int      @id @default(autoincrement())
+  senderId    Int
+  recipientId Int
+  body        String   @db.Text
+  createdAt   DateTime @default(now())
+  sender      User     @relation("ChatMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User     @relation("ChatMessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, senderId, createdAt])
+}
+
+/// Mốc đã xem tin 1–1: `lastReadAt` null = chưa mở hội thoại (coi mọi tin đến là chưa đọc).
+model ChatDirectReadState {
+  userId     Int
+  peerUserId Int
+  lastReadAt DateTime?
+  user       User @relation("ChatReadOwner", fields: [userId], references: [id], onDelete: Cascade)
+  peer       User @relation("ChatReadPeer", fields: [peerUserId], references: [id], onDelete: Cascade)
+
+  @@id([userId, peerUserId])
+  @@index([userId])
+  @@index([peerUserId])
+}
+
+model ChatGroup {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(191)
+  createdById Int
+  createdAt   DateTime @default(now())
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  members     ChatGroupMember[]
+  messages    ChatGroupMessage[]
+
+  @@index([createdById])
+}
+
+model ChatGroupMember {
+  groupId    Int
+  userId     Int
+  joinedAt   DateTime  @default(now())
+  lastReadAt DateTime?
+  group      ChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+model ChatGroupMessage {
+  id        Int      @id @default(autoincrement())
+  groupId   Int
+  senderId  Int
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  group     ChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender    User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt])
+}
+
+model Profile {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @unique
+  fullName    String
+  birthday    DateTime?
+  avatarUrl   String?
+  description String?   @db.Text
+  jobTitle    String?
+  rank        String?
+  phoneNumber String?
+  address     String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Type {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?          @db.Text
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       User[]
+  permissions TypePermission[]
+}
+
+model Permission {
+  id          Int                  @id @default(autoincrement())
+  code        String               @unique
+  name        String
+  description String?              @db.Text
+  method      String
+  module      String
+  pathRoute   String
+  isSystem    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  types            TypePermission[]
+  jobTitles        JobTitlePermission[]
+  unitLevelCaps    UnitLevelPermissionCap[]
+
+  @@unique([method, pathRoute])
+  @@index([module])
+}
+
+model TypePermission {
+  typeId       Int
+  permissionId Int
+  assignedAt   DateTime   @default(now())
+  type         Type       @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([typeId, permissionId])
+  @@index([permissionId])
+}
+
+model Unit {
+  id            Int            @id @default(autoincrement())
+  parentId      Int?
+  path          String         @default("") @db.VarChar(512)
+  depth         Int            @default(0)
+  name          String         @unique
+  description   String?        @db.Text
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  parent        Unit?          @relation("UnitTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Unit[]         @relation("UnitTree")
+  users         User[]
+  assignedUnits AssignedUnit[]
+  jobTitles              JobTitle[]
+  lttpCommodities        LttpCommodity[]
+  lttpPriceTables        LttpPriceTable[]
+  unitEntityForksSource  UnitEntityFork[] @relation("UnitEntityForkSource")
+  unitEntityForksTarget  UnitEntityFork[] @relation("UnitEntityForkTarget")
+  dataPolicyPeriods      UnitDataPolicyPeriod[]
+  shareGrantsOwned       UnitPrivateDataShareGrant[] @relation("ShareGrantOwner")
+  shareGrantsConsumed    UnitPrivateDataShareGrant[] @relation("ShareGrantConsumer")
+  mealRosterEntries           MealRosterEntry[]
+  selectedMealRates         UnitSelectedMealRate[]
+  mealRosterDayExtraSplits  MealRosterDayExtraSplit[]
+  unitMealPeriodSplits      UnitMealPeriodSplit[]
+
+  @@index([parentId])
+  @@index([path])
+}
+
+/// Mức tiền ăn (Thông tư) được đơn vị bật dùng cho danh sách bảo đảm, nhập Excel và sổ chấm cơm.
+model UnitSelectedMealRate {
+  id                  Int               @id @default(autoincrement())
+  unitId              Int
+  mealAllowanceRateId Int
+  createdAt           DateTime          @default(now())
+  unit                Unit              @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  mealAllowanceRate   MealAllowanceRate @relation(fields: [mealAllowanceRateId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, mealAllowanceRateId])
+  @@index([unitId])
+}
+
+/// Tỉ lệ chia S/T/C theo **ngày áp dụng** (`validFrom` inclusive). Đổi tỉ lệ → bản ghi mới; dữ liệu chấm cơm ngày cũ vẫn hiển thị theo bản ghi có `validFrom` ≤ ngày đó.
+model UnitMealPeriodSplit {
+  id                  Int               @id @default(autoincrement())
+  unitId              Int
+  mealAllowanceRateId Int
+  validFrom           DateTime          @db.Date
+  /// `{ "sang", "trua", "chieu" }` (đồng), tổng = `MealAllowanceRate.mucTienAn`
+  periodAmountsJson   Json
+  createdAt           DateTime          @default(now())
+  unit                Unit              @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  mealAllowanceRate   MealAllowanceRate @relation(fields: [mealAllowanceRateId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, mealAllowanceRateId, validFrom], map: "UmPeriodSplit_uc_ujv")
+  @@index([unitId, mealAllowanceRateId])
+}
+
+/// Danh sách bảo đảm quân lương (chấm cơm) theo tháng — dữ liệu private theo đơn vị.
+model MealRosterEntry {
+  id                   Int                 @id @default(autoincrement())
+  unitId               Int
+  /// Tháng áp dụng dạng YYYY-MM
+  yearMonth            String              @db.Char(7)
+  fullName             String              @db.VarChar(255)
+  rank                 String              @db.VarChar(128)
+  /// Mức trong tập đã chọn cho đơn vị (`UnitSelectedMealRate`)
+  mealAllowanceRateId  Int
+  /// Tên đơn vị / bộ phận (trong danh sách đơn vị trực thuộc)
+  unitDisplay          String            @db.VarChar(255)
+  sortOrder            Int               @default(0)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  unit                 Unit                @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  mealAllowanceRate         MealAllowanceRate         @relation(fields: [mealAllowanceRateId], references: [id], onDelete: Restrict)
+  mealRosterDayMarks        MealRosterDayMark[]
+  mealRosterDayExtraMarks   MealRosterDayExtraMark[]
+
+  @@index([unitId, yearMonth])
+  @@index([mealAllowanceRateId])
+}
+
+/// Ô chấm cơm theo **ngày + buổi** — chỉ mức **ăn tiêu chuẩn** (null = không chấm, không lưu dòng).
+model MealRosterDayMark {
+  id                  Int                 @id @default(autoincrement())
+  mealRosterEntryId   Int
+  /// Ngày trong tháng 1–31 (theo `MealRosterEntry.yearMonth`)
+  dayOfMonth          Int
+  /// Sáng / trưa / chiều
+  mealPeriod          MealRosterMealPeriod
+  /// Chỉ `MealAllowanceRate.type = an_tieu_chuan` trong tập đã chọn cho đơn vị
+  mealAllowanceRateId Int?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  mealRosterEntry     MealRosterEntry     @relation(fields: [mealRosterEntryId], references: [id], onDelete: Cascade)
+  mealAllowanceRate   MealAllowanceRate?  @relation(fields: [mealAllowanceRateId], references: [id], onDelete: SetNull)
+
+  @@unique([mealRosterEntryId, dayOfMonth, mealPeriod], map: "MealRosterDayMark_uc_edp")
+  @@index([mealRosterEntryId])
+}
+
+/// Chấm **ăn thêm** theo **người + ngày** (cùng ngày có thể nhiều mức). Buổi nhận phần do cấu hình `MealRosterDayExtraSplit`.
+model MealRosterDayExtraMark {
+  id                  Int                 @id @default(autoincrement())
+  mealRosterEntryId   Int
+  dayOfMonth          Int
+  /// Chỉ `MealAllowanceRate.type = an_them` trong tập đã chọn
+  mealAllowanceRateId Int
+  createdAt           DateTime            @default(now())
+  mealRosterEntry     MealRosterEntry     @relation(fields: [mealRosterEntryId], references: [id], onDelete: Cascade)
+  mealAllowanceRate   MealAllowanceRate   @relation(fields: [mealAllowanceRateId], references: [id], onDelete: Restrict)
+
+  @@unique([mealRosterEntryId, dayOfMonth, mealAllowanceRateId], map: "MealRosterDayExtra_uc_edr")
+  @@index([mealRosterEntryId])
+}
+
+/// Cách **chia tiền ăn thêm** trong ngày (áp dụng chung cả danh sách): 1–3 buổi (sáng/trưa/chiều).
+model MealRosterDayExtraSplit {
+  id          Int      @id @default(autoincrement())
+  unitId      Int
+  yearMonth   String   @db.Char(7)
+  dayOfMonth  Int
+  /// Mảng JSON: ví dụ `["sang","trua","chieu"]`, `["trua","chieu"]`, `["trua"]`
+  periodsJson Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, yearMonth, dayOfMonth], map: "MealRosterDayExtraSplit_uc_udy")
+  @@index([unitId, yearMonth])
+}
+
+/// Nhóm LTTP dùng chung toàn hệ thống (do superadmin quản lý).
+model LttpFoodGroup {
+  id         Int             @id @default(autoincrement())
+  code       String          @unique @db.VarChar(64)
+  name       String          @db.VarChar(191)
+  sortOrder  Int             @default(0)
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  commodities LttpCommodity[]
+}
+
+/// Mặt hàng lương thực thực phẩm (LTTP) — theo từng đơn vị.
+model LttpCommodity {
+  id             Int             @id @default(autoincrement())
+  unitId         Int
+  groupId        Int
+  code           String          @db.VarChar(64)
+  name           String          @db.VarChar(255)
+  measureUnit    String          @db.VarChar(64)
+  conversionRate Decimal?        @db.Decimal(18, 8)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  unit           Unit            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  group          LttpFoodGroup   @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  priceRows      LttpPriceRow[]
+
+  @@unique([unitId, code])
+  @@index([unitId])
+  @@index([groupId])
+  @@map("LrtpCommodity")
+}
+
+/// Phiên bản bảng giá LTTP — một bản ghi / đơn vị / ngày áp dụng.
+model LttpPriceTable {
+  id            Int            @id @default(autoincrement())
+  unitId        Int
+  effectiveDate DateTime       @db.Date
+  note          String?        @db.VarChar(500)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  unit          Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  rows          LttpPriceRow[]
+
+  @@unique([unitId, effectiveDate])
+  @@index([unitId, effectiveDate])
+  @@map("LrtpPriceTable")
+}
+
+model LttpPriceRow {
+  id           Int             @id @default(autoincrement())
+  priceTableId Int
+  commodityId  Int
+  unitPrice    Decimal         @db.Decimal(18, 2)
+  tgsxPrice    Decimal?        @db.Decimal(18, 2)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  priceTable   LttpPriceTable  @relation(fields: [priceTableId], references: [id], onDelete: Cascade)
+  commodity    LttpCommodity   @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+
+  @@unique([priceTableId, commodityId])
+  @@index([commodityId])
+  @@map("LrtpPriceRow")
+}
+
+/// Mô tả nghiệp vụ theo **cấp** cây đơn vị (depth), do superadmin cấu hình — không gắn một Unit cụ thể.
+model UnitLevelMetadata {
+  depth       Int      @id
+  label       String?  @db.VarChar(191)
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Trần quyền theo depth: quyền hiệu lực = giao (type ∪ chức danh) ∩ tập permissionId được phép ở depth.
+model UnitLevelPermissionCap {
+  depth        Int
+  permissionId Int
+  createdAt    DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([depth, permissionId])
+  @@index([permissionId])
+}
+
+/// Chức danh trong một đơn vị; quyền gán qua JobTitlePermission (delegation từ gói quyền admin).
+model JobTitle {
+  id          Int                  @id @default(autoincrement())
+  unitId      Int
+  name        String
+  description String?              @db.Text
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  unit        Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  users       User[]
+  permissions JobTitlePermission[]
+
+  @@unique([unitId, name])
+  @@index([unitId])
+}
+
+model JobTitlePermission {
+  jobTitleId   Int
+  permissionId Int
+  assignedAt   DateTime   @default(now())
+  jobTitle     JobTitle   @relation(fields: [jobTitleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([jobTitleId, permissionId])
+  @@index([permissionId])
+}
+
+model AssignedUnit {
+  id          Int      @id @default(autoincrement())
+  unitId      Int
+  name        String
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  users       User[]
+
+  @@unique([unitId, name])
+  @@index([unitId])
+}
+
+model RefreshToken {
+  id          String    @id @default(cuid())
+  userId      Int
+  tokenHash   String    @unique
+  sessionId   String
+  userAgent   String?   @db.Text
+  ipAddress   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+}

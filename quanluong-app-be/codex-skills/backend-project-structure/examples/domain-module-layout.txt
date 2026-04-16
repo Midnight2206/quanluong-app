@@ -1,0 +1,11 @@
+modules/
+  users/
+    users.routes.js
+    controllers/
+      users.controller.js
+    services/
+      users.service.js
+    validators/
+      users.schema.js
+    mappers/
+      users.mapper.js

@@ -1,0 +1,4 @@
+version: 1
+display_name: Schedule System
+short_description: Recurring backend task scheduling and automation patterns
+default_prompt: Build or refactor a backend scheduling system for automatic recurring tasks with clear boundaries between time-based triggers, services, and BullMQ queues.

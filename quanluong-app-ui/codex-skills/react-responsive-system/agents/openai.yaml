@@ -1,0 +1,4 @@
+version: 1
+display_name: Responsive System
+short_description: Mobile-first responsive layouts and component adaptation for React
+default_prompt: Build or refactor a responsive React interface with mobile-first layout adaptation, clear breakpoint behavior, drawer-style navigation on small screens, and practical patterns for forms, tables, and dashboards across devices.

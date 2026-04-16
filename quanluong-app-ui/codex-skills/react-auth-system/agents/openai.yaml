@@ -1,0 +1,4 @@
+version: 1
+display_name: Auth System
+short_description: Authentication, session, and access-control patterns for React
+default_prompt: Build or refactor a React auth system with login/logout flows, session handling, protected routes, current-user bootstrap, and role or permission guards.

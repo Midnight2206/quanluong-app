@@ -1,0 +1,4 @@
+version: 1
+display_name: Email System
+short_description: SMTP, reusable templates, and mail workflow patterns for Express
+default_prompt: Build or refactor a Node.js Express email system in JavaScript using SMTP, centralized mail sending, reusable templates, and queue-friendly email workflows.

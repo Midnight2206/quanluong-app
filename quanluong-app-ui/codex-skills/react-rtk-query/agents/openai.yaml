@@ -1,0 +1,4 @@
+version: 1
+display_name: RTK Query
+short_description: RTK Query API, cache tag, and custom baseQuery patterns
+default_prompt: Build or update an RTK Query API layer with createApi, custom baseQuery integration, tags, and generated hooks.

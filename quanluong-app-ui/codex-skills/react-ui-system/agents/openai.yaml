@@ -1,0 +1,4 @@
+version: 1
+display_name: UI System
+short_description: Modern React UI system with reusable layers and design patterns
+default_prompt: Build or refactor a modern React UI system with reusable component layers, token-driven styling, clear page composition, and consistent design patterns.

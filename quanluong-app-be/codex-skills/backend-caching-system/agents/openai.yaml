@@ -1,0 +1,4 @@
+version: 1
+display_name: Caching System
+short_description: Redis caching, TTL, and invalidation patterns for Express backends
+default_prompt: Build or refactor backend caching in a Node.js Express app using Redis, cache-aside reads, explicit invalidation, and safe TTL policies to improve performance without breaking data correctness.

@@ -1,0 +1,26 @@
+pages/
+  users/
+    UsersListPage.jsx
+
+features/
+  users/
+    components/
+      UsersToolbar.jsx
+      UsersTable.jsx
+      UserForm.jsx
+      UserFormModal.jsx
+      DeleteUserDialog.jsx
+    hooks/
+      useUsersFilters.js
+      useUsersCrud.js
+    services/
+      usersApi.js
+    utils/
+      mapUserFormValues.js
+
+Flow:
+1. UsersListPage composes toolbar, table, pagination, and dialogs
+2. UsersTable renders list data and row actions
+3. UserForm or UserFormModal handles create and update
+4. DeleteUserDialog confirms destructive actions
+5. useUsersCrud coordinates mutation feedback and refetch behavior

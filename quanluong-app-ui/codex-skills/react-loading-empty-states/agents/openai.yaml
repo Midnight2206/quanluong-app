@@ -1,0 +1,4 @@
+version: 1
+display_name: Loading & Empty States
+short_description: Consistent loading, empty, and refresh state patterns for React
+default_prompt: Build or refactor React loading and empty states with clear separation between initial loading, background refresh, empty results, and content-ready views.

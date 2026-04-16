@@ -1,0 +1,4 @@
+version: 1
+display_name: React HTTP Client
+short_description: Shared axios client with refresh-token and session handling
+default_prompt: Build or update a shared React HTTP client with axios interceptors, refresh-token retry queue, cookie auth, and centralized session handling.

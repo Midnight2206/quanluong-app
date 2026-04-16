@@ -1,0 +1,63 @@
+prisma.config.ts
+src/
+  app/
+    app.js
+    routes.js
+  config/
+    env.js
+  modules/
+    auth/
+      auth.routes.js
+      auth.controller.js
+      auth.service.js
+      auth.validator.js
+      auth.mapper.js
+      auth.constants.js
+    users/
+      users.routes.js
+      users.controller.js
+      users.service.js
+      users.validator.js
+      users.mapper.js
+      users.constants.js
+    payroll/
+      payroll.routes.js
+      payroll.controller.js
+      payroll.service.js
+      payroll.validator.js
+      payroll.mapper.js
+      payroll.constants.js
+  infra/
+    database/
+      prisma/
+        prisma.client.js
+    cache/
+      redis.client.js
+    mail/
+      mail.client.js
+    queue/
+      bullmq.client.js
+    schedule/
+      scheduler.js
+  shared/
+    utils/
+    constants/
+  middlewares/
+    auth.middleware.js
+    permission.middleware.js
+    validate-request.middleware.js
+    request-context.middleware.js
+    error.middleware.js
+  errors/
+    app-error.js
+    error-codes.js
+  prisma/
+    schema.prisma
+    migrations/
+  server.js
+
+Notes:
+- This structure is `module-based`, not `layer-based`.
+- Prefer flat files inside each domain module for normal-sized modules.
+- Only create nested folders inside a module when the module becomes large enough to need subdomain separation.
+- Shared infrastructure stays outside `modules/`, while business code stays inside `modules/<domain>/`.

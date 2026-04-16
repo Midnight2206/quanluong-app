@@ -1,0 +1,4 @@
+version: 1
+display_name: Config System
+short_description: Centralized env loading and config normalization for Express
+default_prompt: Build or refactor backend configuration management in a Node.js Express app with centralized env loading, normalized config access, safe defaults, and clear separation between config and business logic.

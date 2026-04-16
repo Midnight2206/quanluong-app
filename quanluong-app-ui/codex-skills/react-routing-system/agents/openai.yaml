@@ -1,0 +1,4 @@
+version: 1
+display_name: Routing System
+short_description: Public, private, and protected routing with post-login redirect
+default_prompt: Build or refactor React routing with PrivateRoute, ProtectedRoute, login redirect, return-to-intended-page behavior, and permission-based route filtering.

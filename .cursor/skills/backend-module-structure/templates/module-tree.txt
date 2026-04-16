@@ -1,0 +1,17 @@
+src/
+  modules/
+    users/
+      users.routes.js
+      users.controller.js
+      users.service.js
+      users.validator.js
+      users.mapper.js
+      users.constants.js
+
+Notes:
+- `users.mapper.js` and `users.constants.js` are optional.
+- Add extra files only when the module truly needs them.
+- If the service grows too large, split by use case:
+  - `users-create.service.js`
+  - `users-update.service.js`
+  - `users-list.service.js`

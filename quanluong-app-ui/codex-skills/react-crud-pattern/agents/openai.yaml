@@ -1,0 +1,4 @@
+version: 1
+display_name: CRUD Pattern
+short_description: Consistent CRUD orchestration for React admin and business features
+default_prompt: Build or refactor a React CRUD feature with a consistent pattern for list screens, forms, pagination, loading-empty-error states, and mutation feedback.

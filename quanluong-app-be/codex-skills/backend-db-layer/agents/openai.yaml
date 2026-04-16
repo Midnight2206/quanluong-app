@@ -1,0 +1,4 @@
+version: 1
+display_name: DB Layer
+short_description: MariaDB and Prisma schema, migration, transaction, and query rules
+default_prompt: Build or refactor a backend DB layer using MariaDB and Prisma with schema-first modeling, clear migrations, transaction-safe writes, and SQL injection-safe queries.

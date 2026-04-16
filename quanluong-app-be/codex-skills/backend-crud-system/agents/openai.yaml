@@ -1,0 +1,4 @@
+version: 1
+display_name: CRUD System BE
+short_description: Unified backend CRUD with shared list contract and soft delete
+default_prompt: Build or refactor backend CRUD features with a shared listing contract, soft delete policy, PATCH for partial updates, PUT for full replacement, and consistent Prisma-backed service flow.

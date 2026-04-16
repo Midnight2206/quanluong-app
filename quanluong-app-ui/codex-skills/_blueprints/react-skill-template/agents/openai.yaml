@@ -1,0 +1,4 @@
+version: 1
+display_name: React Skill Name
+short_description: Replace with a clear one-line summary
+default_prompt: Build or update this React app concern using the conventions defined by this skill.

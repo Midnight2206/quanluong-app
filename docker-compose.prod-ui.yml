@@ -1,0 +1,46 @@
+# Production UI — Nginx reverse proxy + Next.js standalone (:80 → Next trong container).
+# Chạy cùng stack lõi:
+#   docker compose -f docker-compose.yml -f docker-compose.prod-ui.yml --env-file quanluong-app-be/.env.docker up --build
+
+name: quanluong
+
+services:
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api
+        NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
+        NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+    image: quanluong-ui:latest
+    container_name: quanluong-app-ui
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - media_data:/data/media:ro
+    depends_on:
+      app:
+        condition: service_healthy
+
+  ui-superadmin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui-superadmin
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api
+        NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
+        NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+    image: quanluong-ui-superadmin:latest
+    container_name: quanluong-app-ui-superadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - media_data:/data/media:ro
+    depends_on:
+      app:
+        condition: service_healthy

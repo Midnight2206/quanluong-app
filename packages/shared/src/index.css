@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 42 32% 97%;
+    --foreground: 222 40% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 40% 12%;
+    --primary: 171 73% 28%;
+    --primary-foreground: 48 33% 98%;
+    --secondary: 40 36% 92%;
+    --secondary-foreground: 222 35% 18%;
+    --muted: 40 18% 92%;
+    --muted-foreground: 215 14% 42%;
+    --accent: 28 85% 92%;
+    --accent-foreground: 20 70% 24%;
+    --destructive: 0 78% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 42 20% 85%;
+    --input: 42 20% 85%;
+    --ring: 171 73% 28%;
+    --radius: 1rem;
+    --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.08);
+    --shadow-md: 0 12px 28px -16px rgb(15 23 42 / 0.18);
+    --shadow-lg: 0 24px 50px -24px rgb(15 23 42 / 0.26);
+  }
+
+  html.dark {
+    --background: 214 34% 7%;
+    --foreground: 42 24% 96%;
+    --card: 214 28% 13%;
+    --card-foreground: 42 24% 96%;
+    --primary: 164 72% 66%;
+    --primary-foreground: 171 81% 10%;
+    --secondary: 214 22% 20%;
+    --secondary-foreground: 42 24% 96%;
+    --muted: 214 18% 16%;
+    --muted-foreground: 214 14% 74%;
+    --accent: 27 58% 24%;
+    --accent-foreground: 33 92% 88%;
+    --destructive: 0 68% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 19% 24%;
+    --input: 214 19% 24%;
+    --ring: 164 72% 66%;
+    --shadow-sm: 0 1px 2px 0 rgb(2 6 23 / 0.5);
+    --shadow-md: 0 14px 32px -16px rgb(2 6 23 / 0.58);
+    --shadow-lg: 0 28px 60px -28px rgb(2 6 23 / 0.7);
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top left, rgb(20 184 166 / 0.12), transparent 24rem),
+      radial-gradient(circle at top right, rgb(245 158 11 / 0.08), transparent 18rem);
+    overflow: hidden;
+  }
+
+  html.dark body {
+    background-image:
+      radial-gradient(circle at top left, rgb(45 212 191 / 0.16), transparent 22rem),
+      radial-gradient(circle at top right, rgb(249 115 22 / 0.1), transparent 18rem),
+      linear-gradient(180deg, rgb(15 23 42 / 0.32), transparent 12rem);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  #root {
+    min-height: 0;
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply min-h-0 max-h-dvh h-dvh bg-app-grid bg-[size:28px_28px];
+  }
+}

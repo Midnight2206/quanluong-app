@@ -1,0 +1,4 @@
+version: 1
+display_name: Middleware System
+short_description: Ordered Express middleware for auth, validation, and request context
+default_prompt: Build or refactor a Node.js Express middleware system with clear ordering, request context, auth and permission guards, validation boundaries, and centralized error delegation.

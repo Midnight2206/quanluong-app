@@ -1,0 +1,4 @@
+version: 1
+display_name: Service Layer
+short_description: Business orchestration, transaction, and side-effect patterns
+default_prompt: Build or refactor backend service-layer logic with clear business ownership, repository coordination, and transaction-safe orchestration.

@@ -1,0 +1,4 @@
+version: 1
+display_name: Security System
+short_description: Rate limit, CORS, Helmet, and input sanitization for Express
+default_prompt: Build or refactor backend security middleware in a Node.js Express app using rate limiting, CORS, Helmet, and request input sanitization with safe, configurable defaults.

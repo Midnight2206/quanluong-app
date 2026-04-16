@@ -1,0 +1,4 @@
+version: 1
+display_name: Error Handling
+short_description: Global errors, toast feedback, and fallback UI patterns for React
+default_prompt: Build or refactor React error handling with global policies, toast notifications, fallback UI boundaries, and clean error normalization.

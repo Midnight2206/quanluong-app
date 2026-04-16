@@ -1,0 +1,4 @@
+version: 1
+display_name: API Layer
+short_description: Domain API modules, mapping, and error normalization for React
+default_prompt: Build or refactor a React API layer with shared transport usage, endpoint modules, request-response mapping, and normalized backend contracts.

@@ -1,0 +1,140 @@
+# Stack lõi (DB, Redis, API, worker, migrate) — không gồm UI.
+# Production (Nginx + Next standalone):
+#   docker compose -f docker-compose.yml -f docker-compose.prod-ui.yml --env-file quanluong-app-be/.env.docker up --build
+# Dev (Next `next dev` trực tiếp, không Nginx):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file quanluong-app-be/.env.docker up --build
+#
+# Sau khi gộp prod-ui: :8080 main | :8081 superadmin | REST :3000 | Socket.io :3030 (SOCKET_PORT)
+
+name: quanluong
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    image: quanluong-backend:latest
+    container_name: quanluong-app-be
+    restart: unless-stopped
+    env_file:
+      - quanluong-app-be/.env.docker
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+      - "3030:3030"
+    volumes:
+      - media_data:/data/media
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    image: quanluong-backend:latest
+    container_name: quanluong-app-be-migrate
+    env_file:
+      - quanluong-app-be/.env.docker
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["npm", "run", "prisma:migrate:deploy"]
+    restart: "no"
+
+  db:
+    image: mariadb:11.4
+    container_name: quanluong-app-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
+      TZ: ${TZ}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  worker-email:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    image: quanluong-backend:latest
+    container_name: quanluong-app-be-worker-email
+    restart: unless-stopped
+    env_file:
+      - quanluong-app-be/.env.docker
+    command: ["npm", "run", "worker:email-verification"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker-media:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    image: quanluong-backend:latest
+    container_name: quanluong-app-be-worker-media
+    restart: unless-stopped
+    env_file:
+      - quanluong-app-be/.env.docker
+    command: ["npm", "run", "worker:avatar-processing"]
+    volumes:
+      - media_data:/data/media
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  redis:
+    image: redis:7-alpine
+    container_name: quanluong-app-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mariadb_data:
+  redis_data:
+  media_data:

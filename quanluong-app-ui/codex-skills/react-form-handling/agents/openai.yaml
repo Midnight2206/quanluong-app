@@ -1,0 +1,4 @@
+version: 1
+display_name: Form Handling
+short_description: React Hook Form plus Zod for maintainable form validation
+default_prompt: Build or refactor React forms with react-hook-form and Zod using schema validation, reusable field sections, and maintainable feature-scoped form structure.

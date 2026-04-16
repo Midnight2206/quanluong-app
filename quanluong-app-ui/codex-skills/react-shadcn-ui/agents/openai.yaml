@@ -1,0 +1,4 @@
+version: 1
+display_name: shadcn/ui
+short_description: Token-aware shadcn/ui components with shared dark mode rules
+default_prompt: Build or refactor shadcn/ui components that consume centralized index.css variables, avoid hard-coded visual values, and work with html.dark theme switching.

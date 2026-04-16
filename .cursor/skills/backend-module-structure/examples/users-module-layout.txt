@@ -1,0 +1,16 @@
+src/
+  modules/
+    users/
+      users.routes.js
+      users.controller.js
+      users.service.js
+      users.validator.js
+      users.mapper.js
+      users.constants.js
+
+Example wiring:
+- `users.routes.js` applies auth, permission, and validation middleware
+- `users.controller.js` calls `usersService`
+- `users.service.js` talks to Prisma and owns business rules
+- `users.validator.js` exports Zod schemas for params, query, and body
+- `users.mapper.js` formats DTOs only when response translation is needed

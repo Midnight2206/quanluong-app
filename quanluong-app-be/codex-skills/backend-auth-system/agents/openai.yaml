@@ -1,0 +1,4 @@
+version: 1
+display_name: Auth System BE
+short_description: JWT, session, cookie, and permission-aware auth for Express
+default_prompt: Build or refactor a Node.js Express auth system using JWT, session, httpOnly cookies, route permission guards, and frontend-aligned current-user payloads.

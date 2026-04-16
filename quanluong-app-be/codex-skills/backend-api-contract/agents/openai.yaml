@@ -1,0 +1,4 @@
+version: 1
+display_name: API Contract
+short_description: Backend route design, payload shape, and status code patterns
+default_prompt: Build or refactor backend API contracts with stable routes, request-response schemas, status codes, and predictable query parameters.

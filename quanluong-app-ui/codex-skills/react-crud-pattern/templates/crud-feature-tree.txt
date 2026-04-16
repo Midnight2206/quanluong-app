@@ -1,0 +1,22 @@
+features/
+  entity-name/
+    components/
+      EntityTable.jsx
+      EntityToolbar.jsx
+      EntityForm.jsx
+      EntityFormModal.jsx
+      DeleteEntityDialog.jsx
+    hooks/
+      useEntityFilters.js
+      useEntityCrud.js
+    services/
+      entityApi.js
+    store/
+      entitySelectors.js
+    utils/
+      mapEntityFormValues.js
+    index.js
+
+pages/
+  entity-name/
+    EntityListPage.jsx

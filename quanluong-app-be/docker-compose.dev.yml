@@ -1,0 +1,6 @@
+# Dev backend (mount + nodemon).
+# Chạy: docker compose -f docker-compose.dev.yml --env-file .env.docker up
+name: quanluong
+include:
+  - path: ../docker-compose.yml
+  - path: ../docker-compose.dev.yml

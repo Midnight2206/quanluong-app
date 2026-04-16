@@ -1,0 +1,4 @@
+version: 1
+display_name: Module Structure
+short_description: Per-domain module structure for Express backends
+default_prompt: Build or refactor a Node.js Express backend module in JavaScript using a clean domain-first structure with routes, controllers, services, validators, mappers, and Prisma-aware boundaries.

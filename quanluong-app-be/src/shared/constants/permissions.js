@@ -1,0 +1,43 @@
+const PERMISSIONS = {
+  USERS_READ: "users.read",
+  USERS_CREATE: "users.create",
+  USERS_PATCH: "users.patch",
+  USERS_PUT: "users.put",
+  USERS_DELETE: "users.delete",
+  USERS_DETAIL: "users.detail",
+  UNITS_READ: "units.read",
+  UNITS_DETAIL: "units.detail",
+  UNITS_CREATE: "units.create",
+  UNITS_PATCH: "units.patch",
+  UNITS_DELETE: "units.delete",
+  /** Gán quyền đọc dữ liệu private của đơn vị mình cho đơn vị cấp dưới (UnitPrivateDataShareGrant). */
+  UNITS_PRIVATE_DATA_SHARE_MANAGE: "units.privateDataShare.manage",
+  REGISTRATIONS_READ: "registrations.read",
+  REGISTRATIONS_REVIEW: "registrations.review",
+  JOB_TITLES_READ: "jobTitles.read",
+  JOB_TITLES_DETAIL: "jobTitles.detail",
+  JOB_TITLES_CREATE: "jobTitles.create",
+  JOB_TITLES_PATCH: "jobTitles.patch",
+  JOB_TITLES_DELETE: "jobTitles.delete",
+  JOB_TITLES_APPLY_DOWN: "jobTitles.applyDown",
+  UNIT_LEVEL_READ: "unitLevel.read",
+  UNIT_LEVEL_MANAGE: "unitLevel.manage",
+  UNIT_LEVEL_CAPS_READ: "unitLevelCaps.read",
+  UNIT_LEVEL_CAPS_MANAGE: "unitLevelCaps.manage",
+  PERMISSIONS_READ: "permissions.read",
+  PERMISSIONS_PATCH: "permissions.patch",
+  LTTP_COMMODITIES_READ: "lttp.commodities.read",
+  LTTP_COMMODITIES_WRITE: "lttp.commodities.write",
+  LTTP_COMMODITIES_APPLY_DOWN: "lttp.commodities.applyDown",
+  LTTP_PRICES_READ: "lttp.prices.read",
+  LTTP_PRICES_WRITE: "lttp.prices.write",
+  LTTP_PRICES_APPLY_DOWN: "lttp.prices.applyDown",
+  LTTP_GROUPS_READ: "lttp.groups.read",
+  LTTP_GROUPS_MANAGE: "lttp.groups.manage",
+  /** Danh mục mức tiền ăn công khai (Thông tư) — chỉ superadmin thao tác ghi. */
+  MEAL_ALLOWANCE_RATES_MANAGE: "mealAllowanceRates.manage",
+  /** Danh sách chấm cơm / bảo đảm quân lương theo tháng (dữ liệu private đơn vị). */
+  MEAL_ROSTER_ACCESS: "mealRoster.access",
+};
+
+export { PERMISSIONS };

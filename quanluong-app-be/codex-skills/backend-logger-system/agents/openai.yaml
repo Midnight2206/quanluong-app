@@ -1,0 +1,4 @@
+version: 1
+display_name: Logger System
+short_description: Structured logs, request context, and safe log levels for Express
+default_prompt: Build or refactor structured logging in a Node.js Express backend with centralized logger usage, request-aware context, safe log levels, and security-conscious log payloads.

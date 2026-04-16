@@ -1,0 +1,41 @@
+public/
+src/
+  app/
+    providers/
+    router/
+    store/
+    layouts/
+  layouts/
+    components/
+    DefaultLayout.jsx
+    AuthLayout.jsx
+    MainLayout.jsx
+  constants/
+  lib/
+  pages/
+    dashboard/
+    users/
+    payroll/
+  features/
+    auth/
+      authApi.js
+      authSchema.js
+      authSlice.js
+      authorization.js
+      useAuthorization.js
+  components/
+    ui/
+    common/
+  hooks/
+  hocs/
+  services/
+  utils/
+  constants/
+  assets/
+  App.jsx
+  App.css
+  index.css
+  main.jsx
+.env
+.env.local
+.env.prod

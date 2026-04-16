@@ -1,0 +1,4 @@
+version: 1
+display_name: Validation Layer
+short_description: Request schema, parsing, and normalization patterns for backend
+default_prompt: Build or refactor backend validation with request schemas, normalized DTOs, and boundary-safe parsing before service logic runs.

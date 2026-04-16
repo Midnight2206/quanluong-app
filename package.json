@@ -1,0 +1,16 @@
+{
+  "name": "quanluong-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@quanluong/web",
+    "dev:superadmin": "npm run dev --workspace=@quanluong/superadmin",
+    "build:web": "npm run build --workspace=@quanluong/web",
+    "build:superadmin": "npm run build --workspace=@quanluong/superadmin",
+    "docker:prod": "docker compose -f docker-compose.yml -f docker-compose.prod-ui.yml --env-file quanluong-app-be/.env.docker up --build",
+    "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file quanluong-app-be/.env.docker up --build"
+  }
+}

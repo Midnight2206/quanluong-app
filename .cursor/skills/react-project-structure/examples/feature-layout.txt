@@ -1,0 +1,27 @@
+features/
+  users/
+    components/
+      UserTable.jsx
+      UserToolbar.jsx
+      UserFormModal.jsx
+      UserStatusBadge.jsx
+    hooks/
+      useUsersFilters.js
+      useUsersPermissions.js
+    services/
+      usersApi.js
+    store/
+      usersSlice.js
+      usersSelectors.js
+    utils/
+      mapUserFormValues.js
+    index.js
+
+pages/
+  users/
+    UsersPage.jsx
+
+components/
+  common/
+    EmptyState.jsx
+    ConfirmDialog.jsx

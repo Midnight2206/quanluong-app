@@ -1,0 +1,4 @@
+version: 1
+display_name: Controller Layer
+short_description: Thin Express controllers that call services and return responses
+default_prompt: Build or refactor Express controllers in JavaScript so they only receive requests, call services, and send HTTP responses without business logic or direct database access.

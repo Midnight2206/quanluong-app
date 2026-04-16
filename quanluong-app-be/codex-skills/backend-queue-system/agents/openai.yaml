@@ -1,0 +1,4 @@
+version: 1
+display_name: Queue System
+short_description: Redis and BullMQ background job patterns for backend
+default_prompt: Build or refactor a backend queue system using Redis and BullMQ so long-running work runs asynchronously without blocking user requests.

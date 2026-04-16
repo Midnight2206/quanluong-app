@@ -1,0 +1,4 @@
+version: 1
+display_name: File Upload System
+short_description: Upload boundaries, validation, and safe storage for Express
+default_prompt: Build or refactor file upload handling in a Node.js Express backend with controlled upload boundaries, file validation, safe storage decisions, and queue-friendly post-upload processing.

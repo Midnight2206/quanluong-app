@@ -1,0 +1,4 @@
+version: 1
+display_name: Notify System
+short_description: Toast, notification center, and unread badge patterns for React
+default_prompt: Build or refactor a React notification system with toast feedback, persistent notifications, unread count, and clear UI/state boundaries.

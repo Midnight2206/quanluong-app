@@ -1,0 +1,4 @@
+version: 1
+display_name: Redux Toolkit
+short_description: RTK store, slice, and async thunk patterns for React
+default_prompt: Build or update a React Redux Toolkit setup with configureStore, feature slices, selectors, and createAsyncThunk where appropriate.

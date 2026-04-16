@@ -1,0 +1,4 @@
+version: 1
+display_name: React Project Structure
+short_description: Project-wide React folder architecture and component extraction rules
+default_prompt: Build or refactor a React project using a consistent folder structure, clear feature boundaries, and strict rules for splitting large or repeated components.

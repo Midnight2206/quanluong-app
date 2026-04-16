@@ -1,0 +1,4 @@
+version: 1
+display_name: Backend Skill Name
+short_description: Replace with a clear one-line summary
+default_prompt: Build or refactor this backend concern using the conventions defined by this skill.

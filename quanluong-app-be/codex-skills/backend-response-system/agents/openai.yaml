@@ -1,0 +1,4 @@
+version: 1
+display_name: Response System
+short_description: Unified backend success and error response envelopes
+default_prompt: Build or refactor backend response handling with a consistent success and error envelope, centralized serialization, and safe HTTP semantics.

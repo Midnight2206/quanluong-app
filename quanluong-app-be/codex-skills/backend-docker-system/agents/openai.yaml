@@ -1,0 +1,4 @@
+version: 1
+display_name: Docker System
+short_description: Docker and compose setup for Express, MariaDB, Redis, and Prisma
+default_prompt: Build or refactor Docker setup for a Node.js Express backend in JavaScript with Dockerfile, docker-compose, environment-driven config, and coordinated app, MariaDB, Redis, and Prisma workflows.

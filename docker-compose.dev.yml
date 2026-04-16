@@ -1,0 +1,105 @@
+# Dev: backend nodemon + UI `next dev` trực tiếp (không Nginx). Trình duyệt gọi API tại localhost:3000.
+# Chạy từ quanluong-app:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file quanluong-app-be/.env.docker up --build
+#
+# Không gộp docker-compose.prod-ui.yml — tránh hai stack UI cùng lúc.
+
+name: quanluong
+
+services:
+  app:
+    image: quanluong-backend:dev
+    build:
+      target: backend-dev
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    volumes:
+      - ./quanluong-app-be/src:/app/src
+      - ./quanluong-app-be/prisma:/app/prisma
+      - ./quanluong-app-be/prisma.config.ts:/app/prisma.config.ts
+      - media_data:/data/media
+    command: ["npm", "run", "dev"]
+
+  worker-email:
+    # Tag khác app để tránh lỗi parallel export cùng tên image; cùng Dockerfile target, layer cache tái dùng.
+    image: quanluong-backend:dev-worker
+    build:
+      target: backend-dev
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    volumes:
+      - ./quanluong-app-be/src:/app/src
+      - ./quanluong-app-be/prisma:/app/prisma
+      - ./quanluong-app-be/prisma.config.ts:/app/prisma.config.ts
+    command: ["npm", "run", "worker:email-verification:dev"]
+
+  worker-media:
+    image: quanluong-backend:dev-worker
+    build:
+      target: backend-dev
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    volumes:
+      - ./quanluong-app-be/src:/app/src
+      - ./quanluong-app-be/prisma:/app/prisma
+      - ./quanluong-app-be/prisma.config.ts:/app/prisma.config.ts
+      - media_data:/data/media
+    command: ["npm", "run", "worker:avatar-processing:dev"]
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui-dev
+    image: quanluong-ui:dev
+    container_name: quanluong-app-ui
+    restart: unless-stopped
+    ports:
+      - "8080:3000"
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api
+      API_BASE_URL_INTERNAL: http://app:3000/api
+      NEXT_PUBLIC_SOCKET_BASE_URL: http://localhost:3030
+      NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
+      NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./packages/shared:/app/packages/shared
+      - ./apps/web:/app/apps/web
+      # .next trong container — tránh bind mount + webpack cache bị race/ENOENT (vendor-chunks, *.pack.gz).
+      - ui_web_next:/app/apps/web/.next
+    command: ["npm", "run", "dev", "--workspace=@quanluong/web", "--", "-H", "0.0.0.0"]
+    depends_on:
+      app:
+        condition: service_healthy
+
+  # Cùng image `quanluong-ui:dev` với `ui` — không khai báo build ở đây để tránh Bake export trùng tag song song.
+  ui-superadmin:
+    image: quanluong-ui:dev
+    container_name: quanluong-app-ui-superadmin
+    restart: unless-stopped
+    ports:
+      - "8081:3001"
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api
+      API_BASE_URL_INTERNAL: http://app:3000/api
+      NEXT_PUBLIC_SOCKET_BASE_URL: http://localhost:3030
+      NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
+      NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./packages/shared:/app/packages/shared
+      - ./apps/superadmin:/app/apps/superadmin
+      - ui_superadmin_next:/app/apps/superadmin/.next
+    command: ["npm", "run", "dev", "--workspace=@quanluong/superadmin", "--", "-H", "0.0.0.0"]
+    depends_on:
+      app:
+        condition: service_healthy
+      ui:
+        condition: service_started
+
+volumes:
+  ui_web_next:
+  ui_superadmin_next:

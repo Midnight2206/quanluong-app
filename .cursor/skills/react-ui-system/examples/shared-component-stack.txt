@@ -1,0 +1,13 @@
+Shared UI stack:
+
+1. Primitive
+   Button, Input, Badge, Dialog
+
+2. Shared composed component
+   PageHeader, SectionCard, ToolbarRow, EmptyStateCard
+
+3. Feature-local component
+   UsersToolbar, PayrollSummaryCard, RolePermissionsTable
+
+4. Page composition
+   UsersPage, PayrollPage, RoleDetailsPage

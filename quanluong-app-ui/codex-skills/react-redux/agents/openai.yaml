@@ -1,0 +1,4 @@
+version: 1
+display_name: Redux
+short_description: Plain Redux store, reducer, action, and selector patterns
+default_prompt: Build or update React state management with Redux store, reducers, actions, selectors, and feature-oriented state boundaries.

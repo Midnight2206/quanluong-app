@@ -1,0 +1,4 @@
+version: 1
+display_name: Tailwind
+short_description: Tailwind CSS with centralized tokens and class-based dark mode
+default_prompt: Build or refactor Tailwind CSS UI with centralized variables in index.css, html.dark theme switching, and localStorage-persisted theme state.

@@ -1,0 +1,26 @@
+{
+  "name": "@quanluong/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "sideEffects": ["./src/index.css"],
+  "dependencies": {
+    "server-only": "^0.0.1"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": ">=5.0.0",
+    "next": ">=15.0.0",
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0",
+    "zustand": ">=5.0.0"
+  },
+  "exports": {
+    ".": "./src/App.jsx",
+    "./App": "./src/App.jsx",
+    "./next-auth-middleware": "./src/lib/nextAuthMiddleware.js",
+    "./superadmin-app/SuperadminApp": "./src/superadmin-app/SuperadminApp.jsx",
+    "./server-api": "./src/lib/serverApiFetch.js",
+    "./server-data/users": "./src/features/users/server/fetchUsersList.js",
+    "./server-data/register-units": "./src/features/auth/server/fetchRegisterUnits.js"
+  }
+}

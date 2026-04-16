@@ -1,0 +1,4 @@
+# Stack đầy đủ ở ../docker-compose.yml — cùng project name khi chạy từ BE hoặc từ gốc repo.
+name: quanluong
+include:
+  - path: ../docker-compose.yml

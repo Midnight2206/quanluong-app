@@ -1,0 +1,24 @@
+components/
+  ui/
+    button.jsx
+    input.jsx
+    dialog.jsx
+    badge.jsx
+    tabs.jsx
+  common/
+    PageHeader.jsx
+    SectionCard.jsx
+    ToolbarRow.jsx
+    EmptyStateCard.jsx
+    ConfirmActionDialog.jsx
+
+features/
+  users/
+    components/
+      UsersTable.jsx
+      UserFormSection.jsx
+      UserStatusBadge.jsx
+
+pages/
+  users/
+    UsersPage.jsx

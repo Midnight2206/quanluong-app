@@ -1,0 +1,5 @@
+Example usage:
+
+- add a new domain module following this backend pattern
+- refactor duplicated controller logic into the service layer
+- normalize validation and error mapping at the module boundary

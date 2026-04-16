@@ -1,0 +1,4 @@
+version: 1
+display_name: Data Layer
+short_description: Query, mutation, selector, and derived data patterns for React
+default_prompt: Build or refactor a React data layer that orchestrates server-state consumption, derived screen data, selectors, and clean boundaries between API modules and UI.

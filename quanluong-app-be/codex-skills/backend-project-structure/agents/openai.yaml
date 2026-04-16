@@ -1,0 +1,4 @@
+version: 1
+display_name: Backend Project Structure
+short_description: Layered backend folder structure and module ownership
+default_prompt: Build or refactor a backend project using clear domain modules, layered boundaries, and maintainable folder structure.

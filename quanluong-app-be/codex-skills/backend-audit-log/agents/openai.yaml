@@ -1,0 +1,4 @@
+version: 1
+display_name: Audit Log
+short_description: Audit event recording for important backend business actions
+default_prompt: Build or refactor a backend audit-log system that records important actions, actor identity, target entities, and safe payloads with transaction-aware persistence.
