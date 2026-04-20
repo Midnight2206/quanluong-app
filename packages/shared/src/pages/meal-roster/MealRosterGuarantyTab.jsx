@@ -32,6 +32,9 @@ const rankInputClass =
 const mealSelectClass =
   "w-full min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm font-semibold tabular-nums outline-none focus:border-primary sm:text-base";
 
+/** Stable empty list so `rows` is not a new [] each render when query has no data (fixes useEffect + setDrafts loop). */
+const EMPTY_MEAL_ROSTER_ROWS = [];
+
 export function MealRosterGuarantyTab({
   selectedUnitId,
   yearMonth,
@@ -67,10 +70,11 @@ export function MealRosterGuarantyTab({
     return m;
   }, [metaRates]);
 
-  const { data: rows = [], isLoading, isFetching, refetch } = useGetMealRosterQuery(
+  const { data: rosterData, isLoading, isFetching, refetch } = useGetMealRosterQuery(
     { unitId: selectedUnitId, yearMonth },
     { skip: skipQuery },
   );
+  const rows = rosterData ?? EMPTY_MEAL_ROSTER_ROWS;
 
   useEffect(() => {
     const next = {};
