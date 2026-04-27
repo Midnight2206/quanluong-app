@@ -55,13 +55,16 @@ export function useLazyGetAvatarJobQuery() {
 export function useLazyGetCurrentUserQuery() {
   const qc = useQueryClient();
   return [
-    () =>
-      withUnwrap(
+    async () => {
+      await qc.invalidateQueries({ queryKey: qk.auth.currentUser() });
+      return withUnwrap(
         qc.fetchQuery({
           queryKey: qk.auth.currentUser(),
           queryFn: fetchCurrentUser,
+          staleTime: 0,
         }),
-      ),
+      );
+    },
     { isLoading: false },
   ];
 }
