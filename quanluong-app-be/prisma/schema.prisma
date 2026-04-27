@@ -148,6 +148,10 @@ model User {
   chatGroupsCreated       ChatGroup[]
   chatGroupMembers        ChatGroupMember[]
   chatGroupMessagesSent   ChatGroupMessage[]
+  lttpIssueSlipsCreated     LttpIssueSlip[]   @relation("LttpIssueSlipCreatedBy")
+  lttpIssueSlipsAsRecipient LttpIssueSlip[] @relation("LttpIssueSlipRecipientUser")
+  lttpFormDefaultsAsDefaultRecipientUser LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultRecipientUser")
+  lttpAsDefaultForRecipientUnit          LttpRecipientUnitDefaultUser[] @relation("LttpRecipientDefaultUserUser")
 
   @@index([typeId])
   @@index([unitId])
@@ -293,7 +297,18 @@ model Unit {
   assignedUnits AssignedUnit[]
   jobTitles              JobTitle[]
   lttpCommodities        LttpCommodity[]
+  lttpSuppliers          LttpSupplier[]
   lttpPriceTables        LttpPriceTable[]
+  lttpPartnerPriceTables  LttpPartnerPriceTable[]
+  lttpPartnerDebts        LttpPartnerDebt[]
+  lttpPartnerPayments     LttpPartnerPayment[]
+  lttpPartnerPaymentTotals LttpPartnerPaymentTotal[]
+  lttpIssueSlips              LttpIssueSlip[]              @relation("LttpIssueSlipStorageUnit")
+  lttpIssueSlipsAsRecipient   LttpIssueSlip[]              @relation("LttpIssueSlipRecipientUnit")
+  lttpIssueSlipSerials        LttpIssueSlipSerial[]
+  lttpUnitIssueFormDefaults   LttpUnitIssueFormDefaults?   @relation("LttpIssueFormDefaultUnit")
+  lttpIssueFormDefaultRecip   LttpUnitIssueFormDefaults[]  @relation("LttpIssueFormDefaultRecipUnit")
+  lttpRecipientDefaultUser   LttpRecipientUnitDefaultUser? @relation("LttpRecipientDefaultRecipientUnit")
   unitEntityForksSource  UnitEntityFork[] @relation("UnitEntityForkSource")
   unitEntityForksTarget  UnitEntityFork[] @relation("UnitEntityForkTarget")
   dataPolicyPeriods      UnitDataPolicyPeriod[]
@@ -437,12 +452,151 @@ model LttpCommodity {
   updatedAt      DateTime        @updatedAt
   unit           Unit            @relation(fields: [unitId], references: [id], onDelete: Cascade)
   group          LttpFoodGroup   @relation(fields: [groupId], references: [id], onDelete: Restrict)
-  priceRows      LttpPriceRow[]
+  priceRows                      LttpPriceRow[]
+  lttpPartnerPriceRows            LttpPartnerPriceRow[]
+  issueSlipLines                 LttpIssueSlipLine[]
+  lttpCommodityDefaultSupplier  LttpCommodityDefaultSupplier?
 
   @@unique([unitId, code])
   @@index([unitId])
   @@index([groupId])
   @@map("LrtpCommodity")
+}
+
+/// Đối tác cung cấp LTTP — theo từng đơn vị (kho dữ liệu).
+model LttpSupplier {
+  id                  Int      @id @default(autoincrement())
+  unitId              Int
+  name                String   @db.VarChar(255)
+  representativeName  String   @db.VarChar(255)
+  address             String?  @db.VarChar(500)
+  businessLicenseNo   String?  @db.VarChar(64)
+  taxCode             String?  @db.VarChar(32)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  unit                        Unit                        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  lttpCommodityDefaultRows    LttpCommodityDefaultSupplier[]
+  lttpIssueSlipLines          LttpIssueSlipLine[]
+  lttpPartnerDebts            LttpPartnerDebt[]
+  lttpPartnerPayments         LttpPartnerPayment[]
+  lttpPartnerPaymentTotals    LttpPartnerPaymentTotal[]
+
+  @@index([unitId])
+}
+
+/// Đối tác cung cấp mặc định theo từng mặt hàng (bảng liên kết, cập nhật thường xuyên).
+model LttpCommodityDefaultSupplier {
+  id              Int            @id @default(autoincrement())
+  commodityId     Int            @unique
+  lttpSupplierId  Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  commodity       LttpCommodity  @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+  lttpSupplier    LttpSupplier?  @relation(fields: [lttpSupplierId], references: [id], onDelete: SetNull)
+
+  @@index([lttpSupplierId])
+  @@map("LrtpCommodityDefaultSupplier")
+}
+
+/// Phiếu xuất LTTP theo ngày (đơn vị) — dòng lưu snapshot đơn giá tại thời điểm tạo.
+model LttpIssueSlip {
+  id            Int       @id @default(autoincrement())
+  unitId        Int
+  /// Ngày trên phiếu; giá tham chiếu theo bảng giá hiệu lực tại ngày này.
+  issueDate     DateTime  @db.Date
+  note          String?   @db.VarChar(500)
+  createdById   Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  /// Đơn vị nhận LTTP (có thể trùng đơn vị kho / mặt hàng).
+  recipientUnitId Int?
+  recipientUserId Int?
+  /// Họ tên người nhận in trên phiếu (snapshot).
+  recipientDisplayName String? @db.VarChar(191)
+  /// Quyển số dạng MMYY theo `issueDate` (vd. 0426).
+  bookMmyy      String    @db.Char(4)
+  /// Số phiếu tăng dần trong (unitId kho, bookMmyy).
+  slipNo        Int
+  printLine1    String?   @db.VarChar(255)
+  printLine2    String?   @db.VarChar(128)
+  formMauSo     String?   @db.VarChar(64)
+  warehouseFrom String?   @db.VarChar(128)
+  signerWriter  String?   @db.VarChar(191)
+  signerRecipient String? @db.VarChar(191)
+  signerApprover  String? @db.VarChar(191)
+  unit          Unit   @relation("LttpIssueSlipStorageUnit", fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy     User   @relation("LttpIssueSlipCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  recipientUnit Unit?  @relation("LttpIssueSlipRecipientUnit", fields: [recipientUnitId], references: [id], onDelete: SetNull)
+  recipientUser User?  @relation("LttpIssueSlipRecipientUser", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  lines         LttpIssueSlipLine[]
+
+  @@index([unitId, issueDate])
+  @@index([unitId, bookMmyy, slipNo])
+  @@index([createdById])
+  @@index([recipientUnitId])
+}
+
+/// Số thứ tự phiếu tăng theo quyển (MMYY) từng đơn vị kho.
+model LttpIssueSlipSerial {
+  unitId     Int
+  bookMmyy  String   @db.Char(4)
+  lastSlipNo Int      @default(0)
+  updatedAt DateTime @updatedAt
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@id([unitId, bookMmyy])
+}
+
+/// User nhận mặc định theo từng **đơn vị nhận** (độc lập bảng mẫu in theo kho cấp).
+model LttpRecipientUnitDefaultUser {
+  id               Int      @id @default(autoincrement())
+  recipientUnitId  Int      @unique
+  defaultUserId    Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  recipientUnit    Unit     @relation("LttpRecipientDefaultRecipientUnit", fields: [recipientUnitId], references: [id], onDelete: Cascade)
+  user             User?    @relation("LttpRecipientDefaultUserUser", fields: [defaultUserId], references: [id], onDelete: SetNull)
+
+  @@index([defaultUserId])
+}
+
+/// Mẫu in & chữ ký mặc định theo đơn vị dữ liệu (kho) — dùng khi mở form / lưu tùy chọn.
+model LttpUnitIssueFormDefaults {
+  id                     Int      @id @default(autoincrement())
+  unitId                 Int      @unique
+  printLine1             String?  @db.VarChar(255)
+  printLine2             String?  @db.VarChar(128)
+  formMauSo              String?  @db.VarChar(64)
+  warehouseFrom          String?  @db.VarChar(128)
+  signerWriter           String?  @db.VarChar(191)
+  signerApprover         String?  @db.VarChar(191)
+  defaultRecipientUnitId Int?
+  defaultRecipientUserId Int?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  unit                   Unit  @relation("LttpIssueFormDefaultUnit", fields: [unitId], references: [id], onDelete: Cascade)
+  defaultRecipientUnit   Unit? @relation("LttpIssueFormDefaultRecipUnit", fields: [defaultRecipientUnitId], references: [id], onDelete: SetNull)
+  defaultRecipientUser   User? @relation("LttpIssueFormDefaultRecipientUser", fields: [defaultRecipientUserId], references: [id], onDelete: SetNull)
+}
+
+model LttpIssueSlipLine {
+  id          Int            @id @default(autoincrement())
+  slipId     Int
+  commodityId Int
+  /// Số lượng yêu cầu / theo nhu cầu (có thể khác thực xuất).
+  requiredQuantity Decimal?  @db.Decimal(18, 4)
+  quantity   Decimal        @db.Decimal(18, 4)
+  unitPrice  Decimal        @db.Decimal(18, 2)
+  tgsxPrice        Decimal?       @db.Decimal(18, 2)
+  /// Thành tiền = quantity × unitPrice (lưu snapshot)
+  amount           Decimal        @db.Decimal(18, 2)
+  lttpSupplierId   Int?
+  slip             LttpIssueSlip  @relation(fields: [slipId], references: [id], onDelete: Cascade)
+  commodity        LttpCommodity  @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+  lttpSupplier     LttpSupplier?  @relation(fields: [lttpSupplierId], references: [id], onDelete: SetNull)
+
+  @@index([slipId])
+  @@index([commodityId])
 }
 
 /// Phiên bản bảng giá LTTP — một bản ghi / đơn vị / ngày áp dụng.
@@ -464,17 +618,104 @@ model LttpPriceTable {
 model LttpPriceRow {
   id           Int             @id @default(autoincrement())
   priceTableId Int
-  commodityId  Int
-  unitPrice    Decimal         @db.Decimal(18, 2)
-  tgsxPrice    Decimal?        @db.Decimal(18, 2)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  priceTable   LttpPriceTable  @relation(fields: [priceTableId], references: [id], onDelete: Cascade)
-  commodity    LttpCommodity   @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+  commodityId      Int
+  unitPrice        Decimal         @db.Decimal(18, 2)
+  tgsxPrice        Decimal?        @db.Decimal(18, 2)
+  /// Giá đối tác (tùy nghiệp vụ, không hiển thị ở màn giá công khai mặc định)
+  partnerUnitPrice Decimal?        @db.Decimal(18, 2)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  priceTable       LttpPriceTable  @relation(fields: [priceTableId], references: [id], onDelete: Cascade)
+  commodity        LttpCommodity   @relation(fields: [commodityId], references: [id], onDelete: Restrict)
 
   @@unique([priceTableId, commodityId])
   @@index([commodityId])
   @@map("LrtpPriceRow")
+}
+
+/// Bảng giá đối tác tách biệt bảng giá LTTP công khai (cùng cơ chế: đơn vị + ngày hiệu lực).
+model LttpPartnerPriceTable {
+  id            Int      @id @default(autoincrement())
+  unitId        Int
+  effectiveDate DateTime @db.Date
+  note          String?  @db.VarChar(500)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  unit          Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  rows          LttpPartnerPriceRow[]
+
+  @@unique([unitId, effectiveDate])
+  @@index([unitId, effectiveDate])
+  @@map("LttpPartnerPriceTable")
+}
+
+model LttpPartnerPriceRow {
+  id                 Int     @id @default(autoincrement())
+  priceTableId      Int
+  commodityId        Int
+  /// Giá theo mặt hàng (VND) — tách bảng giá công khai
+  partnerUnitPrice  Decimal? @db.Decimal(18, 2)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  priceTable        LttpPartnerPriceTable @relation(fields: [priceTableId], references: [id], onDelete: Cascade)
+  commodity         LttpCommodity         @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+
+  @@unique([priceTableId, commodityId])
+  @@index([commodityId])
+  @@map("LttpPartnerPriceRow")
+}
+
+/// Tổng công nợ LTTP theo đối tác của một đơn vị cấp. Tổng này được đồng bộ từ phiếu xuất và bảng giá đối tác.
+model LttpPartnerDebt {
+  id                 Int      @id @default(autoincrement())
+  unitId             Int
+  lttpSupplierId     Int
+  totalDebtAmount    Decimal  @default(0) @db.Decimal(18, 2)
+  lastRecalculatedAt DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  unit               Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  lttpSupplier       LttpSupplier @relation(fields: [lttpSupplierId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, lttpSupplierId])
+  @@index([unitId])
+  @@index([lttpSupplierId])
+  @@map("LttpPartnerDebt")
+}
+
+/// Nhật ký từng lần thanh toán công nợ đối tác.
+model LttpPartnerPayment {
+  id             Int      @id @default(autoincrement())
+  unitId         Int
+  lttpSupplierId Int
+  paymentDate    DateTime @db.Date
+  amount         Decimal  @db.Decimal(18, 2)
+  note           String?  @db.VarChar(500)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  unit           Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  lttpSupplier   LttpSupplier @relation(fields: [lttpSupplierId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, lttpSupplierId, paymentDate])
+  @@index([lttpSupplierId])
+  @@map("LttpPartnerPayment")
+}
+
+/// Tổng đã thanh toán theo đối tác của một đơn vị cấp, đồng bộ từ LttpPartnerPayment.
+model LttpPartnerPaymentTotal {
+  id               Int      @id @default(autoincrement())
+  unitId           Int
+  lttpSupplierId   Int
+  totalPaidAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  unit             Unit         @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  lttpSupplier     LttpSupplier @relation(fields: [lttpSupplierId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, lttpSupplierId])
+  @@index([unitId])
+  @@index([lttpSupplierId])
+  @@map("LttpPartnerPaymentTotal")
 }
 
 /// Mô tả nghiệp vụ theo **cấp** cây đơn vị (depth), do superadmin cấu hình — không gắn một Unit cụ thể.

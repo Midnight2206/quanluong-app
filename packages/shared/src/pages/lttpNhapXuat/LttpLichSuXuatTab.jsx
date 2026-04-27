@@ -1,0 +1,410 @@
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Loader2, Printer, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { cn } from "@/utils/cn";
+import {
+  useDeleteLttpIssueSlipMutation,
+  useGetLttpIssueSlipsQuery,
+} from "@/features/lttp/api/lttpApi";
+import { useConfirm } from "@/contexts/ConfirmProvider";
+import { notifyError, notifySuccess } from "@/services/notify";
+import { formatVnd } from "@/utils/formatVnd";
+import { LttpIssueSlipPrintDocument } from "./LttpIssueSlipPrintDocument";
+
+const inputClass =
+  "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+
+function localYmd(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function firstDayOfCurrentMonthYmd() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function lastDayOfCurrentMonthYmd() {
+  const d = new Date();
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return localYmd(last);
+}
+
+const PAGE_SIZE = 20;
+const M = { t: 2, r: 1.5, b: 1.5, l: 3 };
+
+/**
+ * Lịch sử phiếu xuất theo kho (storage) + lọc + in / thu hồi / in hàng loạt.
+ */
+export function LttpLichSuXuatTab({ storageUnitId, units = [], canWrite, storageUnitName }) {
+  const { confirm } = useConfirm();
+  const [mounted, setMounted] = useState(false);
+  const [listFrom, setListFrom] = useState(() => firstDayOfCurrentMonthYmd());
+  const [listTo, setListTo] = useState(() => lastDayOfCurrentMonthYmd());
+  const [filterRecipientId, setFilterRecipientId] = useState("");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(() => new Set());
+  const [printOne, setPrintOne] = useState(null);
+  const [printBatch, setPrintBatch] = useState(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!units.length) {
+      setFilterRecipientId("");
+      return;
+    }
+    setFilterRecipientId((prev) => {
+      if (prev && units.some((u) => String(u.id) === prev)) {
+        return prev;
+      }
+      return String(units[0].id);
+    });
+  }, [units]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [storageUnitId, listFrom, listTo, filterRecipientId]);
+
+  const { data: slipsPayload, isLoading, refetch } = useGetLttpIssueSlipsQuery(
+    {
+      unitId: storageUnitId,
+      from: listFrom,
+      to: listTo,
+      recipientUnitId: filterRecipientId === "" ? undefined : filterRecipientId,
+      page,
+      pageSize: PAGE_SIZE,
+    },
+    { skip: !storageUnitId || filterRecipientId === "" },
+  );
+  const slips = slipsPayload?.items ?? [];
+  const total = slipsPayload?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE) || 1);
+
+  useEffect(() => {
+    if (!isLoading && slips.length === 0 && page > 1) {
+      setPage((p) => Math.max(1, p - 1));
+    }
+  }, [isLoading, slips.length, page]);
+
+  const [deleteSlip, { isLoading: delBusy }] = useDeleteLttpIssueSlipMutation();
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [storageUnitId, listFrom, listTo, filterRecipientId, page]);
+
+  const allIds = useMemo(() => new Set(slips.map((s) => s.id)), [slips]);
+  const allSelected = slips.length > 0 && slips.every((s) => selected.has(s.id));
+  const someSelected = slips.some((s) => selected.has(s.id));
+
+  const toggleAll = useCallback(() => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(allIds));
+    }
+  }, [allSelected, allIds]);
+
+  const toggleOne = useCallback((id) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handlePrint = useCallback((s) => {
+    setPrintBatch(null);
+    setPrintOne(s);
+  }, []);
+
+  const handlePrintMany = useCallback(() => {
+    const chosen = slips.filter((s) => selected.has(s.id));
+    if (!chosen.length) {
+      notifyError("Chọn ít nhất một phiếu.");
+      return;
+    }
+    setPrintOne(null);
+    setPrintBatch(chosen);
+  }, [slips, selected]);
+
+  useLayoutEffect(() => {
+    if (printOne == null) {
+      return undefined;
+    }
+    const t = setTimeout(() => {
+      window.print();
+    }, 100);
+    function onAfterPrint() {
+      setPrintOne(null);
+    }
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("afterprint", onAfterPrint);
+    };
+  }, [printOne]);
+
+  useLayoutEffect(() => {
+    if (printBatch == null || !printBatch.length) {
+      return undefined;
+    }
+    const t = setTimeout(() => {
+      window.print();
+    }, 100);
+    function onAfterPrint() {
+      setPrintBatch(null);
+    }
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("afterprint", onAfterPrint);
+    };
+  }, [printBatch]);
+
+  async function onRecall(s) {
+    const ok = await confirm({
+      title: "Thu hồi phiếu xuất?",
+      message: `Xóa phiếu ${s.issueDate} — quyển ${s.bookMmyy} số ${String(s.slipNo).padStart(4, "0")}.`,
+      confirmLabel: "Thu hồi",
+    });
+    if (!ok) {
+      return;
+    }
+    try {
+      await deleteSlip({ id: s.id });
+      notifySuccess("Đã thu hồi phiếu.");
+      refetch();
+    } catch (err) {
+      notifyError(err?.data?.message || err?.message || "Không thu hồi được.");
+    }
+  }
+
+  const printPortal = mounted
+    ? createPortal(
+        <>
+          <style
+            media="print"
+            dangerouslySetInnerHTML={{
+              __html: `
+          @page { margin: ${M.t}cm ${M.r}cm ${M.b}cm ${M.l}cm; }
+          @media print {
+            body * { visibility: hidden; }
+            .lttp-issue-slip-print-root, .lttp-issue-slip-print-root * { visibility: visible; }
+            .lttp-issue-slip-print-root { position: absolute; left: 0; top: 0; width: 100%; }
+          }
+        `,
+            }}
+          />
+          {printOne ? (
+            <div className="lttp-issue-slip-print-root hidden print:block print:text-black">
+              <LttpIssueSlipPrintDocument slip={printOne} breakAfter={false} />
+            </div>
+          ) : null}
+          {printBatch?.length ? (
+            <div className="lttp-issue-slip-print-root hidden print:block print:text-black">
+              {printBatch.map((s, i) => (
+                <LttpIssueSlipPrintDocument key={s.id} slip={s} breakAfter={i < printBatch.length - 1} />
+              ))}
+            </div>
+          ) : null}
+        </>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <div className="space-y-4 text-xs print:hidden">
+      {printPortal}
+
+      <p className="text-[11px] text-muted-foreground">
+        Kho cấp: <span className="font-medium text-foreground">{storageUnitName || `#${storageUnitId}`}</span> — lọc
+        phiếu xuất đã lưu.
+      </p>
+
+      <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-card/30 p-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="min-w-[9rem] space-y-0.5 text-[10px] text-muted-foreground">
+          Từ ngày
+          <input
+            type="date"
+            className={cn(inputClass, "mt-0.5 block")}
+            value={listFrom}
+            onChange={(e) => setListFrom(e.target.value)}
+          />
+        </label>
+        <label className="min-w-[9rem] space-y-0.5 text-[10px] text-muted-foreground">
+          Đến ngày
+          <input
+            type="date"
+            className={cn(inputClass, "mt-0.5 block")}
+            value={listTo}
+            onChange={(e) => setListTo(e.target.value)}
+          />
+        </label>
+        <label className="min-w-[12rem] flex-1 space-y-0.5 text-[10px] text-muted-foreground">
+          Đơn vị nhận
+          <select
+            className={cn(inputClass, "mt-0.5 block")}
+            value={filterRecipientId}
+            onChange={(e) => setFilterRecipientId(e.target.value)}
+            disabled={!units.length}
+          >
+            {units.map((u) => (
+              <option key={u.id} value={String(u.id)}>
+                {u.name ?? `Đơn vị #${u.id}`}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button type="button" variant="secondary" className="h-8 text-xs" onClick={() => refetch()}>
+          Tải lại
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <p className="text-[10px] text-muted-foreground">
+          {total} phiếu / {pageCount} trang
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-8 min-w-[5rem] text-xs"
+            disabled={page <= 1 || isLoading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Trang trước
+          </Button>
+          <span className="text-[10px] text-muted-foreground">
+            {page} / {pageCount}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-8 min-w-[5rem] text-xs"
+            disabled={page >= pageCount || isLoading}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Trang sau
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-border/60">
+        <table className="w-full min-w-[40rem] border-collapse text-left text-[11px]">
+          <thead className="bg-secondary/90">
+            <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
+              <th className="w-10 px-2 py-2">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  title="Chọn tất cả"
+                  disabled={!slips.length}
+                />
+              </th>
+              <th className="px-2 py-2">Ngày xuất</th>
+              <th className="px-2 py-2">Đơn vị nhận</th>
+              <th className="px-2 py-2">Số phiếu</th>
+              <th className="px-2 py-2 text-right">Thành tiền</th>
+              <th className="w-32 px-2 py-2 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="px-2 py-4 text-muted-foreground">
+                  <Loader2 className="mr-1 inline size-3.5 animate-spin" />
+                  Đang tải…
+                </td>
+              </tr>
+            ) : null}
+            {!isLoading && !slips.length ? (
+              <tr>
+                <td colSpan={6} className="px-2 py-4 text-muted-foreground">
+                  Không có phiếu phù hợp bộ lọc.
+                </td>
+              </tr>
+            ) : null}
+            {slips.map((s) => {
+              const total = s.lines?.reduce((a, l) => a + (Number(l.amount) || 0), 0) ?? 0;
+              const soPhieu = `Quyển ${s.bookMmyy} — Số ${String(s.slipNo).padStart(4, "0")}`;
+              return (
+                <tr key={s.id} className="border-b border-border/50">
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="checkbox"
+                      className="rounded border-border"
+                      checked={selected.has(s.id)}
+                      onChange={() => toggleOne(s.id)}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5 font-medium tabular-nums">{s.issueDate}</td>
+                  <td className="max-w-[12rem] truncate px-2 py-1.5" title={s.recipientUnit?.name ?? "—"}>
+                    {s.recipientUnit?.name ?? "—"}
+                  </td>
+                  <td className="px-2 py-1.5 font-mono text-[10px] text-muted-foreground">{soPhieu}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{formatVnd(total)}</td>
+                  <td className="px-2 py-1.5 text-right">
+                    <div className="flex flex-wrap items-center justify-end gap-0.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-0.5 px-1.5 text-[10px]"
+                        onClick={() => handlePrint(s)}
+                      >
+                        <Printer className="size-3" />
+                        In
+                      </Button>
+                      {canWrite ? (
+                        <IconButton
+                          label="Thu hồi"
+                          variant="danger"
+                          className="h-7"
+                          onClick={() => onRecall(s)}
+                          disabled={delBusy}
+                        >
+                          <RotateCcw className="size-3.5" />
+                        </IconButton>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
+        <p className="text-[10px] text-muted-foreground">
+          Đã chọn {Array.from(selected).length} trên trang này ({slips.length} / trang, {total} tổng)
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-8 gap-1.5 text-xs"
+            disabled={!someSelected}
+            onClick={handlePrintMany}
+          >
+            <Printer className="size-3.5" />
+            In tất cả phiếu đã chọn
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

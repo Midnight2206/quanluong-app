@@ -1,5 +1,5 @@
 import { AUTH_COOKIE_NAMES } from "./auth.constants.js";
-import { setAuthCookies } from "./auth.cookies.js";
+import { clearAuthCookies, setAuthCookies } from "./auth.cookies.js";
 import { mapCurrentUser } from "./auth.mapper.js";
 import {
   getCurrentUser,
@@ -32,6 +32,7 @@ import {
   buildGoogleAuthUrl,
   exchangeCodeAndLinkDrive,
   unlinkGoogleDriveForUser,
+  verifyGoogleDriveLinkForUser,
 } from "./google-drive-link.service.js";
 import { avatarPixelCropSchema } from "./auth.validator.js";
 import { config } from "../../config/config.js";
@@ -263,6 +264,8 @@ async function googleDriveCallbackController(req, res) {
         reason = "no_refresh";
       } else if (String(e.message).includes("Không tạo được thư mục")) {
         reason = "folder";
+      } else if (String(e.message).includes("quyền tạo thư mục Drive")) {
+        reason = "scope";
       } else if (String(e.message).includes("access token")) {
         reason = "token";
       }
@@ -283,14 +286,27 @@ async function googleDriveUnlinkController(req, res) {
   });
 }
 
+async function googleDriveStatusController(req, res) {
+  const user = await getCurrentUser(req.user);
+  const status = await verifyGoogleDriveLinkForUser(user.id);
+  const next = await getCurrentUser(req.user);
+  return respondSuccess(res, {
+    message:
+      status.status === "cleared"
+        ? "Folder Google Drive không còn tồn tại; đã xoá liên kết cũ."
+        : "Đã kiểm tra liên kết Google Drive.",
+    data: await mapAuthUserResponse(next),
+    meta: { googleDriveStatus: status.status },
+  });
+}
+
 async function logoutController(req, res) {
   await logout({
     req,
     refreshToken: req.cookies?.[AUTH_COOKIE_NAMES.REFRESH_TOKEN],
   });
 
-  res.clearCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN);
-  res.clearCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN);
+  clearAuthCookies(res);
 
   return respondSuccess(res, {
     message: "Logged out successfully",
@@ -448,6 +464,7 @@ export {
   googleDriveAuthorizeUrlController,
   googleDriveCallbackController,
   googleDriveStartController,
+  googleDriveStatusController,
   googleDriveUnlinkController,
   loginController,
   logoutController,

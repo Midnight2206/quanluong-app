@@ -14,22 +14,39 @@ import {
   applyLttpPriceTableToUnitController,
   createCommodityController,
   createFoodGroupController,
+  createIssueSlipController,
+  createLttpSupplierController,
   createPriceTableController,
   deleteCommodityController,
   deleteFoodGroupController,
+  deleteIssueSlipController,
+  deleteLttpSupplierController,
   deletePriceTableController,
   downloadPriceImportTemplateController,
   effectivePricesController,
   getCommodityController,
+  getIssueFormDefaultsController,
+  getIssueSlipController,
+  getNextIssueSlipSerialController,
   getPriceTableController,
+  getRecipientDefaultUserByUnitController,
   importPriceTableController,
   listCommoditiesController,
+  listLttpSuppliersController,
   listFoodGroupsCatalogController,
   listFoodGroupsController,
+  listIssueSlipsController,
   listPriceTablesController,
+  listRecipientDefaultUsersInScopeController,
+  listRecipientUsersController,
   patchCommodityController,
   patchFoodGroupController,
+  patchLttpSupplierController,
+  putLttpCommodityDefaultSupplierController,
   patchPriceTableController,
+  putIssueFormDefaultsController,
+  putRecipientDefaultUserController,
+  resolveIssueSlipLineController,
 } from "./lttp.controller.js";
 import { LTTP_ROUTE_DEFINITIONS } from "./lttp.route-definitions.js";
 import {
@@ -38,15 +55,30 @@ import {
   commodityParamsSchema,
   commodityQuerySchema,
   createCommodityBodySchema,
+  createLttpSupplierBodySchema,
   createFoodGroupBodySchema,
+  createIssueSlipBodySchema,
   createPriceTableBodySchema,
   effectiveQuerySchema,
   foodGroupIdParamsSchema,
+  issueFormDefaultsQuerySchema,
+  issueSlipIdParamsSchema,
+  issueSlipResolveQuerySchema,
+  listIssueSlipsQuerySchema,
+  listRecipientUsersQuerySchema,
+  nextIssueSlipSerialQuerySchema,
   listPriceTablesQuerySchema,
+  lttpSupplierQuerySchema,
+  putLttpCommodityDefaultSupplierBodySchema,
+  lttpSupplierParamsSchema,
   patchCommodityBodySchema,
   patchFoodGroupBodySchema,
+  patchLttpSupplierBodySchema,
   patchPriceTableBodySchema,
   priceTableParamsSchema,
+  putRecipientDefaultUserBodySchema,
+  recipientDefaultByUnitQuerySchema,
+  upsertIssueFormDefaultsBodySchema,
 } from "./lttp.validator.js";
 
 const lttpRouter = express.Router();
@@ -121,6 +153,97 @@ lttpRouter.get(
 );
 
 lttpRouter.get(
+  "/issue-slips/resolve",
+  validateRequest({ query: issueSlipResolveQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["date"] }),
+  permissionMiddleware([routePermissions.resolveIssueSlipLine]),
+  asyncHandler(resolveIssueSlipLineController),
+);
+
+lttpRouter.get(
+  "/issue-slips",
+  validateRequest({ query: listIssueSlipsQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["from", "to"] }),
+  permissionMiddleware([routePermissions.listIssueSlips]),
+  asyncHandler(listIssueSlipsController),
+);
+
+lttpRouter.post(
+  "/issue-slips",
+  validateRequest({ body: createIssueSlipBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.createIssueSlip]),
+  asyncHandler(createIssueSlipController),
+);
+
+lttpRouter.get(
+  "/issue-slips/next-serial",
+  validateRequest({ query: nextIssueSlipSerialQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["date"] }),
+  permissionMiddleware([routePermissions.nextIssueSlipSerial]),
+  asyncHandler(getNextIssueSlipSerialController),
+);
+
+lttpRouter.get(
+  "/issue-form-defaults",
+  validateRequest({ query: issueFormDefaultsQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.getIssueFormDefaults]),
+  asyncHandler(getIssueFormDefaultsController),
+);
+
+lttpRouter.put(
+  "/issue-form-defaults",
+  validateRequest({ body: upsertIssueFormDefaultsBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.putIssueFormDefaults]),
+  asyncHandler(putIssueFormDefaultsController),
+);
+
+lttpRouter.get(
+  "/recipient-users",
+  validateRequest({ query: listRecipientUsersQuerySchema }),
+  permissionMiddleware([routePermissions.listRecipientUsers]),
+  asyncHandler(listRecipientUsersController),
+);
+
+lttpRouter.get(
+  "/receiving-default-recipient",
+  validateRequest({ query: recipientDefaultByUnitQuerySchema }),
+  permissionMiddleware([routePermissions.getRecipientDefaultUser]),
+  asyncHandler(getRecipientDefaultUserByUnitController),
+);
+
+lttpRouter.get(
+  "/receiving-default-recipients",
+  permissionMiddleware([routePermissions.listRecipientDefaultUsers]),
+  asyncHandler(listRecipientDefaultUsersInScopeController),
+);
+
+lttpRouter.put(
+  "/receiving-default-recipient",
+  validateRequest({ body: putRecipientDefaultUserBodySchema }),
+  permissionMiddleware([routePermissions.putRecipientDefaultUser]),
+  asyncHandler(putRecipientDefaultUserController),
+);
+
+lttpRouter.get(
+  "/issue-slips/:id",
+  validateRequest({ params: issueSlipIdParamsSchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.getIssueSlip]),
+  asyncHandler(getIssueSlipController),
+);
+
+lttpRouter.delete(
+  "/issue-slips/:id",
+  validateRequest({ params: issueSlipIdParamsSchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.deleteIssueSlip]),
+  asyncHandler(deleteIssueSlipController),
+);
+
+lttpRouter.get(
   "/commodities",
   validateRequest({ query: commodityQuerySchema }),
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
@@ -166,12 +289,58 @@ lttpRouter.patch(
   asyncHandler(patchCommodityController),
 );
 
+lttpRouter.put(
+  "/commodities/:id/default-lttp-supplier",
+  validateRequest({
+    params: commodityParamsSchema,
+    body: putLttpCommodityDefaultSupplierBodySchema,
+  }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, recordIdParam: "id" }),
+  permissionMiddleware([routePermissions.putLttpCommodityDefaultSupplier]),
+  asyncHandler(putLttpCommodityDefaultSupplierController),
+);
+
 lttpRouter.delete(
   "/commodities/:id",
   validateRequest({ params: commodityParamsSchema }),
   unitDataScopeMiddleware({ dataKind: LTTP_COMM, recordIdParam: "id" }),
   permissionMiddleware([routePermissions.deleteCommodity]),
   asyncHandler(deleteCommodityController),
+);
+
+lttpRouter.get(
+  "/suppliers",
+  validateRequest({ query: lttpSupplierQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.listLttpSuppliers]),
+  asyncHandler(listLttpSuppliersController),
+);
+
+lttpRouter.post(
+  "/suppliers",
+  validateRequest({ body: createLttpSupplierBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.createLttpSupplier]),
+  asyncHandler(createLttpSupplierController),
+);
+
+lttpRouter.patch(
+  "/suppliers/:id",
+  validateRequest({
+    params: lttpSupplierParamsSchema,
+    body: patchLttpSupplierBodySchema,
+  }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, recordIdParam: "id" }),
+  permissionMiddleware([routePermissions.patchLttpSupplier]),
+  asyncHandler(patchLttpSupplierController),
+);
+
+lttpRouter.delete(
+  "/suppliers/:id",
+  validateRequest({ params: lttpSupplierParamsSchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, recordIdParam: "id" }),
+  permissionMiddleware([routePermissions.deleteLttpSupplier]),
+  asyncHandler(deleteLttpSupplierController),
 );
 
 lttpRouter.get(

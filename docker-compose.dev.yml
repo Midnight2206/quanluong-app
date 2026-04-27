@@ -13,6 +13,8 @@ services:
       target: backend-dev
       args:
         DATABASE_URL: ${DATABASE_URL}
+    environment:
+      MIDNIGHT_SECRET_PASSWORD: ${MIDNIGHT_SECRET_PASSWORD}
     volumes:
       - ./quanluong-app-be/src:/app/src
       - ./quanluong-app-be/prisma:/app/prisma
@@ -60,6 +62,7 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api
       API_BASE_URL_INTERNAL: http://app:3000/api
+      MIDNIGHT_SECRET_PASSWORD: ${MIDNIGHT_SECRET_PASSWORD}
       NEXT_PUBLIC_SOCKET_BASE_URL: http://localhost:3030
       NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
       NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
@@ -85,6 +88,7 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api
       API_BASE_URL_INTERNAL: http://app:3000/api
+      MIDNIGHT_SECRET_PASSWORD: ${MIDNIGHT_SECRET_PASSWORD}
       NEXT_PUBLIC_SOCKET_BASE_URL: http://localhost:3030
       NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
       NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}

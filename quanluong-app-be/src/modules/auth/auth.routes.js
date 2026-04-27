@@ -11,6 +11,7 @@ import {
   googleDriveAuthorizeUrlController,
   googleDriveCallbackController,
   googleDriveStartController,
+  googleDriveStatusController,
   googleDriveUnlinkController,
   loginController,
   logoutController,
@@ -47,6 +48,7 @@ authRouter.get(
   asyncHandler(googleDriveAuthorizeUrlController),
 );
 authRouter.get("/google/drive/callback", asyncHandler(googleDriveCallbackController));
+authRouter.get("/google/drive/status", authMiddleware, asyncHandler(googleDriveStatusController));
 authRouter.delete("/google/drive", authMiddleware, asyncHandler(googleDriveUnlinkController));
 authRouter.post(
   "/register",

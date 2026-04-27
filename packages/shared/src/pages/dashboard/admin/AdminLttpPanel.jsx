@@ -19,10 +19,13 @@ import {
   useCreateLttpCommodityMutation,
   useCreateLttpFoodGroupMutation,
   useCreateLttpPriceTableMutation,
+  useCreateLttpSupplierMutation,
   useDeleteLttpCommodityMutation,
   useDeleteLttpFoodGroupMutation,
   useDeleteLttpPriceTableMutation,
+  useDeleteLttpSupplierMutation,
   useGetLttpCommoditiesQuery,
+  useGetLttpSuppliersQuery,
   useGetLttpEffectivePricesQuery,
   useGetLttpFoodGroupsCatalogQuery,
   useGetLttpFoodGroupsQuery,
@@ -30,6 +33,8 @@ import {
   useImportLttpPriceTableMutation,
   usePatchLttpCommodityMutation,
   usePatchLttpFoodGroupMutation,
+  usePatchLttpSupplierMutation,
+  usePutLttpCommodityDefaultSupplierMutation,
 } from "@/features/lttp/api/lttpApi";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { DASHBOARD_LTTP_SUB_ACCESS_KEY } from "@/features/route-access/routeAccessRegistry";
@@ -157,6 +162,10 @@ export function AdminLttpPanel({
     skip: !selectedUnitId || !canCRead,
   });
   const commodities = commoditiesData ?? RTK_EMPTY_ARRAY;
+  const { data: suppliersData, isLoading: supLoad } = useGetLttpSuppliersQuery(selectedUnitId, {
+    skip: !selectedUnitId || !canCRead,
+  });
+  const suppliers = suppliersData ?? RTK_EMPTY_ARRAY;
   const { data: priceTablesData, isLoading: tLoad } = useGetLttpPriceTablesQuery(
     { unitId: selectedUnitId },
     { skip: !selectedUnitId || !canPRead },
@@ -180,6 +189,10 @@ export function AdminLttpPanel({
   const [createFoodGroup] = useCreateLttpFoodGroupMutation();
   const [patchFoodGroup] = usePatchLttpFoodGroupMutation();
   const [deleteFoodGroup] = useDeleteLttpFoodGroupMutation();
+  const [createSupplier] = useCreateLttpSupplierMutation();
+  const [patchSupplier] = usePatchLttpSupplierMutation();
+  const [deleteSupplier] = useDeleteLttpSupplierMutation();
+  const [putLttpCommodityDefault] = usePutLttpCommodityDefaultSupplierMutation();
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
   const [newDvt, setNewDvt] = useState("kg");
@@ -196,6 +209,24 @@ export function AdminLttpPanel({
 
   const [fgCode, setFgCode] = useState("");
   const [fgName, setFgName] = useState("");
+
+  const [newSupName, setNewSupName] = useState("");
+  const [newSupRep, setNewSupRep] = useState("");
+  const [newSupAddr, setNewSupAddr] = useState("");
+  const [newSupGpkd, setNewSupGpkd] = useState("");
+  const [newSupTax, setNewSupTax] = useState("");
+
+  const [supEditId, setSupEditId] = useState(null);
+  const [editSupName, setEditSupName] = useState("");
+  const [editSupRep, setEditSupRep] = useState("");
+  const [editSupAddr, setEditSupAddr] = useState("");
+  const [editSupGpkd, setEditSupGpkd] = useState("");
+  const [editSupTax, setEditSupTax] = useState("");
+
+  const editingSupplier = useMemo(
+    () => suppliers.find((s) => s.id === supEditId) ?? null,
+    [suppliers, supEditId],
+  );
 
   const newGroupCode = useMemo(() => {
     if (!newGroupId) {
@@ -218,6 +249,16 @@ export function AdminLttpPanel({
     [commodities, editId],
   );
 
+  /** Giá đang hiệu lực tại `effectiveDate` — dùng cột «hiện tại» ở tab Cập nhật bảng giá. */
+  const effectivePriceByCommodityId = useMemo(() => {
+    const items = effectiveData?.items || [];
+    const m = new Map();
+    for (const row of items) {
+      m.set(row.commodity.id, { unitPrice: row.unitPrice, tgsxPrice: row.tgsxPrice });
+    }
+    return m;
+  }, [effectiveData?.items]);
+
   useEffect(() => {
     if (!editId || !canCWrite) {
       return undefined;
@@ -230,6 +271,19 @@ export function AdminLttpPanel({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [editId, canCWrite]);
+
+  useEffect(() => {
+    if (!supEditId || !canCWrite) {
+      return undefined;
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        setSupEditId(null);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [supEditId, canCWrite]);
 
   useEffect(() => {
     if (newGroupCode === OTHER_CODE) {
@@ -347,6 +401,87 @@ export function AdminLttpPanel({
     if (!ok) return;
     try {
       await deleteCommodity({ id: c.id, unitId: selectedUnitId }).unwrap();
+      notifySuccess("Đã xóa.");
+    } catch (err) {
+      notifyError(err?.data?.message || "Không xóa được.");
+    }
+  }
+
+  function toOptNull(s) {
+    const t = String(s ?? "").trim();
+    return t ? t : null;
+  }
+
+  function openSupEdit(s) {
+    setSupEditId(s.id);
+    setEditSupName(s.name);
+    setEditSupRep(s.representativeName);
+    setEditSupAddr(s.address ?? "");
+    setEditSupGpkd(s.businessLicenseNo ?? "");
+    setEditSupTax(s.taxCode ?? "");
+  }
+
+  async function onAddSupplier(e) {
+    e.preventDefault();
+    if (!selectedUnitId || !newSupName.trim() || !newSupRep.trim()) {
+      notifyError("Nhập tên đối tác và tên người đại diện.");
+      return;
+    }
+    try {
+      await createSupplier({
+        unitId: selectedUnitId,
+        name: newSupName.trim(),
+        representativeName: newSupRep.trim(),
+        address: toOptNull(newSupAddr),
+        businessLicenseNo: toOptNull(newSupGpkd),
+        taxCode: toOptNull(newSupTax),
+      }).unwrap();
+      notifySuccess("Đã thêm đối tác.");
+      setNewSupName("");
+      setNewSupRep("");
+      setNewSupAddr("");
+      setNewSupGpkd("");
+      setNewSupTax("");
+    } catch (err) {
+      notifyError(err?.data?.message || "Không tạo được.");
+    }
+  }
+
+  async function onSaveSupEdit(e) {
+    e.preventDefault();
+    if (!supEditId || !selectedUnitId) return;
+    if (!editSupName.trim() || !editSupRep.trim()) {
+      notifyError("Tên đối tác và tên người đại diện không được để trống.");
+      return;
+    }
+    try {
+      await patchSupplier({
+        id: supEditId,
+        body: {
+          name: editSupName.trim(),
+          representativeName: editSupRep.trim(),
+          address: toOptNull(editSupAddr),
+          businessLicenseNo: toOptNull(editSupGpkd),
+          taxCode: toOptNull(editSupTax),
+        },
+      }).unwrap();
+      notifySuccess("Đã cập nhật đối tác.");
+      setSupEditId(null);
+    } catch (err) {
+      notifyError(err?.data?.message || "Không lưu được.");
+    }
+  }
+
+  async function onDeleteSupplier(s) {
+    const ok = await confirm({
+      title: "Xóa đối tác cung cấp",
+      message: `Xóa «${s.name}»?`,
+      confirmLabel: "Xóa",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await deleteSupplier({ id: s.id }).unwrap();
       notifySuccess("Đã xóa.");
     } catch (err) {
       notifyError(err?.data?.message || "Không xóa được.");
@@ -526,6 +661,7 @@ export function AdminLttpPanel({
       [
         { id: "food-groups", label: "Nhóm LTTP", show: canManageLttpGroups },
         { id: "commodities", label: "Mặt hàng", show: canCRead && !groupsOnly },
+        { id: "suppliers", label: "Đối tác cung cấp", show: canCRead && !groupsOnly },
         { id: "tables", label: "Lịch sử bảng giá", show: canPRead && !groupsOnly },
         { id: "effective", label: "Giá theo ngày", show: canPRead && !groupsOnly },
         { id: "newtable", label: "Cập nhật bảng giá", show: canPRead && canPWrite && !groupsOnly },
@@ -710,7 +846,8 @@ export function AdminLttpPanel({
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     Áp mặt hàng xuống <span className="font-medium text-foreground">nhiều</span> đơn vị cấp dưới (dùng chung
                     nguồn với đơn vị cha): tab{" "}
-                    <span className="font-medium text-foreground">Đồng bộ đơn vị con</span> trên bảng điều khiển.
+                    <span className="font-medium text-foreground">Đồng bộ đơn vị con</span> trên bảng điều khiển. Đối tác
+                    mặc định (phiếu xuất) cấu hình từng dòng; chọn xong lưu ngay.
                   </p>
                   {canCWrite ? (
                     <form
@@ -763,7 +900,7 @@ export function AdminLttpPanel({
                   ) : null}
                   {cLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
                   <div className="rounded-lg border border-border/60">
-                    <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+                    <table className="w-full min-w-[880px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="border-b border-border bg-secondary/40 text-[10px] uppercase text-muted-foreground">
                           <th className="px-2 py-1.5">Mã</th>
@@ -771,6 +908,7 @@ export function AdminLttpPanel({
                           <th className="px-2 py-1.5">ĐVT</th>
                           <th className="px-2 py-1.5">Nhóm</th>
                           <th className="px-2 py-1.5">Tỉ lệ QĐ</th>
+                          <th className="px-2 py-1.5">Đối tác mặc định</th>
                           <th className="px-2 py-1.5">HT</th>
                           <th className="px-2 py-1.5 text-right">Thao tác</th>
                         </tr>
@@ -788,6 +926,37 @@ export function AdminLttpPanel({
                               ) : null}
                             </td>
                             <td className="px-2 py-1 tabular-nums">{c.conversionRate ?? "—"}</td>
+                            <td className="min-w-[10rem] px-1 py-1">
+                              {canCWrite ? (
+                                <select
+                                  className={cn(inputClass, "py-1.5 text-[10px]")}
+                                  value={c.defaultLttpSupplier?.id != null ? String(c.defaultLttpSupplier.id) : ""}
+                                  onChange={async (e) => {
+                                    const v = e.target.value;
+                                    try {
+                                      await putLttpCommodityDefault({
+                                        id: c.id,
+                                        lttpSupplierId: v === "" ? null : Number(v),
+                                      }).unwrap();
+                                      notifySuccess("Đã cập nhật đối tác mặc định cho mặt hàng.");
+                                    } catch (err) {
+                                      notifyError(err?.data?.message || "Không lưu được.");
+                                    }
+                                  }}
+                                >
+                                  <option value="">—</option>
+                                  {suppliers.map((s) => (
+                                    <option key={s.id} value={String(s.id)}>
+                                      {s.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground" title={c.defaultLttpSupplier?.name ?? ""}>
+                                  {c.defaultLttpSupplier?.name ?? "—"}
+                                </span>
+                              )}
+                            </td>
                             <td className="px-2 py-1">{c.isActive ? "✓" : "—"}</td>
                             <td className="px-2 py-1 text-right">
                               {canCWrite ? (
@@ -806,6 +975,111 @@ export function AdminLttpPanel({
                       </tbody>
                     </table>
                   </div>
+                </div>
+              ) : null}
+
+              {sub === "suppliers" && canCRead ? (
+                <div className="space-y-3">
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Danh sách đối tác cung cấp theo <span className="font-medium text-foreground">đơn vị đang chọn</span> — mỗi
+                    đơn vị quản lý riêng.
+                  </p>
+                  {canCWrite ? (
+                    <form
+                      onSubmit={onAddSupplier}
+                      className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card/50 p-2"
+                    >
+                      <label className="min-w-[9rem] flex-1">
+                        <span className="text-[10px] text-muted-foreground">Tên đối tác *</span>
+                        <input
+                          className={inputClass}
+                          value={newSupName}
+                          onChange={(e) => setNewSupName(e.target.value)}
+                          autoComplete="organization"
+                        />
+                      </label>
+                      <label className="min-w-[9rem] flex-1">
+                        <span className="text-[10px] text-muted-foreground">Người đại diện *</span>
+                        <input
+                          className={inputClass}
+                          value={newSupRep}
+                          onChange={(e) => setNewSupRep(e.target.value)}
+                          autoComplete="name"
+                        />
+                      </label>
+                      <label className="min-w-[10rem] flex-[1.2]">
+                        <span className="text-[10px] text-muted-foreground">Địa chỉ</span>
+                        <input
+                          className={inputClass}
+                          value={newSupAddr}
+                          onChange={(e) => setNewSupAddr(e.target.value)}
+                        />
+                      </label>
+                      <label className="w-28 sm:w-32">
+                        <span className="text-[10px] text-muted-foreground">Số GPKD</span>
+                        <input
+                          className={inputClass}
+                          value={newSupGpkd}
+                          onChange={(e) => setNewSupGpkd(e.target.value)}
+                        />
+                      </label>
+                      <label className="w-28 sm:w-32">
+                        <span className="text-[10px] text-muted-foreground">Mã số thuế</span>
+                        <input
+                          className={inputClass}
+                          value={newSupTax}
+                          onChange={(e) => setNewSupTax(e.target.value)}
+                        />
+                      </label>
+                      <Button type="submit" className="h-8 gap-1 text-xs">
+                        <Plus className="size-3.5" aria-hidden />
+                        Thêm
+                      </Button>
+                    </form>
+                  ) : null}
+                  {supLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
+                  <div className="rounded-lg border border-border/60">
+                    <table className="w-full min-w-[640px] border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-secondary/40 text-[10px] uppercase text-muted-foreground">
+                          <th className="px-2 py-1.5">ID</th>
+                          <th className="px-2 py-1.5">Tên đối tác</th>
+                          <th className="px-2 py-1.5">Người đại diện</th>
+                          <th className="px-2 py-1.5">Địa chỉ</th>
+                          <th className="px-2 py-1.5">GPKD</th>
+                          <th className="px-2 py-1.5">MST</th>
+                          <th className="px-2 py-1.5 text-right">Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {suppliers.map((s) => (
+                          <tr key={s.id} className="border-b border-border/50">
+                            <td className="px-2 py-1 font-mono text-[10px] tabular-nums">{s.id}</td>
+                            <td className="px-2 py-1">{s.name}</td>
+                            <td className="px-2 py-1">{s.representativeName}</td>
+                            <td className="px-2 py-1 text-muted-foreground">{s.address || "—"}</td>
+                            <td className="px-2 py-1 text-muted-foreground">{s.businessLicenseNo || "—"}</td>
+                            <td className="px-2 py-1 text-muted-foreground">{s.taxCode || "—"}</td>
+                            <td className="px-2 py-1 text-right">
+                              {canCWrite ? (
+                                <div className="flex justify-end gap-1">
+                                  <IconButton label="Sửa" variant="surface" onClick={() => openSupEdit(s)}>
+                                    <Pencil aria-hidden />
+                                  </IconButton>
+                                  <IconButton label="Xóa" variant="danger" onClick={() => onDeleteSupplier(s)}>
+                                    <Trash2 aria-hidden />
+                                  </IconButton>
+                                </div>
+                              ) : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {!suppliers.length && !supLoad ? (
+                    <p className="text-xs text-muted-foreground">Chưa có đối tác nào.</p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -925,6 +1199,15 @@ export function AdminLttpPanel({
                       Ngày áp dụng
                       <input type="date" className={cn(inputClass, "mt-0.5 block")} value={ptDate} onChange={(e) => setPtDate(e.target.value)} />
                     </label>
+                    <label className="text-xs">
+                      Ngày tham chiếu (giá hiện tại)
+                      <input
+                        type="date"
+                        className={cn(inputClass, "mt-0.5 block")}
+                        value={effectiveDate}
+                        onChange={(e) => setEffectiveDate(e.target.value)}
+                      />
+                    </label>
                     <label className="min-w-[12rem] flex-1 text-xs">
                       Ghi chú
                       <input className={cn(inputClass, "mt-0.5 block")} value={ptNote} onChange={(e) => setPtNote(e.target.value)} />
@@ -935,20 +1218,30 @@ export function AdminLttpPanel({
                     </Button>
                   </div>
                   <div className="rounded-lg border border-border/60">
-                    <table className="w-full min-w-[640px] border-collapse text-left text-[11px]">
+                    <table className="w-full min-w-[56rem] border-collapse text-left text-[11px]">
                       <thead className="sticky top-0 bg-secondary/90">
                         <tr className="border-b border-border text-[10px] uppercase text-muted-foreground">
                           <th className="px-2 py-1.5">Mã</th>
                           <th className="px-2 py-1.5">Tên</th>
-                          <th className="px-2 py-1.5">Đơn giá (VNĐ)</th>
-                          <th className="px-2 py-1.5">TGSX (VNĐ)</th>
+                          <th className="px-2 py-1.5 text-right">Đơn giá hiện tại</th>
+                          <th className="px-2 py-1.5 text-right">TGSX hiện tại</th>
+                          <th className="px-2 py-1.5">Đơn giá mới (VNĐ)</th>
+                          <th className="px-2 py-1.5">TGSX mới (VNĐ)</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {ptRows.map((r, i) => (
+                        {ptRows.map((r, i) => {
+                          const cur = effectivePriceByCommodityId.get(r.commodityId);
+                          return (
                           <tr key={r.commodityId} className="border-b border-border/50">
                             <td className="px-2 py-1 font-mono text-[10px]">{r.code}</td>
                             <td className="px-2 py-1">{r.name}</td>
+                            <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-muted-foreground">
+                              {cur != null && cur.unitPrice != null ? formatVnd(cur.unitPrice) : "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-muted-foreground">
+                              {cur != null && cur.tgsxPrice != null ? formatVnd(cur.tgsxPrice) : "—"}
+                            </td>
                             <td className="px-2 py-1">
                               <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
                                 <input
@@ -992,7 +1285,8 @@ export function AdminLttpPanel({
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1131,6 +1425,82 @@ export function AdminLttpPanel({
                           Lưu
                         </Button>
                         <Button type="button" variant="ghost" className="h-8 text-xs" onClick={() => setEditId(null)}>
+                          Huỷ
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              ) : null}
+
+              {supEditId && canCWrite && editingSupplier ? (
+                <div
+                  className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+                  role="presentation"
+                >
+                  <button
+                    type="button"
+                    className="absolute inset-0 bg-background/80 backdrop-blur-[1px]"
+                    aria-label="Đóng"
+                    onClick={() => setSupEditId(null)}
+                  />
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="lttp-edit-supplier-title"
+                    className="relative flex max-h-[min(92dvh,40rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+                  >
+                    <div className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">
+                      <p
+                        id="lttp-edit-supplier-title"
+                        className="text-[10px] font-semibold uppercase tracking-wide text-primary"
+                      >
+                        Sửa đối tác cung cấp
+                      </p>
+                      <p className="font-mono text-sm font-medium text-foreground">ID #{editingSupplier.id}</p>
+                    </div>
+                    <form
+                      onSubmit={onSaveSupEdit}
+                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"
+                    >
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <label className="sm:col-span-2">
+                          <span className="text-[10px] text-muted-foreground">Tên đối tác *</span>
+                          <input
+                            className={inputClass}
+                            value={editSupName}
+                            onChange={(e) => setEditSupName(e.target.value)}
+                            autoComplete="organization"
+                          />
+                        </label>
+                        <label className="sm:col-span-2">
+                          <span className="text-[10px] text-muted-foreground">Người đại diện *</span>
+                          <input
+                            className={inputClass}
+                            value={editSupRep}
+                            onChange={(e) => setEditSupRep(e.target.value)}
+                            autoComplete="name"
+                          />
+                        </label>
+                        <label className="sm:col-span-2">
+                          <span className="text-[10px] text-muted-foreground">Địa chỉ</span>
+                          <input className={inputClass} value={editSupAddr} onChange={(e) => setEditSupAddr(e.target.value)} />
+                        </label>
+                        <label>
+                          <span className="text-[10px] text-muted-foreground">Số GPKD</span>
+                          <input className={inputClass} value={editSupGpkd} onChange={(e) => setEditSupGpkd(e.target.value)} />
+                        </label>
+                        <label>
+                          <span className="text-[10px] text-muted-foreground">Mã số thuế</span>
+                          <input className={inputClass} value={editSupTax} onChange={(e) => setEditSupTax(e.target.value)} />
+                        </label>
+                      </div>
+                      <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-3">
+                        <Button type="submit" className="h-8 gap-1 text-xs">
+                          <Save className="size-3.5" aria-hidden />
+                          Lưu
+                        </Button>
+                        <Button type="button" variant="ghost" className="h-8 text-xs" onClick={() => setSupEditId(null)}>
                           Huỷ
                         </Button>
                       </div>

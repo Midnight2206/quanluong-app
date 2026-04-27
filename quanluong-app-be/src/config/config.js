@@ -27,6 +27,8 @@ const config = {
     refreshTokenCookieName: env.refreshTokenCookieName,
     accessTokenExpiresIn: env.accessTokenExpiresIn,
     refreshTokenExpiresDays: env.refreshTokenExpiresDays,
+    /** @type {string | undefined} */
+    cookieDomain: env.cookieDomain,
     permissionSyncOnBoot: env.permissionSyncOnBoot,
     runSuperadminBootstrap: env.runSuperadminBootstrap,
     superadminEmail: env.superadminEmail,

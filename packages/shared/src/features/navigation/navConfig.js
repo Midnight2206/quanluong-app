@@ -1,4 +1,4 @@
-import { Home, LayoutDashboard, Soup, Users } from "lucide-react";
+import { Home, LayoutDashboard, Soup, Users, Warehouse } from "lucide-react";
 import { getMainAppOrigin, getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 /**
@@ -7,7 +7,19 @@ import { getMainAppOrigin, getSuperadminAppOrigin } from "@/utils/superadminPort
  */
 export const mainNavItems = [
   { to: "/", label: "Trang chủ", icon: Home },
-  { to: "/dashboard", label: "Bảng điều khiển", icon: LayoutDashboard },
+  {
+    to: "/dashboard/units",
+    label: "Bảng điều khiển",
+    icon: LayoutDashboard,
+    /** Mọi route `/dashboard/...` vẫn tính là đang ở mục này (sáng tab sidebar). */
+    activePathPrefix: "/dashboard",
+  },
+  {
+    to: "/lttp-nhap-xuat",
+    label: "Nhập xuất LTTP",
+    icon: Warehouse,
+    routeAccessKey: "nav-lttp-nhap-xuat",
+  },
   {
     to: "/users",
     label: "Người dùng",
@@ -35,6 +47,12 @@ export const superadminNavItems = [
     external: true,
   },
   {
+    to: "/lttp-nhap-xuat",
+    label: "Nhập xuất LTTP",
+    icon: Warehouse,
+    routeAccessKey: "nav-lttp-nhap-xuat",
+  },
+  {
     to: "/users",
     label: "Người dùng",
     icon: Users,
@@ -53,7 +71,18 @@ export const superadminNavItems = [
  */
 export const superadminPortalNavItems = [
   { to: `${getMainAppOrigin()}/`, label: "Ứng dụng chính", icon: Home, external: true },
-  { to: "/dashboard", label: "Quản trị hệ thống", icon: LayoutDashboard },
+  {
+    to: "/dashboard/units",
+    label: "Quản trị hệ thống",
+    icon: LayoutDashboard,
+    activePathPrefix: "/dashboard",
+  },
+  {
+    to: "/lttp-nhap-xuat",
+    label: "Nhập xuất LTTP",
+    icon: Warehouse,
+    routeAccessKey: "nav-lttp-nhap-xuat",
+  },
   {
     to: "/users",
     label: "Người dùng",

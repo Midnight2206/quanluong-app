@@ -24,6 +24,9 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    environment:
+      API_BASE_URL_INTERNAL: http://app:3000/api
+      MIDNIGHT_SECRET_PASSWORD: ${MIDNIGHT_SECRET_PASSWORD}
 
   ui-superadmin:
     build:
@@ -44,3 +47,6 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    environment:
+      API_BASE_URL_INTERNAL: http://app:3000/api
+      MIDNIGHT_SECRET_PASSWORD: ${MIDNIGHT_SECRET_PASSWORD}

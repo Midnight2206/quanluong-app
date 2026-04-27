@@ -40,6 +40,7 @@ const priceRowSchema = z.object({
   commodityId: z.coerce.number().int().positive(),
   unitPrice: z.coerce.number().finite(),
   tgsxPrice: z.coerce.number().finite().optional().nullable(),
+  partnerUnitPrice: z.coerce.number().finite().optional().nullable(),
 });
 
 const createPriceTableBodySchema = z.object({
@@ -133,6 +134,127 @@ const applyLttpPriceTableToUnitBodySchema = z
     }
   });
 
+const issueSlipLineInputSchema = z.object({
+  commodityId: z.coerce.number().int().positive(),
+  requiredQuantity: z.coerce.number().finite().nonnegative().nullable().optional(),
+  quantity: z.coerce.number().finite().positive(),
+  lttpSupplierId: z.coerce.number().int().positive(),
+});
+
+const createIssueSlipBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+  note: z.string().max(500).optional().nullable(),
+  lines: z.array(issueSlipLineInputSchema).min(1).max(500),
+  recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
+  recipientUserId: z.coerce.number().int().positive().optional().nullable(),
+  recipientDisplayName: z.string().max(191).optional().nullable(),
+  printLine1: z.string().max(255).optional().nullable(),
+  printLine2: z.string().max(128).optional().nullable(),
+  formMauSo: z.string().max(64).optional().nullable(),
+  warehouseFrom: z.string().max(128).optional().nullable(),
+  signerWriter: z.string().max(191).optional().nullable(),
+  signerRecipient: z.string().max(191).optional().nullable(),
+  signerApprover: z.string().max(191).optional().nullable(),
+});
+
+const listIssueSlipsQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  from: z
+    .preprocess(
+      (v) => (v === "" || v === undefined || v === null ? undefined : v),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
+    )
+    .optional(),
+  to: z
+    .preprocess(
+      (v) => (v === "" || v === undefined || v === null ? undefined : v),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
+    )
+    .optional(),
+  recipientUnitId: z
+    .preprocess(
+      (v) => (v === "" || v === undefined || v === null ? undefined : v),
+      z.coerce.number().int().positive().optional(),
+    )
+    .optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const issueSlipResolveQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+  code: z.string().min(1).max(64),
+});
+
+const issueSlipIdParamsSchema = z.object({
+  id: idParam,
+});
+
+const nextIssueSlipSerialQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+});
+
+const issueFormDefaultsQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+});
+
+const upsertIssueFormDefaultsBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  printLine1: z.string().max(255).optional().nullable(),
+  printLine2: z.string().max(128).optional().nullable(),
+  formMauSo: z.string().max(64).optional().nullable(),
+  warehouseFrom: z.string().max(128).optional().nullable(),
+  signerWriter: z.string().max(191).optional().nullable(),
+  signerApprover: z.string().max(191).optional().nullable(),
+  defaultRecipientUnitId: z.coerce.number().int().positive().optional().nullable(),
+  defaultRecipientUserId: z.coerce.number().int().positive().optional().nullable(),
+});
+
+const listRecipientUsersQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+});
+
+const recipientDefaultByUnitQuerySchema = z.object({
+  recipientUnitId: z.coerce.number().int().positive(),
+});
+
+const putRecipientDefaultUserBodySchema = z.object({
+  recipientUnitId: z.coerce.number().int().positive(),
+  userId: z.coerce.number().int().positive().optional().nullable(),
+});
+
+const lttpSupplierQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+});
+
+const putLttpCommodityDefaultSupplierBodySchema = z.object({
+  lttpSupplierId: z.coerce.number().int().positive().optional().nullable(),
+});
+
+const lttpSupplierParamsSchema = z.object({
+  id: idParam,
+});
+
+const createLttpSupplierBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  name: z.string().min(1).max(255),
+  representativeName: z.string().min(1).max(255),
+  address: z.string().max(500).optional().nullable(),
+  businessLicenseNo: z.string().max(64).optional().nullable(),
+  taxCode: z.string().max(32).optional().nullable(),
+});
+
+const patchLttpSupplierBodySchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  representativeName: z.string().min(1).max(255).optional(),
+  address: z.string().max(500).optional().nullable(),
+  businessLicenseNo: z.string().max(64).optional().nullable(),
+  taxCode: z.string().max(32).optional().nullable(),
+});
+
 export {
   applyLttpPriceTableToUnitBodySchema,
   applyLttpToUnitBodySchema,
@@ -140,12 +262,27 @@ export {
   commodityQuerySchema,
   createCommodityBodySchema,
   createFoodGroupBodySchema,
+  createIssueSlipBodySchema,
   createPriceTableBodySchema,
   effectiveQuerySchema,
+  issueSlipIdParamsSchema,
+  issueFormDefaultsQuerySchema,
+  issueSlipResolveQuerySchema,
+  listIssueSlipsQuerySchema,
+  lttpSupplierQuerySchema,
+  putLttpCommodityDefaultSupplierBodySchema,
+  lttpSupplierParamsSchema,
+  createLttpSupplierBodySchema,
+  patchLttpSupplierBodySchema,
+  listRecipientUsersQuerySchema,
+  nextIssueSlipSerialQuerySchema,
   listPriceTablesQuerySchema,
   patchCommodityBodySchema,
   patchFoodGroupBodySchema,
   patchPriceTableBodySchema,
   foodGroupIdParamsSchema,
   priceTableParamsSchema,
+  putRecipientDefaultUserBodySchema,
+  recipientDefaultByUnitQuerySchema,
+  upsertIssueFormDefaultsBodySchema,
 };

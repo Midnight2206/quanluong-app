@@ -6,13 +6,26 @@ import { GuardedNavLink } from "@/hocs/GuardedNavLink";
 import { useRouteDecision } from "@/features/route-access/routeAccessHooks";
 import { cn } from "@/utils/cn";
 
+/** Khớp route với mục sidebar (hỗ trợ `activePathPrefix` khi `to` là entry hẹp, ví dụ `/dashboard/units`). */
+function navItemPathMatches(item, pathname) {
+  if (item.activePathPrefix) {
+    return pathname === item.activePathPrefix || pathname.startsWith(`${item.activePathPrefix}/`);
+  }
+  if (pathname === item.to) {
+    return true;
+  }
+  if (item.to !== "/" && pathname.startsWith(`${item.to}/`)) {
+    return true;
+  }
+  return false;
+}
+
 function SidebarExternalLink({ item, pathname, afterNav, classNameBuilder }) {
   const decision = useRouteDecision(item.routeAccessKey);
   if (item.routeAccessKey && decision === "forbidden") {
     return null;
   }
-  const active =
-    pathname === item.to || (item.to !== "/" && pathname.startsWith(`${item.to}/`));
+  const active = navItemPathMatches(item, pathname);
   return (
     <a
       href={item.to}
@@ -41,10 +54,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
         <nav className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 py-4" aria-label="Điều hướng chính">
           {items.map((item) => {
             const classNameBuilder = ({ isActive }) => {
-              const active =
-                pathname === item.to ||
-                (item.to !== "/" && pathname.startsWith(`${item.to}/`)) ||
-                isActive;
+              const active = navItemPathMatches(item, pathname) || isActive;
               return cn(
                 "flex flex-col items-center gap-2 rounded-2xl px-2 py-3 text-[11px] font-medium transition",
                 active
@@ -68,7 +78,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
                 key={item.to}
                 routeAccessKey={item.routeAccessKey}
                 href={item.to}
-                end={item.to === "/"}
+                end={item.to === "/" || Boolean(item.activePathPrefix)}
                 onClick={afterNav}
                 className={classNameBuilder}
               >
@@ -86,10 +96,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
       >
         {items.map((item) => {
           const classNameBuilder = ({ isActive }) => {
-            const active =
-              pathname === item.to ||
-              (item.to !== "/" && pathname.startsWith(`${item.to}/`)) ||
-              isActive;
+            const active = navItemPathMatches(item, pathname) || isActive;
             return cn(
               "flex min-h-[3.35rem] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1 text-[10px] font-medium leading-tight transition touch-manipulation sm:text-[11px]",
               active
@@ -113,7 +120,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
               key={item.to}
               routeAccessKey={item.routeAccessKey}
               href={item.to}
-              end={item.to === "/"}
+              end={item.to === "/" || Boolean(item.activePathPrefix)}
               onClick={afterNav}
               className={classNameBuilder}
             >

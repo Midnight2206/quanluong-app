@@ -2,6 +2,7 @@
 export const DASHBOARD_LTTP_SUB_PATHS = [
   "food-groups",
   "commodities",
+  "suppliers",
   "tables",
   "effective",
   "newtable",
@@ -38,5 +39,4 @@ export const DASHBOARD_TAB_META = [
     nestedUnder: "lttp",
     routeAccessKey: "dashboard-lttp",
   },
- 
 ];

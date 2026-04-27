@@ -59,6 +59,18 @@ const env = {
     return t || "15m";
   })(),
   refreshTokenExpiresDays: envPositiveIntDays(process.env.REFRESH_TOKEN_EXPIRES_DAYS, 30),
+  /**
+   * Domain chung cho cookie httpOnly (vd. `.example.com`) khi UI app và superadmin là hai subdomain
+   * cùng gọi API — trình duyệt mới gửi `ql.at` / `ql.rt` / `ql.sid` giữa các host con.
+   * Để trống = host-only (mỗi origin một bộ cookie). Dev `:8080` / `:8081` không share được qua biến này.
+   */
+  cookieDomain: (() => {
+    const raw = process.env.COOKIE_DOMAIN;
+    if (raw == null || String(raw).trim() === "") {
+      return undefined;
+    }
+    return String(raw).trim();
+  })(),
   permissionSyncOnBoot: process.env.PERMISSION_SYNC_ON_BOOT !== "false",
   /** Chỉ chạy khi bật rõ ràng — tránh bootstrap superadmin lặp lại / phụ thuộc mặc định yếu. */
   runSuperadminBootstrap: process.env.RUN_SUPERADMIN_BOOTSTRAP === "true",

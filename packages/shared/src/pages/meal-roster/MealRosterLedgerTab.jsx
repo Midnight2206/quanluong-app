@@ -37,6 +37,9 @@ import {
 const inputClass =
   "w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
 
+/** Tham chiếu ổn định — `?? []` trong render tạo mảng mới mỗi lần → useMemo/useEffect phụ thuộc mảng bị lặp vô hạn. */
+const EMPTY_ARRAY = [];
+
 function buildCellTitle({
   periodId,
   periodLabel,
@@ -411,8 +414,8 @@ export function MealRosterLedgerTab({
     { unitId: selectedUnitId, yearMonth },
     { skip: !selectedUnitId || !canAccess || !yearMonth },
   );
-  const standardRates = meta?.rates ?? [];
-  const extraRates = meta?.ratesExtra ?? [];
+  const standardRates = meta?.rates ?? EMPTY_ARRAY;
+  const extraRates = meta?.ratesExtra ?? EMPTY_ARRAY;
   const needsMealRateSelection = Boolean(meta?.needsMealRateSelection);
 
   const standardRateIds = useMemo(() => standardRates.map((r) => r.id), [standardRates]);
@@ -430,18 +433,19 @@ export function MealRosterLedgerTab({
     return m;
   }, [standardRates, extraRates]);
 
-  const { data: rows = [], isLoading: loadingRows } = useGetMealRosterQuery(
+  const { data: rowsData, isLoading: loadingRows } = useGetMealRosterQuery(
     { unitId: selectedUnitId, yearMonth },
     { skip: skipBase },
   );
+  const rows = rowsData ?? EMPTY_ARRAY;
 
   const { data: marksPayload, isFetching: loadingMarks } = useGetMealRosterDayMarksQuery(
     { unitId: selectedUnitId, yearMonth },
     { skip: skipBase },
   );
-  const marksFromApi = marksPayload?.marks ?? [];
-  const extraMarksFromApi = marksPayload?.extraMarks ?? [];
-  const extraSplitsFromApi = marksPayload?.extraSplits ?? [];
+  const marksFromApi = marksPayload?.marks ?? EMPTY_ARRAY;
+  const extraMarksFromApi = marksPayload?.extraMarks ?? EMPTY_ARRAY;
+  const extraSplitsFromApi = marksPayload?.extraSplits ?? EMPTY_ARRAY;
 
   /** @type {Record<string, number>} */
   const [localStandard, setLocalStandard] = useState({});

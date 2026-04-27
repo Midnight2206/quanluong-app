@@ -40,6 +40,16 @@ export function useGetLttpCommoditiesQuery(unitId, options = {}) {
   });
 }
 
+export function useGetLttpSuppliersQuery(unitId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.suppliers(unitId),
+    queryFn: () => apiRequest({ url: "/lttp/suppliers", method: "get", params: { unitId } }),
+    enabled: skip !== true && unitId != null && unitId !== "",
+    ...rest,
+  });
+}
+
 export function useGetLttpEffectivePricesQuery(arg, options = {}) {
   const { unitId, date } = arg || {};
   const { skip, ...rest } = options;
@@ -160,6 +170,46 @@ export function useDeleteLttpCommodityMutation() {
   });
 }
 
+export function useCreateLttpSupplierMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) => apiRequest({ url: "/lttp/suppliers", method: "post", data: body }),
+    onSuccess: () => invalidateLttpData(qc),
+  });
+}
+
+export function usePatchLttpSupplierMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, body }) =>
+      apiRequest({ url: `/lttp/suppliers/${id}`, method: "patch", data: body }),
+    onSuccess: () => invalidateLttpData(qc),
+  });
+}
+
+export function useDeleteLttpSupplierMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id }) => apiRequest({ url: `/lttp/suppliers/${id}`, method: "delete" }),
+    onSuccess: () => invalidateLttpData(qc),
+  });
+}
+
+export function usePutLttpCommodityDefaultSupplierMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, lttpSupplierId }) =>
+      apiRequest({
+        url: `/lttp/commodities/${id}/default-lttp-supplier`,
+        method: "put",
+        data: { lttpSupplierId },
+      }),
+    onSuccess: () => {
+      invalidateLttpData(qc);
+    },
+  });
+}
+
 export function useApplyLttpCommodityToUnitMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
@@ -231,6 +281,137 @@ export function useImportLttpPriceTableMutation() {
       }
       return apiRequest({ url: "/lttp/price-tables/import", method: "post", data: fd });
     },
+    onSuccess: () => invalidateLttpData(qc),
+  });
+}
+
+export function useGetLttpIssueFormDefaultsQuery(unitId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.issueFormDefaults(unitId),
+    queryFn: () =>
+      apiRequest({ url: "/lttp/issue-form-defaults", method: "get", params: { unitId } }),
+    enabled: skip !== true && unitId != null && unitId !== "",
+    ...rest,
+  });
+}
+
+export function usePutLttpIssueFormDefaultsMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) => apiRequest({ url: "/lttp/issue-form-defaults", method: "put", data: body }),
+    onSuccess: () => {
+      invalidateLttpData(qc);
+    },
+  });
+}
+
+export function useGetLttpNextIssueSlipSerialQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.nextIssueSlipSerial(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp/issue-slips/next-serial",
+        method: "get",
+        params: { unitId, date },
+      }),
+    enabled: Boolean(
+      skip !== true && unitId != null && unitId !== "" && date && String(date).trim() !== "",
+    ),
+    ...rest,
+  });
+}
+
+export function useGetLttpRecipientUsersQuery(recipientUnitId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.recipientUsers(recipientUnitId),
+    queryFn: () =>
+      apiRequest({ url: "/lttp/recipient-users", method: "get", params: { unitId: recipientUnitId } }),
+    enabled: skip !== true && recipientUnitId != null && recipientUnitId !== "",
+    ...rest,
+  });
+}
+
+/** User mặc định theo **đơn vị nhận** (bảng riêng, không theo kho cấp). */
+export function useGetLttpReceivingDefaultRecipientQuery(recipientUnitId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.receivingDefaultRecipient(recipientUnitId),
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp/receiving-default-recipient",
+        method: "get",
+        params: { recipientUnitId },
+      }),
+    enabled: skip !== true && recipientUnitId != null && recipientUnitId !== "",
+    staleTime: 30 * 1000,
+    ...rest,
+  });
+}
+
+export function useGetLttpReceivingDefaultRecipientsListQuery(options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.receivingDefaultRecipientsList(),
+    queryFn: () => apiRequest({ url: "/lttp/receiving-default-recipients", method: "get" }),
+    enabled: skip !== true,
+    staleTime: 30 * 1000,
+    ...rest,
+  });
+}
+
+export function usePutLttpReceivingDefaultRecipientMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) => apiRequest({ url: "/lttp/receiving-default-recipient", method: "put", data: body }),
+    onSuccess: () => {
+      invalidateLttpData(qc);
+      qc.invalidateQueries({ queryKey: qk.lttp.receivingDefaultRecipientsList() });
+      qc.invalidateQueries({ queryKey: ["lttp", "receivingDefaultRecipient"] });
+    },
+  });
+}
+
+export function useGetLttpIssueSlipsQuery(arg, options = {}) {
+  const { unitId, from, to, recipientUnitId, page = 1, pageSize = 20 } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.issueSlips(unitId, from, to, recipientUnitId, page, pageSize),
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp/issue-slips",
+        method: "get",
+        params: {
+          unitId,
+          from,
+          to,
+          page,
+          pageSize,
+          ...(recipientUnitId != null && recipientUnitId !== ""
+            ? { recipientUnitId: Number(recipientUnitId) }
+            : {}),
+        },
+      }),
+    enabled: skip !== true && unitId != null && unitId !== "",
+    ...rest,
+  });
+}
+
+export function useCreateLttpIssueSlipMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) => apiRequest({ url: "/lttp/issue-slips", method: "post", data: body }),
+    onSuccess: () => invalidateLttpData(qc),
+  });
+}
+
+export function useDeleteLttpIssueSlipMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id }) => apiRequest({ url: `/lttp/issue-slips/${id}`, method: "delete" }),
     onSuccess: () => invalidateLttpData(qc),
   });
 }

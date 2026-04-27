@@ -123,7 +123,7 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
   }
 
   return (
-    <section className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-y-contain">
+    <section className="space-y-6">
       <div>
         <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
           Người dùng

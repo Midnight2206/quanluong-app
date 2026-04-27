@@ -181,6 +181,19 @@ export function useUnlinkGoogleDriveMutation() {
   });
 }
 
+export function useCheckGoogleDriveLinkMutation() {
+  const qc = useQueryClient();
+  return useAuthMutation({
+    mutationFn: () => apiRequest({ url: "/auth/google/drive/status", method: "get" }),
+    onSuccess: (data) => {
+      if (data?.id != null) {
+        useAuthStore.getState().setAuthState({ user: data, permissions: mapPermissionsFromUser(data) });
+      }
+      qc.invalidateQueries({ queryKey: qk.auth.currentUser() });
+    },
+  });
+}
+
 export function useUploadAvatarMutation() {
   const qc = useQueryClient();
   return useAuthMutation({

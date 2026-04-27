@@ -90,6 +90,8 @@ function createApp(options = {}) {
       sameSite: "lax",
       secure: config.app.isProduction,
       maxAge: 7 * 24 * 60 * 60 * 1000,
+      path: "/",
+      ...(config.auth.cookieDomain ? { domain: config.auth.cookieDomain } : {}),
     },
   };
   if (sessionStore) {

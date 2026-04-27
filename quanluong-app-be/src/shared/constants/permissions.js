@@ -34,6 +34,8 @@ const PERMISSIONS = {
   LTTP_PRICES_APPLY_DOWN: "lttp.prices.applyDown",
   LTTP_GROUPS_READ: "lttp.groups.read",
   LTTP_GROUPS_MANAGE: "lttp.groups.manage",
+  LTTP_ISSUE_SLIPS_READ: "lttp.issue-slips.read",
+  LTTP_ISSUE_SLIPS_WRITE: "lttp.issue-slips.write",
   /** Danh mục mức tiền ăn công khai (Thông tư) — chỉ superadmin thao tác ghi. */
   MEAL_ALLOWANCE_RATES_MANAGE: "mealAllowanceRates.manage",
   /** Danh sách chấm cơm / bảo đảm quân lương theo tháng (dữ liệu private đơn vị). */

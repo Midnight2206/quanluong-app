@@ -31,7 +31,15 @@ const dashboardCard = "space-y-2 !p-3 sm:!p-4";
 const linkCardClass =
   "flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition hover:bg-secondary sm:text-sm";
 
-const LTTP_SUB_ORDER = ["food-groups", "commodities", "tables", "effective", "newtable", "import"];
+const LTTP_SUB_ORDER = [
+  "food-groups",
+  "commodities",
+  "suppliers",
+  "tables",
+  "effective",
+  "newtable",
+  "import",
+];
 
 /** Khôi phục tab dashboard cấp 1 đã lưu (mặc định «units»). */
 export function DashboardIndexRedirect() {
@@ -39,8 +47,9 @@ export function DashboardIndexRedirect() {
 
   useEffect(() => {
     const raw = readRawPersistedNavTab("dashboard.primary");
-    const safe =
-      raw && /^[a-z0-9-]+$/.test(raw) && raw.length <= 64 ? raw : "units";
+    const isValid = raw && /^[a-z0-9-]+$/.test(raw) && raw.length <= 64;
+    // Vào `/dashboard` gốc: không khôi phục thẳng tab «Bảng giá LTTP» (lttp) — tránh nhầm với màn Nhập xuất LTTP trên menu.
+    const safe = isValid && raw !== "lttp" ? raw : "units";
     startNavigationIntent();
     router.replace(`/dashboard/${safe}`);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- một lần khi mount; router không đưa vào deps
@@ -168,6 +177,7 @@ export function DashboardLttpIndexRedirect() {
     const show = {
       "food-groups": canManageLttpGroups,
       commodities: canCRead,
+      suppliers: canCRead,
       tables: canPRead,
       effective: canPRead,
       newtable: canPRead && canPWrite,

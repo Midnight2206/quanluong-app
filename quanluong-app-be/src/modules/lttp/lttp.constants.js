@@ -9,6 +9,8 @@ const LTTP_PERMISSIONS = {
   PRICES_APPLY_DOWN: "lttp.prices.applyDown",
   GROUPS_READ: "lttp.groups.read",
   GROUPS_MANAGE: "lttp.groups.manage",
+  ISSUE_SLIPS_READ: "lttp.issue-slips.read",
+  ISSUE_SLIPS_WRITE: "lttp.issue-slips.write",
 };
 
 const LTTP_OTHER_GROUP_CODE = "other";

@@ -36,7 +36,7 @@ function hasSessionCookie(request, accessName, refreshName) {
  * Quyền chi tiết / superadmin vẫn do `PrivateRoute`, `SuperadminOnlyRoute`, `RouteApiGuard` xử lý.
  */
 export function createAuthMiddleware(options = {}) {
-  const { redirectAuthenticatedFromAuthForms = true } = options;
+  const { redirectAuthenticatedFromAuthForms = false } = options;
 
   return function authMiddleware(request) {
     const { pathname } = request.nextUrl;

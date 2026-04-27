@@ -51,6 +51,10 @@ export const ROUTE_ACCESS_RULES = {
     description: "LTTP — mặt hàng",
     requiredPermissions: [PERMISSIONS.LTTP_COMMODITIES_READ],
   },
+  "dashboard-lttp-suppliers": {
+    description: "LTTP — đối tác cung cấp",
+    requiredPermissions: [PERMISSIONS.LTTP_COMMODITIES_READ],
+  },
   "dashboard-lttp-price-tables": {
     description: "LTTP — bảng giá",
     requiredPermissions: [PERMISSIONS.LTTP_PRICES_READ],
@@ -58,6 +62,10 @@ export const ROUTE_ACCESS_RULES = {
   "dashboard-lttp-effective": {
     description: "LTTP — giá theo ngày",
     requiredPermissions: [PERMISSIONS.LTTP_PRICES_READ],
+  },
+  "nav-lttp-nhap-xuat": {
+    description: "Trang Nhập xuất LTTP — phiếu xuất, in theo mẫu",
+    requiredPermissions: [PERMISSIONS.LTTP_ISSUE_SLIPS_READ],
   },
   "dashboard-lttp-groups": {
     description: "Nhóm LTTP toàn cục",
@@ -99,6 +107,7 @@ export const ROUTE_ACCESS_KEYS = Object.freeze(Object.keys(ROUTE_ACCESS_RULES));
 export const DASHBOARD_LTTP_SUB_ACCESS_KEY = Object.freeze({
   "food-groups": "dashboard-lttp-food-groups",
   commodities: "dashboard-lttp-commodities",
+  suppliers: "dashboard-lttp-suppliers",
   tables: "dashboard-lttp-price-tables",
   effective: "dashboard-lttp-effective",
   newtable: "dashboard-lttp-price-tables",

@@ -8,21 +8,38 @@ import {
   buildPriceImportTemplateBuffer,
   createCommodity,
   createFoodGroup,
+  createIssueSlip,
+  createLttpSupplier,
   createPriceTable,
   deleteCommodity,
   deleteFoodGroup,
+  deleteIssueSlip,
+  deleteLttpSupplier,
   deletePriceTable,
   getCommodityById,
   getEffectivePrices,
+  putLttpCommodityDefaultSupplier,
+  getIssueFormDefaults,
+  getIssueSlipById,
+  getRecipientDefaultUserByUnit,
+  getNextIssueSlipSerial,
   getPriceTableById,
   importPriceTableFromExcel,
   listCommodities,
+  listLttpSuppliers,
   listFoodGroupsCatalog,
   listFoodGroupsForSelect,
+  listIssueSlips,
   listPriceTables,
+  listRecipientDefaultUsersInScope,
+  listRecipientUsers,
   patchCommodity,
   patchFoodGroup,
+  patchLttpSupplier,
   patchPriceTable,
+  putRecipientDefaultUser,
+  resolveIssueSlipLine,
+  upsertIssueFormDefaults,
 } from "./lttp.service.js";
 
 const importBodySchema = z.object({
@@ -81,6 +98,72 @@ async function listCommoditiesController(req, res) {
   return respondSuccess(res, {
     message: "Đã tải danh sách mặt hàng",
     data: rows,
+  });
+}
+
+async function listLttpSuppliersController(req, res) {
+  const rows = await listLttpSuppliers(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã tải danh sách đối tác cung cấp",
+    data: rows,
+  });
+}
+
+async function putLttpCommodityDefaultSupplierController(req, res) {
+  const data = await putLttpCommodityDefaultSupplier(
+    { commodityId: req.validatedParams.id, ...req.validatedBody },
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã cập nhật đối tác mặc định theo mặt hàng",
+    data,
+  });
+}
+
+async function createLttpSupplierController(req, res) {
+  const row = await createLttpSupplier(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondCreated(res, {
+    message: "Đã tạo đối tác",
+    data: row,
+  });
+}
+
+async function patchLttpSupplierController(req, res) {
+  const row = await patchLttpSupplier(
+    req.validatedParams.id,
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã cập nhật đối tác",
+    data: row,
+  });
+}
+
+async function deleteLttpSupplierController(req, res) {
+  await deleteLttpSupplier(
+    req.validatedParams.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã xóa đối tác",
+    data: null,
   });
 }
 
@@ -330,25 +413,170 @@ async function downloadPriceImportTemplateController(req, res) {
   res.send(buffer);
 }
 
+async function listIssueSlipsController(req, res) {
+  const data = await listIssueSlips(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã tải danh sách phiếu xuất",
+    data,
+  });
+}
+
+async function resolveIssueSlipLineController(req, res) {
+  const data = await resolveIssueSlipLine(
+    { unitId: req.validatedQuery.unitId, date: req.validatedQuery.date, code: req.validatedQuery.code },
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã tra mã mặt hàng & giá",
+    data,
+  });
+}
+
+async function getIssueSlipController(req, res) {
+  const row = await getIssueSlipById(
+    req.validatedParams.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã tải phiếu xuất",
+    data: row,
+  });
+}
+
+async function createIssueSlipController(req, res) {
+  const row = await createIssueSlip(
+    req.validatedBody,
+    req.user.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondCreated(res, {
+    message: "Đã lưu phiếu xuất",
+    data: row,
+  });
+}
+
+async function deleteIssueSlipController(req, res) {
+  await deleteIssueSlip(
+    req.validatedParams.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã xóa phiếu xuất",
+    data: null,
+  });
+}
+
+async function getNextIssueSlipSerialController(req, res) {
+  const data = await getNextIssueSlipSerial(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Số dự kiến (quyển theo tháng/năm)", data });
+}
+
+async function getIssueFormDefaultsController(req, res) {
+  const data = await getIssueFormDefaults(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Cấu hình mẫu in", data });
+}
+
+async function putIssueFormDefaultsController(req, res) {
+  const data = await upsertIssueFormDefaults(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã lưu mẫu in", data });
+}
+
+async function listRecipientUsersController(req, res) {
+  const data = await listRecipientUsers(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+  );
+  return respondSuccess(res, { message: "Danh sách user theo đơn vị", data });
+}
+
+async function getRecipientDefaultUserByUnitController(req, res) {
+  const data = await getRecipientDefaultUserByUnit(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+  );
+  return respondSuccess(res, { message: "Người nhận mặc định theo đơn vị nhận", data });
+}
+
+async function listRecipientDefaultUsersInScopeController(req, res) {
+  const data = await listRecipientDefaultUsersInScope(req.effectiveUnitIds);
+  return respondSuccess(res, { message: "Danh sách cấu hình theo đơn vị nhận", data });
+}
+
+async function putRecipientDefaultUserController(req, res) {
+  const data = await putRecipientDefaultUser(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+  );
+  return respondSuccess(res, { message: "Đã lưu người nhận mặc định theo đơn vị nhận", data });
+}
+
 export {
   applyLttpCommodityToUnitController,
   applyLttpPriceTableToUnitController,
   createCommodityController,
   createFoodGroupController,
+  createIssueSlipController,
   createPriceTableController,
   deleteCommodityController,
   deleteFoodGroupController,
+  deleteIssueSlipController,
   deletePriceTableController,
   downloadPriceImportTemplateController,
   effectivePricesController,
   getCommodityController,
+  putLttpCommodityDefaultSupplierController,
+  getIssueFormDefaultsController,
+  getRecipientDefaultUserByUnitController,
+  getIssueSlipController,
+  getNextIssueSlipSerialController,
   getPriceTableController,
   importPriceTableController,
   listCommoditiesController,
+  listLttpSuppliersController,
+  createLttpSupplierController,
+  patchLttpSupplierController,
+  deleteLttpSupplierController,
   listFoodGroupsCatalogController,
   listFoodGroupsController,
+  listIssueSlipsController,
   listPriceTablesController,
+  listRecipientDefaultUsersInScopeController,
+  listRecipientUsersController,
   patchCommodityController,
   patchFoodGroupController,
   patchPriceTableController,
+  putIssueFormDefaultsController,
+  putRecipientDefaultUserController,
+  resolveIssueSlipLineController,
 };

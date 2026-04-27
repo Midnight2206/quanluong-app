@@ -169,6 +169,16 @@ const PERMISSION_CATALOG_VI = {
     name: "Quản lý nhóm mặt hàng LTTP",
     description: "Thêm, sửa, ngưng dùng nhóm LTTP toàn hệ thống (chỉ superadmin).",
   },
+  "lttp.issue-slips.read": {
+    name: "Xem phiếu xuất LTTP",
+    description:
+      "Xem danh sách và chi tiết phiếu xuất lương thực thực phẩm theo ngày; tra mã mặt hàng cùng đơn giá tham chiếu theo bảng giá hiệu lực tại ngày (trong phạm vi đơn vị dữ liệu và nhánh đơn vị).",
+  },
+  "lttp.issue-slips.write": {
+    name: "Lập & xóa phiếu xuất LTTP",
+    description:
+      "Tạo phiếu xuất theo ngày (dòng hàng lưu snapshot giá) và xóa phiếu; chỉ dùng khi cần ghi sổ xuất theo đơn vị (khác với quản lý bảng giá).",
+  },
   "mealAllowanceRates.manage": {
     name: "Quản lý mức tiền ăn (Thông tư)",
     description:

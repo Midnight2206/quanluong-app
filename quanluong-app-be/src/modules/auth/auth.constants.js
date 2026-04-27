@@ -11,12 +11,15 @@ const refreshDays =
     ? config.auth.refreshTokenExpiresDays
     : 30;
 
+const cookieDomainOpts = config.auth.cookieDomain ? { domain: config.auth.cookieDomain } : {};
+
 const ACCESS_TOKEN_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax",
   secure: config.app.isProduction,
   path: "/",
   maxAge: accessTokenExpiresInToCookieMaxAgeMs(config.auth.accessTokenExpiresIn),
+  ...cookieDomainOpts,
 };
 
 const REFRESH_TOKEN_COOKIE_OPTIONS = {

@@ -10,11 +10,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import {
+  useCheckGoogleDriveLinkMutation,
   useLazyGetCurrentUserQuery,
   useUnlinkGoogleDriveMutation,
 } from "@/features/auth/api/authApi";
@@ -31,6 +32,7 @@ const GOOGLE_DRIVE_ERROR_MESSAGES = {
     "Google không cấp refresh token. Vào Tài khoản Google → Bảo mật → Quyền truy cập của bên thứ ba, gỡ ứng dụng này rồi liên kết lại.",
   config: "Google OAuth chưa được cấu hình đúng trên máy chủ (CLIENT_ID / SECRET / REDIRECT_URI).",
   folder: "Không tạo hoặc tìm được thư mục «midnight-app» trên Drive. Thử lại sau vài phút.",
+  scope: "Google chưa cấp quyền tạo thư mục Drive. Hãy gỡ quyền ứng dụng trong Google Account rồi liên kết lại.",
   token: "Google không trả về access token hợp lệ. Thử liên kết lại.",
   unknown: "Liên kết Google Drive thất bại. Thử lại hoặc kiểm tra cấu hình OAuth.",
 };
@@ -89,6 +91,8 @@ export function HomePage() {
   const googleReasonParam = searchParams.get("reason");
   const [refetchUser] = useLazyGetCurrentUserQuery();
   const [unlinkDrive, { isLoading: unlinkingDrive }] = useUnlinkGoogleDriveMutation();
+  const [checkDriveLink] = useCheckGoogleDriveLinkMutation();
+  const checkedDriveFolderRef = useRef(null);
   const { confirm } = useConfirm();
   const [driveLinkBusy, setDriveLinkBusy] = useState(false);
   const apiBase = getApiBaseUrl();
@@ -116,6 +120,29 @@ export function HomePage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParams + router cố ý bỏ qua (scalar google* + pathname đủ kích hoạt)
   }, [googleParam, googleReasonParam, pathname, refetchUser]);
+
+  useEffect(() => {
+    const folderId = user?.googleDriveFolderId;
+    if (!folderId || checkedDriveFolderRef.current === folderId) {
+      return;
+    }
+    checkedDriveFolderRef.current = folderId;
+    let cancelled = false;
+    async function checkLinkedFolder() {
+      try {
+        const nextUser = await checkDriveLink().unwrap();
+        if (!cancelled && !nextUser?.googleDriveFolderId) {
+          notifyError("Folder làm việc trên Google Drive không còn tồn tại. Hệ thống đã huỷ liên kết cũ.");
+        }
+      } catch {
+        // Không chặn trang chủ nếu Google tạm thời không phản hồi.
+      }
+    }
+    void checkLinkedFolder();
+    return () => {
+      cancelled = true;
+    };
+  }, [checkDriveLink, user?.googleDriveFolderId]);
 
   const canLinkDrive = isAuthenticated;
 
@@ -165,17 +192,17 @@ export function HomePage() {
 
   async function handleUnlinkDrive() {
     const ok = await confirm({
-      title: "Gỡ liên kết Google Drive",
+      title: "Huỷ liên kết Google Drive",
       message:
         "Hệ thống sẽ xóa token và folder ID đã lưu. Thư mục trên Drive của bạn không bị xóa. Bạn có thể liên kết lại sau.",
-      confirmLabel: "Gỡ liên kết",
+      confirmLabel: "Huỷ liên kết",
     });
     if (!ok) {
       return;
     }
     try {
       await unlinkDrive().unwrap();
-      notifySuccess("Đã gỡ liên kết Google Drive.");
+      notifySuccess("Đã huỷ liên kết Google Drive.");
     } catch (e) {
       notifyError(e?.data?.message || "Không gỡ được liên kết.");
     }
@@ -266,28 +293,18 @@ export function HomePage() {
                           )}
                         >
                           <ExternalLink className="size-4 shrink-0" aria-hidden />
-                          Mở thư mục trên Drive
+                          Mở thư mục làm việc
                         </a>
-                        <div className="flex flex-wrap gap-2 sm:justify-end">
-                          <button
-                            type="button"
-                            disabled={driveLinkBusy || unlinkingDrive}
-                            onClick={() => void startGoogleDriveLink()}
-                            className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-3 py-1.5 text-center text-xs font-medium text-foreground shadow-sm transition hover:bg-muted/80 disabled:pointer-events-none disabled:opacity-50"
-                          >
-                            {driveLinkBusy ? "Đang mở Google…" : "Liên kết lại / cập nhật quyền"}
-                          </button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-muted-foreground hover:text-destructive"
-                            disabled={unlinkingDrive}
-                            onClick={() => void handleUnlinkDrive()}
-                          >
-                            Gỡ liên kết
-                          </Button>
-                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-muted-foreground hover:text-destructive sm:self-end"
+                          disabled={unlinkingDrive}
+                          onClick={() => void handleUnlinkDrive()}
+                        >
+                          {unlinkingDrive ? "Đang huỷ…" : "Huỷ liên kết"}
+                        </Button>
                       </>
                     ) : null}
                     {mayUseDriveLink && !user?.googleDriveFolderId ? (

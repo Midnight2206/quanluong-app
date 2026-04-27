@@ -34,6 +34,8 @@ export const PERMISSIONS = {
   LTTP_PRICES_APPLY_DOWN: "lttp.prices.applyDown",
   LTTP_GROUPS_READ: "lttp.groups.read",
   LTTP_GROUPS_MANAGE: "lttp.groups.manage",
+  LTTP_ISSUE_SLIPS_READ: "lttp.issue-slips.read",
+  LTTP_ISSUE_SLIPS_WRITE: "lttp.issue-slips.write",
   MEAL_ALLOWANCE_RATES_MANAGE: "mealAllowanceRates.manage",
   MEAL_ROSTER_ACCESS: "mealRoster.access",
 };
