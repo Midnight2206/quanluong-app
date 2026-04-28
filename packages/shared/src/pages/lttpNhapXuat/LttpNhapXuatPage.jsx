@@ -13,13 +13,35 @@ import { writePersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpNguoiNhanBulkModal } from "./LttpNguoiNhanBulkModal";
-import { cn } from "@/utils/cn";
 import { readStoredManualUnitId, writeStoredManualUnitId } from "./lttpNhapXuatSessionPersist";
 
 const LTTP_TAB_PERSIST_ID = "lttp-nhap-xuat";
 
 function sortUnitsByPath(units) {
   return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+}
+
+/** Khớp `getSubtreeUnitIds` BE: gốc + mọi đơn vị có `path` bắt đầu bằng prefix của path gốc */
+function normalizePathPrefix(path) {
+  if (!path) return "";
+  return path.endsWith("/") ? path : `${path}/`;
+}
+
+function unitsWithinSubtree(allUnits, rootId) {
+  if (rootId == null || !allUnits?.length) return [];
+  const root = allUnits.find((u) => Number(u.id) === Number(rootId));
+  if (!root) {
+    return [{ id: rootId, name: `Đơn vị #${rootId}` }];
+  }
+  const pref = normalizePathPrefix(root.path || "");
+  if (!pref) {
+    return allUnits.filter((u) => Number(u.id) === Number(rootId));
+  }
+  return allUnits.filter(
+    (u) =>
+      Number(u.id) === Number(rootId) ||
+      (typeof u.path === "string" && u.path.startsWith(pref)),
+  );
 }
 
 export function LttpNhapXuatPage() {
@@ -43,8 +65,8 @@ export function LttpNhapXuatPage() {
       return Number(workingUnitId);
     }
     /**
-     * User thường (không phải admin/superadmin): phạm vi API EXACT chỉ có `user.unit.id`.
-     * Luôn lấy đơn vị đó làm kho — không fallback `sortedUnits[0]` (dễ lệch id trong cây đơn vị → 403 X-Target).
+     * User thường: mặc định kho = đơn vị gốc tài khoản — không fallback `sortedUnits[0]` (tránh lệch nhánh).
+     * Phạm vi API là SUBTREE (nhánh con); chọn kho con qua manualUnitId / session.
      */
     if (!isPrivileged && defaultUnitId != null) {
       return defaultUnitId;
@@ -65,20 +87,22 @@ export function LttpNhapXuatPage() {
     didRestoreManualUnitRef.current = false;
   }, [user?.id]);
 
-  /** Khôi phục nháp kho từ session — chỉ privileged; user thường không đổi nhánh kho được (EXACT scope). */
+  /** Khôi phục nháp kho từ session nếu id vẫn nằm trong phạm vi (toàn tree hoặc nhánh user). */
   useEffect(() => {
     if (!canPickUnits || !sortedUnits.length || didRestoreManualUnitRef.current) {
       return;
     }
     didRestoreManualUnitRef.current = true;
-    if (!isPrivileged) {
-      return;
-    }
+    const allowed =
+      !isPrivileged && defaultUnitId != null
+        ? unitsWithinSubtree(sortedUnits, defaultUnitId)
+        : sortedUnits;
+    const allowedIds = new Set(allowed.map((u) => Number(u.id)));
     const stored = readStoredManualUnitId();
-    if (stored != null && sortedUnits.some((u) => Number(u.id) === stored)) {
+    if (stored != null && allowedIds.has(Number(stored))) {
       setManualUnitId(stored);
     }
-  }, [canPickUnits, sortedUnits, isPrivileged]);
+  }, [canPickUnits, sortedUnits, isPrivileged, defaultUnitId]);
 
   useEffect(() => {
     setManualUnitId(null);
@@ -106,25 +130,17 @@ export function LttpNhapXuatPage() {
     setTabRemountKey((k) => k + 1);
   }, []);
 
-  /**
-   * Kho gửi API — user thường chỉ được đơn vị của tài khoản; bỏ qua manual/sessionStorage để không 403 nhánh EXACT.
-   */
-  const effectiveUnitId = useMemo(() => {
-    if (!isPrivileged && defaultUnitId != null) {
-      return Number(defaultUnitId);
-    }
-    return manualUnitId ?? selectedUnitId;
-  }, [defaultUnitId, isPrivileged, manualUnitId, selectedUnitId]);
+  const effectiveUnitId = useMemo(() => manualUnitId ?? selectedUnitId, [manualUnitId, selectedUnitId]);
 
-  /** Dropdown kho: user thường chỉ thấy (và chỉ được) đơn vị của mình — tránh chọn nhầm id khác. */
+  /** Dropdown kho: user thường chỉ các đơn vị trong nhánh (path) của đơn vị gốc — khớp scope SUBTREE API. */
   const unitsForKhoDropdown = useMemo(() => {
     if (!isPrivileged && defaultUnitId != null) {
-      const rows = sortedUnits.filter((u) => Number(u.id) === Number(defaultUnitId));
-      if (rows.length > 0) {
-        return rows;
+      const rows = unitsWithinSubtree(sortedUnits, defaultUnitId);
+      const sorted = sortUnitsByPath(rows);
+      if (sorted.length > 0) {
+        return sorted;
       }
-      const fallbackName = user?.unit?.name ?? `Đơn vị #${defaultUnitId}`;
-      return [{ id: defaultUnitId, name: fallbackName }];
+      return [{ id: defaultUnitId, name: user?.unit?.name ?? `Đơn vị #${defaultUnitId}` }];
     }
     return sortedUnits;
   }, [defaultUnitId, isPrivileged, sortedUnits, user?.unit?.name]);
@@ -160,12 +176,8 @@ export function LttpNhapXuatPage() {
             <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">Đơn vị cấp phát (kho dữ liệu)</span>
             <select
               id="lttp-io-unit"
-              className={cn(
-                "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium outline-none focus:border-primary",
-                !isPrivileged && "cursor-not-allowed opacity-90",
-              )}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium outline-none focus:border-primary"
               value={String(effectiveUnitId ?? "")}
-              disabled={!isPrivileged}
               onChange={(e) => {
                 const v = e.target.value;
                 persistManualUnitId(v === "" ? null : Number(v));

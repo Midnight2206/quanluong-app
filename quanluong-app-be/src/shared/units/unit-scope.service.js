@@ -172,12 +172,9 @@ async function resolveUnitScopeForUser(user) {
     return { mode: UNIT_SCOPE_MODES.EXACT, unitIds: [] };
   }
 
-  if (typeName === SYSTEM_TYPE_NAMES.ADMIN) {
-    const unitIds = await getSubtreeUnitIds(unitId);
-    return { mode: UNIT_SCOPE_MODES.SUBTREE, unitIds };
-  }
-
-  return { mode: UNIT_SCOPE_MODES.EXACT, unitIds: [unitId] };
+  /** Cả admin và user thường: phạm vi đơn vị = gốc gán + mọi đơn vị con (nhánh path). Khớp LTTP/meal roster/X-Target branch. */
+  const unitIds = await getSubtreeUnitIds(unitId);
+  return { mode: UNIT_SCOPE_MODES.SUBTREE, unitIds };
 }
 
 function unitIdsWhereClause(scope) {
