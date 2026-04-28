@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { Loader2, Printer, Settings2, Trash2 } from "lucide-react";
+import { Loader2, Printer, Settings2, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
@@ -14,12 +14,18 @@ import {
   useGetLttpRecipientUsersQuery,
   useGetLttpReceivingDefaultRecipientQuery,
   usePutLttpIssueFormDefaultsMutation,
+  useUpdateLttpIssueSlipMutation,
 } from "@/features/lttp/api/lttpApi";
 import { apiRequest } from "@/services/apiRequest";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { vndToVietnameseDocumentLine } from "@/utils/vndVietnameseText";
 import { LttpIssueSlipPrintDocument } from "./LttpIssueSlipPrintDocument";
+import {
+  clearIssueSlipDraft,
+  readIssueSlipDraft,
+  writeIssueSlipDraft,
+} from "./lttpNhapXuatSessionPersist";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -51,6 +57,73 @@ function newEmptyRow() {
     quantity: "1",
     unitPrice: null,
     tgsxPrice: null,
+    lineNote: "",
+  };
+}
+
+/** Khôi phục dòng từ sessionStorage draft (chuẩn hoá kiểu, giữ stable key khi có). */
+function normalizeStoredDraftRows(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return [newEmptyRow()];
+  }
+  const out = raw.map((r, i) => ({
+    key:
+      typeof r?.key === "string" && String(r.key).trim()
+        ? r.key
+        : `r${Date.now()}_${i}_${Math.random().toString(36).slice(2, 9)}`,
+    commodityId: (() => {
+      if (r?.commodityId === "" || r?.commodityId == null) {
+        return "";
+      }
+      const n = Number(r.commodityId);
+      return Number.isInteger(n) && n > 0 ? n : "";
+    })(),
+    codeDraft: r?.codeDraft != null ? String(r.codeDraft) : "",
+    lttpSupplierId: r?.lttpSupplierId !== "" && r?.lttpSupplierId != null ? String(r.lttpSupplierId) : "",
+    requiredQuantity:
+      r?.requiredQuantity != null && String(r.requiredQuantity).trim() !== ""
+        ? String(r.requiredQuantity)
+        : "",
+    quantity:
+      r?.quantity !== "" && r?.quantity != null && String(r.quantity).trim() !== ""
+        ? String(r.quantity)
+        : "1",
+    unitPrice:
+      typeof r?.unitPrice === "number" && Number.isFinite(r.unitPrice)
+        ? r.unitPrice
+        : r?.unitPrice === "" || r?.unitPrice == null || r?.unitPrice === undefined
+          ? null
+          : Number.isFinite(Number(r.unitPrice))
+            ? Number(r.unitPrice)
+            : null,
+    tgsxPrice:
+      typeof r?.tgsxPrice === "number" && Number.isFinite(r.tgsxPrice)
+        ? r.tgsxPrice
+        : r?.tgsxPrice === "" || r?.tgsxPrice == null || r?.tgsxPrice === undefined
+          ? null
+          : Number.isFinite(Number(r.tgsxPrice))
+            ? Number(r.tgsxPrice)
+            : null,
+    lineNote: typeof r?.lineNote === "string" ? r.lineNote : "",
+  }));
+  return out.length ? out : [newEmptyRow()];
+}
+
+/** Chuyển dòng phiếu (snapshot từ BE) thành state ô của form sửa. */
+function rowFromSlipLine(line) {
+  const rand = Math.random().toString(36).slice(2, 7);
+  return {
+    key: `e${line.id}_${rand}`,
+    commodityId: line.commodityId,
+    codeDraft: line.commodity?.code ?? "",
+    lttpSupplierId: line.lttpSupplierId != null ? String(line.lttpSupplierId) : "",
+    requiredQuantity:
+      line.requiredQuantity != null && Number.isFinite(Number(line.requiredQuantity))
+        ? String(line.requiredQuantity)
+        : "",
+    quantity: line.quantity != null ? String(line.quantity) : "",
+    unitPrice: line.unitPrice ?? null,
+    tgsxPrice: line.tgsxPrice ?? null,
     lineNote: "",
   };
 }
@@ -114,8 +187,21 @@ const FONT_CHOICES = [
 
 /**
  * Tab Phiếu xuất LTTP: bảng nhập (dòng mới khi hoàn tất dòng hiện tại + Enter ở Thực xuất), giá theo blur mã, in theo cùng mẫu lịch sử, tổng bằng chữ.
+ *
+ * Khi `editingSlip` được truyền, form chuyển sang chế độ sửa: khoá ngày phiếu (giữ ngày + quyển/số gốc),
+ * prefill toàn bộ trường, đổi nút lưu thành «Cập nhật phiếu» và hiển thị nút «Hủy».
  */
-export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = [], canPickUnits }) {
+export function LttpPhieuXuatTab({
+  selectedUnitId,
+  canWrite,
+  unitLabel,
+  units = [],
+  canPickUnits,
+  editingSlip = null,
+  onCancelEdit,
+  onUpdated,
+}) {
+  const isEditMode = !!editingSlip;
   const formId = useId();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -144,7 +230,94 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
   const rowQtyRefs = useRef({});
   const rowCodeRefs = useRef({});
 
+  /** Nháp phiếu xuất (sessionStorage): đổi kho hoặc F5 không mất nhập tay. Không áp vào chế độ sửa. */
+  const [draftNotice, setDraftNotice] = useState(false);
+  const prevCreateUnitRef = useRef(null);
+  const skipRecipientResetAfterDraftRef = useRef(false);
+  const skipReceivingDefAfterDraftRef = useRef(false);
+  const draftPersistAllowedRef = useRef(false);
+
   const defLoadedKey = useRef(null);
+
+  useLayoutEffect(() => {
+    if (isEditMode) {
+      draftPersistAllowedRef.current = true;
+      return;
+    }
+    if (selectedUnitId == null) {
+      draftPersistAllowedRef.current = false;
+      return;
+    }
+
+    draftPersistAllowedRef.current = false;
+
+    const prev = prevCreateUnitRef.current;
+    const unitChanged = prev != null && Number(prev) !== Number(selectedUnitId);
+    const draft = readIssueSlipDraft(selectedUnitId);
+
+    if (draft && Number(draft.unitId) === Number(selectedUnitId)) {
+      const ymd =
+        typeof draft.issueDate === "string" && /^\d{4}-\d{2}-\d{2}/.test(draft.issueDate)
+          ? draft.issueDate
+          : localYmd();
+
+      setIssueDate(ymd);
+      setMarginTop(Number.isFinite(Number(draft.marginTop)) ? Number(draft.marginTop) : 2);
+      setMarginRight(Number.isFinite(Number(draft.marginRight)) ? Number(draft.marginRight) : 1.5);
+      setMarginBottom(Number.isFinite(Number(draft.marginBottom)) ? Number(draft.marginBottom) : 1.5);
+      setMarginLeft(Number.isFinite(Number(draft.marginLeft)) ? Number(draft.marginLeft) : 3);
+      setPrintFontId(typeof draft.printFontId === "string" && draft.printFontId ? draft.printFontId : "times");
+      setPrintFontSizePt(
+        Number.isFinite(Number(draft.printFontSizePt))
+          ? Math.min(18, Math.max(8, Number(draft.printFontSizePt)))
+          : 12,
+      );
+      if (draft.printHeaderLine1 != null) {
+        setPrintHeaderLine1(String(draft.printHeaderLine1));
+      }
+      if (draft.printHeaderLine2 != null) {
+        setPrintHeaderLine2(String(draft.printHeaderLine2));
+      }
+      if (draft.formMauSo != null) {
+        setFormMauSo(String(draft.formMauSo));
+      }
+      const ru = draft.recipientUnitId;
+      const rid =
+        ru != null && Number.isFinite(Number(ru))
+          ? Number(ru)
+          : Number.isFinite(Number(selectedUnitId))
+            ? Number(selectedUnitId)
+            : null;
+      setRecipientUnitId(rid);
+      setRecipientUserId(draft.recipientUserId != null ? String(draft.recipientUserId) : "");
+      setRecipientName(draft.recipientName != null ? String(draft.recipientName) : "");
+      skipReceivingDefAfterDraftRef.current =
+        draft.recipientUserId != null && String(draft.recipientUserId).trim() !== "";
+
+      setWarehouseFrom(draft.warehouseFrom != null ? String(draft.warehouseFrom) : "Quân nhu");
+      setSignerWriter(draft.signerWriter != null ? String(draft.signerWriter) : "");
+      setSignerRecipient(draft.signerRecipient != null ? String(draft.signerRecipient) : "");
+      setSignerApprover(draft.signerApprover != null ? String(draft.signerApprover) : "");
+      setRows(normalizeStoredDraftRows(draft.rows));
+
+      skipRecipientResetAfterDraftRef.current = true;
+      defLoadedKey.current = selectedUnitId;
+      setDraftNotice(true);
+      prevCreateUnitRef.current = selectedUnitId;
+      draftPersistAllowedRef.current = true;
+      return;
+    }
+
+    if (unitChanged) {
+      setIssueDate(localYmd());
+      setRows([newEmptyRow()]);
+      defLoadedKey.current = null;
+      setDraftNotice(false);
+    }
+
+    prevCreateUnitRef.current = selectedUnitId;
+    draftPersistAllowedRef.current = true;
+  }, [selectedUnitId, isEditMode]);
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -219,18 +392,29 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
     if (selectedUnitId == null) {
       return;
     }
+    if (isEditMode) {
+      return;
+    }
+    if (skipRecipientResetAfterDraftRef.current) {
+      skipRecipientResetAfterDraftRef.current = false;
+      return;
+    }
     setRecipientUnitId(selectedUnitId);
     setRecipientUserId("");
     setRecipientName("");
     setSignerRecipient("");
     defLoadedKey.current = null;
-  }, [selectedUnitId]);
+  }, [selectedUnitId, isEditMode]);
 
   useEffect(() => {
     if (formDefPayload?.unitId !== selectedUnitId) {
       return;
     }
     if (defLoadedKey.current === selectedUnitId) {
+      return;
+    }
+    if (isEditMode) {
+      defLoadedKey.current = selectedUnitId;
       return;
     }
     const d = formDefPayload.defaults;
@@ -255,7 +439,7 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
       }
     }
     defLoadedKey.current = selectedUnitId;
-  }, [formDefPayload, selectedUnitId]);
+  }, [formDefPayload, selectedUnitId, isEditMode]);
 
   useEffect(() => {
     if (recipientUnitId == null) {
@@ -271,13 +455,20 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
     if (recipientUnitId == null || !receivingDefSuccess) {
       return;
     }
+    if (isEditMode) {
+      return;
+    }
     if (receivingDef != null && Number(receivingDef.recipientUnitId) !== Number(recipientUnitId)) {
+      return;
+    }
+    if (skipReceivingDefAfterDraftRef.current) {
+      skipReceivingDefAfterDraftRef.current = false;
       return;
     }
     if (receivingDef?.userId != null) {
       setRecipientUserId(String(receivingDef.userId));
     }
-  }, [recipientUnitId, receivingDef, receivingDefSuccess]);
+  }, [recipientUnitId, receivingDef, receivingDefSuccess, isEditMode]);
 
   useEffect(() => {
     if (!recipientUserId) {
@@ -306,6 +497,129 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
   }, [settingsOpen]);
 
   const [createSlip, { isLoading: createBusy }] = useCreateLttpIssueSlipMutation();
+  const [updateSlip, { isLoading: updateBusy }] = useUpdateLttpIssueSlipMutation();
+
+  /** Prefill state từ phiếu đang sửa; chỉ chạy khi đổi sang phiếu khác. */
+  const editLoadedKey = useRef(null);
+  useEffect(() => {
+    if (!editingSlip) {
+      editLoadedKey.current = null;
+      return;
+    }
+    if (editLoadedKey.current === editingSlip.id) {
+      return;
+    }
+    editLoadedKey.current = editingSlip.id;
+    setIssueDate(editingSlip.issueDate);
+    setRecipientUnitId(
+      editingSlip.recipientUnitId != null ? Number(editingSlip.recipientUnitId) : selectedUnitId,
+    );
+    setRecipientUserId(
+      editingSlip.recipientUserId != null ? String(editingSlip.recipientUserId) : "",
+    );
+    setRecipientName(editingSlip.recipientDisplayName ?? "");
+    if (editingSlip.printLine1 != null) {
+      setPrintHeaderLine1(editingSlip.printLine1);
+    }
+    if (editingSlip.printLine2 != null) {
+      setPrintHeaderLine2(editingSlip.printLine2);
+    }
+    if (editingSlip.formMauSo != null) {
+      setFormMauSo(editingSlip.formMauSo);
+    }
+    if (editingSlip.warehouseFrom != null) {
+      setWarehouseFrom(editingSlip.warehouseFrom);
+    }
+    if (editingSlip.signerWriter != null) {
+      setSignerWriter(editingSlip.signerWriter);
+    }
+    if (editingSlip.signerRecipient != null) {
+      setSignerRecipient(editingSlip.signerRecipient);
+    }
+    if (editingSlip.signerApprover != null) {
+      setSignerApprover(editingSlip.signerApprover);
+    }
+    const lineRows = (editingSlip.lines ?? []).map(rowFromSlipLine);
+    setRows(lineRows.length ? lineRows : [newEmptyRow()]);
+  }, [editingSlip, selectedUnitId]);
+
+  /** Ghi nháp vào sessionStorage (debounce) — chỉ tab tạo mới và khi được phép chỉnh. */
+  useEffect(() => {
+    if (isEditMode || !selectedUnitId || !canWrite || !draftPersistAllowedRef.current) {
+      return undefined;
+    }
+    const handle = window.setTimeout(() => {
+      writeIssueSlipDraft(selectedUnitId, {
+        issueDate,
+        marginTop,
+        marginRight,
+        marginBottom,
+        marginLeft,
+        printFontId,
+        printFontSizePt,
+        printHeaderLine1,
+        printHeaderLine2,
+        formMauSo,
+        recipientName,
+        recipientUnitId,
+        recipientUserId,
+        warehouseFrom,
+        signerWriter,
+        signerRecipient,
+        signerApprover,
+        rows: rows.map((r) => ({
+          key: r.key,
+          commodityId: r.commodityId,
+          codeDraft: r.codeDraft,
+          lttpSupplierId: r.lttpSupplierId,
+          requiredQuantity: r.requiredQuantity,
+          quantity: r.quantity,
+          unitPrice: r.unitPrice,
+          tgsxPrice: r.tgsxPrice,
+          lineNote: r.lineNote ?? "",
+        })),
+      });
+    }, 450);
+    return () => window.clearTimeout(handle);
+  }, [
+    isEditMode,
+    selectedUnitId,
+    canWrite,
+    issueDate,
+    marginTop,
+    marginRight,
+    marginBottom,
+    marginLeft,
+    printFontId,
+    printFontSizePt,
+    printHeaderLine1,
+    printHeaderLine2,
+    formMauSo,
+    recipientName,
+    recipientUnitId,
+    recipientUserId,
+    warehouseFrom,
+    signerWriter,
+    signerRecipient,
+    signerApprover,
+    rows,
+  ]);
+
+  const discardIssueSlipDraft = useCallback(() => {
+    if (selectedUnitId == null) {
+      return;
+    }
+    clearIssueSlipDraft(selectedUnitId);
+    setDraftNotice(false);
+    setIssueDate(localYmd());
+    setRows([newEmptyRow()]);
+    setRecipientUserId("");
+    setRecipientName("");
+    setSignerRecipient("");
+    setRecipientUnitId(Number(selectedUnitId));
+    defLoadedKey.current = null;
+    skipReceivingDefAfterDraftRef.current = false;
+  }, [selectedUnitId]);
 
   const applyRowPatch = useCallback((key, patch) => {
     setRows((prev) => {
@@ -426,6 +740,44 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
     return Math.round(q * p * 100) / 100;
   }, []);
 
+  /** Trùng mặt hàng trong phiếu (cùng commodityId ≥ 2 dòng) — khớp lỗi BE «Trùng mặt hàng trong phiếu». */
+  const commodityIdsDuplicatedInForm = useMemo(() => {
+    const counts = new Map();
+    for (const r of rows) {
+      if (r.commodityId === "" || r.commodityId == null) {
+        continue;
+      }
+      const cid = Number(r.commodityId);
+      if (!Number.isInteger(cid) || cid <= 0) {
+        continue;
+      }
+      counts.set(cid, (counts.get(cid) ?? 0) + 1);
+    }
+    const dup = new Set();
+    for (const [cid, n] of counts) {
+      if (n > 1) {
+        dup.add(cid);
+      }
+    }
+    return dup;
+  }, [rows]);
+
+  const isDuplicateCommodityRow = useCallback(
+    (r) => {
+      if (r.commodityId === "" || r.commodityId == null) {
+        return false;
+      }
+      const cid = Number(r.commodityId);
+      if (!Number.isInteger(cid) || cid <= 0) {
+        return false;
+      }
+      return commodityIdsDuplicatedInForm.has(cid);
+    },
+    [commodityIdsDuplicatedInForm],
+  );
+
+  const hasDuplicateCommodityInForm = commodityIdsDuplicatedInForm.size > 0;
+
   const dataRows = useMemo(() => rows.filter(isRowCompleteForSubmit), [rows]);
 
   const formTotal = useMemo(
@@ -438,12 +790,18 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
   const printPreviewSlip = useMemo(
     () => {
       const n = nextSerialPayload?.nextSlipNo;
+      const previewBookMmyy = isEditMode && editingSlip?.bookMmyy ? editingSlip.bookMmyy : bookMmyyDisplay;
+      const previewSlipNo = isEditMode && editingSlip?.slipNo != null
+        ? Number(editingSlip.slipNo)
+        : n != null && Number.isFinite(Number(n))
+          ? Number(n)
+          : 0;
       return {
         printLine1: printHeaderLine1,
         printLine2: printHeaderLine2,
         formMauSo: formMauSo,
-        bookMmyy: bookMmyyDisplay,
-        slipNo: n != null && Number.isFinite(Number(n)) ? Number(n) : 0,
+        bookMmyy: previewBookMmyy,
+        slipNo: previewSlipNo,
         issueDate,
         note: null,
         recipientDisplayName: recipientName,
@@ -476,7 +834,10 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
       bookMmyyDisplay,
       comById,
       dataRows,
+      editingSlip?.bookMmyy,
+      editingSlip?.slipNo,
       formMauSo,
+      isEditMode,
       issueDate,
       lineTotal,
       nextSerialPayload?.nextSlipNo,
@@ -532,24 +893,42 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
         lttpSupplierId: Number(r.lttpSupplierId),
       });
     }
+    const uniqueCids = new Set(lines.map((ln) => ln.commodityId));
+    if (uniqueCids.size !== lines.length) {
+      notifyError("Trùng mặt hàng trong phiếu — mỗi mặt hàng chỉ một dòng.");
+      return;
+    }
+    const sharedPayload = {
+      note: null,
+      lines,
+      recipientUnitId: recipientUnitId ?? selectedUnitId,
+      recipientUserId: recipientUserId ? Number(recipientUserId) : null,
+      recipientDisplayName: recipientName?.trim() || null,
+      printLine1: printHeaderLine1?.trim() || null,
+      printLine2: printHeaderLine2?.trim() || null,
+      formMauSo: formMauSo?.trim() || null,
+      warehouseFrom: warehouseFrom?.trim() || null,
+      signerWriter: signerWriter?.trim() || null,
+      signerRecipient: signerRecipient?.trim() || null,
+      signerApprover: signerApprover?.trim() || null,
+    };
     try {
+      if (isEditMode) {
+        await updateSlip({ id: editingSlip.id, ...sharedPayload });
+        notifySuccess("Đã cập nhật phiếu xuất.");
+        if (typeof onUpdated === "function") {
+          onUpdated();
+        }
+        return;
+      }
       await createSlip({
         unitId: selectedUnitId,
         issueDate,
-        note: null,
-        lines,
-        recipientUnitId: recipientUnitId ?? selectedUnitId,
-        recipientUserId: recipientUserId ? Number(recipientUserId) : null,
-        recipientDisplayName: recipientName?.trim() || null,
-        printLine1: printHeaderLine1?.trim() || null,
-        printLine2: printHeaderLine2?.trim() || null,
-        formMauSo: formMauSo?.trim() || null,
-        warehouseFrom: warehouseFrom?.trim() || null,
-        signerWriter: signerWriter?.trim() || null,
-        signerRecipient: signerRecipient?.trim() || null,
-        signerApprover: signerApprover?.trim() || null,
+        ...sharedPayload,
       });
       notifySuccess("Đã lưu phiếu xuất.");
+      clearIssueSlipDraft(selectedUnitId);
+      setDraftNotice(false);
       setRows([newEmptyRow()]);
       refetchNextSerial();
     } catch (err) {
@@ -560,6 +939,51 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
   return (
     <div className="space-y-4 text-xs">
       <div className="print:hidden space-y-3">
+        {isEditMode ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-amber-300/70 bg-amber-50/70 p-3 text-[11px] text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100">
+            <div className="min-w-0 space-y-0.5">
+              <p className="font-medium">
+                Đang sửa phiếu — Quyển{" "}
+                <span className="font-mono">{editingSlip?.bookMmyy}</span> — Số{" "}
+                <span className="font-mono">
+                  {editingSlip?.slipNo != null
+                    ? String(editingSlip.slipNo).padStart(4, "0")
+                    : "—"}
+                </span>{" "}
+                · ngày <span className="font-mono">{editingSlip?.issueDate}</span>
+              </p>
+              <p className="text-[10px] opacity-80">
+                Ngày xuất và số phiếu giữ nguyên. Cập nhật phiếu sẽ tự đồng bộ công nợ đối tác.
+              </p>
+            </div>
+            {typeof onCancelEdit === "function" ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 shrink-0 gap-1.5 text-xs"
+                onClick={onCancelEdit}
+              >
+                <X className="size-3.5" />
+                Hủy sửa
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        {!isEditMode && draftNotice && canWrite ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-sky-400/50 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-950 dark:border-sky-600/50 dark:bg-sky-950/35 dark:text-sky-50 sm:flex-row sm:items-center sm:justify-between">
+            <p className="min-w-0">
+              <span className="font-medium">Đã khôi phục nháp phiếu</span> từ phiên làm việc trước (chừng nào tab trình duyệt còn mở).
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-8 shrink-0 text-xs text-sky-900 underline-offset-2 hover:underline dark:text-sky-100"
+              onClick={() => discardIssueSlipDraft()}
+            >
+              Xóa nháp
+            </Button>
+          </div>
+        ) : null}
         <p className="text-[11px] leading-snug text-muted-foreground">
           {unitLabel ? (
             <span>
@@ -795,12 +1219,19 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
       >
         <div className="flex flex-wrap items-end gap-2">
           <label className="min-w-[10rem] space-y-0.5 text-xs">
-            Ngày phiếu
+            Ngày phiếu{isEditMode ? " (không đổi)" : ""}
             <input
               type="date"
-              className={cn(inputClass, "mt-0.5 block")}
+              className={cn(
+                inputClass,
+                "mt-0.5 block",
+                isEditMode ? "cursor-not-allowed opacity-70" : "",
+              )}
               value={issueDate}
               onChange={(e) => setIssueDate(e.target.value)}
+              disabled={isEditMode}
+              readOnly={isEditMode}
+              title={isEditMode ? "Ngày phiếu giữ nguyên khi sửa." : undefined}
             />
           </label>
           {canPickUnits && units.length > 0 ? (
@@ -841,6 +1272,11 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
         <p className="text-[10px] text-muted-foreground">
           <span className="font-medium text-foreground/90">Đối tác:</span> gợi ý từ cột &quot;Đối tác mặc định&quot; từng mặt hàng (quản trị LTTP); mỗi dòng phải chọn đối tác trước khi lưu (chưa cấp theo mặt hàng thì chọn thủ công).
         </p>
+        {hasDuplicateCommodityInForm ? (
+          <p className="rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1.5 text-[11px] font-medium leading-snug text-destructive dark:bg-destructive/20">
+            Trùng mặt hàng trong phiếu — các dòng tô đỏ có cùng một mặt hàng; chỉ giữ một dòng cho mỗi mặt hàng hoặc đổi mặt hàng trước khi lưu.
+          </p>
+        ) : null}
 
         <div className="overflow-x-auto rounded-lg border border-border/60">
           <table className="w-full min-w-[64rem] border-collapse text-left text-[11px]">
@@ -893,12 +1329,35 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
               ) : null}
               {rows.map((r, i) => {
                 const c = r.commodityId ? comById.get(r.commodityId) : null;
+                const dupRow = isDuplicateCommodityRow(r);
                 return (
-                  <tr key={r.key} className="border-b border-border/50">
-                    <td className="px-1 py-1 text-[10px] text-muted-foreground">{i + 1}</td>
+                  <tr
+                    key={r.key}
+                    className={cn(
+                      "border-b border-border/50 transition-colors",
+                      dupRow &&
+                        "border-l-[3px] border-l-red-600 bg-red-500/12 dark:border-l-red-400 dark:bg-red-950/35",
+                    )}
+                    title={
+                      dupRow
+                        ? "Trùng mặt hàng trong phiếu — mỗi mặt hàng chỉ một dòng."
+                        : undefined
+                    }
+                  >
+                    <td
+                      className={cn(
+                        "px-1 py-1 text-[10px] text-muted-foreground",
+                        dupRow && "text-red-900 dark:text-red-100/95",
+                      )}
+                    >
+                      {i + 1}
+                    </td>
                     <td className="px-1 py-1.5">
                       <select
-                        className={inputClass}
+                        className={cn(
+                          inputClass,
+                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                        )}
                         value={r.commodityId === "" ? "" : String(r.commodityId)}
                         onChange={(e) => onPickCommodity(r.key, e.target.value)}
                       >
@@ -912,7 +1371,10 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                     </td>
                     <td className="px-1 py-1.5">
                       <select
-                        className={inputClass}
+                        className={cn(
+                          inputClass,
+                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                        )}
                         value={r.lttpSupplierId === "" || r.lttpSupplierId == null ? "" : String(r.lttpSupplierId)}
                         onChange={(e) => applyRowPatch(r.key, { lttpSupplierId: e.target.value })}
                       >
@@ -929,7 +1391,11 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                         ref={(el) => {
                           rowCodeRefs.current[r.key] = el;
                         }}
-                        className={cn(inputClass, "font-mono text-[10px]")}
+                        className={cn(
+                          inputClass,
+                          "font-mono text-[10px]",
+                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                        )}
                         value={r.codeDraft}
                         onChange={(e) => applyRowPatch(r.key, { codeDraft: e.target.value })}
                         onBlur={() => resolveByCode(r.key, r.codeDraft, { silent: true })}
@@ -942,12 +1408,22 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                         placeholder="Mã, Enter"
                       />
                     </td>
-                    <td className="px-1 py-1 text-[10px] text-muted-foreground">{c?.measureUnit ?? "—"}</td>
+                    <td
+                      className={cn(
+                        "px-1 py-1 text-[10px] text-muted-foreground",
+                        dupRow && "text-red-900/90 dark:text-red-100/90",
+                      )}
+                    >
+                      {c?.measureUnit ?? "—"}
+                    </td>
                     <td className="px-1 py-1.5">
                       <input
                         type="text"
                         inputMode="decimal"
-                        className={inputClass}
+                        className={cn(
+                          inputClass,
+                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                        )}
                         value={r.requiredQuantity}
                         onChange={(e) => applyRowPatch(r.key, { requiredQuantity: e.target.value })}
                         placeholder="—"
@@ -960,7 +1436,10 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                         }}
                         type="text"
                         inputMode="decimal"
-                        className={inputClass}
+                        className={cn(
+                          inputClass,
+                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                        )}
                         value={quantityInputDisplay(r.quantity)}
                         onChange={(e) => {
                           const cleaned = e.target.value.replace(/[^\d.,]/g, "");
@@ -988,18 +1467,37 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                         }}
                       />
                     </td>
-                    <td className="whitespace-nowrap px-1 py-1 text-right tabular-nums text-[10px]">
+                    <td
+                      className={cn(
+                        "whitespace-nowrap px-1 py-1 text-right tabular-nums text-[10px]",
+                        dupRow && "text-red-950 dark:text-red-50/95",
+                      )}
+                    >
                       {r.unitPrice != null ? formatVnd(r.unitPrice) : "—"}
                     </td>
-                    <td className="whitespace-nowrap px-1 py-1 text-right tabular-nums text-[9px] text-muted-foreground">
+                    <td
+                      className={cn(
+                        "whitespace-nowrap px-1 py-1 text-right tabular-nums text-[9px] text-muted-foreground",
+                        dupRow && "text-red-900/90 dark:text-red-200/85",
+                      )}
+                    >
                       {r.tgsxPrice != null ? formatVnd(r.tgsxPrice) : "—"}
                     </td>
-                    <td className="whitespace-nowrap px-1 py-1 text-right tabular-nums text-[10px]">
+                    <td
+                      className={cn(
+                        "whitespace-nowrap px-1 py-1 text-right tabular-nums text-[10px]",
+                        dupRow && "text-red-950 dark:text-red-50/95",
+                      )}
+                    >
                       {formatVnd(lineTotal(r))}
                     </td>
                     <td className="px-1 py-1">
                       <input
-                        className={cn(inputClass, "text-[10px]")}
+                        className={cn(
+                          inputClass,
+                          "text-[10px]",
+                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                        )}
                         value={r.lineNote ?? ""}
                         onChange={(e) => applyRowPatch(r.key, { lineNote: e.target.value })}
                         placeholder="—"
@@ -1045,17 +1543,31 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
           </table>
         </div>
         {canWrite ? (
-          <Button
-            type="button"
-            className="gap-1.5 text-xs"
-            disabled={createBusy || !selectedUnitId}
-            onClick={() => void onSubmit()}
-          >
-            {createBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}
-            Lưu phiếu xuất
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              className="gap-1.5 text-xs"
+              disabled={createBusy || updateBusy || !selectedUnitId}
+              onClick={() => void onSubmit()}
+            >
+              {createBusy || updateBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {isEditMode ? "Cập nhật phiếu" : "Lưu phiếu xuất"}
+            </Button>
+            {isEditMode && typeof onCancelEdit === "function" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-1.5 text-xs"
+                disabled={updateBusy}
+                onClick={onCancelEdit}
+              >
+                <X className="size-3.5" />
+                Hủy
+              </Button>
+            ) : null}
+          </div>
         ) : (
-          <p className="text-[11px] text-muted-foreground">Bạn không có quyền lập/xóa phiếu (cần lttp.issue-slips.write).</p>
+          <p className="text-[11px] text-muted-foreground">Bạn không có quyền lập/sửa/xóa phiếu (cần lttp.issue-slips.write).</p>
         )}
       </form>
 

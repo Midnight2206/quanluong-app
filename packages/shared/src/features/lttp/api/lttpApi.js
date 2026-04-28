@@ -408,6 +408,15 @@ export function useCreateLttpIssueSlipMutation() {
   });
 }
 
+export function useUpdateLttpIssueSlipMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) =>
+      apiRequest({ url: `/lttp/issue-slips/${id}`, method: "put", data: body }),
+    onSuccess: () => invalidateLttpData(qc),
+  });
+}
+
 export function useDeleteLttpIssueSlipMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({

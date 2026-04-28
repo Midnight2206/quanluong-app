@@ -445,6 +445,19 @@ const LTTP_ROUTE_DEFINITIONS = [
       description: "Xóa phiếu xuất LTTP (cùng dòng) trong phạm vi đơn vị dữ liệu.",
     },
   },
+  {
+    key: "updateIssueSlip",
+    method: "PUT",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/:id",
+    pathRoute: "/api/lttp/issue-slips/:id",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Update LTTP issue slip",
+      description:
+        "Sửa phiếu xuất LTTP (đơn vị nhận, ghi chú, các dòng hàng, mẫu in, người ký); giữ ngày xuất và số phiếu. Tự động cập nhật công nợ đối tác.",
+    },
+  },
 ];
 
 export { LTTP_ROUTE_DEFINITIONS };

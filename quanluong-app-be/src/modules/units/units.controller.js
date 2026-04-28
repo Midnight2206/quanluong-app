@@ -1,4 +1,8 @@
 import { respondCreated, respondSuccess } from "../../shared/utils/responders.js";
+import {
+  getSubtreeUnitIds,
+  UNIT_SCOPE_MODES,
+} from "../../shared/units/unit-scope.service.js";
 import { mapUnit } from "./units.mapper.js";
 import {
   createPrivateDataShares,
@@ -11,8 +15,29 @@ import {
   revokePrivateDataShare,
 } from "./units.service.js";
 
+const MANAGER_TYPE_NAMES = new Set(["superadmin", "admin"]);
+
+async function resolveUnitsViewScope(req) {
+  let scope = req.unitScope;
+  let effectiveUnitIds = req.effectiveUnitIds;
+
+  const typeName = req.user?.type?.name;
+  const isManagerType = MANAGER_TYPE_NAMES.has(typeName);
+
+  if (!isManagerType && req.user?.unitId && req.targetUnitId == null) {
+    const subtreeIds = await getSubtreeUnitIds(req.user.unitId);
+    if (subtreeIds.length > 0) {
+      scope = { mode: UNIT_SCOPE_MODES.SUBTREE, unitIds: subtreeIds };
+      effectiveUnitIds = subtreeIds;
+    }
+  }
+
+  return { scope, effectiveUnitIds };
+}
+
 async function listUnitsController(req, res) {
-  const units = await listUnits(req.unitScope, req.effectiveUnitIds);
+  const { scope, effectiveUnitIds } = await resolveUnitsViewScope(req);
+  const units = await listUnits(scope, effectiveUnitIds);
 
   return respondSuccess(res, {
     message: "Fetched units successfully",

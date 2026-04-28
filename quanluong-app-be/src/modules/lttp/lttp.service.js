@@ -1080,6 +1080,206 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
   return mapIssueSlip(slip);
 }
 
+async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) {
+  const existing = await prisma.lttpIssueSlip.findFirst({ where: { id } });
+  if (!existing) {
+    throw new AppError({
+      message: "Không tìm thấy phiếu",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+  assertCommodityRowStorage(existing.unitId, dataScope);
+  assertUnitIdInScope(dataScope.logicalUnitId, scope);
+  assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
+
+  const { note, lines } = payload;
+  if (!Array.isArray(lines) || lines.length === 0) {
+    throw new AppError({
+      message: "Cần ít nhất một dòng hàng",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+
+  const storageUnitId = existing.unitId;
+  const issueDateYmd = existing.issueDate.toISOString().slice(0, 10);
+  const eff = await getEffectivePrices(
+    { unitId: dataScope.logicalUnitId, date: issueDateYmd },
+    scope,
+    effectiveUnitIds,
+    dataScope,
+  );
+  const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
+
+  const seen = new Set();
+  const lineData = [];
+  for (const raw of lines) {
+    const cid = Number(raw.commodityId);
+    const qty = Number(raw.quantity);
+    if (!Number.isInteger(cid) || cid <= 0) {
+      throw new AppError({
+        message: "commodityId không hợp lệ",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    if (seen.has(cid)) {
+      throw new AppError({
+        message: "Trùng mặt hàng trong phiếu",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    seen.add(cid);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new AppError({
+        message: "Số lượng phải lớn hơn 0",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    const hit = priceByCid.get(cid);
+    if (!hit || hit.unitPrice == null) {
+      throw new AppError({
+        message: `Chưa có đơn giá tại ngày cho mặt hàng (id: ${cid})`,
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    const unitPrice = Number(hit.unitPrice);
+    const tgsx = hit.tgsxPrice != null ? Number(hit.tgsxPrice) : null;
+    const amount = roundMoney2(qty * unitPrice);
+    const reqQ = raw.requiredQuantity;
+    const reqQNum =
+      reqQ != null && reqQ !== "" && Number.isFinite(Number(reqQ)) ? Number(reqQ) : null;
+
+    if (raw.lttpSupplierId == null || raw.lttpSupplierId === "") {
+      throw new AppError({
+        message: "Mỗi dòng mặt hàng cần chọn đối tác cung cấp",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    const lineSid = Number(raw.lttpSupplierId);
+    if (!Number.isInteger(lineSid) || lineSid <= 0) {
+      throw new AppError({
+        message: "lttpSupplierId dòng phiếu không hợp lệ",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    const supRow = await prisma.lttpSupplier.findFirst({
+      where: { id: lineSid, unitId: storageUnitId },
+    });
+    if (!supRow) {
+      throw new AppError({
+        message: "Đối tác ghi trên dòng phiếu không thuộc đơn vị kho",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    lineData.push({
+      commodityId: cid,
+      lttpSupplierId: lineSid,
+      requiredQuantity:
+        reqQNum != null && Number.isFinite(reqQNum) && reqQNum >= 0 ? String(reqQNum) : null,
+      quantity: String(qty),
+      unitPrice: String(unitPrice),
+      tgsxPrice: tgsx != null ? String(tgsx) : null,
+      amount: String(amount),
+    });
+  }
+  if (!lineData.length) {
+    throw new AppError({
+      message: "Không có dòng hợp lệ",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+
+  const recipientUnitId =
+    payload.recipientUnitId != null && payload.recipientUnitId !== ""
+      ? Number(payload.recipientUnitId)
+      : storageUnitId;
+  if (!Number.isInteger(recipientUnitId) || recipientUnitId <= 0) {
+    throw new AppError({
+      message: "Đơn vị nhận không hợp lệ",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  assertUnitInEffectiveBranch(recipientUnitId, effectiveUnitIds);
+
+  let recipientUserId = null;
+  let recipientDisplayName = payload.recipientDisplayName?.trim() || null;
+  let signerRecipient = payload.signerRecipient?.trim() || null;
+  if (payload.recipientUserId != null && payload.recipientUserId !== "") {
+    const ruId = Number(payload.recipientUserId);
+    if (!Number.isInteger(ruId) || ruId <= 0) {
+      throw new AppError({
+        message: "Người nhận (user) không hợp lệ",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    const ru = await prisma.user.findFirst({
+      where: { id: ruId, deletedAt: null, unitId: recipientUnitId },
+      include: { profile: { select: { fullName: true } } },
+    });
+    if (!ru) {
+      throw new AppError({
+        message: "Không tìm thấy user trong đơn vị nhận đã chọn",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    recipientUserId = ruId;
+    const name = (ru.profile?.fullName && String(ru.profile.fullName).trim()) || ru.username;
+    recipientDisplayName = recipientDisplayName || name;
+    signerRecipient = signerRecipient || name;
+  }
+
+  const printLine1 = payload.printLine1?.trim() || null;
+  const printLine2 = payload.printLine2?.trim() || null;
+  const formMauSo = payload.formMauSo?.trim() || null;
+  const warehouseFrom = payload.warehouseFrom?.trim() || null;
+  const signerWriter = payload.signerWriter?.trim() || null;
+  const signerApprover = payload.signerApprover?.trim() || null;
+
+  assertLttpPrismaDelegates();
+
+  const slip = await prisma.$transaction(
+    async (tx) => {
+      await tx.lttpIssueSlipLine.deleteMany({ where: { slipId: existing.id } });
+      await tx.lttpIssueSlip.update({
+        where: { id: existing.id },
+        data: {
+          note: note?.trim() || null,
+          recipientUnitId,
+          recipientUserId,
+          recipientDisplayName,
+          printLine1,
+          printLine2,
+          formMauSo,
+          warehouseFrom,
+          signerWriter,
+          signerRecipient,
+          signerApprover,
+          lines: { create: lineData },
+        },
+      });
+      return tx.lttpIssueSlip.findUnique({
+        where: { id: existing.id },
+        include: issueSlipInclude,
+      });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 },
+  );
+  await recalculateLttpPartnerDebtsForUnit(storageUnitId);
+  return mapIssueSlip(slip);
+}
+
 async function listIssueSlips(
   { unitId, from, to, recipientUnitId, page: pageIn, pageSize: pageSizeIn },
   scope,
@@ -3044,5 +3244,6 @@ export {
   recalculateLttpPartnerDebtsForUnit,
   putRecipientDefaultUser,
   resolveIssueSlipLine,
+  updateIssueSlip,
   upsertIssueFormDefaults,
 };

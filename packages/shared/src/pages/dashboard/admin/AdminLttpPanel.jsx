@@ -1243,46 +1243,36 @@ export function AdminLttpPanel({
                               {cur != null && cur.tgsxPrice != null ? formatVnd(cur.tgsxPrice) : "—"}
                             </td>
                             <td className="px-2 py-1">
-                              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className={cn(inputClass, "min-w-[6rem] py-1")}
-                                  value={r.unitPrice}
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    setPtRows((prev) => {
-                                      const next = [...prev];
-                                      next[i] = { ...next[i], unitPrice: v === "" ? "" : Number(v) };
-                                      return next;
-                                    });
-                                  }}
-                                />
-                                <span className="whitespace-nowrap text-[10px] text-muted-foreground">
-                                  {formatVnd(r.unitPrice)}
-                                </span>
-                              </div>
+                              <input
+                                type="number"
+                                step="0.01"
+                                className={cn(inputClass, "min-w-[6rem] py-1")}
+                                value={r.unitPrice}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setPtRows((prev) => {
+                                    const next = [...prev];
+                                    next[i] = { ...next[i], unitPrice: v === "" ? "" : Number(v) };
+                                    return next;
+                                  });
+                                }}
+                              />
                             </td>
                             <td className="px-2 py-1">
-                              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  className={cn(inputClass, "min-w-[6rem] py-1")}
-                                  value={r.tgsxPrice ?? ""}
-                                  onChange={(e) => {
-                                    const v = e.target.value;
-                                    setPtRows((prev) => {
-                                      const next = [...prev];
-                                      next[i] = { ...next[i], tgsxPrice: v === "" ? null : Number(v) };
-                                      return next;
-                                    });
-                                  }}
-                                />
-                                <span className="whitespace-nowrap text-[10px] text-muted-foreground">
-                                  {formatVnd(r.tgsxPrice)}
-                                </span>
-                              </div>
+                              <input
+                                type="number"
+                                step="0.01"
+                                className={cn(inputClass, "min-w-[6rem] py-1")}
+                                value={r.tgsxPrice ?? ""}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setPtRows((prev) => {
+                                    const next = [...prev];
+                                    next[i] = { ...next[i], tgsxPrice: v === "" ? null : Number(v) };
+                                    return next;
+                                  });
+                                }}
+                              />
                             </td>
                           </tr>
                           );

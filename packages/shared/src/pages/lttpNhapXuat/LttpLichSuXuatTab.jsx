@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Printer, RotateCcw } from "lucide-react";
+import { Loader2, Pencil, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
@@ -12,6 +12,7 @@ import { useConfirm } from "@/contexts/ConfirmProvider";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { LttpIssueSlipPrintDocument } from "./LttpIssueSlipPrintDocument";
+import { readLichSuFilters, writeLichSuFilters } from "./lttpNhapXuatSessionPersist";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -38,9 +39,15 @@ const PAGE_SIZE = 20;
 const M = { t: 2, r: 1.5, b: 1.5, l: 3 };
 
 /**
- * Lịch sử phiếu xuất theo kho (storage) + lọc + in / thu hồi / in hàng loạt.
+ * Lịch sử phiếu xuất theo kho (storage) + lọc + in / sửa / thu hồi / in hàng loạt.
  */
-export function LttpLichSuXuatTab({ storageUnitId, units = [], canWrite, storageUnitName }) {
+export function LttpLichSuXuatTab({
+  storageUnitId,
+  units = [],
+  canWrite,
+  storageUnitName,
+  onRequestEdit,
+}) {
   const { confirm } = useConfirm();
   const [mounted, setMounted] = useState(false);
   const [listFrom, setListFrom] = useState(() => firstDayOfCurrentMonthYmd());
@@ -55,9 +62,39 @@ export function LttpLichSuXuatTab({ storageUnitId, units = [], canWrite, storage
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!units.length) {
-      setFilterRecipientId("");
+  const historyHydrateKey = useRef(null);
+  /** Tránh ghi sessionStorage với state mặc định trước khi hydrate xong (layout chạy trước passive effect). */
+  const historyFiltersReadyRef = useRef(false);
+  useLayoutEffect(() => {
+    historyFiltersReadyRef.current = false;
+    if (!storageUnitId || !units.length) {
+      return;
+    }
+    const k = `${storageUnitId}`;
+    if (historyHydrateKey.current === k) {
+      historyFiltersReadyRef.current = true;
+      return;
+    }
+    historyHydrateKey.current = k;
+
+    const stored = readLichSuFilters(storageUnitId);
+    if (
+      stored &&
+      stored.filterRecipientId &&
+      units.some((u) => String(u.id) === String(stored.filterRecipientId))
+    ) {
+      if (typeof stored.listFrom === "string" && /^\d{4}-\d{2}-\d{2}/.test(stored.listFrom)) {
+        setListFrom(stored.listFrom);
+      }
+      if (typeof stored.listTo === "string" && /^\d{4}-\d{2}-\d{2}/.test(stored.listTo)) {
+        setListTo(stored.listTo);
+      }
+      setFilterRecipientId(String(stored.filterRecipientId));
+      const p = Number(stored.page);
+      if (Number.isInteger(p) && p >= 1) {
+        setPage(p);
+      }
+      historyFiltersReadyRef.current = true;
       return;
     }
     setFilterRecipientId((prev) => {
@@ -66,7 +103,15 @@ export function LttpLichSuXuatTab({ storageUnitId, units = [], canWrite, storage
       }
       return String(units[0].id);
     });
-  }, [units]);
+    historyFiltersReadyRef.current = true;
+  }, [storageUnitId, units]);
+
+  useEffect(() => {
+    if (!historyFiltersReadyRef.current || !storageUnitId || filterRecipientId === "") {
+      return;
+    }
+    writeLichSuFilters(storageUnitId, { listFrom, listTo, filterRecipientId, page });
+  }, [storageUnitId, listFrom, listTo, filterRecipientId, page]);
 
   useEffect(() => {
     setPage(1);
@@ -301,7 +346,7 @@ export function LttpLichSuXuatTab({ storageUnitId, units = [], canWrite, storage
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border/60">
-        <table className="w-full min-w-[40rem] border-collapse text-left text-[11px]">
+        <table className="w-full min-w-[44rem] border-collapse text-left text-[11px]">
           <thead className="bg-secondary/90">
             <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
               <th className="w-10 px-2 py-2">
@@ -318,7 +363,7 @@ export function LttpLichSuXuatTab({ storageUnitId, units = [], canWrite, storage
               <th className="px-2 py-2">Đơn vị nhận</th>
               <th className="px-2 py-2">Số phiếu</th>
               <th className="px-2 py-2 text-right">Thành tiền</th>
-              <th className="w-32 px-2 py-2 text-right">Thao tác</th>
+              <th className="min-w-[13rem] whitespace-nowrap px-2 py-2 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -356,8 +401,8 @@ export function LttpLichSuXuatTab({ storageUnitId, units = [], canWrite, storage
                   </td>
                   <td className="px-2 py-1.5 font-mono text-[10px] text-muted-foreground">{soPhieu}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{formatVnd(total)}</td>
-                  <td className="px-2 py-1.5 text-right">
-                    <div className="flex flex-wrap items-center justify-end gap-0.5">
+                  <td className="min-w-[13rem] whitespace-nowrap px-2 py-1.5 text-right align-middle">
+                    <div className="flex flex-nowrap items-center justify-end gap-1">
                       <Button
                         type="button"
                         size="sm"
@@ -368,6 +413,17 @@ export function LttpLichSuXuatTab({ storageUnitId, units = [], canWrite, storage
                         <Printer className="size-3" />
                         In
                       </Button>
+                      {canWrite && typeof onRequestEdit === "function" ? (
+                        <IconButton
+                          label="Sửa phiếu"
+                          variant="ghost"
+                          className="h-7"
+                          onClick={() => onRequestEdit(s)}
+                          disabled={delBusy}
+                        >
+                          <Pencil className="size-3.5" />
+                        </IconButton>
+                      ) : null}
                       {canWrite ? (
                         <IconButton
                           label="Thu hồi"

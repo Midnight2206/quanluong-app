@@ -47,6 +47,7 @@ import {
   putIssueFormDefaultsController,
   putRecipientDefaultUserController,
   resolveIssueSlipLineController,
+  updateIssueSlipController,
 } from "./lttp.controller.js";
 import { LTTP_ROUTE_DEFINITIONS } from "./lttp.route-definitions.js";
 import {
@@ -78,6 +79,7 @@ import {
   priceTableParamsSchema,
   putRecipientDefaultUserBodySchema,
   recipientDefaultByUnitQuerySchema,
+  updateIssueSlipBodySchema,
   upsertIssueFormDefaultsBodySchema,
 } from "./lttp.validator.js";
 
@@ -233,6 +235,14 @@ lttpRouter.get(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   permissionMiddleware([routePermissions.getIssueSlip]),
   asyncHandler(getIssueSlipController),
+);
+
+lttpRouter.put(
+  "/issue-slips/:id",
+  validateRequest({ params: issueSlipIdParamsSchema, body: updateIssueSlipBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.updateIssueSlip]),
+  asyncHandler(updateIssueSlipController),
 );
 
 lttpRouter.delete(

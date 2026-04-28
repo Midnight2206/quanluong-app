@@ -39,6 +39,7 @@ import {
   patchPriceTable,
   putRecipientDefaultUser,
   resolveIssueSlipLine,
+  updateIssueSlip,
   upsertIssueFormDefaults,
 } from "./lttp.service.js";
 
@@ -479,6 +480,20 @@ async function deleteIssueSlipController(req, res) {
   });
 }
 
+async function updateIssueSlipController(req, res) {
+  const row = await updateIssueSlip(
+    req.validatedParams.id,
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã cập nhật phiếu xuất",
+    data: row,
+  });
+}
+
 async function getNextIssueSlipSerialController(req, res) {
   const data = await getNextIssueSlipSerial(
     req.validatedQuery,
@@ -579,4 +594,5 @@ export {
   putIssueFormDefaultsController,
   putRecipientDefaultUserController,
   resolveIssueSlipLineController,
+  updateIssueSlipController,
 };

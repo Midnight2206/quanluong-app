@@ -158,6 +158,21 @@ const createIssueSlipBodySchema = z.object({
   signerApprover: z.string().max(191).optional().nullable(),
 });
 
+const updateIssueSlipBodySchema = z.object({
+  note: z.string().max(500).optional().nullable(),
+  lines: z.array(issueSlipLineInputSchema).min(1).max(500),
+  recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
+  recipientUserId: z.coerce.number().int().positive().optional().nullable(),
+  recipientDisplayName: z.string().max(191).optional().nullable(),
+  printLine1: z.string().max(255).optional().nullable(),
+  printLine2: z.string().max(128).optional().nullable(),
+  formMauSo: z.string().max(64).optional().nullable(),
+  warehouseFrom: z.string().max(128).optional().nullable(),
+  signerWriter: z.string().max(191).optional().nullable(),
+  signerRecipient: z.string().max(191).optional().nullable(),
+  signerApprover: z.string().max(191).optional().nullable(),
+});
+
 const listIssueSlipsQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   from: z
@@ -284,5 +299,6 @@ export {
   priceTableParamsSchema,
   putRecipientDefaultUserBodySchema,
   recipientDefaultByUnitQuerySchema,
+  updateIssueSlipBodySchema,
   upsertIssueFormDefaultsBodySchema,
 };

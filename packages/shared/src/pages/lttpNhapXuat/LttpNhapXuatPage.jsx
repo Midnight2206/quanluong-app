@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -9,9 +9,13 @@ import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
 import { TabPanel } from "@/components/common/TabPanel";
+import { writePersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpNguoiNhanBulkModal } from "./LttpNguoiNhanBulkModal";
+import { readStoredManualUnitId, writeStoredManualUnitId } from "./lttpNhapXuatSessionPersist";
+
+const LTTP_TAB_PERSIST_ID = "lttp-nhap-xuat";
 
 function sortUnitsByPath(units) {
   return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
@@ -45,9 +49,47 @@ export function LttpNhapXuatPage() {
 
   const [manualUnitId, setManualUnitId] = useState(null);
   const [bulkRecipientOpen, setBulkRecipientOpen] = useState(false);
+  const [editingSlip, setEditingSlip] = useState(null);
+  const [tabRemountKey, setTabRemountKey] = useState(0);
+
+  const didRestoreManualUnitRef = useRef(false);
+  /** Khôi phục đơn vị kho đã chọn một lần sau khi có danh sách đơn vị (remount hoặc lần đầu load). */
+  useEffect(() => {
+    if (!canPickUnits || !sortedUnits.length || didRestoreManualUnitRef.current) {
+      return;
+    }
+    const stored = readStoredManualUnitId();
+    if (stored != null && sortedUnits.some((u) => Number(u.id) === stored)) {
+      setManualUnitId(stored);
+    }
+    didRestoreManualUnitRef.current = true;
+  }, [canPickUnits, sortedUnits]);
+
   useEffect(() => {
     setManualUnitId(null);
+    writeStoredManualUnitId(null);
+    setEditingSlip(null);
   }, [workingUnitId]);
+
+  const persistManualUnitId = useCallback((next) => {
+    setManualUnitId(next);
+    writeStoredManualUnitId(next);
+  }, []);
+
+  const handleRequestEditSlip = useCallback((slip) => {
+    if (!slip) {
+      return;
+    }
+    writePersistedNavTab(LTTP_TAB_PERSIST_ID, "phieu-xuat");
+    setEditingSlip(slip);
+    setTabRemountKey((k) => k + 1);
+  }, []);
+
+  const handleCancelEditSlip = useCallback(() => {
+    writePersistedNavTab(LTTP_TAB_PERSIST_ID, "lich-su");
+    setEditingSlip(null);
+    setTabRemountKey((k) => k + 1);
+  }, []);
 
   const effectiveUnitId = manualUnitId ?? selectedUnitId;
 
@@ -86,7 +128,7 @@ export function LttpNhapXuatPage() {
               value={String(effectiveUnitId ?? "")}
               onChange={(e) => {
                 const v = e.target.value;
-                setManualUnitId(v === "" ? null : Number(v));
+                persistManualUnitId(v === "" ? null : Number(v));
               }}
             >
               {sortedUnits.map((u) => (
@@ -125,10 +167,11 @@ export function LttpNhapXuatPage() {
             <p className="text-xs text-destructive">Chưa có đơn vị làm việc — gán đơn vị cho tài khoản.</p>
           ) : (
             <TabPanel
+              key={tabRemountKey}
               scrollablePanel={false}
               stickyTabList
               equalWidthTabs
-              persistId="lttp-nhap-xuat"
+              persistId={LTTP_TAB_PERSIST_ID}
               defaultTabId="phieu-xuat"
               tabs={[
                 {
@@ -136,11 +179,15 @@ export function LttpNhapXuatPage() {
                   label: "Phiếu xuất",
                   panel: (
                     <LttpPhieuXuatTab
+                      key={editingSlip ? `edit-${editingSlip.id}` : "create"}
                       selectedUnitId={effectiveUnitId}
                       canWrite={canWrite}
                       unitLabel={unitLabel}
                       units={sortedUnits}
                       canPickUnits={canPickUnits}
+                      editingSlip={editingSlip}
+                      onCancelEdit={handleCancelEditSlip}
+                      onUpdated={handleCancelEditSlip}
                     />
                   ),
                 },
@@ -153,6 +200,7 @@ export function LttpNhapXuatPage() {
                       storageUnitName={unitLabel}
                       units={sortedUnits}
                       canWrite={canWrite}
+                      onRequestEdit={handleRequestEditSlip}
                     />
                   ),
                 },
