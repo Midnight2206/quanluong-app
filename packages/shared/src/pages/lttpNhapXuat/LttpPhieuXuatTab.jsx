@@ -17,7 +17,7 @@ import {
   useUpdateLttpIssueSlipMutation,
 } from "@/features/lttp/api/lttpApi";
 import { apiRequest } from "@/services/apiRequest";
-import { notifyError, notifySuccess } from "@/services/notify";
+import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { vndToVietnameseDocumentLine } from "@/utils/vndVietnameseText";
 import { LttpIssueSlipPrintDocument } from "./LttpIssueSlipPrintDocument";
@@ -716,8 +716,16 @@ export function LttpPhieuXuatTab({
         if (focusQuantity) {
           focusRowQuantity(key);
         }
-        if (!silent) {
+        const missingPrice =
+          d?.missingEffectivePrice === true ||
+          d?.unitPrice == null ||
+          (typeof d.unitPrice === "number" && !Number.isFinite(d.unitPrice));
+        if (!missingPrice && !silent) {
           notifySuccess("Đã lấy giá theo ngày.");
+        } else if (missingPrice && focusQuantity) {
+          notifyWarning(
+            "Đã nhận mặt hàng nhưng chưa có đơn giá tại ngày phiếu trong bảng giá LTTP — cập nhật bảng giá hiệu lực hoặc import bảng giá (Excel) để có giá và lưu phiếu.",
+          );
         }
       } catch (err) {
         if (!silent) {

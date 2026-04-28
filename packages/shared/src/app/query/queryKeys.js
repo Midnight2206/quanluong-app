@@ -48,6 +48,13 @@ export const qk = {
       String(recipientUnitId ?? ""),
     ],
     receivingDefaultRecipientsList: () => ["lttp", "receivingDefaultRecipientsList"],
+    dailyOrderSummary: (unitId, date, supplierFilter) => [
+      "lttp",
+      "dailyOrderSummary",
+      String(unitId ?? ""),
+      date ?? "",
+      supplierFilter ?? "all",
+    ],
   },
   mealRoster: {
     root: ["mealRoster"],

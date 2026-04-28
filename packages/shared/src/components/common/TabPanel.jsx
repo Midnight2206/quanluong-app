@@ -12,6 +12,8 @@ import { cn } from "@/utils/cn";
  * @param {boolean} [fullBleedInCard] — dùng khi `CardContent` có `p-0`: thanh tab kéo sát mép card; panel có padding ngang/dưới.
  * @param {boolean} [equalWidthTabs] — các nút tab chia đều chiều ngang (`flex-1`).
  * @param {string} [stickyTabListTopClassName] — với `stickyTabList`, class `top-*` (mặc định `top-0`; tab lồng dùng vd. `top-14`).
+ * @param {string} [forcedActiveTabId] — nếu thuộc `tabs`, ép tab hiển thị (vd. đồng bộ segment URL); khi `undefined` dùng state nội bộ.
+ * @param {(id: string) => void} [onTabSelect] — gọi sau khi đổi tab (điều hướng / side-effect ngoài).
  */
 export function TabPanel({
   tabs,
@@ -23,6 +25,8 @@ export function TabPanel({
   stickyTabListTopClassName,
   fullBleedInCard = false,
   equalWidthTabs = false,
+  forcedActiveTabId,
+  onTabSelect,
 }) {
   const baseId = useId();
   const firstId = tabs[0]?.id;
@@ -38,12 +42,17 @@ export function TabPanel({
     return null;
   }
 
-  const safeActive =
-    tabs.some((t) => t.id === activeId) && activeId ? activeId : firstId;
+  const safeActive = (() => {
+    if (forcedActiveTabId && validIds.includes(forcedActiveTabId)) {
+      return forcedActiveTabId;
+    }
+    return tabs.some((t) => t.id === activeId) && activeId ? activeId : firstId;
+  })();
   const activeTab = tabs.find((t) => t.id === safeActive) ?? tabs[0];
 
   function handleSelectTab(id) {
     setActiveId(id);
+    onTabSelect?.(id);
   }
 
   return (

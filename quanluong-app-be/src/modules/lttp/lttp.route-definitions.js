@@ -326,6 +326,18 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "dailyOrderSummary",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/daily-order-summary",
+    pathRoute: "/api/lttp/issue-slips/daily-order-summary",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "LTTP daily order summary from issue slips",
+      description: "Tổng hợp đặt hàng theo ngày từ phiếu xuất (theo đơn vị nhận, ghi chú, số lượng mặt hàng).",
+    },
+  },
+  {
     key: "nextIssueSlipSerial",
     method: "GET",
     module: LTTP_MODULE_NAME,

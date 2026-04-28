@@ -792,20 +792,18 @@ async function resolveIssueSlipLine({ unitId, date, code }, scope, effectiveUnit
   }
   const eff = await getEffectivePrices({ unitId, date }, scope, effectiveUnitIds, dataScope);
   const item = eff.items.find((i) => i.commodity.id === commodity.id);
-  if (!item || item.unitPrice == null) {
-    throw new AppError({
-      message: "Chưa có đơn giá cho mặt hàng tại ngày đã chọn",
-      statusCode: 400,
-      code: ERROR_CODES.VALIDATION_ERROR,
-    });
-  }
+  /** Mặt hàng mới tạo từ app thường chưa có dòng trên bảng giá hiệu lực — vẫn tra được mã để điền dòng; đơn giá nhập qua cập nhật bảng giá. */
+  const unitPrice = item?.unitPrice ?? null;
+  const tgsxPrice = item?.tgsxPrice ?? null;
+  const partnerUnitPrice = item?.partnerUnitPrice ?? null;
   return {
     commodity: mapCommodity(commodity),
-    unitPrice: item.unitPrice,
-    tgsxPrice: item.tgsxPrice,
-    partnerUnitPrice: item.partnerUnitPrice,
+    unitPrice,
+    tgsxPrice,
+    partnerUnitPrice,
     appliedEffectiveDate: eff.appliedEffectiveDate,
     appliedPriceTableId: eff.appliedPriceTableId,
+    missingEffectivePrice: unitPrice == null,
   };
 }
 
@@ -1327,6 +1325,222 @@ async function listIssueSlips(
     total,
     page,
     pageSize,
+  };
+}
+
+function formatAggregatedQuantity(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return "0";
+  const s = x.toFixed(4);
+  const t = s.replace(/\.?0+$/, "");
+  return t === "" ? "0" : t;
+}
+
+function lineMatchesSupplierOrderFilter(line, filter) {
+  if (filter === "all") {
+    return true;
+  }
+  if (filter === "none") {
+    return line.lttpSupplierId == null;
+  }
+  return Number(line.lttpSupplierId) === Number(filter);
+}
+
+function collectAvailableSuppliersFromSlips(slips) {
+  /** @type Map<string, { id: number | null; name: string }> */
+  const byKey = new Map();
+  for (const slip of slips) {
+    for (const line of slip.lines ?? []) {
+      if (line.lttpSupplierId == null) {
+        if (!byKey.has("__none__")) {
+          byKey.set("__none__", { id: null, name: "Chưa gán đối tác" });
+        }
+      } else {
+        const sid = line.lttpSupplierId;
+        const k = String(sid);
+        if (!byKey.has(k)) {
+          const nm =
+            line.lttpSupplier?.name != null && String(line.lttpSupplier.name).trim() !== ""
+              ? line.lttpSupplier.name
+              : `Đối tác #${sid}`;
+          byKey.set(k, { id: sid, name: nm });
+        }
+      }
+    }
+  }
+  const list = [...byKey.values()];
+  list.sort((a, b) => {
+    if (a.id == null && b.id != null) return 1;
+    if (a.id != null && b.id == null) return -1;
+    return a.name.localeCompare(b.name, "vi");
+  });
+  return list;
+}
+
+/**
+ * Một ngày — bảng đặt hàng từ phiếu xuất: có thể lọc theo đối tác cấp (`lttpSupplierId` trên dòng).
+ * Theo đơn vị nhận (ghi chú phiếu), cộng dồn số lượng theo mặt hàng chỉ trên các dòng khớp bộ lọc.
+ */
+async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope) {
+  const { unitId, date } = payload;
+  /** @type {"all"|"none"|number} */
+  const supplierFilter = payload.supplierFilter === undefined ? "all" : payload.supplierFilter;
+
+  assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  const storageUnitId = dataScope.storageUnitId;
+  const issueDate = parseDateOnly(date);
+
+  const unitRow =
+    storageUnitId != null
+      ? await prisma.unit.findUnique({
+          where: { id: storageUnitId },
+          select: { id: true, name: true },
+        })
+      : null;
+
+  const slips = await prisma.lttpIssueSlip.findMany({
+    where: {
+      unitId: storageUnitId,
+      issueDate,
+    },
+    orderBy: [{ id: "asc" }],
+    include: issueSlipInclude,
+  });
+
+  const availableSuppliers = collectAvailableSuppliersFromSlips(slips);
+
+  if (typeof supplierFilter === "number") {
+    const exists = await prisma.lttpSupplier.findFirst({
+      where: { id: supplierFilter, unitId: storageUnitId },
+      select: { id: true },
+    });
+    if (!exists) {
+      throw new AppError({
+        message: "Đối tác không thuộc đơn vị kho hoặc không tồn tại",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+  }
+
+  /** @typedef {{ recipientUnitId: number|null, recipientUnitName: string, slipNotes: Set<string>, agg: Map<number, { commodityId: number; name: string; measureUnit: string; quantity: number }> }} Group */
+  /** @type {Map<string, Group>} */
+  const byRecipient = new Map();
+
+  let slipsWithIncludedLine = 0;
+
+  for (const slip of slips) {
+    const matchingLines = (slip.lines ?? []).filter((ln) =>
+      lineMatchesSupplierOrderFilter(ln, supplierFilter),
+    );
+    if (matchingLines.length === 0) {
+      continue;
+    }
+    slipsWithIncludedLine += 1;
+
+    const rid = slip.recipientUnitId;
+    const key = rid == null ? "__none__" : String(rid);
+
+    if (!byRecipient.has(key)) {
+      const nm =
+        slip.recipientUnit != null && slip.recipientUnit.name != null && String(slip.recipientUnit.name).trim() !== ""
+          ? slip.recipientUnit.name
+          : rid == null
+            ? "Chưa gán đơn vị nhận"
+            : `Đơn vị #${rid}`;
+      byRecipient.set(key, {
+        recipientUnitId: rid,
+        recipientUnitName: nm,
+        slipNotes: new Set(),
+        agg: new Map(),
+      });
+    }
+    const g = byRecipient.get(key);
+    if (slip.note != null && String(slip.note).trim() !== "") {
+      g.slipNotes.add(String(slip.note).trim());
+    }
+
+    for (const line of matchingLines) {
+      const cid = line.commodityId;
+      const qty = Number(line.quantity);
+      const name = line.commodity?.name ?? "?";
+      const measureUnit = line.commodity?.measureUnit ?? "";
+      const cur = g.agg.get(cid);
+      if (!cur) {
+        g.agg.set(cid, {
+          commodityId: cid,
+          name,
+          measureUnit,
+          quantity: Number.isFinite(qty) ? qty : 0,
+        });
+      } else {
+        cur.quantity += Number.isFinite(qty) ? qty : 0;
+      }
+    }
+  }
+
+  /** @type {Map<number, { commodityId: number; name: string; measureUnit: string; quantity: number }>} */
+  const grand = new Map();
+
+  const recipientGroups = [];
+  for (const g of byRecipient.values()) {
+    const lines = [...g.agg.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    if (lines.length === 0) continue;
+    for (const row of lines) {
+      const t = grand.get(row.commodityId);
+      if (!t) {
+        grand.set(row.commodityId, {
+          commodityId: row.commodityId,
+          name: row.name,
+          measureUnit: row.measureUnit,
+          quantity: row.quantity,
+        });
+      } else {
+        t.quantity += row.quantity;
+      }
+    }
+    recipientGroups.push({
+      recipientUnitId: g.recipientUnitId,
+      recipientUnitName: g.recipientUnitName,
+      slipNotes: [...g.slipNotes].sort((a, b) => a.localeCompare(b, "vi")),
+      lines: lines.map((row) => ({
+        commodityId: row.commodityId,
+        name: row.name,
+        measureUnit: row.measureUnit,
+        quantity: row.quantity,
+        quantityFormatted: formatAggregatedQuantity(row.quantity),
+      })),
+    });
+  }
+
+  recipientGroups.sort((a, b) => {
+    if (a.recipientUnitId == null && b.recipientUnitId != null) return 1;
+    if (a.recipientUnitId != null && b.recipientUnitId == null) return -1;
+    return a.recipientUnitName.localeCompare(b.recipientUnitName, "vi");
+  });
+
+  const grandTotals = [...grand.values()]
+    .sort((a, b) => a.name.localeCompare(b.name, "vi"))
+    .map((row) => ({
+      commodityId: row.commodityId,
+      name: row.name,
+      measureUnit: row.measureUnit,
+      quantity: row.quantity,
+      quantityFormatted: formatAggregatedQuantity(row.quantity),
+    }));
+
+  return {
+    date: issueDate.toISOString().slice(0, 10),
+    storageUnitId,
+    storageUnitName: unitRow?.name ?? null,
+    supplierFilter,
+    availableSuppliers,
+    slipCount: slipsWithIncludedLine,
+    totalSlipsOnDate: slips.length,
+    recipientGroups,
+    grandTotals,
   };
 }
 
@@ -3221,6 +3435,7 @@ export {
   putLttpPartnerPriceTableUnscoped,
   listLttpPartnerDebtSummary,
   listLttpPartnerPayments,
+  getDailyOrderSummary,
   getIssueFormDefaults,
   getIssueSlipById,
   getNextIssueSlipSerial,

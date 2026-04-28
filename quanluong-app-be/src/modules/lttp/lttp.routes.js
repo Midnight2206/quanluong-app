@@ -26,6 +26,7 @@ import {
   effectivePricesController,
   getCommodityController,
   getIssueFormDefaultsController,
+  getDailyOrderSummaryController,
   getIssueSlipController,
   getNextIssueSlipSerialController,
   getPriceTableController,
@@ -65,6 +66,7 @@ import {
   issueFormDefaultsQuerySchema,
   issueSlipIdParamsSchema,
   issueSlipResolveQuerySchema,
+  dailyOrderSummaryQuerySchema,
   listIssueSlipsQuerySchema,
   listRecipientUsersQuerySchema,
   nextIssueSlipSerialQuerySchema,
@@ -160,6 +162,14 @@ lttpRouter.get(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["date"] }),
   permissionMiddleware([routePermissions.resolveIssueSlipLine]),
   asyncHandler(resolveIssueSlipLineController),
+);
+
+lttpRouter.get(
+  "/issue-slips/daily-order-summary",
+  validateRequest({ query: dailyOrderSummaryQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["date"] }),
+  permissionMiddleware([routePermissions.dailyOrderSummary]),
+  asyncHandler(getDailyOrderSummaryController),
 );
 
 lttpRouter.get(

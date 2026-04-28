@@ -375,6 +375,27 @@ export function usePutLttpReceivingDefaultRecipientMutation() {
   });
 }
 
+export function useGetLttpDailyOrderSummaryQuery(arg, options = {}) {
+  const { unitId, date, supplierFilter = "all" } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.dailyOrderSummary(unitId, date, supplierFilter),
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp/issue-slips/daily-order-summary",
+        method: "get",
+        params: { unitId, date, supplierFilter },
+      }),
+    enabled:
+      skip !== true &&
+      unitId != null &&
+      unitId !== "" &&
+      date != null &&
+      String(date).trim() !== "",
+    ...rest,
+  });
+}
+
 export function useGetLttpIssueSlipsQuery(arg, options = {}) {
   const { unitId, from, to, recipientUnitId, page = 1, pageSize = 20 } = arg || {};
   const { skip, ...rest } = options;

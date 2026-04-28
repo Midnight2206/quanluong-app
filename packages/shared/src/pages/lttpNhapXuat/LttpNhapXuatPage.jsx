@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -9,13 +10,17 @@ import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
 import { TabPanel } from "@/components/common/TabPanel";
-import { writePersistedNavTab } from "@/hooks/usePersistedNavTab";
+import { useSyncPersistedNavTabFromRoute, writePersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
+import { LttpOrderingTab } from "./LttpOrderingTab";
 import { LttpNguoiNhanBulkModal } from "./LttpNguoiNhanBulkModal";
 import { readStoredManualUnitId, writeStoredManualUnitId } from "./lttpNhapXuatSessionPersist";
 
 const LTTP_TAB_PERSIST_ID = "lttp-nhap-xuat";
+/** Khớp thư mục `app/.../lttp-nhap-xuat/ordering-lttp/` */
+const LTTP_ORDER_TAB_ID = "ordering-lttp";
+const LTTP_ORDERING_ROUTE_PATH = "/lttp-nhap-xuat/ordering-lttp";
 
 function sortUnitsByPath(units) {
   return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
@@ -45,6 +50,11 @@ function unitsWithinSubtree(allUnits, rootId) {
 }
 
 export function LttpNhapXuatPage() {
+  const router = useRouter();
+  const pathname = usePathname() ?? "";
+  const orderingRouteForced =
+    pathname === LTTP_ORDERING_ROUTE_PATH || pathname.endsWith(`/ordering-lttp`);
+
   const user = useCurrentUser();
   const { workingUnitId, isPrivileged } = useTargetUnitScope();
   const canRead = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_READ);
@@ -130,6 +140,23 @@ export function LttpNhapXuatPage() {
     setTabRemountKey((k) => k + 1);
   }, []);
 
+  const handleNhapXuatTabNavigate = useCallback(
+    (id) => {
+      if (id === LTTP_ORDER_TAB_ID) {
+        router.push(LTTP_ORDERING_ROUTE_PATH);
+        return;
+      }
+      router.push("/lttp-nhap-xuat");
+    },
+    [router],
+  );
+
+  useSyncPersistedNavTabFromRoute(
+    LTTP_TAB_PERSIST_ID,
+    ["phieu-xuat", "lich-su", LTTP_ORDER_TAB_ID],
+    orderingRouteForced ? LTTP_ORDER_TAB_ID : undefined,
+  );
+
   const effectiveUnitId = useMemo(() => manualUnitId ?? selectedUnitId, [manualUnitId, selectedUnitId]);
 
   /** Dropdown kho: user thường chỉ các đơn vị trong nhánh (path) của đơn vị gốc — khớp scope SUBTREE API. */
@@ -167,7 +194,10 @@ export function LttpNhapXuatPage() {
     <section className="min-w-0 pb-6 print:hidden">
       <div className="mb-2 space-y-0.5">
         <h1 className="text-base font-semibold tracking-tight sm:text-lg">Nhập xuất LTTP</h1>
-        <p className="text-[11px] text-muted-foreground">Chọn kho cấp phát bên dưới, lập phiếu ở tab Phiếu xuất; lịch sử và in hàng loạt ở tab tương ứng.</p>
+        <p className="text-[11px] text-muted-foreground">
+          Chọn kho cấp phát — tab Phiếu xuất, Lịch sử xuất kho, hoặc Đặt hàng (tổng hợp phiếu trong ngày; có đường dẫn riêng{" "}
+          <span className="font-mono text-[10px]">…/ordering-lttp</span> để chia sẻ và in).
+        </p>
       </div>
 
       {canPickUnits && unitsForKhoDropdown.length > 0 && effectiveUnitId != null ? (
@@ -225,6 +255,8 @@ export function LttpNhapXuatPage() {
               equalWidthTabs
               persistId={LTTP_TAB_PERSIST_ID}
               defaultTabId="phieu-xuat"
+              forcedActiveTabId={orderingRouteForced ? LTTP_ORDER_TAB_ID : undefined}
+              onTabSelect={handleNhapXuatTabNavigate}
               tabs={[
                 {
                   id: "phieu-xuat",
@@ -254,6 +286,13 @@ export function LttpNhapXuatPage() {
                       canWrite={canWrite}
                       onRequestEdit={handleRequestEditSlip}
                     />
+                  ),
+                },
+                {
+                  id: LTTP_ORDER_TAB_ID,
+                  label: "Đặt hàng",
+                  panel: (
+                    <LttpOrderingTab effectiveUnitId={effectiveUnitId} storageUnitName={unitLabel ?? ""} />
                   ),
                 },
               ]}

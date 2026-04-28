@@ -212,6 +212,25 @@ const nextIssueSlipSerialQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
 });
 
+/** `all` | `none` (không chọn đối tác trên dòng) | id đối tác kho đang chọn. */
+const dailyOrderSummaryQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+  supplierFilter: z
+    .preprocess((v) => {
+      if (v === "" || v === undefined || v === null) return "all";
+      if (typeof v === "string") {
+        const t = v.trim().toLowerCase();
+        if (t === "" || t === "all") return "all";
+        if (t === "none") return "none";
+        const n = Number(v);
+        if (Number.isInteger(n) && n > 0) return n;
+      }
+      if (typeof v === "number" && Number.isInteger(v) && v > 0) return v;
+      return "all";
+    }, z.union([z.literal("all"), z.literal("none"), z.number().int().positive()])),
+});
+
 const issueFormDefaultsQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
 });
@@ -277,6 +296,7 @@ export {
   commodityQuerySchema,
   createCommodityBodySchema,
   createFoodGroupBodySchema,
+  dailyOrderSummaryQuerySchema,
   createIssueSlipBodySchema,
   createPriceTableBodySchema,
   effectiveQuerySchema,

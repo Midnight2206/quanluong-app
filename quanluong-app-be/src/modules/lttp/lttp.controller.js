@@ -19,6 +19,7 @@ import {
   getCommodityById,
   getEffectivePrices,
   putLttpCommodityDefaultSupplier,
+  getDailyOrderSummary,
   getIssueFormDefaults,
   getIssueSlipById,
   getRecipientDefaultUserByUnit,
@@ -427,6 +428,19 @@ async function listIssueSlipsController(req, res) {
   });
 }
 
+async function getDailyOrderSummaryController(req, res) {
+  const data = await getDailyOrderSummary(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã tổng hợp đặt hàng theo phiếu xuất",
+    data,
+  });
+}
+
 async function resolveIssueSlipLineController(req, res) {
   const data = await resolveIssueSlipLine(
     { unitId: req.validatedQuery.unitId, date: req.validatedQuery.date, code: req.validatedQuery.code },
@@ -572,6 +586,7 @@ export {
   getCommodityController,
   putLttpCommodityDefaultSupplierController,
   getIssueFormDefaultsController,
+  getDailyOrderSummaryController,
   getRecipientDefaultUserByUnitController,
   getIssueSlipController,
   getNextIssueSlipSerialController,

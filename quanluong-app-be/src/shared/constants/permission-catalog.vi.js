@@ -172,7 +172,7 @@ const PERMISSION_CATALOG_VI = {
   "lttp.issue-slips.read": {
     name: "Xem phiếu xuất LTTP",
     description:
-      "Xem danh sách và chi tiết phiếu xuất lương thực thực phẩm theo ngày; tra mã mặt hàng cùng đơn giá tham chiếu theo bảng giá hiệu lực tại ngày (trong phạm vi đơn vị dữ liệu và nhánh đơn vị).",
+      "Xem danh sách và chi tiết phiếu xuất lương thực thực phẩm theo ngày; tra mã mặt hàng cùng đơn giá tham chiếu theo bảng giá hiệu lực tại ngày; tổng hợp đặt hàng theo ngày từ các phiếu (trong phạm vi đơn vị dữ liệu và nhánh đơn vị).",
   },
   "lttp.issue-slips.write": {
     name: "Lập, sửa & xóa phiếu xuất LTTP",
