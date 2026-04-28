@@ -105,10 +105,12 @@ async function assertConversionMatchesGroup(groupId, conversionRate) {
 }
 
 function assertUnitInEffectiveBranch(unitId, effectiveUnitIds) {
+  const uid =
+    unitId !== null && unitId !== undefined && unitId !== "" ? Number(unitId) : unitId;
   if (
     effectiveUnitIds != null &&
     effectiveUnitIds.length > 0 &&
-    !effectiveUnitIds.includes(unitId)
+    !effectiveUnitIds.some((id) => Number(id) === Number(uid))
   ) {
     throw new AppError({
       message: "Đơn vị ngoài nhánh đang chọn (X-Target-Unit-Id).",

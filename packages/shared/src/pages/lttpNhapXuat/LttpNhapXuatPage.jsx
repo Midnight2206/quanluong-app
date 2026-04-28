@@ -23,7 +23,7 @@ function sortUnitsByPath(units) {
 
 export function LttpNhapXuatPage() {
   const user = useCurrentUser();
-  const { workingUnitId } = useTargetUnitScope();
+  const { workingUnitId, isPrivileged } = useTargetUnitScope();
   const canRead = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_READ);
   const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
   const canPickUnits = useHasPermission(PERMISSIONS.UNITS_READ);
@@ -41,11 +41,22 @@ export function LttpNhapXuatPage() {
     if (workingUnitId != null) {
       return Number(workingUnitId);
     }
+    /**
+     * User thường không gửi X-Target-Unit-Id — API siết `effectiveUnitIds` = đúng `user.unit.id`.
+     * Không được mặc định kho = `sortedUnits[0]` (thường là đơn vị khác theo thứ tự path), kẻo lưu phiếu lỗi 403.
+     */
+    if (
+      !isPrivileged &&
+      defaultUnitId != null &&
+      sortedUnits.some((u) => Number(u.id) === Number(defaultUnitId))
+    ) {
+      return defaultUnitId;
+    }
     if (sortedUnits.length) {
       return sortedUnits[0].id;
     }
     return defaultUnitId;
-  }, [canPickUnits, defaultUnitId, workingUnitId, sortedUnits]);
+  }, [canPickUnits, defaultUnitId, isPrivileged, workingUnitId, sortedUnits]);
 
   const [manualUnitId, setManualUnitId] = useState(null);
   const [bulkRecipientOpen, setBulkRecipientOpen] = useState(false);
