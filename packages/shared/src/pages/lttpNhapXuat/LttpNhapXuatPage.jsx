@@ -13,6 +13,7 @@ import { writePersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpNguoiNhanBulkModal } from "./LttpNguoiNhanBulkModal";
+import { cn } from "@/utils/cn";
 import { readStoredManualUnitId, writeStoredManualUnitId } from "./lttpNhapXuatSessionPersist";
 
 const LTTP_TAB_PERSIST_ID = "lttp-nhap-xuat";
@@ -42,14 +43,10 @@ export function LttpNhapXuatPage() {
       return Number(workingUnitId);
     }
     /**
-     * User thường không gửi X-Target-Unit-Id — API siết `effectiveUnitIds` = đúng `user.unit.id`.
-     * Không được mặc định kho = `sortedUnits[0]` (thường là đơn vị khác theo thứ tự path), kẻo lưu phiếu lỗi 403.
+     * User thường (không phải admin/superadmin): phạm vi API EXACT chỉ có `user.unit.id`.
+     * Luôn lấy đơn vị đó làm kho — không fallback `sortedUnits[0]` (dễ lệch id trong cây đơn vị → 403 X-Target).
      */
-    if (
-      !isPrivileged &&
-      defaultUnitId != null &&
-      sortedUnits.some((u) => Number(u.id) === Number(defaultUnitId))
-    ) {
+    if (!isPrivileged && defaultUnitId != null) {
       return defaultUnitId;
     }
     if (sortedUnits.length) {
@@ -64,17 +61,24 @@ export function LttpNhapXuatPage() {
   const [tabRemountKey, setTabRemountKey] = useState(0);
 
   const didRestoreManualUnitRef = useRef(false);
-  /** Khôi phục đơn vị kho đã chọn một lần sau khi có danh sách đơn vị (remount hoặc lần đầu load). */
+  useEffect(() => {
+    didRestoreManualUnitRef.current = false;
+  }, [user?.id]);
+
+  /** Khôi phục nháp kho từ session — chỉ privileged; user thường không đổi nhánh kho được (EXACT scope). */
   useEffect(() => {
     if (!canPickUnits || !sortedUnits.length || didRestoreManualUnitRef.current) {
+      return;
+    }
+    didRestoreManualUnitRef.current = true;
+    if (!isPrivileged) {
       return;
     }
     const stored = readStoredManualUnitId();
     if (stored != null && sortedUnits.some((u) => Number(u.id) === stored)) {
       setManualUnitId(stored);
     }
-    didRestoreManualUnitRef.current = true;
-  }, [canPickUnits, sortedUnits]);
+  }, [canPickUnits, sortedUnits, isPrivileged]);
 
   useEffect(() => {
     setManualUnitId(null);
@@ -102,7 +106,28 @@ export function LttpNhapXuatPage() {
     setTabRemountKey((k) => k + 1);
   }, []);
 
-  const effectiveUnitId = manualUnitId ?? selectedUnitId;
+  /**
+   * Kho gửi API — user thường chỉ được đơn vị của tài khoản; bỏ qua manual/sessionStorage để không 403 nhánh EXACT.
+   */
+  const effectiveUnitId = useMemo(() => {
+    if (!isPrivileged && defaultUnitId != null) {
+      return Number(defaultUnitId);
+    }
+    return manualUnitId ?? selectedUnitId;
+  }, [defaultUnitId, isPrivileged, manualUnitId, selectedUnitId]);
+
+  /** Dropdown kho: user thường chỉ thấy (và chỉ được) đơn vị của mình — tránh chọn nhầm id khác. */
+  const unitsForKhoDropdown = useMemo(() => {
+    if (!isPrivileged && defaultUnitId != null) {
+      const rows = sortedUnits.filter((u) => Number(u.id) === Number(defaultUnitId));
+      if (rows.length > 0) {
+        return rows;
+      }
+      const fallbackName = user?.unit?.name ?? `Đơn vị #${defaultUnitId}`;
+      return [{ id: defaultUnitId, name: fallbackName }];
+    }
+    return sortedUnits;
+  }, [defaultUnitId, isPrivileged, sortedUnits, user?.unit?.name]);
 
   const unitLabel = useMemo(() => {
     if (effectiveUnitId == null) {
@@ -129,20 +154,24 @@ export function LttpNhapXuatPage() {
         <p className="text-[11px] text-muted-foreground">Chọn kho cấp phát bên dưới, lập phiếu ở tab Phiếu xuất; lịch sử và in hàng loạt ở tab tương ứng.</p>
       </div>
 
-      {canPickUnits && sortedUnits.length > 0 && effectiveUnitId != null ? (
+      {canPickUnits && unitsForKhoDropdown.length > 0 && effectiveUnitId != null ? (
         <div className="mb-3 flex flex-col gap-3 rounded-xl border border-border/80 bg-card/40 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <label className="min-w-0 flex-1 space-y-1 sm:max-w-md" htmlFor="lttp-io-unit">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">Đơn vị cấp phát (kho dữ liệu)</span>
             <select
               id="lttp-io-unit"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium outline-none focus:border-primary"
+              className={cn(
+                "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium outline-none focus:border-primary",
+                !isPrivileged && "cursor-not-allowed opacity-90",
+              )}
               value={String(effectiveUnitId ?? "")}
+              disabled={!isPrivileged}
               onChange={(e) => {
                 const v = e.target.value;
                 persistManualUnitId(v === "" ? null : Number(v));
               }}
             >
-              {sortedUnits.map((u) => (
+              {unitsForKhoDropdown.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.name ?? `Đơn vị #${u.id}`}
                 </option>
@@ -167,7 +196,7 @@ export function LttpNhapXuatPage() {
         <LttpNguoiNhanBulkModal
           open={bulkRecipientOpen}
           onClose={() => setBulkRecipientOpen(false)}
-          units={sortedUnits}
+          units={unitsForKhoDropdown}
           canWrite={canWrite}
         />
       ) : null}
@@ -194,7 +223,7 @@ export function LttpNhapXuatPage() {
                       selectedUnitId={effectiveUnitId}
                       canWrite={canWrite}
                       unitLabel={unitLabel}
-                      units={sortedUnits}
+                      units={unitsForKhoDropdown}
                       canPickUnits={canPickUnits}
                       editingSlip={editingSlip}
                       onCancelEdit={handleCancelEditSlip}
@@ -209,7 +238,7 @@ export function LttpNhapXuatPage() {
                     <LttpLichSuXuatTab
                       storageUnitId={effectiveUnitId}
                       storageUnitName={unitLabel}
-                      units={sortedUnits}
+                      units={unitsForKhoDropdown}
                       canWrite={canWrite}
                       onRequestEdit={handleRequestEditSlip}
                     />
