@@ -201,30 +201,19 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
     [units, selectedUnitId, unitLabel],
   );
 
-  const settingsSummary = useMemo(() => {
-    const whoParts = [];
-    if (recipientUnitLabel) {
-      whoParts.push(recipientUnitLabel);
-    }
-    if (recipientName?.trim()) {
-      whoParts.push(recipientName.trim());
-    } else if (recipientUserId) {
-      whoParts.push(`user #${recipientUserId}`);
-    }
-    const whoStr = whoParts.length ? whoParts.join(" — ") : "—";
-    return `Lề ${marginTop} / ${marginRight} / ${marginBottom} / ${marginLeft} cm · ${printFont.label} ${printFontSizePt}pt · Mẫu: ${formMauSo || "—"} · Nhận: ${whoStr}`;
-  }, [
-    formMauSo,
-    marginBottom,
-    marginLeft,
-    marginRight,
-    marginTop,
-    printFont.label,
-    printFontSizePt,
-    recipientName,
-    recipientUnitLabel,
-    recipientUserId,
-  ]);
+  const settingsSummary = useMemo(
+    () =>
+      `Lề ${marginTop} / ${marginRight} / ${marginBottom} / ${marginLeft} cm · ${printFont.label} ${printFontSizePt}pt · Mẫu: ${formMauSo || "—"}`,
+    [
+      formMauSo,
+      marginBottom,
+      marginLeft,
+      marginRight,
+      marginTop,
+      printFont.label,
+      printFontSizePt,
+    ],
+  );
 
   useEffect(() => {
     if (selectedUnitId == null) {
@@ -263,14 +252,6 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
       }
       if (d.signerApprover != null) {
         setSignerApprover(d.signerApprover);
-      }
-      if (d.defaultRecipientUnitId != null) {
-        setRecipientUnitId(d.defaultRecipientUnitId);
-      }
-      if (d.defaultRecipientUserId != null) {
-        setRecipientUserId(String(d.defaultRecipientUserId));
-      } else {
-        setRecipientUserId("");
       }
     }
     defLoadedKey.current = selectedUnitId;
@@ -589,7 +570,7 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
 
         <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-card/30 p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <div className="min-w-0 space-y-1">
-            <p className="text-[10px] font-medium uppercase text-muted-foreground">Cài đặt mẫu in &amp; người nhận</p>
+            <p className="text-[10px] font-medium uppercase text-muted-foreground">Cài đặt mẫu in</p>
             <p className="text-[11px] leading-relaxed text-foreground">{settingsSummary}</p>
             <p className="text-[9px] text-muted-foreground">
               Mặc định lề: 2 / 1,5 / 1,5 / 3 cm. In chỉ nội dung khổ phiếu (không gồm giao diện trang).
@@ -619,22 +600,22 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
             role="dialog"
             aria-modal="true"
             aria-labelledby="lttp-px-settings-title"
-            className="relative max-h-[min(100dvh,42rem)] w-full max-w-3xl overflow-y-auto rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+            className="relative flex max-h-dvh w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[42rem] sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-border bg-card px-4 pb-3 pt-4 sm:px-5">
+            <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border bg-card px-4 pb-3 pt-4 sm:px-5">
               <div className="min-w-0 space-y-0.5">
                 <p id="lttp-px-settings-title" className="text-[10px] font-semibold uppercase tracking-wide text-primary">
                   Cài đặt phiếu xuất
                 </p>
-                <p className="text-xs text-muted-foreground">Lề, font, mẫu, chữ ký, user nhận mặc định. Bảng giá theo đơn vị cấp ở thanh ứng dụng.</p>
+                <p className="text-xs text-muted-foreground">Lề, font, mẫu, chữ ký. Người nhận mặc định cấu hình tại modal «Người nhận mặc định». Bảng giá theo đơn vị cấp ở thanh ứng dụng.</p>
               </div>
               <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0 text-xs" onClick={() => setSettingsOpen(false)}>
                 Đóng
               </Button>
             </div>
 
-            <div className="space-y-3 p-4 sm:p-5">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:p-5">
               <p className="text-[10px] font-medium uppercase text-muted-foreground">Tuỳ chọn bản in</p>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                 <label className="text-[10px] text-muted-foreground">
@@ -741,44 +722,6 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                   <span className="font-medium text-foreground">Số phiếu</span> kế tiếp:{" "}
                   <span className="font-mono text-foreground">{nextSlipNoDisplay}</span> (cấp khi bấm Lưu phiếu xuất).
                 </p>
-                <label className="text-[10px] text-muted-foreground sm:col-span-2">
-                  Người nhận mặc định (user thuộc đơn vị nhận)
-                  <select
-                    className={cn(inputClass, "mt-0.5")}
-                    value={recipientUserId}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setRecipientUserId(v);
-                      if (!v) {
-                        setRecipientName("");
-                        setSignerRecipient("");
-                        return;
-                      }
-                      const p = recipientUsers.find((x) => String(x.id) === v);
-                      const name = (p?.fullName && String(p.fullName).trim()) || p?.username || "";
-                      setRecipientName(name);
-                      setSignerRecipient(name);
-                    }}
-                  >
-                    <option value="">— Chọn user —</option>
-                    {recipientUsers.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.fullName || u.username}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-[10px] text-muted-foreground sm:col-span-2">
-                  Họ tên người nhận in trên phiếu
-                  <input
-                    className={cn(inputClass, "mt-0.5")}
-                    value={recipientName}
-                    onChange={(e) => {
-                      setRecipientName(e.target.value);
-                      setSignerRecipient(e.target.value);
-                    }}
-                  />
-                </label>
                 <label className="text-[10px] text-muted-foreground">
                   Nhận tại kho
                   <input
@@ -793,14 +736,6 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                     className={cn(inputClass, "mt-0.5")}
                     value={signerWriter}
                     onChange={(e) => setSignerWriter(e.target.value)}
-                  />
-                </label>
-                <label className="text-[10px] text-muted-foreground">
-                  Người nhận hàng (ký)
-                  <input
-                    className={cn(inputClass, "mt-0.5")}
-                    value={signerRecipient}
-                    onChange={(e) => setSignerRecipient(e.target.value)}
                   />
                 </label>
                 <label className="text-[10px] text-muted-foreground">
@@ -831,8 +766,6 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                           warehouseFrom,
                           signerWriter,
                           signerApprover,
-                          defaultRecipientUnitId: recipientUnitId,
-                          defaultRecipientUserId: recipientUserId ? Number(recipientUserId) : null,
                         });
                         notifySuccess("Đã lưu cấu hình mẫu in theo đơn vị.");
                         setSettingsOpen(false);
@@ -844,7 +777,7 @@ export function LttpPhieuXuatTab({ selectedUnitId, canWrite, unitLabel, units = 
                     {putDefBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}
                     Lưu cấu hình mẫu in
                   </Button>
-                  <p className="text-[9px] text-muted-foreground">Ghi lại mẫu số, kho, chữ ký, đơn vị &amp; user nhận mặc định cho lần sau.</p>
+                  <p className="text-[9px] text-muted-foreground">Ghi lại mẫu số, kho, chữ ký cho lần sau.</p>
                 </div>
               </div>
               <p className="text-[9px] text-muted-foreground">

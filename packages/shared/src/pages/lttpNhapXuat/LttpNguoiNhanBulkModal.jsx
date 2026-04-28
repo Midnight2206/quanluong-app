@@ -122,10 +122,10 @@ export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative max-h-[min(100dvh,44rem)] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+        className="relative flex max-h-dvh w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[44rem] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-border bg-card px-4 py-3 sm:px-5">
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border bg-card px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <p id={titleId} className="text-sm font-semibold text-foreground">
               Người nhận mặc định theo đơn vị nhận
@@ -140,39 +140,41 @@ export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
           </Button>
         </div>
 
-        <div className="overflow-x-auto p-3 sm:p-4">
-          {listLoad ? (
-            <p className="px-2 py-4 text-[11px] text-muted-foreground">
-              <Loader2 className="inline size-3.5 animate-spin" /> Đang tải cấu hình…
-            </p>
-          ) : null}
-          <table className="w-full border-collapse text-left text-[11px]">
-            <thead>
-              <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
-                <th className="px-2 py-2">Đơn vị nhận (LTTP)</th>
-                <th className="px-2 py-2">Người nhận mặc định</th>
-                <th className="w-20 px-2 py-2 text-right">Lưu</th>
-              </tr>
-            </thead>
-            <tbody>
-              {units.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-2 py-4 text-muted-foreground">
-                    Không có danh sách đơn vị.
-                  </td>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="overflow-x-auto p-3 sm:p-4">
+            {listLoad ? (
+              <p className="px-2 py-4 text-[11px] text-muted-foreground">
+                <Loader2 className="inline size-3.5 animate-spin" /> Đang tải cấu hình…
+              </p>
+            ) : null}
+            <table className="w-full border-collapse text-left text-[11px]">
+              <thead>
+                <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
+                  <th className="px-2 py-2">Đơn vị nhận (LTTP)</th>
+                  <th className="px-2 py-2">Người nhận mặc định</th>
+                  <th className="w-20 px-2 py-2 text-right">Lưu</th>
                 </tr>
-              ) : (
-                units.map((u) => (
-                  <BulkRecipientRow
-                    key={u.id}
-                    unit={u}
-                    canWrite={canWrite}
-                    initialUserId={userIdByRecipient.get(u.id)}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {units.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-2 py-4 text-muted-foreground">
+                      Không có danh sách đơn vị.
+                    </td>
+                  </tr>
+                ) : (
+                  units.map((u) => (
+                    <BulkRecipientRow
+                      key={u.id}
+                      unit={u}
+                      canWrite={canWrite}
+                      initialUserId={userIdByRecipient.get(u.id)}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
