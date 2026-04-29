@@ -46,7 +46,7 @@ function createApp(options = {}) {
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: 300,
+      max: config.security.globalApiRateLimitMax,
       standardHeaders: true,
       legacyHeaders: false,
       skip: (req) => {

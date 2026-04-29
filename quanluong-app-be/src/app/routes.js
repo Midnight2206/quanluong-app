@@ -1,5 +1,4 @@
 import express from "express";
-import { authPostRateLimit } from "../middlewares/auth-rate-limit.middleware.js";
 import { authRouter } from "../modules/auth/auth.routes.js";
 import { jobTitlesRouter } from "../modules/job-titles/job-titles.routes.js";
 import { registrationsRouter } from "../modules/registrations/registrations.routes.js";
@@ -27,7 +26,7 @@ router.get("/health", (_req, res) => {
   });
 });
 
-router.use("/auth", authPostRateLimit, authRouter);
+router.use("/auth", authRouter);
 router.use("/job-titles", jobTitlesRouter);
 router.use("/registrations", registrationsRouter);
 router.use("/types", typesRouter);

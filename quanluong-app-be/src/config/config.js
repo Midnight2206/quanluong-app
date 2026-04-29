@@ -46,6 +46,8 @@ const config = {
   },
   security: {
     corsOrigins: env.corsOrigins,
+    /** Tối đa request / IP / 15 phút cho lớp rate-limit chung `app.js` (trừ đã skip). */
+    globalApiRateLimitMax: env.globalApiRateLimitMax,
   },
   media: {
     root: env.mediaRoot,

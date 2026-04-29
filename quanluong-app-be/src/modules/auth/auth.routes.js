@@ -1,4 +1,5 @@
 import express from "express";
+import { sensitiveAuthEndpointRateLimit } from "../../middlewares/auth-rate-limit.middleware.js";
 import { asyncHandler } from "../../shared/utils/async-handler.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
@@ -52,17 +53,25 @@ authRouter.get("/google/drive/status", authMiddleware, asyncHandler(googleDriveS
 authRouter.delete("/google/drive", authMiddleware, asyncHandler(googleDriveUnlinkController));
 authRouter.post(
   "/register",
+  sensitiveAuthEndpointRateLimit,
   validateRequest({ body: registerBodySchema }),
   asyncHandler(registerController),
 );
-authRouter.post("/login", validateRequest({ body: loginBodySchema }), asyncHandler(loginController));
+authRouter.post(
+  "/login",
+  sensitiveAuthEndpointRateLimit,
+  validateRequest({ body: loginBodySchema }),
+  asyncHandler(loginController),
+);
 authRouter.post(
   "/forgot-password",
+  sensitiveAuthEndpointRateLimit,
   validateRequest({ body: forgotPasswordBodySchema }),
   asyncHandler(forgotPasswordController),
 );
 authRouter.post(
   "/reset-password",
+  sensitiveAuthEndpointRateLimit,
   validateRequest({ body: resetPasswordBodySchema }),
   asyncHandler(resetPasswordController),
 );
@@ -89,6 +98,7 @@ authRouter.post(
 );
 authRouter.post(
   "/request-verification-email/public",
+  sensitiveAuthEndpointRateLimit,
   validateRequest({ body: requestVerificationEmailPublicBodySchema }),
   asyncHandler(requestVerificationEmailPublicController),
 );

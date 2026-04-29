@@ -82,6 +82,16 @@ const env = {
   minUnitDepthToApproveRegistration: Number(
     process.env.MIN_UNIT_DEPTH_TO_APPROVE_REGISTRATION ?? 0,
   ),
+  /**
+   * Giới hạn số HTTP request / IP / cửa sổ 15 phút cho toàn `/api` (express-rate-limit toàn app).
+   * SPA + nhiều tab + cùng WiFi/NAT — 300 thường chật; mặc định nâng nhẹ; tinh chỉnh bằng env production.
+   */
+  globalApiRateLimitMax: (() => {
+    const raw = process.env.GLOBAL_API_RATE_LIMIT_MAX;
+    const n = raw == null || String(raw).trim() === "" ? 1200 : Number(raw);
+    if (!Number.isFinite(n)) return 1200;
+    return Math.min(200_000, Math.max(50, Math.floor(n)));
+  })(),
   corsOrigins: (() => {
     const fromEnv = (process.env.CORS_ORIGINS || "")
       .split(",")
