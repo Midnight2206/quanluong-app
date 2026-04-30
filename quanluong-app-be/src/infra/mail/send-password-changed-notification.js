@@ -5,7 +5,7 @@ import { sendMultipartEmailViaGmailApi } from "./gmail-transactional.send.js";
 import { isGmailApiMailConfigured } from "./mail-capabilities.js";
 
 async function sendPasswordChangedNotification({ to, username }) {
-  const subject = "[Quản lương] Mật khẩu tài khoản đã được thay đổi";
+  const subject = "[Quân lương] Mật khẩu tài khoản đã được thay đổi";
   const text = `Xin chào${username ? ` ${username}` : ""},
 
 Mật khẩu tài khoản của bạn vừa được đổi thành công.

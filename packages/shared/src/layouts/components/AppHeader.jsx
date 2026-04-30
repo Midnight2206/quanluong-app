@@ -71,7 +71,7 @@ export function AppHeader() {
             </div>
             <div className="hidden sm:block">
               <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-                Quản Lương
+                Quân lương
               </p>
               <p className="text-xs font-semibold">Workspace</p>
             </div>

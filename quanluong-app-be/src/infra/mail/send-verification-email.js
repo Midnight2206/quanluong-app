@@ -11,7 +11,7 @@ function buildVerificationLink(token) {
 
 async function sendVerificationEmail({ to, token, username }) {
   const link = buildVerificationLink(token);
-  const subject = "[Quản lương] Xác minh địa chỉ email";
+  const subject = "[Quân lương] Xác minh địa chỉ email";
   const text = `Xin chào${username ? ` ${username}` : ""},
 
 Vui lòng mở liên kết sau để xác minh email (hiệu lực 48 giờ):

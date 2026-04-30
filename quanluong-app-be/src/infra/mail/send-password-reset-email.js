@@ -11,7 +11,7 @@ function buildPasswordResetLink(token) {
 
 async function sendPasswordResetEmail({ to, token, username }) {
   const link = buildPasswordResetLink(token);
-  const subject = "[Quản lương] Đặt lại mật khẩu";
+  const subject = "[Quân lương] Đặt lại mật khẩu";
   const text = `Xin chào${username ? ` ${username}` : ""},
 
 Bạn (hoặc ai đó) đã yêu cầu đặt lại mật khẩu. Mở liên kết sau (hiệu lực 1 giờ):

@@ -6,11 +6,13 @@ import {
 } from "../../lib/midnightSecretServer.js";
 import { MidnightGateForm } from "./MidnightGateForm";
 import { MidnightShell } from "./MidnightShell";
+import { quanLuongPageMeta } from "@/lib/quanLuongPageMeta";
 
-export const metadata = {
+export const metadata = quanLuongPageMeta({
   title: "Báo cáo nội bộ",
+  description: "Báo cáo ẩn nội bộ có mật cổng; không lập chỉ mục công khai.",
   robots: { index: false, follow: false },
-};
+});
 
 export default async function MidnightSecretPage() {
   const cookieStore = await cookies();
