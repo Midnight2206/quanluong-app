@@ -33,10 +33,17 @@ function formatViDate(ymd) {
   }
 }
 
+/** Quyển + số phiếu — nhãn phân biệt khi cùng đơn vị nhiều phiếu. */
+function slipRefLabel(bookMmyy, slipNo) {
+  const sn = slipNo != null && Number.isFinite(Number(slipNo)) ? String(Number(slipNo)).padStart(4, "0") : "—";
+  const b = bookMmyy != null && String(bookMmyy).trim() !== "" ? String(bookMmyy).trim() : "—";
+  return `Q.${b}-${sn}`;
+}
+
 /**
- * Giàn màu cột đơn vị (nền + viền trái) — tương thích sáng/tối, in vẫn nhìn phân nhánh.
+ * Giàn màu cột phiếu (nền + viền trái) — tương thích sáng/tối, in vẫn nhìn phân nhánh.
  */
-const UNIT_COLUMN_STYLES = [
+const SLIP_COLUMN_STYLES = [
   { bar: "bg-sky-500", cell: "bg-sky-500/[0.09] dark:bg-sky-500/15 border-sky-500/25" },
   { bar: "bg-violet-500", cell: "bg-violet-500/[0.09] dark:bg-violet-500/15 border-violet-500/25" },
   { bar: "bg-emerald-500", cell: "bg-emerald-500/[0.09] dark:bg-emerald-500/15 border-emerald-500/25" },
@@ -47,12 +54,8 @@ const UNIT_COLUMN_STYLES = [
   { bar: "bg-fuchsia-500", cell: "bg-fuchsia-500/[0.09] dark:bg-fuchsia-500/15 border-fuchsia-500/25" },
 ];
 
-function recipientColKey(unitId) {
-  return unitId == null ? "__none__" : String(unitId);
-}
-
 /**
- * Tab «Đặt hàng»: bảng ma trận mặt hàng × đơn vị nhận, màu phân nhánh.
+ * Tab «Đặt hàng»: bảng ma trận mặt hàng × từng phiếu xuất trong ngày, màu phân cột.
  */
 export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   const orderCaptureRef = useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -79,36 +82,35 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   }, [summary?.availableSuppliers, supplierFilterKey]);
 
   const matrix = useMemo(() => {
-    if (!summary?.grandTotals?.length && !summary?.recipientGroups?.length) {
+    if (!summary?.grandTotals?.length && !summary?.slipColumns?.length) {
       return null;
     }
 
-    const groups = [...(summary.recipientGroups || [])].sort((a, b) =>
-      a.recipientUnitName.localeCompare(b.recipientUnitName, "vi"),
-    );
+    const slips = [...(summary.slipColumns || [])];
 
-    /** @type {{ key: string, unitId: number|null, name: string, notes: string[], styleIdx: number }[]} */
-    const columns = groups.map((g, i) => ({
-      key: recipientColKey(g.recipientUnitId),
-      unitId: g.recipientUnitId,
-      name: g.recipientUnitName,
-      notes: g.slipNotes || [],
-      styleIdx: i % UNIT_COLUMN_STYLES.length,
+    /** @type {{ key: string; slipId: number; recipientUnitName: string; caption: string|null; refLabel: string; styleIdx: number }[]} */
+    const columns = slips.map((col, i) => ({
+      key: `slip-${col.slipId}`,
+      slipId: col.slipId,
+      recipientUnitName: col.recipientUnitName,
+      caption: col.note != null && String(col.note).trim() !== "" ? String(col.note).trim() : null,
+      refLabel: slipRefLabel(col.bookMmyy, col.slipNo),
+      styleIdx: i % SLIP_COLUMN_STYLES.length,
     }));
 
     const rows = [...(summary.grandTotals || [])].sort((a, b) => a.name.localeCompare(b.name, "vi"));
 
-    const qtyByRecipient = new Map();
-    for (const g of groups) {
-      const k = recipientColKey(g.recipientUnitId);
+    const qtyBySlip = new Map();
+    for (const s of slips) {
+      const k = `slip-${s.slipId}`;
       const m = new Map();
-      for (const line of g.lines || []) {
+      for (const line of s.lines || []) {
         m.set(line.commodityId, line.quantityFormatted);
       }
-      qtyByRecipient.set(k, m);
+      qtyBySlip.set(k, m);
     }
 
-    return { columns, rows, qtyByRecipient };
+    return { columns, rows, qtyBySlip };
   }, [summary]);
 
   const supplierFilterLabel = useMemo(() => {
@@ -158,8 +160,9 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   return (
     <div className="min-w-0 space-y-4 pb-2 print:pb-4" aria-busy={showLoader}>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Bảng gộp số lượng theo <span className="font-medium text-foreground">đơn vị nhận</span> — chỉ tính các dòng phiếu xuất
-        khớp <span className="font-medium text-foreground">đối tác cung cấp</span> (trên từng dòng) khi bạn chọn lọc bên dưới.
+        Mỗi <span className="font-medium text-foreground">phiếu xuất</span> trong ngày là một cột — cùng đơn vị nhận nhưng nhiều phiếu sẽ có nhiều cột. Dòng hai tiêu đề cột là{" "}
+        <span className="font-medium text-foreground">chú thích phiếu</span> (nhập khi viết phiếu). Chỉ tính các dòng khớp{" "}
+        <span className="font-medium text-foreground">đối tác cung cấp</span> khi bạn chọn lọc.
       </p>
 
       <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card/50 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-end print:hidden">
@@ -237,7 +240,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             <p className="mt-1 text-xs text-muted-foreground">
               {summary.slipCount === 0
                 ? "Không có dòng phiếu khớp bộ lọc trong ngày."
-                : `${summary.slipCount} phiếu có ít nhất một dòng khớp${typeof summary.totalSlipsOnDate === "number" ? ` — ${summary.totalSlipsOnDate} phiếu trong ngày (tổng)` : ""} — ${matrix?.columns?.length ?? 0} đơn vị nhận.`}
+                : `${summary.slipCount} phiếu có ít nhất một dòng khớp${typeof summary.totalSlipsOnDate === "number" ? ` — ${summary.totalSlipsOnDate} phiếu trong ngày (tổng)` : ""} — ${matrix?.columns?.length ?? 0} cột.`}
             </p>
           </>
           ) : null}
@@ -248,8 +251,8 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
         {!showLoader && matrix && matrix.columns.length > 0 && matrix.rows.length > 0 ? (
           <Card data-lttp-ordering-card className="overflow-hidden border-border/80 shadow-md print:break-inside-avoid">
             <div className="border-b border-border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-2.5">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground">Bảng đặt hàng theo đơn vị nhận</h2>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">Cuộn ngang nếu nhiều đơn vị — cột đầu (mặt hàng) luôn cố định khi cuộn.</p>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-foreground">Bảng đặt hàng theo phiếu</h2>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">Cuộn ngang nếu nhiều phiếu — cột đầu (mặt hàng) cố định khi cuộn.</p>
             </div>
             <CardContent className="!p-0">
               <div data-lttp-ordering-table-scroll className="overflow-x-auto overflow-y-visible">
@@ -257,74 +260,55 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                   <thead>
                     <tr className="border-b border-border">
                       <th
-                        rowSpan={2}
+                        scope="col"
                         className="sticky left-0 z-20 min-w-[2.5rem] border-b border-r border-border bg-muted/95 px-2 py-2 text-center text-[10px] font-semibold uppercase text-muted-foreground backdrop-blur-sm print:relative print:bg-muted"
                       >
                         STT
                       </th>
                       <th
-                        rowSpan={2}
+                        scope="col"
                         className="sticky left-[2.5rem] z-20 min-w-[11rem] max-w-[14rem] border-b border-r border-border bg-muted/95 px-2 py-2 text-[10px] font-semibold uppercase text-muted-foreground backdrop-blur-sm print:relative print:bg-muted"
                       >
                         Tên mặt hàng
                       </th>
                       <th
-                        rowSpan={2}
+                        scope="col"
                         className="sticky left-[calc(2.5rem+11rem)] z-20 min-w-[4rem] border-b border-r border-border bg-muted/95 px-2 py-2 text-center text-[10px] font-semibold uppercase text-muted-foreground backdrop-blur-sm print:relative print:bg-muted"
                       >
                         ĐVT
                       </th>
                       {matrix.columns.map((col) => {
-                        const tint = UNIT_COLUMN_STYLES[col.styleIdx];
+                        const tint = SLIP_COLUMN_STYLES[col.styleIdx];
                         return (
                           <th
                             key={col.key}
+                            scope="col"
                             className={cn(
-                              "min-w-[7.5rem] max-w-[12rem] border-b border-l border-border/60 px-1.5 py-0 align-bottom",
+                              "min-w-[7.5rem] max-w-[13rem] border-b border-l border-border/60 px-1.5 py-1.5 align-top",
                               tint.cell,
                             )}
                           >
                             <div className={cn("mb-1 h-1 w-full rounded-sm", tint.bar)} aria-hidden />
-                            <div className="px-0.5 pb-1 text-center text-[11px] font-semibold leading-tight text-foreground">
-                              {col.name}
+                            <div className="px-0.5 text-center text-[10px] font-medium tabular-nums text-muted-foreground">
+                              {col.refLabel}
+                            </div>
+                            <div className="mt-1 px-0.5 text-center text-[11px] font-semibold leading-tight text-foreground">
+                              {col.recipientUnitName}
+                            </div>
+                            <div className="mt-1 px-0.5 pb-0.5 text-center text-[10px] leading-snug text-muted-foreground">
+                              {col.caption != null ? <span>({col.caption})</span> : <span className="italic opacity-75">—</span>}
                             </div>
                           </th>
                         );
                       })}
                       <th
-                        rowSpan={2}
+                        scope="col"
                         className="min-w-[5rem] border-b border-l-2 border-primary/40 bg-primary/12 px-2 py-2 text-center text-[10px] font-bold uppercase text-primary"
                       >
                         Tổng
                         <br />
                         <span className="font-normal text-muted-foreground">(ngày)</span>
                       </th>
-                    </tr>
-                    <tr className="border-b border-border">
-                      {matrix.columns.map((col) => {
-                        const tint = UNIT_COLUMN_STYLES[col.styleIdx];
-                        return (
-                          <th
-                            key={`${col.key}-notes`}
-                            className={cn(
-                              "max-w-[12rem] border-b border-l border-border/50 px-1.5 pb-2 align-top font-normal",
-                              tint.cell,
-                            )}
-                          >
-                            {col.notes.length > 0 ? (
-                              <ul className="mx-auto max-h-16 max-w-full list-none space-y-0.5 overflow-y-auto text-[9px] leading-snug text-muted-foreground">
-                                {col.notes.map((n) => (
-                                  <li key={n} className="rounded bg-background/60 px-1 py-0.5 text-left ring-1 ring-border/40">
-                                    {n}
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <span className="block text-center text-[9px] italic text-muted-foreground/80">—</span>
-                            )}
-                          </th>
-                        );
-                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -355,8 +339,8 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                           {row.measureUnit || "—"}
                         </td>
                         {matrix.columns.map((col) => {
-                          const tint = UNIT_COLUMN_STYLES[col.styleIdx];
-                          const cell = matrix.qtyByRecipient.get(col.key);
+                          const tint = SLIP_COLUMN_STYLES[col.styleIdx];
+                          const cell = matrix.qtyBySlip.get(col.key);
                           const val = cell?.get(row.commodityId);
                           return (
                             <td
@@ -385,10 +369,12 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                   {matrix.columns.map((col) => (
                     <li
                       key={`legend-${col.key}`}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-2 py-0.5 text-[10px] font-medium text-foreground shadow-sm"
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-2 py-0.5 text-[10px] font-medium text-foreground shadow-sm"
                     >
-                      <span className={cn("size-2 shrink-0 rounded-full", UNIT_COLUMN_STYLES[col.styleIdx].bar)} aria-hidden />
-                      {col.name}
+                      <span className={cn("size-2 shrink-0 rounded-full", SLIP_COLUMN_STYLES[col.styleIdx].bar)} aria-hidden />
+                      <span className="min-w-0 truncate">
+                        {col.refLabel} · {col.recipientUnitName}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -400,7 +386,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
         {!showLoader && summary && matrix && matrix.columns.length === 0 && summary.slipCount > 0 ? (
           <Card className="border-amber-500/25 bg-amber-500/[0.06]">
             <CardContent className="py-6 text-center text-sm text-muted-foreground">
-              Có phiếu nhưng không gom được cột đơn vị nhận — kiểm tra dữ liệu phiếu.
+              Có phiếu nhưng không có cột phiếu sau lọc — kiểm tra đối tác trên từng dòng và dữ liệu phiếu.
             </CardContent>
           </Card>
         ) : null}
@@ -410,7 +396,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             <CardContent className="py-10 text-center">
               <p className="text-sm text-muted-foreground">Không có phiếu xuất cho ngày đã chọn.</p>
               <p className="mt-2 text-xs text-muted-foreground">
-                Lập phiếu ở tab <span className="font-medium text-foreground">Phiếu xuất</span> (mục Nhập xuất LTTP).
+                Lập phiếu ở tab <span className="font-medium text-foreground">Phiếu xuất</span> (mục Nhập xuất LTTP). Đặt <span className="font-medium text-foreground">chú thích phiếu</span> trong form để hiển thị dưới tên đơn vị ở tab Đặt hàng.
               </p>
             </CardContent>
           </Card>

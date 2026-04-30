@@ -1379,7 +1379,8 @@ function collectAvailableSuppliersFromSlips(slips) {
 
 /**
  * Một ngày — bảng đặt hàng từ phiếu xuất: có thể lọc theo đối tác cấp (`lttpSupplierId` trên dòng).
- * Theo đơn vị nhận (ghi chú phiếu), cộng dồn số lượng theo mặt hàng chỉ trên các dòng khớp bộ lọc.
+ * Mỗi phiếu (có ít nhất một dòng khớp) là một cột; chú thích phiếu = `LttpIssueSlip.note`.
+ * Cột «Tổng» = gộp mọi phiếu trong ngày (sau lọc).
  */
 async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope) {
   const { unitId, date } = payload;
@@ -1425,11 +1426,24 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
     }
   }
 
-  /** @typedef {{ recipientUnitId: number|null, recipientUnitName: string, slipNotes: Set<string>, agg: Map<number, { commodityId: number; name: string; measureUnit: string; quantity: number }> }} Group */
-  /** @type {Map<string, Group>} */
-  const byRecipient = new Map();
+  /** @type {Map<number, { commodityId: number; name: string; measureUnit: string; quantity: number }>} */
+  const grand = new Map();
+
+  /** @type {Array<{ slipId: number; recipientUnitId: number|null; recipientUnitName: string; note: string|null; bookMmyy: string; slipNo: number; lines: Array<{ commodityId: number; name: string; measureUnit: string; quantity: number; quantityFormatted: string }> }>} */
+  const slipColumns = [];
 
   let slipsWithIncludedLine = 0;
+
+  function recipientNameForSlip(slip) {
+    const rid = slip.recipientUnitId;
+    const nm =
+      slip.recipientUnit != null && slip.recipientUnit.name != null && String(slip.recipientUnit.name).trim() !== ""
+        ? slip.recipientUnit.name
+        : rid == null
+          ? "Chưa gán đơn vị nhận"
+          : `Đơn vị #${rid}`;
+    return { rid, nm };
+  }
 
   for (const slip of slips) {
     const matchingLines = (slip.lines ?? []).filter((ln) =>
@@ -1440,36 +1454,17 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
     }
     slipsWithIncludedLine += 1;
 
-    const rid = slip.recipientUnitId;
-    const key = rid == null ? "__none__" : String(rid);
-
-    if (!byRecipient.has(key)) {
-      const nm =
-        slip.recipientUnit != null && slip.recipientUnit.name != null && String(slip.recipientUnit.name).trim() !== ""
-          ? slip.recipientUnit.name
-          : rid == null
-            ? "Chưa gán đơn vị nhận"
-            : `Đơn vị #${rid}`;
-      byRecipient.set(key, {
-        recipientUnitId: rid,
-        recipientUnitName: nm,
-        slipNotes: new Set(),
-        agg: new Map(),
-      });
-    }
-    const g = byRecipient.get(key);
-    if (slip.note != null && String(slip.note).trim() !== "") {
-      g.slipNotes.add(String(slip.note).trim());
-    }
+    const { rid, nm } = recipientNameForSlip(slip);
+    const perSlipAgg = new Map();
 
     for (const line of matchingLines) {
       const cid = line.commodityId;
       const qty = Number(line.quantity);
       const name = line.commodity?.name ?? "?";
       const measureUnit = line.commodity?.measureUnit ?? "";
-      const cur = g.agg.get(cid);
+      const cur = perSlipAgg.get(cid);
       if (!cur) {
-        g.agg.set(cid, {
+        perSlipAgg.set(cid, {
           commodityId: cid,
           name,
           measureUnit,
@@ -1478,34 +1473,30 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
       } else {
         cur.quantity += Number.isFinite(qty) ? qty : 0;
       }
-    }
-  }
 
-  /** @type {Map<number, { commodityId: number; name: string; measureUnit: string; quantity: number }>} */
-  const grand = new Map();
-
-  const recipientGroups = [];
-  for (const g of byRecipient.values()) {
-    const lines = [...g.agg.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
-    if (lines.length === 0) continue;
-    for (const row of lines) {
-      const t = grand.get(row.commodityId);
-      if (!t) {
-        grand.set(row.commodityId, {
-          commodityId: row.commodityId,
-          name: row.name,
-          measureUnit: row.measureUnit,
-          quantity: row.quantity,
+      const gRow = grand.get(cid);
+      if (!gRow) {
+        grand.set(cid, {
+          commodityId: cid,
+          name,
+          measureUnit,
+          quantity: Number.isFinite(qty) ? qty : 0,
         });
       } else {
-        t.quantity += row.quantity;
+        gRow.quantity += Number.isFinite(qty) ? qty : 0;
       }
     }
-    recipientGroups.push({
-      recipientUnitId: g.recipientUnitId,
-      recipientUnitName: g.recipientUnitName,
-      slipNotes: [...g.slipNotes].sort((a, b) => a.localeCompare(b, "vi")),
-      lines: lines.map((row) => ({
+
+    const linesSorted = [...perSlipAgg.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+
+    slipColumns.push({
+      slipId: slip.id,
+      recipientUnitId: rid,
+      recipientUnitName: nm,
+      note: slip.note != null && String(slip.note).trim() !== "" ? String(slip.note).trim() : null,
+      bookMmyy: slip.bookMmyy,
+      slipNo: slip.slipNo,
+      lines: linesSorted.map((row) => ({
         commodityId: row.commodityId,
         name: row.name,
         measureUnit: row.measureUnit,
@@ -1515,10 +1506,14 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
     });
   }
 
-  recipientGroups.sort((a, b) => {
+  slipColumns.sort((a, b) => {
     if (a.recipientUnitId == null && b.recipientUnitId != null) return 1;
     if (a.recipientUnitId != null && b.recipientUnitId == null) return -1;
-    return a.recipientUnitName.localeCompare(b.recipientUnitName, "vi");
+    const cname = a.recipientUnitName.localeCompare(b.recipientUnitName, "vi");
+    if (cname !== 0) return cname;
+    const book = String(a.bookMmyy ?? "").localeCompare(String(b.bookMmyy ?? ""), "vi");
+    if (book !== 0) return book;
+    return (a.slipNo ?? 0) - (b.slipNo ?? 0);
   });
 
   const grandTotals = [...grand.values()]
@@ -1539,7 +1534,7 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
     availableSuppliers,
     slipCount: slipsWithIncludedLine,
     totalSlipsOnDate: slips.length,
-    recipientGroups,
+    slipColumns,
     grandTotals,
   };
 }

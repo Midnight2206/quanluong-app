@@ -225,6 +225,8 @@ export function LttpPhieuXuatTab({
   const [signerWriter, setSignerWriter] = useState("");
   const [signerRecipient, setSignerRecipient] = useState("");
   const [signerApprover, setSignerApprover] = useState("");
+  /** Phân biệt phiếu trên tab Đặt hàng — lưu `LttpIssueSlip.note`, không hiển thị trên bản in. */
+  const [slipNote, setSlipNote] = useState("");
 
   const [rows, setRows] = useState(() => [newEmptyRow()]);
   const rowQtyRefs = useRef({});
@@ -298,6 +300,7 @@ export function LttpPhieuXuatTab({
       setSignerWriter(draft.signerWriter != null ? String(draft.signerWriter) : "");
       setSignerRecipient(draft.signerRecipient != null ? String(draft.signerRecipient) : "");
       setSignerApprover(draft.signerApprover != null ? String(draft.signerApprover) : "");
+      setSlipNote(draft.slipNote != null ? String(draft.slipNote) : "");
       setRows(normalizeStoredDraftRows(draft.rows));
 
       skipRecipientResetAfterDraftRef.current = true;
@@ -311,6 +314,7 @@ export function LttpPhieuXuatTab({
     if (unitChanged) {
       setIssueDate(localYmd());
       setRows([newEmptyRow()]);
+      setSlipNote("");
       defLoadedKey.current = null;
       setDraftNotice(false);
     }
@@ -501,6 +505,15 @@ export function LttpPhieuXuatTab({
 
   /** Prefill state từ phiếu đang sửa; chỉ chạy khi đổi sang phiếu khác. */
   const editLoadedKey = useRef(null);
+  const prevEditingSlipIdRef = useRef(null);
+  useEffect(() => {
+    const curId = editingSlip?.id ?? null;
+    if (prevEditingSlipIdRef.current != null && curId == null) {
+      setSlipNote("");
+    }
+    prevEditingSlipIdRef.current = curId;
+  }, [editingSlip]);
+
   useEffect(() => {
     if (!editingSlip) {
       editLoadedKey.current = null;
@@ -539,6 +552,7 @@ export function LttpPhieuXuatTab({
     if (editingSlip.signerApprover != null) {
       setSignerApprover(editingSlip.signerApprover);
     }
+    setSlipNote(editingSlip.note != null ? String(editingSlip.note) : "");
     const lineRows = (editingSlip.lines ?? []).map(rowFromSlipLine);
     setRows(lineRows.length ? lineRows : [newEmptyRow()]);
   }, [editingSlip, selectedUnitId]);
@@ -567,6 +581,7 @@ export function LttpPhieuXuatTab({
         signerWriter,
         signerRecipient,
         signerApprover,
+        slipNote,
         rows: rows.map((r) => ({
           key: r.key,
           commodityId: r.commodityId,
@@ -602,6 +617,7 @@ export function LttpPhieuXuatTab({
     signerWriter,
     signerRecipient,
     signerApprover,
+    slipNote,
     rows,
   ]);
 
@@ -617,6 +633,7 @@ export function LttpPhieuXuatTab({
     setRecipientName("");
     setSignerRecipient("");
     setRecipientUnitId(Number(selectedUnitId));
+    setSlipNote("");
     defLoadedKey.current = null;
     skipReceivingDefAfterDraftRef.current = false;
   }, [selectedUnitId]);
@@ -811,7 +828,7 @@ export function LttpPhieuXuatTab({
         bookMmyy: previewBookMmyy,
         slipNo: previewSlipNo,
         issueDate,
-        note: null,
+        note: slipNote?.trim() ? slipNote.trim() : null,
         recipientDisplayName: recipientName,
         recipientUnit: { name: recipientUnitLabel || "—" },
         warehouseFrom: warehouseFrom || "—",
@@ -856,6 +873,7 @@ export function LttpPhieuXuatTab({
       signerApprover,
       signerRecipient,
       signerWriter,
+      slipNote,
       warehouseFrom,
     ],
   );
@@ -906,8 +924,9 @@ export function LttpPhieuXuatTab({
       notifyError("Trùng mặt hàng trong phiếu — mỗi mặt hàng chỉ một dòng.");
       return;
     }
+    const noteTrim = slipNote != null && String(slipNote).trim() !== "" ? String(slipNote).trim().slice(0, 500) : null;
     const sharedPayload = {
-      note: null,
+      note: noteTrim,
       lines,
       recipientUnitId: recipientUnitId ?? selectedUnitId,
       recipientUserId: recipientUserId ? Number(recipientUserId) : null,
@@ -1272,6 +1291,18 @@ export function LttpPhieuXuatTab({
             In / PDF
           </Button>
         </div>
+        <label className="block space-y-0.5 text-xs">
+          Chú thích phiếu (chỉ dùng trên tab Đặt hàng để phân biệt phiếu — không in trên phiếu xuất)
+          <textarea
+            className={cn(inputClass, "mt-0.5 min-h-[2.5rem] resize-y")}
+            rows={2}
+            maxLength={500}
+            value={slipNote}
+            onChange={(e) => setSlipNote(e.target.value)}
+            placeholder="Ví dụ: bữa trưa 28/4, ca 1…"
+            disabled={!canWrite}
+          />
+        </label>
         <p className="text-[10px] text-muted-foreground">
           Bảng giá theo đơn vị cấp, tham chiếu ngày: {eff?.appliedEffectiveDate ?? "—"}{" "}
           {eLoad ? <Loader2 className="ml-1 inline size-3 animate-spin" /> : null}

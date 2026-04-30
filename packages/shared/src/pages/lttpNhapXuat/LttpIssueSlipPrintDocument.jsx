@@ -123,12 +123,6 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
           <span className="font-bold">Nhận tại kho: </span>
           {slip?.warehouseFrom || "—"}
         </p>
-        {slip?.note?.trim() ? (
-          <p className="m-0 pr-1">
-            <span className="font-bold">Ghi chú (phiếu): </span>
-            {slip.note}
-          </p>
-        ) : null}
       </div>
 
       {/* Cột: STT | Tên (trái) | Mã | ĐV | YC | TX | Giá (phải) | Thành tiền (phải) | Ghi chú (giữa) */}
