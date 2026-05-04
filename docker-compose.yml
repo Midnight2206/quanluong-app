@@ -59,7 +59,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["npm", "run", "prisma:migrate:deploy"]
+    # Tự xử lý drift tên migration meal_roster (20100 vs 30000) rồi deploy — pull + rebuild là đủ.
+    command: ["npm", "run", "prisma:migrate:deploy:recover"]
     restart: "no"
 
   db:

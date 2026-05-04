@@ -13,6 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:deploy:recover": "bash scripts/prisma-migrate-deploy-recover.sh",
     "prisma:migrate:status": "prisma migrate status",
     "prisma:migrate:resolve": "prisma migrate resolve",
     "seed:meal-allowance": "node scripts/seed-meal-allowance-rates.js",

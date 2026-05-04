@@ -37,6 +37,7 @@ COPY --from=backend-builder /app/prisma ./prisma
 COPY --from=backend-builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=backend-builder /app/src ./src
 COPY --from=backend-builder /app/scripts ./scripts
+RUN chmod +x scripts/prisma-migrate-deploy-recover.sh
 RUN npx prisma generate
 EXPOSE 3000
 CMD ["node", "src/server.js"]
