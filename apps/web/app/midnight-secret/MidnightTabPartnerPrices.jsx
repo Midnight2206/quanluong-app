@@ -197,9 +197,10 @@ export function MidnightTabPartnerPrices({ units, unitId, onUnitId }) {
                     <td className="px-3 py-1.5 text-right">
                       <input
                         type="number"
+                        inputMode="decimal"
                         min={0}
                         step="0.01"
-                        className="w-32 rounded border border-slate-300 px-2 py-1 text-right text-sm"
+                        className="w-32 rounded border border-slate-300 px-2 py-1 text-right text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         value={v == null || Number.isNaN(v) ? "" : v}
                         onChange={(e) => {
                           const t = e.target.value;

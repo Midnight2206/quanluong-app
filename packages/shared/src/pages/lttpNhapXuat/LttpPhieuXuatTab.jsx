@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { Loader2, Printer, Settings2, Trash2, X } from "lucide-react";
+import { Loader2, Printer, RefreshCw, Settings2, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
@@ -14,6 +14,7 @@ import {
   useGetLttpRecipientUsersQuery,
   useGetLttpReceivingDefaultRecipientQuery,
   usePutLttpIssueFormDefaultsMutation,
+  useResyncLttpIssueSlipPricesMutation,
   useUpdateLttpIssueSlipMutation,
 } from "@/features/lttp/api/lttpApi";
 import { apiRequest } from "@/services/apiRequest";
@@ -35,6 +36,14 @@ function localYmd(d = new Date()) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+/** Họ tên hiển thị từ dòng user trong API recipient-users. */
+function displayNameFromRecipientUserRow(p) {
+  if (p == null) return "";
+  const fn = p.fullName != null ? String(p.fullName).trim() : "";
+  if (fn !== "") return fn;
+  return p.username != null ? String(p.username).trim() : "";
 }
 
 /** Quyển số dạng MMYY theo ngày YYYY-MM-DD (khớp backend). */
@@ -176,6 +185,171 @@ function quantityInputDisplay(q) {
     return "";
   }
   return String(q);
+}
+
+const COMMODITY_SEARCH_DEBOUNCE_MS = 300;
+const COMMODITY_SEARCH_MAX = 100;
+
+/**
+ * Ô tìm mặt hàng (thay select dài): lọc theo tên/mã sau debounce; chọn từ danh sách portal.
+ */
+function IssueSlipCommoditySearch({
+  rowKey,
+  commodityId,
+  selectedLabel,
+  commodities,
+  dupRow,
+  inputClass,
+  disabled,
+  onPickCommodity,
+}) {
+  const wrapRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(() => selectedLabel ?? "");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [anchor, setAnchor] = useState(/** @type {DOMRect | null} */ (null));
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQ(query.trim().toLowerCase());
+    }, COMMODITY_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    setQuery(selectedLabel ?? "");
+  }, [commodityId, selectedLabel]);
+
+  const filtered = useMemo(() => {
+    const list = (commodities || []).filter((c) => c && c.id != null);
+    const q = debouncedQ;
+    if (!q) {
+      return list.slice(0, COMMODITY_SEARCH_MAX);
+    }
+    return list
+      .filter((c) => {
+        const nm = String(c.name ?? "").toLowerCase();
+        const cd = String(c.code ?? "").toLowerCase();
+        return nm.includes(q) || cd.includes(q);
+      })
+      .slice(0, COMMODITY_SEARCH_MAX);
+  }, [commodities, debouncedQ]);
+
+  const refreshAnchor = useCallback(() => {
+    const el = wrapRef.current;
+    if (el) {
+      setAnchor(el.getBoundingClientRect());
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+    refreshAnchor();
+    function onWin() {
+      refreshAnchor();
+    }
+    window.addEventListener("scroll", onWin, true);
+    window.addEventListener("resize", onWin);
+    return () => {
+      window.removeEventListener("scroll", onWin, true);
+      window.removeEventListener("resize", onWin);
+    };
+  }, [open, refreshAnchor, filtered.length]);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const listEl =
+    open &&
+    anchor &&
+    createPortal(
+      <ul
+        className="fixed z-[120] max-h-52 overflow-y-auto rounded-md border border-border bg-card py-1 text-left text-xs text-card-foreground shadow-float"
+        style={{
+          top: anchor.bottom + 6,
+          left: anchor.left,
+          width: Math.max(anchor.width, 240),
+          maxWidth: "min(96vw, 28rem)",
+        }}
+        role="listbox"
+        aria-label="Kết quả tìm mặt hàng"
+      >
+        {filtered.length === 0 ? (
+          <li className="bg-card px-3 py-2 text-muted-foreground">Không có mặt hàng khớp.</li>
+        ) : (
+          filtered.map((c) => (
+            <li key={`${rowKey}-${c.id}`} role="none">
+              <button
+                type="button"
+                role="option"
+                className="flex w-full items-start gap-2 bg-card px-3 py-2 text-left hover:bg-muted"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onPickCommodity(rowKey, String(c.id));
+                  setOpen(false);
+                }}
+              >
+                <span className="min-w-0 flex-1 font-medium text-foreground">{c.name}</span>
+                <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{c.code}</span>
+              </button>
+            </li>
+          ))
+        )}
+      </ul>,
+      document.body,
+    );
+
+  return (
+    <div ref={wrapRef} className="relative min-w-0 max-w-[14rem]">
+      <input
+        type="search"
+        enterKeyHint="search"
+        disabled={disabled}
+        className={cn(
+          inputClass,
+          dupRow && "border-red-500/90 dark:border-red-400/80",
+        )}
+        value={query}
+        onChange={(e) => {
+          const v = e.target.value;
+          setOpen(true);
+          if (v === "") {
+            onPickCommodity(rowKey, "");
+            setQuery(v);
+            return;
+          }
+          const canon = (selectedLabel ?? "").trim();
+          if (commodityId !== "" && commodityId != null && canon !== "" && v.trim() !== canon) {
+            onPickCommodity(rowKey, "");
+          }
+          setQuery(v);
+        }}
+        onFocus={() => {
+          setOpen(true);
+          queueMicrotask(refreshAnchor);
+        }}
+        onBlur={() => {
+          window.setTimeout(() => setOpen(false), 180);
+        }}
+        placeholder="Gõ tìm mặt hàng…"
+        autoComplete="off"
+        spellCheck={false}
+      />
+      {typeof document !== "undefined" ? listEl : null}
+    </div>
+  );
 }
 
 const FONT_CHOICES = [
@@ -474,18 +648,71 @@ export function LttpPhieuXuatTab({
     }
   }, [recipientUnitId, receivingDef, receivingDefSuccess, isEditMode]);
 
+  /**
+   * Tên người nhận trên form:
+   * - Tạo mới: theo user đang chọn (recipientUserId) trong danh sách đơn vị nhận.
+   * - Sửa phiếu: nếu DB có `recipientDisplayName` thì luôn dùng (đồng bộ khi phiếu refetch / updatedAt đổi);
+   *   nếu DB trống thì lấy tên user trên phiếu, không có thì lấy user mặc định cài «Người nhận theo đơn vị nhận»;
+   *   không ghi đè chữ ký người nhận nếu phiếu đã lưu signerRecipient.
+   */
   useEffect(() => {
-    if (!recipientUserId) {
+    if (recipientUnitId == null) {
       return;
     }
-    const p = recipientUsers.find((x) => String(x.id) === String(recipientUserId));
-    if (!p) {
+    if (!isEditMode) {
+      if (!recipientUserId) {
+        return;
+      }
+      const p = recipientUsers.find((x) => String(x.id) === String(recipientUserId));
+      if (!p) {
+        return;
+      }
+      const name = displayNameFromRecipientUserRow(p);
+      setRecipientName(name);
+      setSignerRecipient(name);
       return;
     }
-    const name = (p.fullName && String(p.fullName).trim()) || p.username || "";
+    const slip = editingSlip;
+    if (!slip) {
+      return;
+    }
+    const dbDisplay = String(slip.recipientDisplayName ?? "").trim();
+    if (dbDisplay !== "") {
+      setRecipientName(dbDisplay);
+      return;
+    }
+    let name = "";
+    if (slip.recipientUserId != null) {
+      const p = recipientUsers.find((x) => String(x.id) === String(slip.recipientUserId));
+      name = displayNameFromRecipientUserRow(p);
+    }
+    if (
+      !name &&
+      receivingDefSuccess &&
+      receivingDef?.userId != null &&
+      Number(receivingDef.recipientUnitId) === Number(recipientUnitId)
+    ) {
+      const p = recipientUsers.find((x) => String(x.id) === String(receivingDef.userId));
+      name = displayNameFromRecipientUserRow(p);
+    }
     setRecipientName(name);
-    setSignerRecipient(name);
-  }, [recipientUserId, recipientUsers]);
+    const slipSigner = String(slip.signerRecipient ?? "").trim();
+    if (slipSigner === "" && name) {
+      setSignerRecipient(name);
+    }
+  }, [
+    isEditMode,
+    editingSlip?.id,
+    editingSlip?.updatedAt,
+    editingSlip?.recipientDisplayName,
+    editingSlip?.recipientUserId,
+    editingSlip?.signerRecipient,
+    recipientUsers,
+    receivingDef,
+    receivingDefSuccess,
+    recipientUnitId,
+    recipientUserId,
+  ]);
 
   useEffect(() => {
     if (!settingsOpen) {
@@ -502,9 +729,10 @@ export function LttpPhieuXuatTab({
 
   const [createSlip, { isLoading: createBusy }] = useCreateLttpIssueSlipMutation();
   const [updateSlip, { isLoading: updateBusy }] = useUpdateLttpIssueSlipMutation();
+  const [resyncSlipPrices, { isLoading: resyncBusy }] = useResyncLttpIssueSlipPricesMutation();
 
-  /** Prefill state từ phiếu đang sửa; chỉ chạy khi đổi sang phiếu khác. */
-  const editLoadedKey = useRef(null);
+  /** Prefill state từ phiếu đang sửa; chạy lại khi cùng id nhưng phiếu refetch (updatedAt / trường nhận đổi). */
+  const editHydrateSigRef = useRef(null);
   const prevEditingSlipIdRef = useRef(null);
   useEffect(() => {
     const curId = editingSlip?.id ?? null;
@@ -516,13 +744,21 @@ export function LttpPhieuXuatTab({
 
   useEffect(() => {
     if (!editingSlip) {
-      editLoadedKey.current = null;
+      editHydrateSigRef.current = null;
       return;
     }
-    if (editLoadedKey.current === editingSlip.id) {
+    const hydrateSig = [
+      editingSlip.id,
+      editingSlip.updatedAt ?? editingSlip.createdAt ?? "",
+      editingSlip.recipientDisplayName ?? "",
+      editingSlip.recipientUserId ?? "",
+      editingSlip.recipientUnitId ?? "",
+      editingSlip.signerRecipient ?? "",
+    ].join("|");
+    if (editHydrateSigRef.current === hydrateSig) {
       return;
     }
-    editLoadedKey.current = editingSlip.id;
+    editHydrateSigRef.current = hydrateSig;
     setIssueDate(editingSlip.issueDate);
     setRecipientUnitId(
       editingSlip.recipientUnitId != null ? Number(editingSlip.recipientUnitId) : selectedUnitId,
@@ -530,7 +766,6 @@ export function LttpPhieuXuatTab({
     setRecipientUserId(
       editingSlip.recipientUserId != null ? String(editingSlip.recipientUserId) : "",
     );
-    setRecipientName(editingSlip.recipientDisplayName ?? "");
     if (editingSlip.printLine1 != null) {
       setPrintHeaderLine1(editingSlip.printLine1);
     }
@@ -546,9 +781,7 @@ export function LttpPhieuXuatTab({
     if (editingSlip.signerWriter != null) {
       setSignerWriter(editingSlip.signerWriter);
     }
-    if (editingSlip.signerRecipient != null) {
-      setSignerRecipient(editingSlip.signerRecipient);
-    }
+    setSignerRecipient(editingSlip.signerRecipient != null ? String(editingSlip.signerRecipient) : "");
     if (editingSlip.signerApprover != null) {
       setSignerApprover(editingSlip.signerApprover);
     }
@@ -963,6 +1196,20 @@ export function LttpPhieuXuatTab({
     }
   }
 
+  async function onResyncSlipPricesFromEffectiveTable() {
+    if (!editingSlip?.id) {
+      return;
+    }
+    try {
+      const slip = await resyncSlipPrices({ id: editingSlip.id }).unwrap();
+      const lineRows = (slip?.lines ?? []).map(rowFromSlipLine);
+      setRows(lineRows.length ? lineRows : [newEmptyRow()]);
+      notifySuccess("Đã cập nhật đơn giá các dòng theo bảng giá hiệu lực tại ngày phiếu.");
+    } catch (err) {
+      notifyError(err?.data?.message || err?.message || "Không đồng bộ được đơn giá.");
+    }
+  }
+
   return (
     <div className="space-y-4 text-xs">
       <div className="print:hidden space-y-3">
@@ -980,20 +1227,35 @@ export function LttpPhieuXuatTab({
                 · ngày <span className="font-mono">{editingSlip?.issueDate}</span>
               </p>
               <p className="text-[10px] opacity-80">
-                Ngày xuất và số phiếu giữ nguyên. Cập nhật phiếu sẽ tự đồng bộ công nợ đối tác.
+                Ngày xuất và số phiếu giữ nguyên. Cập nhật phiếu sẽ tự đồng bộ công nợ đối tác. Sau khi sửa bảng
+                giá, dùng «Đồng bộ đơn giá» để ghi lại đơn giá trên phiếu theo bảng hiệu lực tại ngày phiếu.
               </p>
             </div>
-            {typeof onCancelEdit === "function" ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 shrink-0 gap-1.5 text-xs"
-                onClick={onCancelEdit}
-              >
-                <X className="size-3.5" />
-                Hủy sửa
-              </Button>
-            ) : null}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {canWrite ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-8 gap-1.5 text-xs"
+                  disabled={resyncBusy || updateBusy || !selectedUnitId}
+                  onClick={() => void onResyncSlipPricesFromEffectiveTable()}
+                >
+                  {resyncBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <RefreshCw className="size-3.5" aria-hidden />}
+                  Đồng bộ đơn giá
+                </Button>
+              ) : null}
+              {typeof onCancelEdit === "function" ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-8 shrink-0 gap-1.5 text-xs"
+                  onClick={onCancelEdit}
+                >
+                  <X className="size-3.5" />
+                  Hủy sửa
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {!isEditMode && draftNotice && canWrite ? (
@@ -1368,6 +1630,7 @@ export function LttpPhieuXuatTab({
               ) : null}
               {rows.map((r, i) => {
                 const c = r.commodityId ? comById.get(r.commodityId) : null;
+                const commoditySelectedLabel = c ? `${c.name} (${c.code})` : "";
                 const dupRow = isDuplicateCommodityRow(r);
                 return (
                   <tr
@@ -1391,22 +1654,17 @@ export function LttpPhieuXuatTab({
                     >
                       {i + 1}
                     </td>
-                    <td className="px-1 py-1.5">
-                      <select
-                        className={cn(
-                          inputClass,
-                          dupRow && "border-red-500/90 dark:border-red-400/80",
-                        )}
-                        value={r.commodityId === "" ? "" : String(r.commodityId)}
-                        onChange={(e) => onPickCommodity(r.key, e.target.value)}
-                      >
-                        <option value="">— Chọn tên —</option>
-                        {commodities.map((x) => (
-                          <option key={x.id} value={x.id}>
-                            {x.name} ({x.code})
-                          </option>
-                        ))}
-                      </select>
+                    <td className="px-1 py-1.5 align-top">
+                      <IssueSlipCommoditySearch
+                        rowKey={r.key}
+                        commodityId={r.commodityId}
+                        selectedLabel={commoditySelectedLabel}
+                        commodities={commodities}
+                        dupRow={dupRow}
+                        inputClass={inputClass}
+                        disabled={!canWrite}
+                        onPickCommodity={onPickCommodity}
+                      />
                     </td>
                     <td className="px-1 py-1.5">
                       <select
@@ -1586,7 +1844,7 @@ export function LttpPhieuXuatTab({
             <Button
               type="button"
               className="gap-1.5 text-xs"
-              disabled={createBusy || updateBusy || !selectedUnitId}
+              disabled={createBusy || updateBusy || resyncBusy || !selectedUnitId}
               onClick={() => void onSubmit()}
             >
               {createBusy || updateBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}

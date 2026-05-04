@@ -40,6 +40,7 @@ import {
   patchPriceTable,
   putRecipientDefaultUser,
   resolveIssueSlipLine,
+  resyncIssueSlipLinePricesFromEffectiveTable,
   updateIssueSlip,
   upsertIssueFormDefaults,
 } from "./lttp.service.js";
@@ -508,6 +509,19 @@ async function updateIssueSlipController(req, res) {
   });
 }
 
+async function resyncIssueSlipPricesController(req, res) {
+  const row = await resyncIssueSlipLinePricesFromEffectiveTable(
+    req.validatedParams.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã đồng bộ đơn giá các dòng theo bảng giá hiệu lực tại ngày phiếu",
+    data: row,
+  });
+}
+
 async function getNextIssueSlipSerialController(req, res) {
   const data = await getNextIssueSlipSerial(
     req.validatedQuery,
@@ -609,5 +623,6 @@ export {
   putIssueFormDefaultsController,
   putRecipientDefaultUserController,
   resolveIssueSlipLineController,
+  resyncIssueSlipPricesController,
   updateIssueSlipController,
 };

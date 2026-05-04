@@ -438,6 +438,16 @@ export function useUpdateLttpIssueSlipMutation() {
   });
 }
 
+/** Đồng bộ đơn giá / thành tiền dòng phiếu theo bảng giá hiệu lực tại ngày phiếu (backend cập nhật DB). */
+export function useResyncLttpIssueSlipPricesMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id }) =>
+      apiRequest({ url: `/lttp/issue-slips/${id}/resync-prices`, method: "post" }),
+    onSuccess: () => invalidateLttpData(qc),
+  });
+}
+
 export function useDeleteLttpIssueSlipMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({

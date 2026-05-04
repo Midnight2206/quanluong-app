@@ -48,6 +48,7 @@ import {
   putIssueFormDefaultsController,
   putRecipientDefaultUserController,
   resolveIssueSlipLineController,
+  resyncIssueSlipPricesController,
   updateIssueSlipController,
 } from "./lttp.controller.js";
 import { LTTP_ROUTE_DEFINITIONS } from "./lttp.route-definitions.js";
@@ -245,6 +246,14 @@ lttpRouter.get(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   permissionMiddleware([routePermissions.getIssueSlip]),
   asyncHandler(getIssueSlipController),
+);
+
+lttpRouter.post(
+  "/issue-slips/:id/resync-prices",
+  validateRequest({ params: issueSlipIdParamsSchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.resyncIssueSlipPrices]),
+  asyncHandler(resyncIssueSlipPricesController),
 );
 
 lttpRouter.put(

@@ -470,6 +470,19 @@ const LTTP_ROUTE_DEFINITIONS = [
         "Sửa phiếu xuất LTTP (đơn vị nhận, ghi chú, các dòng hàng, mẫu in, người ký); giữ ngày xuất và số phiếu. Tự động cập nhật công nợ đối tác.",
     },
   },
+  {
+    key: "resyncIssueSlipPrices",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/:id/resync-prices",
+    pathRoute: "/api/lttp/issue-slips/:id/resync-prices",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Resync LTTP issue slip line prices",
+      description:
+        "Đồng bộ lại đơn giá và thành tiền các dòng phiếu xuất theo bảng giá hiệu lực tại ngày phiếu (không đổi SL, đối tác, mặt hàng).",
+    },
+  },
 ];
 
 export { LTTP_ROUTE_DEFINITIONS };

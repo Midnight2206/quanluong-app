@@ -857,6 +857,7 @@ function mapIssueSlip(slip) {
     signerRecipient: slip.signerRecipient,
     signerApprover: slip.signerApprover,
     createdAt: slip.createdAt.toISOString(),
+    updatedAt: slip.updatedAt.toISOString(),
     createdBy: slip.createdBy
       ? {
           id: slip.createdBy.id,
@@ -1277,6 +1278,71 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 },
   );
   await recalculateLttpPartnerDebtsForUnit(storageUnitId);
+  return mapIssueSlip(slip);
+}
+
+/**
+ * Cập nhật lại đơn giá / TGSX / thành tiền từng dòng theo bảng giá hiệu lực tại **ngày phiếu** (giữ SL, đối tác, mặt hàng).
+ * Không đổi schema — chỉ ghi đè cột snapshot trên `LttpIssueSlipLine`.
+ */
+async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveUnitIds, dataScope) {
+  const existing = await prisma.lttpIssueSlip.findFirst({
+    where: { id },
+    include: { lines: true },
+  });
+  if (!existing) {
+    throw new AppError({
+      message: "Không tìm thấy phiếu",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+  assertCommodityRowStorage(existing.unitId, dataScope);
+  assertUnitIdInScope(dataScope.logicalUnitId, scope);
+  assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
+
+  const storageUnitId = existing.unitId;
+  const issueDateYmd = existing.issueDate.toISOString().slice(0, 10);
+  const eff = await getEffectivePrices(
+    { unitId: dataScope.logicalUnitId, date: issueDateYmd },
+    scope,
+    effectiveUnitIds,
+    dataScope,
+  );
+  const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
+
+  assertLttpPrismaDelegates();
+
+  await prisma.$transaction(async (tx) => {
+    for (const line of existing.lines) {
+      const hit = priceByCid.get(line.commodityId);
+      if (!hit || hit.unitPrice == null) {
+        throw new AppError({
+          message: `Chưa có đơn giá tại ngày phiếu cho mặt hàng (id: ${line.commodityId})`,
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+        });
+      }
+      const unitPrice = Number(hit.unitPrice);
+      const tgsx = hit.tgsxPrice != null ? Number(hit.tgsxPrice) : null;
+      const qty = Number(line.quantity);
+      const amount = roundMoney2(qty * unitPrice);
+      await tx.lttpIssueSlipLine.update({
+        where: { id: line.id },
+        data: {
+          unitPrice: String(unitPrice),
+          tgsxPrice: tgsx != null ? String(tgsx) : null,
+          amount: String(amount),
+        },
+      });
+    }
+  });
+
+  await recalculateLttpPartnerDebtsForUnit(storageUnitId);
+  const slip = await prisma.lttpIssueSlip.findUnique({
+    where: { id: existing.id },
+    include: issueSlipInclude,
+  });
   return mapIssueSlip(slip);
 }
 
@@ -3456,6 +3522,7 @@ export {
   recalculateLttpPartnerDebtsForUnit,
   putRecipientDefaultUser,
   resolveIssueSlipLine,
+  resyncIssueSlipLinePricesFromEffectiveTable,
   updateIssueSlip,
   upsertIssueFormDefaults,
 };

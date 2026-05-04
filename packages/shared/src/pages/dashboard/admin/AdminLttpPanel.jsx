@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Download,
   Loader2,
@@ -49,6 +49,10 @@ import { formatVnd } from "@/utils/formatVnd";
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
 
+/** Ẩn nút tăng/giảm của `type="number"` (Chrome / Edge / Safari). */
+const noSpinnerNumClass =
+  "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
 /** Tham chiếu cố định khi RTK Query chưa có `data` / bị skip — tránh `useEffect(..., [data])` lặp vô hạn. */
 const RTK_EMPTY_ARRAY = [];
 
@@ -61,6 +65,18 @@ const P = {
 };
 
 const OTHER_CODE = "other";
+
+/** Ô «mới» coi như chưa gõ — cho phép điền mặc định khi API giá theo ngày áp dụng tải xong. */
+function isPtRowNewPricesBlank(old) {
+  if (!old) {
+    return false;
+  }
+  const up = old.unitPrice;
+  const upBlank = up === "" || up == null || up === 0 || up === "0";
+  const tg = old.tgsxPrice;
+  const tgBlank = tg == null || tg === "" || tg === "0";
+  return upBlank && tgBlank;
+}
 
 function sortUnitsByPath(units) {
   return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
@@ -171,11 +187,7 @@ export function AdminLttpPanel({
     { skip: !selectedUnitId || !canPRead },
   );
   const priceTables = priceTablesData ?? RTK_EMPTY_ARRAY;
-  const {
-    data: effectiveData,
-    isLoading: eLoad,
-    refetch: refetchEffective,
-  } = useGetLttpEffectivePricesQuery(
+  const { data: effectiveData, isLoading: eLoad } = useGetLttpEffectivePricesQuery(
     { unitId: selectedUnitId, date: effectiveDate },
     { skip: !selectedUnitId || !canPRead },
   );
@@ -300,6 +312,22 @@ export function AdminLttpPanel({
   const [ptDate, setPtDate] = useState(() => localYmd());
   const [ptNote, setPtNote] = useState("");
   const [ptRows, setPtRows] = useState([]);
+  /** Tránh reset toàn bộ lưới giá khi RTK refetch `commodities` (mất focus / xóa đang gõ). */
+  const priceGridUnitRef = useRef(null);
+  const priceGridPrevPtDateRef = useRef(null);
+  /** Giá hiệu lực tại ngày áp dụng bảng — mặc định cột «mới». */
+  const { data: applyDateEffectiveData, isLoading: applyDatePriceLoad } = useGetLttpEffectivePricesQuery(
+    { unitId: selectedUnitId, date: ptDate },
+    { skip: !selectedUnitId || !canPRead },
+  );
+  const applyDatePriceByCommodityId = useMemo(() => {
+    const items = applyDateEffectiveData?.items || [];
+    const m = new Map();
+    for (const row of items) {
+      m.set(row.commodity.id, { unitPrice: row.unitPrice, tgsxPrice: row.tgsxPrice });
+    }
+    return m;
+  }, [applyDateEffectiveData?.items]);
 
   const [impFile, setImpFile] = useState(null);
   const [impDate, setImpDate] = useState(() => localYmd());
@@ -309,18 +337,69 @@ export function AdminLttpPanel({
   useEffect(() => {
     if (!commodities.length) {
       setPtRows([]);
+      priceGridUnitRef.current = null;
+      priceGridPrevPtDateRef.current = null;
       return;
     }
-    setPtRows(
-      commodities.filter((c) => c.isActive).map((c) => ({
-        commodityId: c.id,
-        code: c.code,
-        name: c.name,
-        unitPrice: 0,
-        tgsxPrice: null,
-      })),
-    );
-  }, [commodities]);
+    const uid = selectedUnitId;
+    const prevUid = priceGridUnitRef.current;
+    const unitSwitched = prevUid != null && prevUid !== uid;
+    const prevPt = priceGridPrevPtDateRef.current;
+    const ptDateChanged = prevPt != null && prevPt !== ptDate;
+    priceGridUnitRef.current = uid;
+    priceGridPrevPtDateRef.current = ptDate;
+
+    setPtRows((prev) => {
+      const prevById = new Map(prev.map((r) => [r.commodityId, r]));
+      return commodities
+        .filter((c) => c.isActive)
+        .map((c) => {
+          const hit = applyDatePriceByCommodityId.get(c.id);
+          const hasApplyRef = hit?.unitPrice != null && Number.isFinite(Number(hit.unitPrice));
+          const upFromRef = hasApplyRef ? Number(hit.unitPrice) : 0;
+          const tgsxFromRef =
+            hit?.tgsxPrice != null && Number.isFinite(Number(hit.tgsxPrice)) ? Number(hit.tgsxPrice) : null;
+
+          if (unitSwitched || ptDateChanged) {
+            return {
+              commodityId: c.id,
+              code: c.code,
+              name: c.name,
+              unitPrice: upFromRef,
+              tgsxPrice: tgsxFromRef,
+            };
+          }
+
+          const old = prevById.get(c.id);
+          if (old) {
+            if (isPtRowNewPricesBlank(old) && hasApplyRef) {
+              return {
+                commodityId: c.id,
+                code: c.code,
+                name: c.name,
+                unitPrice: upFromRef,
+                tgsxPrice: tgsxFromRef,
+              };
+            }
+            return {
+              commodityId: c.id,
+              code: c.code,
+              name: c.name,
+              unitPrice: old.unitPrice,
+              tgsxPrice: old.tgsxPrice,
+            };
+          }
+
+          return {
+            commodityId: c.id,
+            code: c.code,
+            name: c.name,
+            unitPrice: upFromRef,
+            tgsxPrice: tgsxFromRef,
+          };
+        });
+    });
+  }, [commodities, selectedUnitId, ptDate, applyDatePriceByCommodityId]);
 
   function openEdit(c) {
     setEditId(c.id);
@@ -534,27 +613,34 @@ export function AdminLttpPanel({
     }
   }
 
-  async function fillFromEffective() {
-    if (!selectedUnitId) return;
-    try {
-      const result = await refetchEffective();
-      const data = result.data;
-      const items = data?.items || [];
-      const priceById = new Map(items.map((i) => [i.commodity.id, i]));
-      setPtRows((prev) =>
-        prev.map((r) => {
-          const hit = priceById.get(r.commodityId);
-          return {
-            ...r,
-            unitPrice: hit?.unitPrice ?? r.unitPrice,
-            tgsxPrice: hit?.tgsxPrice ?? r.tgsxPrice,
-          };
-        }),
-      );
-      notifySuccess("Đã điền theo giá hiệu lực tại ngày đang xem (tab «Giá theo ngày»).");
-    } catch {
-      notifyError("Không lấy được giá hiện tại.");
-    }
+  function fillNewPricesFromApplyDate() {
+    setPtRows((prev) =>
+      prev.map((r) => {
+        const hit = applyDatePriceByCommodityId.get(r.commodityId);
+        const has = hit?.unitPrice != null && Number.isFinite(Number(hit.unitPrice));
+        return {
+          ...r,
+          unitPrice: has ? Number(hit.unitPrice) : 0,
+          tgsxPrice:
+            hit?.tgsxPrice != null && Number.isFinite(Number(hit.tgsxPrice)) ? Number(hit.tgsxPrice) : null,
+        };
+      }),
+    );
+    notifySuccess(`Đã điền cột «mới» theo giá hiệu lực tại ngày áp dụng (${ptDate}).`);
+  }
+
+  function fillNewPricesFromReferenceDate() {
+    setPtRows((prev) =>
+      prev.map((r) => {
+        const hit = effectivePriceByCommodityId.get(r.commodityId);
+        return {
+          ...r,
+          unitPrice: hit?.unitPrice != null ? Number(hit.unitPrice) : r.unitPrice,
+          tgsxPrice: hit?.tgsxPrice != null ? Number(hit.tgsxPrice) : r.tgsxPrice,
+        };
+      }),
+    );
+    notifySuccess(`Đã điền cột «mới» theo cột «hiện tại» (ngày tham chiếu ${effectiveDate}).`);
   }
 
   async function onSavePriceTable(e) {
@@ -1212,10 +1298,16 @@ export function AdminLttpPanel({
                       Ghi chú
                       <input className={cn(inputClass, "mt-0.5 block")} value={ptNote} onChange={(e) => setPtNote(e.target.value)} />
                     </label>
-                    <Button type="button" variant="ghost" className="h-8 gap-1 text-xs" onClick={fillFromEffective}>
+                    <Button type="button" variant="secondary" className="h-8 gap-1 text-xs" onClick={fillNewPricesFromApplyDate}>
                       <RefreshCw className="size-3.5" aria-hidden />
-                      Lấy từ giá hiện tại ({effectiveDate})
+                      Lấy theo ngày áp dụng ({ptDate})
                     </Button>
+                    <Button type="button" variant="ghost" className="h-8 gap-1 text-xs" onClick={fillNewPricesFromReferenceDate}>
+                      Theo ngày tham chiếu ({effectiveDate})
+                    </Button>
+                    {applyDatePriceLoad ? (
+                      <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+                    ) : null}
                   </div>
                   <div className="rounded-lg border border-border/60">
                     <table className="w-full min-w-[56rem] border-collapse text-left text-[11px]">
@@ -1245,8 +1337,9 @@ export function AdminLttpPanel({
                             <td className="px-2 py-1">
                               <input
                                 type="number"
+                                inputMode="decimal"
                                 step="0.01"
-                                className={cn(inputClass, "min-w-[6rem] py-1")}
+                                className={cn(inputClass, noSpinnerNumClass, "min-w-[6rem] py-1")}
                                 value={r.unitPrice}
                                 onChange={(e) => {
                                   const v = e.target.value;
@@ -1261,8 +1354,9 @@ export function AdminLttpPanel({
                             <td className="px-2 py-1">
                               <input
                                 type="number"
+                                inputMode="decimal"
                                 step="0.01"
-                                className={cn(inputClass, "min-w-[6rem] py-1")}
+                                className={cn(inputClass, noSpinnerNumClass, "min-w-[6rem] py-1")}
                                 value={r.tgsxPrice ?? ""}
                                 onChange={(e) => {
                                   const v = e.target.value;

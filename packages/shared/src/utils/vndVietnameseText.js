@@ -76,12 +76,12 @@ export function vndToVietnameseText(value) {
     const s = i < scales.length ? scales[i] : "";
     parts.push(s ? `${read} ${s}`.trim() : read);
   }
-  return `${parts.join(" ")} đồng chẵn`.replace(/\s+/g, " ").trim();
+  return `${parts.join(" ")} đồng`.replace(/\s+/g, " ").trim();
 }
 
 /**
- * Dòng đọc tiền dạng công văn / mẫu kho: «Ba trăm bảy mươi ba ngàn, sáu trăm đồng».
- * Dùng «ngàn»; phần dưới 1000 sau dấu phẩy.
+ * Dòng đọc tiền dạng công văn / mẫu kho: «Ba trăm bảy mươi ba nghìn, sáu trăm đồng».
+ * Dùng «nghìn»; phần dưới 1000 sau dấu phẩy.
  * @param {number} value
  * @returns {string}
  */
@@ -105,7 +105,7 @@ export function vndToVietnameseDocumentLine(value) {
   r %= 1_000_000_000;
   const triệu = Math.floor(r / 1_000_000);
   r %= 1_000_000;
-  const ngàn = Math.floor(r / 1_000);
+  const nghìn = Math.floor(r / 1_000);
   const đơn = r % 1000;
   const high = [];
   if (tỷ) {
@@ -114,8 +114,8 @@ export function vndToVietnameseDocumentLine(value) {
   if (triệu) {
     high.push(`${readGroup(triệu)} triệu`);
   }
-  if (ngàn) {
-    high.push(`${readGroup(ngàn)} ngàn`);
+  if (nghìn) {
+    high.push(`${readGroup(nghìn)} nghìn`);
   }
   const highStr = high.join(" ");
   if (đơn > 0) {
@@ -126,7 +126,7 @@ export function vndToVietnameseDocumentLine(value) {
     return cap(low);
   }
   if (highStr) {
-    return cap(`${highStr} đồng chẵn`);
+    return cap(`${highStr} đồng`);
   }
   return "Không đồng";
 }
