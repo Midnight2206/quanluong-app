@@ -12,7 +12,7 @@ services:
     build:
       target: backend-dev
       args:
-        DATABASE_URL: ${DATABASE_URL}
+        DATABASE_URL: ${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
     environment:
       MIDNIGHT_SECRET_PASSWORD: ${MIDNIGHT_SECRET_PASSWORD}
     volumes:
@@ -28,7 +28,7 @@ services:
     build:
       target: backend-dev
       args:
-        DATABASE_URL: ${DATABASE_URL}
+        DATABASE_URL: ${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
     volumes:
       - ./quanluong-app-be/src:/app/src
       - ./quanluong-app-be/prisma:/app/prisma
@@ -40,7 +40,7 @@ services:
     build:
       target: backend-dev
       args:
-        DATABASE_URL: ${DATABASE_URL}
+        DATABASE_URL: ${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
     volumes:
       - ./quanluong-app-be/src:/app/src
       - ./quanluong-app-be/prisma:/app/prisma

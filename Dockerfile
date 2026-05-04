@@ -12,8 +12,9 @@ WORKDIR /app
 # Prisma cần OpenSSL; bookworm-slim thiếu → cảnh báo "failed to detect libssl" nếu không cài.
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
+# Build-time URL chỉ phục vụ `prisma generate` (Prisma 7 + prisma.config.ts). Khi compose truyền rỗng, vẫn có fallback.
 ARG DATABASE_URL=mysql://root:change-me@db:3306/quanluong
-ENV DATABASE_URL=$DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
 COPY quanluong-app-be/package*.json ./
 RUN npm ci
 COPY quanluong-app-be/ ./
@@ -29,7 +30,7 @@ WORKDIR /app
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 ARG DATABASE_URL=mysql://root:change-me@db:3306/quanluong
-ENV DATABASE_URL=$DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
 COPY quanluong-app-be/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=backend-builder /app/prisma ./prisma

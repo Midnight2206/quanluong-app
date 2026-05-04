@@ -15,7 +15,7 @@ services:
       dockerfile: Dockerfile
       target: backend
       args:
-        DATABASE_URL: ${DATABASE_URL}
+        DATABASE_URL: ${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
     image: quanluong-backend:latest
     container_name: quanluong-app-be
     restart: unless-stopped
@@ -51,7 +51,7 @@ services:
       dockerfile: Dockerfile
       target: backend
       args:
-        DATABASE_URL: ${DATABASE_URL}
+        DATABASE_URL: ${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
     image: quanluong-backend:latest
     container_name: quanluong-app-be-migrate
     env_file:
@@ -86,7 +86,7 @@ services:
       dockerfile: Dockerfile
       target: backend
       args:
-        DATABASE_URL: ${DATABASE_URL}
+        DATABASE_URL: ${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
     image: quanluong-backend:latest
     container_name: quanluong-app-be-worker-email
     restart: unless-stopped
@@ -105,7 +105,7 @@ services:
       dockerfile: Dockerfile
       target: backend
       args:
-        DATABASE_URL: ${DATABASE_URL}
+        DATABASE_URL: ${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
     image: quanluong-backend:latest
     container_name: quanluong-app-be-worker-media
     restart: unless-stopped
