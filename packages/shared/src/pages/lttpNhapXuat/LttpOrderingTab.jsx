@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useCallback, useState, useEffect, useRef } from "react";
-import { ClipboardCopy, ImageIcon, Printer } from "lucide-react";
+import { ClipboardCopy, ImageIcon, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { useGetLttpDailyOrderSummaryQuery } from "@/features/lttp/api/lttpApi";
@@ -85,10 +85,17 @@ function buildOrderSharePlainText({ orderDate, storageUnitName, supplierFilterLa
         return nt ? `${nm}:${qf} (${nt})` : `${nm}:${qf}`;
       })
       .join(";");
-    return pairs ? `${head}\n${pairs}` : `${head}\n`;
+    const bodyText = pairs
+      ? pairs
+          .split(";")
+          .map((it) => it.trim())
+          .filter(Boolean)
+          .join("\n")
+      : "(Không có mặt hàng)";
+    return `${head}\n${bodyText}`;
   });
 
-  return `${meta.join("\n")}\n\n${slipBlocks.join("\n")}`;
+  return `${meta.join("\n")}\n\n${slipBlocks.join("\n\n")}`;
 }
 
 /**
@@ -110,10 +117,15 @@ const SLIP_COLUMN_STYLES = [
  */
 export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   const orderCaptureRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const tableCardRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const [orderDate, setOrderDate] = useState(() => todayIsoDate());
   /** Chuỗi gửi API: `all` | `none` | id đối tác (số trong danh mục kho). */
   const [supplierFilterKey, setSupplierFilterKey] = useState(() => "all");
   const [pngExporting, setPngExporting] = useState(false);
+  const [tablePreviewOpen, setTablePreviewOpen] = useState(false);
+  const [tablePreviewImageUrl, setTablePreviewImageUrl] = useState("");
+  const [tablePreviewLoading, setTablePreviewLoading] = useState(false);
+  const [forceShowTableForCapture, setForceShowTableForCapture] = useState(false);
 
   const { data: summary, isLoading, isFetching, error } = useGetLttpDailyOrderSummaryQuery(
     { unitId: effectiveUnitId, date: orderDate, supplierFilter: supplierFilterKey },
@@ -220,6 +232,29 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
     }
   }, [pngExporting, isLoading, isFetching, matrix?.rows?.length, orderDate]);
 
+  const handleOpenTablePreview = useCallback(async () => {
+    const el = tableCardRef.current;
+    if (!el || tablePreviewLoading || isLoading || isFetching || !matrix?.rows?.length) return;
+    setTablePreviewLoading(true);
+    setForceShowTableForCapture(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      const blob = await captureElementToPngBlob(el);
+      const nextUrl = URL.createObjectURL(blob);
+      setTablePreviewImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return nextUrl;
+      });
+      setTablePreviewOpen(true);
+    } catch (e) {
+      const msg = typeof e?.message === "string" ? e.message : null;
+      notifyError(msg || "Không tạo được ảnh xem trước bảng.");
+    } finally {
+      setForceShowTableForCapture(false);
+      setTablePreviewLoading(false);
+    }
+  }, [isLoading, isFetching, matrix?.rows?.length, tablePreviewLoading]);
+
   const showLoader = isLoading || isFetching;
   const canExportPng =
     Boolean(matrix?.columns?.length && matrix?.rows?.length) && !showLoader && effectiveUnitId != null;
@@ -236,6 +271,12 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
       notifyError("Trình duyệt không cho phép copy — chọn văn bản trong ô và copy thủ công (Ctrl+C).");
     }
   }, [orderSharePlainText]);
+
+  useEffect(() => {
+    return () => {
+      if (tablePreviewImageUrl) URL.revokeObjectURL(tablePreviewImageUrl);
+    };
+  }, [tablePreviewImageUrl]);
 
   if (effectiveUnitId == null) {
     return <p className="text-xs text-destructive">Chưa có đơn vị kho — gán đơn vị cho tài khoản.</p>;
@@ -297,7 +338,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             variant="outline"
             className="h-9 shrink-0 gap-2 text-xs"
             disabled={!canCopyText}
-            title="Định dạng: mỗi phiếu hai dòng (đơn vị|số phiếu, rồi mặt:SL;…); phiếu liền nhau."
+            title="Định dạng: mỗi phiếu là một khối riêng, có dòng trống ngăn cách để dễ đọc khi dán vào Zalo."
             onClick={() => void handleCopyOrderText()}
           >
             <ClipboardCopy className="size-3.5 shrink-0" />
@@ -306,6 +347,16 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
           <Button type="button" variant="secondary" className="h-9 shrink-0 gap-2 text-xs" onClick={handlePrint}>
             <Printer className="size-3.5" />
             In / PDF
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 shrink-0 gap-2 text-xs lg:hidden"
+            disabled={!canExportPng || tablePreviewLoading}
+            onClick={() => void handleOpenTablePreview()}
+          >
+            <ImageIcon className="size-3.5 shrink-0" />
+            {tablePreviewLoading ? "Đang tạo ảnh bảng…" : "Xem bảng"}
           </Button>
         </div>
       </div>
@@ -353,8 +404,12 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
 
         {!showLoader && matrix && matrix.columns.length > 0 && matrix.rows.length > 0 ? (
           <Card
+            ref={tableCardRef}
             data-lttp-ordering-card
-            className="-mx-3 w-[calc(100%+1.5rem)] overflow-hidden border-border/80 shadow-md sm:-mx-4 sm:w-[calc(100%+2rem)] print:mx-0 print:w-full print:break-inside-avoid"
+            className={cn(
+              "-mx-3 w-[calc(100%+1.5rem)] overflow-hidden border-border/80 shadow-md sm:-mx-4 sm:w-[calc(100%+2rem)] print:mx-0 print:w-full print:break-inside-avoid",
+              !forceShowTableForCapture ? "hidden lg:block print:block" : "block",
+            )}
           >
             <div className="border-b border-border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-3 py-2.5 sm:px-4">
               <h2 className="text-balance text-xs font-semibold uppercase tracking-wide text-foreground">Bảng đặt hàng theo phiếu</h2>
@@ -365,9 +420,9 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             <CardContent className="!p-0">
               <div
                 data-lttp-ordering-table-scroll
-                className="min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain [-webkit-overflow-scrolling:touch]"
+                className="min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain lg:overflow-x-visible [-webkit-overflow-scrolling:touch]"
               >
-                <table className="w-full min-w-max border-collapse text-left text-sm">
+                <table className="w-full min-w-max border-collapse text-left text-sm lg:min-w-0 lg:table-fixed">
                   <thead>
                     <tr className="border-b border-border">
                       <th
@@ -396,6 +451,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                             scope="col"
                             className={cn(
                               "min-w-[6.25rem] border-b border-l border-border/60 px-1.5 py-2 align-top sm:min-w-[7rem]",
+                              "lg:min-w-0",
                               tint.cell,
                             )}
                           >
@@ -461,6 +517,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                               key={`${row.commodityId}-${col.key}`}
                               className={cn(
                                 "min-w-[6.25rem] border-l border-border/50 px-1.5 py-2.5 text-right text-sm sm:min-w-[7rem]",
+                                "lg:min-w-0",
                                 tint.cell,
                                 !hasQty && !lineNote ? "text-muted-foreground/70" : "text-foreground",
                               )}
@@ -522,6 +579,31 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
           </Card>
         ) : null}
       </div>
+      {tablePreviewOpen ? (
+        <div className="fixed inset-0 z-[120] bg-black/80 p-3 sm:p-6 lg:hidden" role="dialog" aria-modal="true">
+          <div className="mx-auto flex h-full max-w-6xl flex-col">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-medium text-white">Ảnh toàn bộ bảng đặt hàng</p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-8 gap-1.5 px-2 text-xs"
+                onClick={() => setTablePreviewOpen(false)}
+              >
+                <X className="size-3.5" />
+                Đóng
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-1">
+              {tablePreviewImageUrl ? (
+                <img src={tablePreviewImageUrl} alt="Ảnh chụp bảng đặt hàng" className="mx-auto h-auto max-w-none rounded-md" />
+              ) : (
+                <p className="px-3 py-4 text-center text-sm text-white/80">Không có ảnh xem trước.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
