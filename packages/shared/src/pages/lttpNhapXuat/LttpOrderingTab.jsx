@@ -78,7 +78,11 @@ function buildOrderSharePlainText({ orderDate, storageUnitName, supplierFilterLa
       .map((ln) => {
         const nm = sanitizeOrderTextToken(ln.name);
         const qf = String(ln.quantityFormatted ?? "").trim() || "0";
-        return `${nm}:${qf}`;
+        const nt =
+          ln.lineNote != null && String(ln.lineNote).trim() !== ""
+            ? sanitizeOrderTextToken(ln.lineNote)
+            : "";
+        return nt ? `${nm}:${qf} (${nt})` : `${nm}:${qf}`;
       })
       .join(";");
     return pairs ? `${head}\n${pairs}` : `${head}\n`;
@@ -147,12 +151,20 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
 
     const rows = [...(summary.grandTotals || [])].sort((a, b) => a.name.localeCompare(b.name, "vi"));
 
+    /** @type {Map<string, Map<number, { quantityFormatted: string; lineNote: string | null }>>} */
     const qtyBySlip = new Map();
     for (const s of slips) {
       const k = `slip-${s.slipId}`;
       const m = new Map();
       for (const line of s.lines || []) {
-        m.set(line.commodityId, line.quantityFormatted);
+        const ln =
+          line.lineNote != null && String(line.lineNote).trim() !== ""
+            ? String(line.lineNote).trim()
+            : null;
+        m.set(line.commodityId, {
+          quantityFormatted: line.quantityFormatted,
+          lineNote: ln,
+        });
       }
       qtyBySlip.set(k, m);
     }
@@ -346,30 +358,33 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
           >
             <div className="border-b border-border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-3 py-2.5 sm:px-4">
               <h2 className="text-balance text-xs font-semibold uppercase tracking-wide text-foreground">Bảng đặt hàng theo phiếu</h2>
-              <p className="mt-0.5 text-balance text-[10px] text-muted-foreground">
-                Bảng dùng hết chiều ngang khi đủ chỗ; cuộn ngang chỉ khi nhiều phiếu hoặc màn hình hẹp — cột STT / mặt hàng / ĐVT cố định khi cuộn.
+              <p className="mt-0.5 text-balance text-[11px] leading-snug text-muted-foreground sm:text-[10px]">
+                Trên điện thoại / máy tính bảng: vuốt ngang để xem thêm cột — STT, tên mặt hàng và ĐVT giữ cố định bên trái; không thu nhỏ chữ để vừa màn hình.
               </p>
             </div>
             <CardContent className="!p-0">
-              <div data-lttp-ordering-table-scroll className="min-w-0 overflow-x-auto overflow-y-visible">
-                <table className="w-full min-w-0 table-fixed border-collapse text-left text-sm">
+              <div
+                data-lttp-ordering-table-scroll
+                className="min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain [-webkit-overflow-scrolling:touch]"
+              >
+                <table className="w-full min-w-max border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-border">
                       <th
                         scope="col"
-                        className="sticky left-0 z-20 w-9 min-w-9 max-w-9 border-b border-r border-border bg-muted/95 px-1 py-2 text-center text-[10px] font-semibold uppercase text-muted-foreground backdrop-blur-sm print:relative print:bg-muted"
+                        className="sticky left-0 z-20 w-10 min-w-10 border-b border-r border-border bg-muted/95 px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
                       >
                         STT
                       </th>
                       <th
                         scope="col"
-                        className="sticky left-9 z-20 w-32 min-w-32 max-w-32 border-b border-r border-border bg-muted/95 px-1.5 py-2 text-[10px] font-semibold uppercase text-muted-foreground backdrop-blur-sm print:relative print:bg-muted"
+                        className="sticky left-10 z-20 min-w-[13rem] max-w-[18rem] border-b border-r border-border bg-muted/95 px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:max-w-none sm:text-[10px] print:relative print:bg-muted"
                       >
-                        <span className="block break-words leading-tight">Tên mặt hàng</span>
+                        <span className="block break-words leading-snug">Tên mặt hàng</span>
                       </th>
                       <th
                         scope="col"
-                        className="sticky left-[10.25rem] z-20 w-10 min-w-10 max-w-10 border-b border-r border-border bg-muted/95 px-0.5 py-2 text-center text-[10px] font-semibold uppercase text-muted-foreground backdrop-blur-sm print:relative print:bg-muted"
+                        className="sticky left-[15.5rem] z-20 w-11 min-w-11 border-b border-r border-border bg-muted/95 px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
                       >
                         ĐVT
                       </th>
@@ -380,18 +395,18 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                             key={col.key}
                             scope="col"
                             className={cn(
-                              "min-w-0 border-b border-l border-border/60 px-1 py-1.5 align-top",
+                              "min-w-[6.25rem] border-b border-l border-border/60 px-1.5 py-2 align-top sm:min-w-[7rem]",
                               tint.cell,
                             )}
                           >
                             <div className={cn("mb-1 h-1 w-full rounded-sm", tint.bar)} aria-hidden />
-                            <div className="break-words px-0.5 text-center text-[10px] font-medium leading-snug tabular-nums text-muted-foreground">
+                            <div className="break-words px-0.5 text-center text-[11px] font-medium leading-snug tabular-nums text-muted-foreground sm:text-[10px]">
                               {col.refLabel}
                             </div>
-                            <div className="mt-1 break-words px-0.5 text-center text-[11px] font-semibold leading-snug text-foreground">
+                            <div className="mt-1 break-words px-0.5 text-center text-xs font-semibold leading-snug text-foreground sm:text-[11px]">
                               {col.recipientUnitName}
                             </div>
-                            <div className="mt-1 break-words px-0.5 pb-0.5 text-center text-[10px] leading-snug text-muted-foreground">
+                            <div className="mt-1 break-words px-0.5 pb-0.5 text-center text-[11px] leading-snug text-muted-foreground sm:text-[10px]">
                               {col.caption != null ? <span>({col.caption})</span> : <span className="italic opacity-75">—</span>}
                             </div>
                           </th>
@@ -399,7 +414,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       })}
                       <th
                         scope="col"
-                        className="w-14 min-w-14 max-w-[4.5rem] border-b border-l-2 border-primary/40 bg-primary/12 px-1 py-2 text-center text-[10px] font-bold uppercase text-primary"
+                        className="min-w-[4.75rem] border-b border-l-2 border-primary/40 bg-primary/12 px-1.5 py-2.5 text-center text-[11px] font-bold uppercase text-primary sm:min-w-[5.25rem] sm:text-[10px]"
                       >
                         Tổng
                         <br />
@@ -412,7 +427,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       <tr key={row.commodityId} className="border-b border-border/50">
                         <td
                           className={cn(
-                            "sticky left-0 z-10 w-9 min-w-9 max-w-9 border-r border-border px-1 py-2 text-center text-xs text-muted-foreground print:relative",
+                            "sticky left-0 z-10 w-10 min-w-10 border-r border-border px-1.5 py-2.5 text-center text-sm text-muted-foreground tabular-nums print:relative",
                             i % 2 === 0 ? "bg-background" : "bg-muted/30",
                           )}
                         >
@@ -420,7 +435,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                         </td>
                         <td
                           className={cn(
-                            "sticky left-9 z-10 w-32 min-w-32 max-w-32 border-r border-border px-1.5 py-2 text-xs font-medium leading-snug text-foreground print:relative",
+                            "sticky left-10 z-10 min-w-[13rem] max-w-[18rem] border-r border-border px-2 py-2.5 text-sm font-medium leading-snug text-foreground sm:max-w-none print:relative",
                             i % 2 === 0 ? "bg-background" : "bg-muted/30",
                           )}
                         >
@@ -428,30 +443,39 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                         </td>
                         <td
                           className={cn(
-                            "sticky left-[10.25rem] z-10 w-10 min-w-10 max-w-10 border-r border-border px-0.5 py-2 text-center text-xs text-muted-foreground print:relative",
+                            "sticky left-[15.5rem] z-10 w-11 min-w-11 border-r border-border px-1 py-2.5 text-center text-sm text-muted-foreground print:relative",
                             i % 2 === 0 ? "bg-background" : "bg-muted/30",
                           )}
                         >
-                          <span className="block break-words leading-tight">{row.measureUnit || "—"}</span>
+                          <span className="block break-words leading-snug">{row.measureUnit || "—"}</span>
                         </td>
                         {matrix.columns.map((col) => {
                           const tint = SLIP_COLUMN_STYLES[col.styleIdx];
                           const cell = matrix.qtyBySlip.get(col.key);
-                          const val = cell?.get(row.commodityId);
+                          const cellData = cell?.get(row.commodityId);
+                          const val = cellData?.quantityFormatted;
+                          const lineNote = cellData?.lineNote;
+                          const hasQty = val != null && val !== "" && val !== "0";
                           return (
                             <td
                               key={`${row.commodityId}-${col.key}`}
                               className={cn(
-                                "min-w-0 border-l border-border/50 px-1 py-2 text-right text-xs tabular-nums",
+                                "min-w-[6.25rem] border-l border-border/50 px-1.5 py-2.5 text-right text-sm sm:min-w-[7rem]",
                                 tint.cell,
-                                !val || val === "0" ? "text-muted-foreground/70" : "font-medium text-foreground",
+                                !hasQty && !lineNote ? "text-muted-foreground/70" : "text-foreground",
                               )}
                             >
-                              {val ?? "—"}
+                              <span className={cn("tabular-nums", hasQty ? "font-medium" : "")}>{val ?? "—"}</span>
+                              {lineNote ? (
+                                <span className="mt-0.5 block text-xs font-normal leading-snug text-foreground/85 sm:mt-0 sm:inline sm:ml-1">
+                                  {" "}
+                                  ({lineNote})
+                                </span>
+                              ) : null}
                             </td>
                           );
                         })}
-                        <td className="w-14 min-w-14 max-w-[4.5rem] border-l-2 border-primary/30 bg-primary/[0.07] px-1 py-2 text-right text-xs font-semibold tabular-nums text-primary">
+                        <td className="min-w-[4.75rem] border-l-2 border-primary/30 bg-primary/[0.07] px-1.5 py-2.5 text-right text-sm font-semibold tabular-nums text-primary sm:min-w-[5.25rem]">
                           {row.quantityFormatted}
                         </td>
                       </tr>

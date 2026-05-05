@@ -133,7 +133,7 @@ function rowFromSlipLine(line) {
     quantity: line.quantity != null ? String(line.quantity) : "",
     unitPrice: line.unitPrice ?? null,
     tgsxPrice: line.tgsxPrice ?? null,
-    lineNote: "",
+    lineNote: typeof line?.lineNote === "string" ? line.lineNote : "",
   };
 }
 
@@ -1144,12 +1144,17 @@ export function LttpPhieuXuatTab({
         reqRaw !== "" && reqRaw != null && String(reqRaw).trim() !== ""
           ? parsePositiveDecimalField(reqRaw)
           : null;
+      const noteTrim =
+        r.lineNote != null && String(r.lineNote).trim() !== ""
+          ? String(r.lineNote).trim().slice(0, 500)
+          : null;
       lines.push({
         commodityId: Number(r.commodityId),
         quantity: parsePositiveDecimalField(r.quantity),
         requiredQuantity:
           reqNum != null && Number.isFinite(reqNum) && reqNum >= 0 ? reqNum : null,
         lttpSupplierId: Number(r.lttpSupplierId),
+        lineNote: noteTrim,
       });
     }
     const uniqueCids = new Set(lines.map((ln) => ln.commodityId));

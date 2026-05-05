@@ -139,6 +139,10 @@ const issueSlipLineInputSchema = z.object({
   requiredQuantity: z.coerce.number().finite().nonnegative().nullable().optional(),
   quantity: z.coerce.number().finite().positive(),
   lttpSupplierId: z.coerce.number().int().positive(),
+  lineNote: z.preprocess(
+    (v) => (v === "" || v === undefined ? null : v),
+    z.union([z.string().max(500), z.null()]).optional(),
+  ),
 });
 
 const createIssueSlipBodySchema = z.object({

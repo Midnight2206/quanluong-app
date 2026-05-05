@@ -60,7 +60,6 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
         dangerouslySetInnerHTML={{
           __html: `
         .lttp-isd-print table { border-collapse: collapse; }
-        .lttp-isd-print .lttp-isd-mono { font-family: ui-monospace, "Courier New", monospace; }
         .lttp-isd-print .lttp-isd-nums { font-variant-numeric: tabular-nums; }
       `,
         }}
@@ -219,7 +218,7 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
                 <td className="box-border border border-black p-[0.12em] text-left align-top text-[0.9em] [border-width:0.4pt]">
                   {c?.name ?? "—"}
                 </td>
-                <td className="lttp-isd-mono box-border border border-black p-[0.1em] text-center text-[0.78em] [border-width:0.4pt]">
+                <td className="box-border border border-black p-[0.1em] text-center text-[0.9em] [border-width:0.4pt]">
                   {c?.code ?? "—"}
                 </td>
                 <td className="box-border border border-black p-[0.1em] text-center text-[0.86em] [border-width:0.4pt]">

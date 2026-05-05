@@ -882,6 +882,7 @@ function mapIssueSlip(slip) {
       unitPrice: Number(r.unitPrice),
       tgsxPrice: r.tgsxPrice != null ? Number(r.tgsxPrice) : null,
       amount: Number(r.amount),
+      lineNote: r.lineNote != null && String(r.lineNote).trim() !== "" ? String(r.lineNote).trim() : null,
     })),
   };
 }
@@ -969,6 +970,10 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
       });
     }
     const lineLttpSupplierId = lineSid;
+    const lineNoteTrim =
+      raw.lineNote != null && String(raw.lineNote).trim() !== ""
+        ? String(raw.lineNote).trim().slice(0, 500)
+        : null;
     lineData.push({
       commodityId: cid,
       lttpSupplierId: lineLttpSupplierId,
@@ -978,6 +983,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
       unitPrice: String(unitPrice),
       tgsxPrice: tgsx != null ? String(tgsx) : null,
       amount: String(amount),
+      lineNote: lineNoteTrim,
     });
   }
   if (!lineData.length) {
@@ -1052,7 +1058,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
         data: { lastSlipNo: { increment: 1 } },
       });
       const slipNo = ser.lastSlipNo;
-      return tx.lttpIssueSlip.create({
+      const created = await tx.lttpIssueSlip.create({
         data: {
           unitId: storageUnitId,
           issueDate: issueD,
@@ -1070,8 +1076,23 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
           signerWriter,
           signerRecipient,
           signerApprover,
-          lines: { create: lineData },
         },
+      });
+      await tx.lttpIssueSlipLine.createMany({
+        data: lineData.map((d) => ({
+          slipId: created.id,
+          commodityId: d.commodityId,
+          lttpSupplierId: d.lttpSupplierId,
+          requiredQuantity: d.requiredQuantity,
+          quantity: d.quantity,
+          unitPrice: d.unitPrice,
+          tgsxPrice: d.tgsxPrice,
+          amount: d.amount,
+          lineNote: d.lineNote,
+        })),
+      });
+      return tx.lttpIssueSlip.findUnique({
+        where: { id: created.id },
         include: issueSlipInclude,
       });
     },
@@ -1180,6 +1201,10 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
+    const lineNoteTrim =
+      raw.lineNote != null && String(raw.lineNote).trim() !== ""
+        ? String(raw.lineNote).trim().slice(0, 500)
+        : null;
     lineData.push({
       commodityId: cid,
       lttpSupplierId: lineSid,
@@ -1189,6 +1214,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
       unitPrice: String(unitPrice),
       tgsxPrice: tgsx != null ? String(tgsx) : null,
       amount: String(amount),
+      lineNote: lineNoteTrim,
     });
   }
   if (!lineData.length) {
@@ -1267,8 +1293,20 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
           signerWriter,
           signerRecipient,
           signerApprover,
-          lines: { create: lineData },
         },
+      });
+      await tx.lttpIssueSlipLine.createMany({
+        data: lineData.map((d) => ({
+          slipId: existing.id,
+          commodityId: d.commodityId,
+          lttpSupplierId: d.lttpSupplierId,
+          requiredQuantity: d.requiredQuantity,
+          quantity: d.quantity,
+          unitPrice: d.unitPrice,
+          tgsxPrice: d.tgsxPrice,
+          amount: d.amount,
+          lineNote: d.lineNote,
+        })),
       });
       return tx.lttpIssueSlip.findUnique({
         where: { id: existing.id },
@@ -1528,6 +1566,10 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
       const qty = Number(line.quantity);
       const name = line.commodity?.name ?? "?";
       const measureUnit = line.commodity?.measureUnit ?? "";
+      const notePart =
+        line.lineNote != null && String(line.lineNote).trim() !== ""
+          ? String(line.lineNote).trim()
+          : null;
       const cur = perSlipAgg.get(cid);
       if (!cur) {
         perSlipAgg.set(cid, {
@@ -1535,9 +1577,13 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
           name,
           measureUnit,
           quantity: Number.isFinite(qty) ? qty : 0,
+          lineNotes: notePart ? [notePart] : [],
         });
       } else {
         cur.quantity += Number.isFinite(qty) ? qty : 0;
+        if (notePart && !cur.lineNotes.includes(notePart)) {
+          cur.lineNotes.push(notePart);
+        }
       }
 
       const gRow = grand.get(cid);
@@ -1568,6 +1614,7 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
         measureUnit: row.measureUnit,
         quantity: row.quantity,
         quantityFormatted: formatAggregatedQuantity(row.quantity),
+        lineNote: row.lineNotes?.length ? row.lineNotes.join("; ") : null,
       })),
     });
   }

@@ -11,6 +11,7 @@
     "worker:avatar-processing": "node src/workers/avatar-processing.worker.js",
     "worker:avatar-processing:dev": "nodemon --watch src src/workers/avatar-processing.worker.js",
     "prisma:generate": "prisma generate",
+    "prisma:sync": "prisma generate && prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:deploy:recover": "bash scripts/prisma-migrate-deploy-recover.sh",

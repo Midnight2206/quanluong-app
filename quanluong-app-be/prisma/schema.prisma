@@ -590,6 +590,8 @@ model LttpIssueSlipLine {
   tgsxPrice        Decimal?       @db.Decimal(18, 2)
   /// Thành tiền = quantity × unitPrice (lưu snapshot)
   amount           Decimal        @db.Decimal(18, 2)
+  /// Ghi chú dòng phiếu (hiển thị Đặt hàng, không in mặc định).
+  lineNote         String?        @db.VarChar(500)
   lttpSupplierId   Int?
   slip             LttpIssueSlip  @relation(fields: [slipId], references: [id], onDelete: Cascade)
   commodity        LttpCommodity  @relation(fields: [commodityId], references: [id], onDelete: Restrict)

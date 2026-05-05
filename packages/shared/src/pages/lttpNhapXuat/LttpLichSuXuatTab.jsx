@@ -346,7 +346,7 @@ export function LttpLichSuXuatTab({
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border/60">
-        <table className="w-full min-w-[44rem] border-collapse text-left text-[11px]">
+        <table className="w-full min-w-[52rem] border-collapse text-left text-[11px]">
           <thead className="bg-secondary/90">
             <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
               <th className="w-10 px-2 py-2">
@@ -361,6 +361,7 @@ export function LttpLichSuXuatTab({
               </th>
               <th className="px-2 py-2">Ngày xuất</th>
               <th className="px-2 py-2">Đơn vị nhận</th>
+              <th className="min-w-[10rem] px-2 py-2">Chú thích phiếu</th>
               <th className="px-2 py-2">Số phiếu</th>
               <th className="px-2 py-2 text-right">Thành tiền</th>
               <th className="min-w-[13rem] whitespace-nowrap px-2 py-2 text-right">Thao tác</th>
@@ -369,7 +370,7 @@ export function LttpLichSuXuatTab({
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-2 py-4 text-muted-foreground">
+                <td colSpan={7} className="px-2 py-4 text-muted-foreground">
                   <Loader2 className="mr-1 inline size-3.5 animate-spin" />
                   Đang tải…
                 </td>
@@ -377,7 +378,7 @@ export function LttpLichSuXuatTab({
             ) : null}
             {!isLoading && !slips.length ? (
               <tr>
-                <td colSpan={6} className="px-2 py-4 text-muted-foreground">
+                <td colSpan={7} className="px-2 py-4 text-muted-foreground">
                   Không có phiếu phù hợp bộ lọc.
                 </td>
               </tr>
@@ -398,6 +399,16 @@ export function LttpLichSuXuatTab({
                   <td className="px-2 py-1.5 font-medium tabular-nums">{s.issueDate}</td>
                   <td className="max-w-[12rem] truncate px-2 py-1.5" title={s.recipientUnit?.name ?? "—"}>
                     {s.recipientUnit?.name ?? "—"}
+                  </td>
+                  <td
+                    className="max-w-[14rem] px-2 py-1.5 align-top text-[11px] leading-snug text-muted-foreground"
+                    title={s.note != null && String(s.note).trim() !== "" ? String(s.note) : undefined}
+                  >
+                    {s.note != null && String(s.note).trim() !== "" ? (
+                      <span className="line-clamp-3 text-foreground">{String(s.note).trim()}</span>
+                    ) : (
+                      <span className="italic opacity-60">—</span>
+                    )}
                   </td>
                   <td className="px-2 py-1.5 font-mono text-[10px] text-muted-foreground">{soPhieu}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{formatVnd(total)}</td>
