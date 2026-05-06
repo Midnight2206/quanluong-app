@@ -5,7 +5,7 @@ import { ClipboardCopy, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { useGetLttpDailyOrderSummaryQuery } from "@/features/lttp/api/lttpApi";
-import { notifyError, notifySuccess } from "@/services/notify";
+import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { captureElementToPngBlob, shareOrDownloadPng } from "@/utils/captureElementToPng";
 import { cn } from "@/utils/cn";
 
@@ -216,9 +216,13 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
       const filename = `dat-hang-lttp-${orderDate}.png`;
       const outcome = await shareOrDownloadPng(blob, filename);
       if (outcome === "shared") {
-        notifySuccess("Đã mở chia sẻ — chọn Zalo hoặc ứng dụng khác.");
+        notifySuccess("Đã mở chia sẻ — chọn ứng dụng đích.");
+      } else if (outcome === "downloaded_fallback") {
+        notifyWarning(
+          "Ứng dụng đích không nhận ảnh qua chia sẻ (hay gặp với Zalo) — đã tải ảnh. Mở Zalo → đính kèm ảnh trong album hoặc Tệp.",
+        );
       } else if (outcome === "downloaded") {
-        notifySuccess("Đã tải ảnh — mở Zalo và đính kèm file vừa tải.");
+        notifySuccess("Đã tải ảnh — mở ứng dụng và đính kèm file vừa tải.");
       }
     } catch (e) {
       const msg = typeof e?.message === "string" ? e.message : null;
@@ -264,7 +268,11 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
       const filename = `dat-hang-lttp-${orderDate}.png`;
       const outcome = await shareOrDownloadPng(tablePreviewBlob, filename);
       if (outcome === "shared") {
-        notifySuccess("Đã mở chia sẻ — chọn Zalo hoặc ứng dụng khác.");
+        notifySuccess("Đã mở chia sẻ — chọn ứng dụng đích.");
+      } else if (outcome === "downloaded_fallback") {
+        notifyWarning(
+          "Ứng dụng đích không nhận ảnh qua chia sẻ (hay gặp với Zalo) — đã tải ảnh. Mở Zalo → đính kèm ảnh trong album hoặc Tệp.",
+        );
       } else if (outcome === "downloaded") {
         notifySuccess("Đã tải ảnh — mở ứng dụng và đính kèm file vừa tải.");
       }
@@ -433,10 +441,10 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             <CardContent className="!p-0">
               <div
                 data-lttp-ordering-table-scroll
-                className="min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain lg:overflow-x-visible [-webkit-overflow-scrolling:touch]"
+                className="min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain pr-3 [-webkit-overflow-scrolling:touch]"
               >
                 {/* Không dùng lg:table-fixed: với layout cố định, các cột trái dễ bị co < colgroup và sticky left-[15.5rem] (STT+họ tên) làm cột ĐVT lệch phải. */}
-                <table className="w-full min-w-max border-collapse text-left text-sm">
+                <table className="w-full min-w-max border-collapse text-center text-sm">
                   {/*
                     Cố định 3 cột trái (STT + tên + ĐVT) khớp sticky left — tránh cột tên giãn (sm:max-w-none) làm lệch ĐVT và các cột phiếu.
                   */}
@@ -445,7 +453,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                     <col className="w-[13rem]" />
                     <col className="w-11" />
                     {matrix.columns.map((col) => (
-                      <col key={`cg-${col.key}`} className="min-w-[6.25rem] lg:min-w-0" />
+                      <col key={`cg-${col.key}`} className="min-w-[65px]" />
                     ))}
                     <col className="w-[5.25rem] sm:w-24" />
                   </colgroup>
@@ -476,8 +484,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                             key={col.key}
                             scope="col"
                             className={cn(
-                              "min-w-[6.25rem] border-b border-l border-border/60 px-1.5 py-2 align-top sm:min-w-[7rem]",
-                              "lg:min-w-0",
+                              "min-w-[65px] border-b border-l border-border/60 px-1.5 py-2 align-top",
                               tint.cell,
                             )}
                           >
@@ -542,16 +549,15 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                             <td
                               key={`${row.commodityId}-${col.key}`}
                               className={cn(
-                                "min-w-[6.25rem] border-l border-border/50 px-1.5 py-2.5 text-right text-sm sm:min-w-[7rem]",
-                                "lg:min-w-0",
+                                "min-w-[65px] border-l border-border/50 px-1.5 py-2.5 text-center text-sm whitespace-normal break-words",
                                 tint.cell,
                                 i % 2 === 0 ? "brightness-100" : "brightness-[0.78]",
                                 !hasQty && !lineNote ? "text-muted-foreground/70" : "text-foreground",
                               )}
                             >
-                              <span className={cn("tabular-nums", hasQty ? "font-medium" : "")}>{val ?? "—"}</span>
+                              <span className={cn("block tabular-nums break-all", hasQty ? "font-medium" : "")}>{val ?? "—"}</span>
                               {lineNote ? (
-                                <span className="mt-0.5 block text-xs font-normal leading-snug text-foreground/85 sm:mt-0 sm:inline sm:ml-1">
+                                <span className="mt-0.5 block break-words text-xs font-normal leading-snug text-foreground/85">
                                   {" "}
                                   ({lineNote})
                                 </span>
@@ -561,7 +567,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                         })}
                         <td
                           className={cn(
-                            "min-w-[4.75rem] border-l-2 border-primary/30 bg-primary/[0.07] px-1.5 py-2.5 text-right text-sm font-semibold tabular-nums text-primary sm:min-w-[5.25rem]",
+                            "min-w-[4.75rem] border-l-2 border-primary/30 bg-primary/[0.07] px-1.5 py-2.5 text-center text-sm font-semibold tabular-nums text-primary sm:min-w-[5.25rem]",
                             i % 2 === 0 ? "brightness-100" : "brightness-[0.78]",
                           )}
                         >
