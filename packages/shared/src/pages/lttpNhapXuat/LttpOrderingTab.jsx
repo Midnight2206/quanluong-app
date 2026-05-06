@@ -124,7 +124,9 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   const [pngExporting, setPngExporting] = useState(false);
   const [tablePreviewOpen, setTablePreviewOpen] = useState(false);
   const [tablePreviewImageUrl, setTablePreviewImageUrl] = useState("");
+  const [tablePreviewBlob, setTablePreviewBlob] = useState(null);
   const [tablePreviewLoading, setTablePreviewLoading] = useState(false);
+  const [tablePreviewSharing, setTablePreviewSharing] = useState(false);
   const [forceShowTableForCapture, setForceShowTableForCapture] = useState(false);
 
   const { data: summary, isLoading, isFetching, error } = useGetLttpDailyOrderSummaryQuery(
@@ -245,6 +247,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
         if (prev) URL.revokeObjectURL(prev);
         return nextUrl;
       });
+      setTablePreviewBlob(blob);
       setTablePreviewOpen(true);
     } catch (e) {
       const msg = typeof e?.message === "string" ? e.message : null;
@@ -259,6 +262,25 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   const canExportPng =
     Boolean(matrix?.columns?.length && matrix?.rows?.length) && !showLoader && effectiveUnitId != null;
   const canCopyText = Boolean(orderSharePlainText) && !showLoader && effectiveUnitId != null;
+
+  const handleShareTablePreview = useCallback(async () => {
+    if (!tablePreviewBlob || tablePreviewSharing) return;
+    setTablePreviewSharing(true);
+    try {
+      const filename = `dat-hang-lttp-${orderDate}.png`;
+      const outcome = await shareOrDownloadPng(tablePreviewBlob, filename);
+      if (outcome === "shared") {
+        notifySuccess("Đã mở chia sẻ — chọn Zalo hoặc ứng dụng khác.");
+      } else if (outcome === "downloaded") {
+        notifySuccess("Đã tải ảnh — mở ứng dụng và đính kèm file vừa tải.");
+      }
+    } catch (e) {
+      const msg = typeof e?.message === "string" ? e.message : null;
+      notifyError(msg || "Không chia sẻ được ảnh bảng.");
+    } finally {
+      setTablePreviewSharing(false);
+    }
+  }, [tablePreviewBlob, tablePreviewSharing, orderDate]);
 
   const handleCopyOrderText = useCallback(async () => {
     if (!orderSharePlainText) {
@@ -326,8 +348,9 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
           <Button
             type="button"
             variant="ghost"
-            className="h-9 shrink-0 gap-2 text-xs"
+            className="hidden h-9 shrink-0 gap-2 text-xs lg:inline-flex"
             disabled={!canExportPng || pngExporting}
+            title="Trên điện thoại / máy tính bảng dùng «Xem bảng» để chụp ảnh sau khi xem trước."
             onClick={handleExportPngForZalo}
           >
             <ImageIcon className="size-3.5 shrink-0" />
@@ -422,24 +445,37 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                 data-lttp-ordering-table-scroll
                 className="min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain lg:overflow-x-visible [-webkit-overflow-scrolling:touch]"
               >
-                <table className="w-full min-w-max border-collapse text-left text-sm lg:min-w-0 lg:table-fixed">
+                {/* Không dùng lg:table-fixed: với layout cố định, các cột trái dễ bị co < colgroup và sticky left-[15.5rem] (STT+họ tên) làm cột ĐVT lệch phải. */}
+                <table className="w-full min-w-max border-collapse text-left text-sm">
+                  {/*
+                    Cố định 3 cột trái (STT + tên + ĐVT) khớp sticky left — tránh cột tên giãn (sm:max-w-none) làm lệch ĐVT và các cột phiếu.
+                  */}
+                  <colgroup>
+                    <col className="w-10" />
+                    <col className="w-[13rem]" />
+                    <col className="w-11" />
+                    {matrix.columns.map((col) => (
+                      <col key={`cg-${col.key}`} className="min-w-[6.25rem] lg:min-w-0" />
+                    ))}
+                    <col className="w-[5.25rem] sm:w-24" />
+                  </colgroup>
                   <thead>
                     <tr className="border-b border-border">
                       <th
                         scope="col"
-                        className="sticky left-0 z-20 w-10 min-w-10 border-b border-r border-border bg-muted/95 px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
+                        className="sticky left-0 z-20 w-10 min-w-10 max-w-10 border-b border-r border-border bg-muted/95 px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
                       >
                         STT
                       </th>
                       <th
                         scope="col"
-                        className="sticky left-10 z-20 min-w-[13rem] max-w-[18rem] border-b border-r border-border bg-muted/95 px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:max-w-none sm:text-[10px] print:relative print:bg-muted"
+                        className="sticky left-10 z-20 w-[13rem] min-w-[13rem] max-w-[13rem] border-b border-r border-border bg-muted/95 px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
                       >
                         <span className="block break-words leading-snug">Tên mặt hàng</span>
                       </th>
                       <th
                         scope="col"
-                        className="sticky left-[15.5rem] z-20 w-11 min-w-11 border-b border-r border-border bg-muted/95 px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
+                        className="sticky left-[15.5rem] z-20 w-11 min-w-11 max-w-11 border-b border-r border-border bg-muted/95 px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
                       >
                         ĐVT
                       </th>
@@ -483,7 +519,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       <tr key={row.commodityId} className="border-b border-border/50">
                         <td
                           className={cn(
-                            "sticky left-0 z-10 w-10 min-w-10 border-r border-border px-1.5 py-2.5 text-center text-sm text-muted-foreground tabular-nums print:relative",
+                            "sticky left-0 z-10 w-10 min-w-10 max-w-10 border-r border-border px-1.5 py-2.5 text-center text-sm text-muted-foreground tabular-nums print:relative",
                             i % 2 === 0 ? "bg-background" : "bg-muted/30",
                           )}
                         >
@@ -491,7 +527,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                         </td>
                         <td
                           className={cn(
-                            "sticky left-10 z-10 min-w-[13rem] max-w-[18rem] border-r border-border px-2 py-2.5 text-sm font-medium leading-snug text-foreground sm:max-w-none print:relative",
+                            "sticky left-10 z-10 w-[13rem] min-w-[13rem] max-w-[13rem] border-r border-border px-2 py-2.5 text-sm font-medium leading-snug text-foreground print:relative",
                             i % 2 === 0 ? "bg-background" : "bg-muted/30",
                           )}
                         >
@@ -499,7 +535,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                         </td>
                         <td
                           className={cn(
-                            "sticky left-[15.5rem] z-10 w-11 min-w-11 border-r border-border px-1 py-2.5 text-center text-sm text-muted-foreground print:relative",
+                            "sticky left-[15.5rem] z-10 w-11 min-w-11 max-w-11 border-r border-border px-1 py-2.5 text-center text-sm text-muted-foreground print:relative",
                             i % 2 === 0 ? "bg-background" : "bg-muted/30",
                           )}
                         >
@@ -584,15 +620,27 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
           <div className="mx-auto flex h-full max-w-6xl flex-col">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-medium text-white">Ảnh toàn bộ bảng đặt hàng</p>
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-8 gap-1.5 px-2 text-xs"
-                onClick={() => setTablePreviewOpen(false)}
-              >
-                <X className="size-3.5" />
-                Đóng
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-8 gap-1.5 px-2 text-xs"
+                  disabled={!tablePreviewBlob || tablePreviewSharing}
+                  onClick={() => void handleShareTablePreview()}
+                >
+                  <ImageIcon className="size-3.5" />
+                  {tablePreviewSharing ? "Đang chia sẻ…" : "Chia sẻ ảnh"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-8 gap-1.5 px-2 text-xs"
+                  onClick={() => setTablePreviewOpen(false)}
+                >
+                  <X className="size-3.5" />
+                  Đóng
+                </Button>
+              </div>
             </div>
             <div className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-1">
               {tablePreviewImageUrl ? (
