@@ -520,7 +520,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                         <td
                           className={cn(
                             "sticky left-0 z-10 w-10 min-w-10 max-w-10 border-r border-border px-1.5 py-2.5 text-center text-sm text-muted-foreground tabular-nums print:relative",
-                            i % 2 === 0 ? "bg-background" : "bg-muted/30",
+                            i % 2 === 0 ? "bg-background" : "bg-muted/75",
                           )}
                         >
                           {i + 1}
@@ -528,7 +528,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                         <td
                           className={cn(
                             "sticky left-10 z-10 w-[13rem] min-w-[13rem] max-w-[13rem] border-r border-border px-2 py-2.5 text-sm font-medium leading-snug text-foreground print:relative",
-                            i % 2 === 0 ? "bg-background" : "bg-muted/30",
+                            i % 2 === 0 ? "bg-background" : "bg-muted/75",
                           )}
                         >
                           <span className="block break-words">{row.name}</span>
@@ -536,7 +536,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                         <td
                           className={cn(
                             "sticky left-[15.5rem] z-10 w-11 min-w-11 max-w-11 border-r border-border px-1 py-2.5 text-center text-sm text-muted-foreground print:relative",
-                            i % 2 === 0 ? "bg-background" : "bg-muted/30",
+                            i % 2 === 0 ? "bg-background" : "bg-muted/75",
                           )}
                         >
                           <span className="block break-words leading-snug">{row.measureUnit || "—"}</span>
@@ -555,6 +555,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                                 "min-w-[6.25rem] border-l border-border/50 px-1.5 py-2.5 text-right text-sm sm:min-w-[7rem]",
                                 "lg:min-w-0",
                                 tint.cell,
+                                i % 2 === 0 ? "brightness-100" : "brightness-[0.78]",
                                 !hasQty && !lineNote ? "text-muted-foreground/70" : "text-foreground",
                               )}
                             >
@@ -568,7 +569,12 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                             </td>
                           );
                         })}
-                        <td className="min-w-[4.75rem] border-l-2 border-primary/30 bg-primary/[0.07] px-1.5 py-2.5 text-right text-sm font-semibold tabular-nums text-primary sm:min-w-[5.25rem]">
+                        <td
+                          className={cn(
+                            "min-w-[4.75rem] border-l-2 border-primary/30 bg-primary/[0.07] px-1.5 py-2.5 text-right text-sm font-semibold tabular-nums text-primary sm:min-w-[5.25rem]",
+                            i % 2 === 0 ? "brightness-100" : "brightness-[0.78]",
+                          )}
+                        >
                           {row.quantityFormatted}
                         </td>
                       </tr>
