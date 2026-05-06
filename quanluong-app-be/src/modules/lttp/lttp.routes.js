@@ -24,6 +24,8 @@ import {
   deletePriceTableController,
   downloadPriceImportTemplateController,
   effectivePricesController,
+  exportIssueSlipPdfController,
+  exportIssueSlipsPdfMergedController,
   getCommodityController,
   getIssueFormDefaultsController,
   getDailyOrderSummaryController,
@@ -66,6 +68,7 @@ import {
   foodGroupIdParamsSchema,
   issueFormDefaultsQuerySchema,
   issueSlipIdParamsSchema,
+  issueSlipPrintBatchBodySchema,
   issueSlipResolveQuerySchema,
   dailyOrderSummaryQuerySchema,
   listIssueSlipsQuerySchema,
@@ -238,6 +241,22 @@ lttpRouter.put(
   validateRequest({ body: putRecipientDefaultUserBodySchema }),
   permissionMiddleware([routePermissions.putRecipientDefaultUser]),
   asyncHandler(putRecipientDefaultUserController),
+);
+
+lttpRouter.post(
+  "/issue-slips/print-pdfs",
+  validateRequest({ body: issueSlipPrintBatchBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.printIssueSlipsPdfMerged]),
+  asyncHandler(exportIssueSlipsPdfMergedController),
+);
+
+lttpRouter.get(
+  "/issue-slips/:id/print-pdf",
+  validateRequest({ params: issueSlipIdParamsSchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.printIssueSlipPdf]),
+  asyncHandler(exportIssueSlipPdfController),
 );
 
 lttpRouter.get(

@@ -849,6 +849,13 @@ function mapIssueSlip(slip) {
     recipientUnit: slip.recipientUnit
       ? { id: slip.recipientUnit.id, name: slip.recipientUnit.name }
       : null,
+    recipientUser: slip.recipientUser
+      ? {
+          id: slip.recipientUser.id,
+          username: slip.recipientUser.username,
+          fullName: slip.recipientUser.profile?.fullName ?? null,
+        }
+      : null,
     printLine1: slip.printLine1,
     printLine2: slip.printLine2,
     formMauSo: slip.formMauSo,
@@ -884,6 +891,26 @@ function mapIssueSlip(slip) {
       amount: Number(r.amount),
       lineNote: r.lineNote != null && String(r.lineNote).trim() !== "" ? String(r.lineNote).trim() : null,
     })),
+  };
+}
+
+function mapIssueFormDefaultsRow(row) {
+  if (!row) return null;
+  return {
+    printLine1: row.printLine1,
+    printLine2: row.printLine2,
+    formMauSo: row.formMauSo,
+    warehouseFrom: row.warehouseFrom,
+    marginTopCm: row.marginTopCm != null ? Number(row.marginTopCm) : null,
+    marginRightCm: row.marginRightCm != null ? Number(row.marginRightCm) : null,
+    marginBottomCm: row.marginBottomCm != null ? Number(row.marginBottomCm) : null,
+    marginLeftCm: row.marginLeftCm != null ? Number(row.marginLeftCm) : null,
+    printFontId: row.printFontId ?? null,
+    printFontSizePt: row.printFontSizePt != null ? Number(row.printFontSizePt) : null,
+    signerWriter: row.signerWriter,
+    signerApprover: row.signerApprover,
+    defaultRecipientUnitId: row.defaultRecipientUnitId,
+    defaultRecipientUserId: row.defaultRecipientUserId,
   };
 }
 
@@ -1667,7 +1694,30 @@ async function getIssueSlipById(id, scope, effectiveUnitIds, dataScope) {
   assertCommodityRowStorage(slip.unitId, dataScope);
   assertUnitIdInScope(dataScope.logicalUnitId, scope);
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
-  return mapIssueSlip(slip);
+  const mapped = mapIssueSlip(slip);
+  /** Cùng khóa `unitId` với `upsertIssueFormDefaults` (dataScope.storageUnitId === slip.unitId sau assertCommodityRowStorage). */
+  const defaults = await prisma.lttpUnitIssueFormDefaults.findUnique({
+    where: { unitId: dataScope.storageUnitId },
+  });
+  let recipientNameFromUnitDefault = null;
+  if (mapped.recipientUnitId != null) {
+    const defRow = await prisma.lttpRecipientUnitDefaultUser.findUnique({
+      where: { recipientUnitId: mapped.recipientUnitId },
+      include: {
+        user: { select: { username: true, profile: { select: { fullName: true } } } },
+      },
+    });
+    const u = defRow?.user;
+    if (u) {
+      const fn = u.profile?.fullName?.trim();
+      recipientNameFromUnitDefault = fn || u.username || null;
+    }
+  }
+  return {
+    ...mapped,
+    printSettings: mapIssueFormDefaultsRow(defaults),
+    recipientNameFromUnitDefault,
+  };
 }
 
 async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope) {
@@ -2705,22 +2755,7 @@ async function getIssueFormDefaults({ unitId }, scope, effectiveUnitIds, dataSco
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
   const storageUnitId = dataScope.storageUnitId;
   const row = await prisma.lttpUnitIssueFormDefaults.findUnique({ where: { unitId: storageUnitId } });
-  if (!row) {
-    return { unitId: storageUnitId, defaults: null };
-  }
-  return {
-    unitId: storageUnitId,
-    defaults: {
-      printLine1: row.printLine1,
-      printLine2: row.printLine2,
-      formMauSo: row.formMauSo,
-      warehouseFrom: row.warehouseFrom,
-      signerWriter: row.signerWriter,
-      signerApprover: row.signerApprover,
-      defaultRecipientUnitId: row.defaultRecipientUnitId,
-      defaultRecipientUserId: row.defaultRecipientUserId,
-    },
-  };
+  return { unitId: storageUnitId, defaults: mapIssueFormDefaultsRow(row) };
 }
 
 async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope) {
@@ -2773,6 +2808,12 @@ async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope)
       printLine2: rest.printLine2?.trim() || null,
       formMauSo: rest.formMauSo?.trim() || null,
       warehouseFrom: rest.warehouseFrom?.trim() || null,
+      marginTopCm: rest.marginTopCm != null ? String(rest.marginTopCm) : null,
+      marginRightCm: rest.marginRightCm != null ? String(rest.marginRightCm) : null,
+      marginBottomCm: rest.marginBottomCm != null ? String(rest.marginBottomCm) : null,
+      marginLeftCm: rest.marginLeftCm != null ? String(rest.marginLeftCm) : null,
+      printFontId: rest.printFontId?.trim() || null,
+      printFontSizePt: rest.printFontSizePt != null ? String(rest.printFontSizePt) : null,
       signerWriter: rest.signerWriter?.trim() || null,
       signerApprover: rest.signerApprover?.trim() || null,
       defaultRecipientUnitId,
@@ -2783,6 +2824,12 @@ async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope)
       printLine2: rest.printLine2?.trim() || null,
       formMauSo: rest.formMauSo?.trim() || null,
       warehouseFrom: rest.warehouseFrom?.trim() || null,
+      marginTopCm: rest.marginTopCm != null ? String(rest.marginTopCm) : null,
+      marginRightCm: rest.marginRightCm != null ? String(rest.marginRightCm) : null,
+      marginBottomCm: rest.marginBottomCm != null ? String(rest.marginBottomCm) : null,
+      marginLeftCm: rest.marginLeftCm != null ? String(rest.marginLeftCm) : null,
+      printFontId: rest.printFontId?.trim() || null,
+      printFontSizePt: rest.printFontSizePt != null ? String(rest.printFontSizePt) : null,
       signerWriter: rest.signerWriter?.trim() || null,
       signerApprover: rest.signerApprover?.trim() || null,
       defaultRecipientUnitId,

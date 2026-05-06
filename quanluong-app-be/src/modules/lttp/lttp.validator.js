@@ -211,6 +211,10 @@ const issueSlipIdParamsSchema = z.object({
   id: idParam,
 });
 
+const issueSlipPrintBatchBodySchema = z.object({
+  ids: z.array(z.coerce.number().int().positive()).min(1).max(80),
+});
+
 const nextIssueSlipSerialQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
@@ -245,6 +249,12 @@ const upsertIssueFormDefaultsBodySchema = z.object({
   printLine2: z.string().max(128).optional().nullable(),
   formMauSo: z.string().max(64).optional().nullable(),
   warehouseFrom: z.string().max(128).optional().nullable(),
+  marginTopCm: z.coerce.number().finite().min(0).max(10).optional().nullable(),
+  marginRightCm: z.coerce.number().finite().min(0).max(10).optional().nullable(),
+  marginBottomCm: z.coerce.number().finite().min(0).max(10).optional().nullable(),
+  marginLeftCm: z.coerce.number().finite().min(0).max(10).optional().nullable(),
+  printFontId: z.string().max(32).optional().nullable(),
+  printFontSizePt: z.coerce.number().finite().min(8).max(18).optional().nullable(),
   signerWriter: z.string().max(191).optional().nullable(),
   signerApprover: z.string().max(191).optional().nullable(),
   defaultRecipientUnitId: z.coerce.number().int().positive().optional().nullable(),
@@ -305,6 +315,7 @@ export {
   createPriceTableBodySchema,
   effectiveQuerySchema,
   issueSlipIdParamsSchema,
+  issueSlipPrintBatchBodySchema,
   issueFormDefaultsQuerySchema,
   issueSlipResolveQuerySchema,
   listIssueSlipsQuerySchema,

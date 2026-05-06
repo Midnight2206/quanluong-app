@@ -20,13 +20,19 @@ function BulkRecipientRow({ unit, initialUserId, canWrite }) {
   );
 
   useEffect(() => {
-    setRecipientUserId(initialUserId != null && initialUserId !== "" ? String(initialUserId) : "");
+    setRecipientUserId(
+      initialUserId != null && initialUserId !== ""
+        ? String(initialUserId)
+        : "",
+    );
   }, [initialUserId, unit.id]);
 
-  const { data: recipientUsers = [], isLoading: usersLoad } = useGetLttpRecipientUsersQuery(unit.id, {
-    staleTime: 5 * 60 * 1000,
-  });
-  const [putDefault, { isLoading: saving }] = usePutLttpReceivingDefaultRecipientMutation();
+  const { data: recipientUsers = [], isLoading: usersLoad } =
+    useGetLttpRecipientUsersQuery(unit.id, {
+      staleTime: 5 * 60 * 1000,
+    });
+  const [putDefault, { isLoading: saving }] =
+    usePutLttpReceivingDefaultRecipientMutation();
 
   const saveRow = useCallback(async () => {
     if (!canWrite) {
@@ -39,7 +45,9 @@ function BulkRecipientRow({ unit, initialUserId, canWrite }) {
       });
       notifySuccess("Đã lưu người nhận mặc định cho đơn vị nhận.");
     } catch (err) {
-      notifyError(err?.data?.message || err?.message || "Lưu không thành công.");
+      notifyError(
+        err?.data?.message || err?.message || "Lưu không thành công.",
+      );
     }
   }, [canWrite, putDefault, recipientUserId, unit.id]);
 
@@ -60,9 +68,6 @@ function BulkRecipientRow({ unit, initialUserId, canWrite }) {
             </option>
           ))}
         </select>
-        <p className="mt-0.5 text-[9px] text-muted-foreground">
-          Chỉ user thuộc đơn vị nhận này. Mẫu in / lề cài trong « Mở cài đặt » trên tab Phiếu xuất (theo kho cấp).
-        </p>
       </td>
       <td className="w-24 px-2 py-1.5 text-right">
         <Button
@@ -86,9 +91,10 @@ function BulkRecipientRow({ unit, initialUserId, canWrite }) {
  */
 export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
   const titleId = useId();
-  const { data: listPayload, isLoading: listLoad } = useGetLttpReceivingDefaultRecipientsListQuery({
-    skip: !open,
-  });
+  const { data: listPayload, isLoading: listLoad } =
+    useGetLttpReceivingDefaultRecipientsListQuery({
+      skip: !open,
+    });
 
   const userIdByRecipient = useMemo(() => {
     const m = new Map();
@@ -116,8 +122,16 @@ export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" role="presentation">
-      <button type="button" className="absolute inset-0 bg-background/80 backdrop-blur-[1px]" aria-label="Đóng" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+      role="presentation"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-background/80 backdrop-blur-[1px]"
+        aria-label="Đóng"
+        onClick={onClose}
+      />
       <div
         role="dialog"
         aria-modal="true"
@@ -130,12 +144,14 @@ export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
             <p id={titleId} className="text-sm font-semibold text-foreground">
               Người nhận mặc định theo đơn vị nhận
             </p>
-            <p className="text-[11px] text-muted-foreground">
-              Mỗi dòng là một đơn vị LTTP (nhận hàng), chọn tài khoản user thuộc đơn vị đó. Khác với cấu hình mẫu in theo kho
-              cấp.
-            </p>
           </div>
-          <Button type="button" variant="ghost" size="sm" className="h-8 shrink-0" onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 shrink-0"
+            onClick={onClose}
+          >
             <X className="size-4" />
           </Button>
         </div>
@@ -144,7 +160,8 @@ export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
           <div className="overflow-x-auto p-3 sm:p-4">
             {listLoad ? (
               <p className="px-2 py-4 text-[11px] text-muted-foreground">
-                <Loader2 className="inline size-3.5 animate-spin" /> Đang tải cấu hình…
+                <Loader2 className="inline size-3.5 animate-spin" /> Đang tải
+                cấu hình…
               </p>
             ) : null}
             <table className="w-full border-collapse text-left text-[11px]">

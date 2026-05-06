@@ -422,6 +422,32 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "printIssueSlipPdf",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/:id/print-pdf",
+    pathRoute: "/api/lttp/issue-slips/:id/print-pdf",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "Export LTTP issue slip PDF",
+      description:
+        "Xuất phiếu LTTP dạng PDF với phân trang chủ động: Cộng sang trang / Mang sang và kiểm soát ngắt trang trong phần bảng.",
+    },
+  },
+  {
+    key: "printIssueSlipsPdfMerged",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/print-pdfs",
+    pathRoute: "/api/lttp/issue-slips/print-pdfs",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "Export merged LTTP issue slips PDF",
+      description:
+        "Xuất một file PDF gồm nhiều phiếu xuất LTTP đã chọn (thứ tự theo danh sách gửi lên).",
+    },
+  },
+  {
     key: "getIssueSlip",
     method: "GET",
     module: LTTP_MODULE_NAME,

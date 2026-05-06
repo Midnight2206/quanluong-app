@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Loader2, Pencil, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
+import httpClient from "@/services/httpClient";
 import {
   useDeleteLttpIssueSlipMutation,
   useGetLttpIssueSlipsQuery,
@@ -11,7 +11,6 @@ import {
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
-import { LttpIssueSlipPrintDocument } from "./LttpIssueSlipPrintDocument";
 import { readLichSuFilters, writeLichSuFilters } from "./lttpNhapXuatSessionPersist";
 
 const inputClass =
@@ -36,7 +35,6 @@ function lastDayOfCurrentMonthYmd() {
 }
 
 const PAGE_SIZE = 20;
-const M = { t: 2, r: 1.5, b: 1.5, l: 3 };
 
 /**
  * Lịch sử phiếu xuất theo kho (storage) + lọc + in / sửa / thu hồi / in hàng loạt.
@@ -49,18 +47,12 @@ export function LttpLichSuXuatTab({
   onRequestEdit,
 }) {
   const { confirm } = useConfirm();
-  const [mounted, setMounted] = useState(false);
   const [listFrom, setListFrom] = useState(() => firstDayOfCurrentMonthYmd());
   const [listTo, setListTo] = useState(() => lastDayOfCurrentMonthYmd());
   const [filterRecipientId, setFilterRecipientId] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(() => new Set());
-  const [printOne, setPrintOne] = useState(null);
-  const [printBatch, setPrintBatch] = useState(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [batchPrintBusy, setBatchPrintBusy] = useState(false);
 
   const historyHydrateKey = useRef(null);
   /** Tránh ghi sessionStorage với state mặc định trước khi hydrate xong (layout chạy trước passive effect). */
@@ -168,54 +160,70 @@ export function LttpLichSuXuatTab({
     });
   }, []);
 
-  const handlePrint = useCallback((s) => {
-    setPrintBatch(null);
-    setPrintOne(s);
+  const handlePrint = useCallback(async (s) => {
+    try {
+      const resp = await httpClient({
+        url: `/lttp/issue-slips/${s.id}/print-pdf`,
+        method: "get",
+        responseType: "blob",
+      });
+      const blob = resp?.data;
+      if (!(blob instanceof Blob)) {
+        notifyError("Không lấy được file PDF.");
+        return;
+      }
+      const pdfUrl = URL.createObjectURL(blob);
+      const popup = window.open(pdfUrl, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        const a = document.createElement("a");
+        a.href = pdfUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
+    } catch (err) {
+      notifyError(err?.response?.data?.message || err?.data?.message || err?.message || "Không xuất được PDF.");
+    }
   }, []);
 
-  const handlePrintMany = useCallback(() => {
+  const handlePrintMany = useCallback(async () => {
     const chosen = slips.filter((s) => selected.has(s.id));
     if (!chosen.length) {
       notifyError("Chọn ít nhất một phiếu.");
       return;
     }
-    setPrintOne(null);
-    setPrintBatch(chosen);
+    setBatchPrintBusy(true);
+    try {
+      const resp = await httpClient({
+        url: "/lttp/issue-slips/print-pdfs",
+        method: "post",
+        data: { ids: chosen.map((s) => s.id) },
+        responseType: "blob",
+      });
+      const blob = resp?.data;
+      if (!(blob instanceof Blob)) {
+        notifyError("Không lấy được file PDF.");
+        return;
+      }
+      const pdfUrl = URL.createObjectURL(blob);
+      const popup = window.open(pdfUrl, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        const a = document.createElement("a");
+        a.href = pdfUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 120_000);
+    } catch (err) {
+      notifyError(
+        err?.response?.data?.message || err?.data?.message || err?.message || "Không xuất được PDF gộp.",
+      );
+    } finally {
+      setBatchPrintBusy(false);
+    }
   }, [slips, selected]);
-
-  useLayoutEffect(() => {
-    if (printOne == null) {
-      return undefined;
-    }
-    const t = setTimeout(() => {
-      window.print();
-    }, 100);
-    function onAfterPrint() {
-      setPrintOne(null);
-    }
-    window.addEventListener("afterprint", onAfterPrint);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("afterprint", onAfterPrint);
-    };
-  }, [printOne]);
-
-  useLayoutEffect(() => {
-    if (printBatch == null || !printBatch.length) {
-      return undefined;
-    }
-    const t = setTimeout(() => {
-      window.print();
-    }, 100);
-    function onAfterPrint() {
-      setPrintBatch(null);
-    }
-    window.addEventListener("afterprint", onAfterPrint);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("afterprint", onAfterPrint);
-    };
-  }, [printBatch]);
 
   async function onRecall(s) {
     const ok = await confirm({
@@ -235,43 +243,8 @@ export function LttpLichSuXuatTab({
     }
   }
 
-  const printPortal = mounted
-    ? createPortal(
-        <>
-          <style
-            media="print"
-            dangerouslySetInnerHTML={{
-              __html: `
-          @page { margin: ${M.t}cm ${M.r}cm ${M.b}cm ${M.l}cm; }
-          @media print {
-            body * { visibility: hidden; }
-            .lttp-issue-slip-print-root, .lttp-issue-slip-print-root * { visibility: visible; }
-            .lttp-issue-slip-print-root { position: absolute; left: 0; top: 0; width: 100%; }
-          }
-        `,
-            }}
-          />
-          {printOne ? (
-            <div className="lttp-issue-slip-print-root hidden print:block print:text-black">
-              <LttpIssueSlipPrintDocument slip={printOne} breakAfter={false} />
-            </div>
-          ) : null}
-          {printBatch?.length ? (
-            <div className="lttp-issue-slip-print-root hidden print:block print:text-black">
-              {printBatch.map((s, i) => (
-                <LttpIssueSlipPrintDocument key={s.id} slip={s} breakAfter={i < printBatch.length - 1} />
-              ))}
-            </div>
-          ) : null}
-        </>,
-        document.body,
-      )
-    : null;
-
   return (
-    <div className="space-y-4 text-xs print:hidden">
-      {printPortal}
-
+    <div className="space-y-4 text-xs">
       <p className="text-[11px] text-muted-foreground">
         Kho cấp: <span className="font-medium text-foreground">{storageUnitName || `#${storageUnitId}`}</span> — lọc
         phiếu xuất đã lưu.
@@ -464,11 +437,11 @@ export function LttpLichSuXuatTab({
             type="button"
             variant="secondary"
             className="h-8 gap-1.5 text-xs"
-            disabled={!someSelected}
-            onClick={handlePrintMany}
+            disabled={!someSelected || batchPrintBusy}
+            onClick={() => void handlePrintMany()}
           >
-            <Printer className="size-3.5" />
-            In tất cả phiếu đã chọn
+            {batchPrintBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Printer className="size-3.5" />}
+            In tất cả phiếu đã chọn (PDF gộp)
           </Button>
         </div>
       </div>

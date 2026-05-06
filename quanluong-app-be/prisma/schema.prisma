@@ -568,6 +568,12 @@ model LttpUnitIssueFormDefaults {
   printLine2             String?  @db.VarChar(128)
   formMauSo              String?  @db.VarChar(64)
   warehouseFrom          String?  @db.VarChar(128)
+  marginTopCm            Decimal? @db.Decimal(5, 2)
+  marginRightCm          Decimal? @db.Decimal(5, 2)
+  marginBottomCm         Decimal? @db.Decimal(5, 2)
+  marginLeftCm           Decimal? @db.Decimal(5, 2)
+  printFontId            String?  @db.VarChar(32)
+  printFontSizePt        Decimal? @db.Decimal(5, 2)
   signerWriter           String?  @db.VarChar(191)
   signerApprover         String?  @db.VarChar(191)
   defaultRecipientUnitId Int?

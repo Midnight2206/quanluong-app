@@ -44,6 +44,8 @@ import {
   updateIssueSlip,
   upsertIssueFormDefaults,
 } from "./lttp.service.js";
+import { buildIssueSlipPdfBuffer } from "./lttp-issue-slip-pdf.js";
+import { mergePdfBuffers } from "./lttp-pdf-merge.js";
 
 const importBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
@@ -468,6 +470,46 @@ async function getIssueSlipController(req, res) {
   });
 }
 
+async function exportIssueSlipPdfController(req, res) {
+  const row = await getIssueSlipById(
+    req.validatedParams.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  const pdfBuffer = await buildIssueSlipPdfBuffer(row);
+  const safeBook = row?.bookMmyy ? String(row.bookMmyy) : "book";
+  const safeNo =
+    row?.slipNo != null && Number.isFinite(Number(row.slipNo))
+      ? String(Number(row.slipNo)).padStart(4, "0")
+      : "0000";
+  const filename = `lttp-phieu-xuat-${safeBook}-${safeNo}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+  res.send(pdfBuffer);
+}
+
+async function exportIssueSlipsPdfMergedController(req, res) {
+  const rawIds = req.validatedBody.ids;
+  const seen = new Set();
+  const ids = [];
+  for (const id of rawIds) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+  const buffers = [];
+  for (const id of ids) {
+    const row = await getIssueSlipById(id, req.unitScope, req.effectiveUnitIds, req.dataScope);
+    buffers.push(await buildIssueSlipPdfBuffer(row));
+  }
+  const merged = await mergePdfBuffers(buffers);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="lttp-phieu-xuat-nhieu.pdf"`);
+  res.send(merged);
+}
+
 async function createIssueSlipController(req, res) {
   const row = await createIssueSlip(
     req.validatedBody,
@@ -603,6 +645,8 @@ export {
   getDailyOrderSummaryController,
   getRecipientDefaultUserByUnitController,
   getIssueSlipController,
+  exportIssueSlipPdfController,
+  exportIssueSlipsPdfMergedController,
   getNextIssueSlipSerialController,
   getPriceTableController,
   importPriceTableController,
