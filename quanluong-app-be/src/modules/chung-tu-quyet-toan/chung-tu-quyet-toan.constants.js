@@ -1,0 +1,3 @@
+const CHUNG_TU_QUYET_TOAN_MODULE_NAME = "ChungTuQuyetToan";
+
+export { CHUNG_TU_QUYET_TOAN_MODULE_NAME };

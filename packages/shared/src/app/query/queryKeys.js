@@ -63,6 +63,10 @@ export const qk = {
     catalog: () => ["mealRoster", "catalog"],
     dayMarks: (unitId, yearMonth) => ["mealRoster", "dayMarks", String(unitId), String(yearMonth)],
   },
+  chungTuQuyetToan: {
+    root: ["chungTuQuyetToan"],
+    health: () => ["chungTuQuyetToan", "health"],
+  },
 };
 
 /** Các tag string RTK `invalidateTags([...])` → prefix queryKey để invalidate. */

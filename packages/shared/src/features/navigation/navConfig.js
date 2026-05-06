@@ -1,4 +1,4 @@
-import { Home, LayoutDashboard, Soup, Users, Warehouse } from "lucide-react";
+import { FileText, Home, LayoutDashboard, Soup, Users, Warehouse } from "lucide-react";
 import { getMainAppOrigin, getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 /**
@@ -19,6 +19,12 @@ export const mainNavItems = [
     label: "Nhập xuất LTTP",
     icon: Warehouse,
     routeAccessKey: "nav-lttp-nhap-xuat",
+  },
+  {
+    to: "/chungtuquyettoan",
+    label: "Chứng từ quyết toán",
+    icon: FileText,
+    routeAccessKey: "nav-chungtuquyettoan",
   },
   {
     to: "/users",

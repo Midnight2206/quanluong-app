@@ -52,6 +52,9 @@ export async function captureElementToPngBlobWithDeps(root, opts = {}, deps) {
     if (scrollEl) {
       const fullW = scrollEl.scrollWidth;
       push(scrollEl, "overflow", "visible");
+      // Remove viewport clipping so PNG captures the full table, not just current scrolled region.
+      push(scrollEl, "max-height", "none");
+      push(scrollEl, "height", "auto");
       push(scrollEl, "width", `${fullW}px`);
     }
     if (card) {

@@ -9,6 +9,7 @@ import { PERMISSIONS_ROUTE_DEFINITIONS } from "../modules/permissions/permission
 import { LTTP_ROUTE_DEFINITIONS } from "../modules/lttp/lttp.route-definitions.js";
 import { MEAL_ALLOWANCE_RATES_ROUTE_DEFINITIONS } from "../modules/meal-allowance-rates/meal-allowance-rates.route-definitions.js";
 import { MEAL_ROSTER_ROUTE_DEFINITIONS } from "../modules/meal-roster/meal-roster.route-definitions.js";
+import { CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS } from "../modules/chung-tu-quyet-toan/chung-tu-quyet-toan.route-definitions.js";
 import { getPermissionVi } from "../shared/constants/permission-catalog.vi.js";
 
 const ROUTE_PERMISSION_DEFINITIONS = [
@@ -23,6 +24,7 @@ const ROUTE_PERMISSION_DEFINITIONS = [
   ...USERS_ROUTE_DEFINITIONS,
   ...MEAL_ALLOWANCE_RATES_ROUTE_DEFINITIONS,
   ...MEAL_ROSTER_ROUTE_DEFINITIONS,
+  ...CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS,
 ]
   .filter((route) => route.permission)
   .map((route) => {

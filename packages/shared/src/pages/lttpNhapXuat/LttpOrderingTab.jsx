@@ -649,22 +649,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                   </tbody>
                 </table>
               </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 bg-muted/25 px-3 py-2.5 print:break-inside-avoid">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Chú thích màu:</span>
-                <ul className="flex flex-1 flex-wrap gap-2">
-                  {matrix.columns.map((col) => (
-                    <li
-                      key={`legend-${col.key}`}
-                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-2 py-0.5 text-[10px] font-medium text-foreground shadow-sm"
-                    >
-                      <span className={cn("size-2 shrink-0 rounded-full", SLIP_COLUMN_STYLES[col.styleIdx].bar)} aria-hidden />
-                      <span className="min-w-0 break-words">
-                        {col.refLabel} · {col.recipientUnitName}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </CardContent>
           </Card>
         ) : null}

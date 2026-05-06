@@ -67,6 +67,10 @@ export const ROUTE_ACCESS_RULES = {
     description: "Trang Nhập xuất LTTP — phiếu xuất, in theo mẫu",
     requiredPermissions: [PERMISSIONS.LTTP_ISSUE_SLIPS_READ],
   },
+  "nav-chungtuquyettoan": {
+    description: "Trang Chứng từ quyết toán",
+    requiredPermissions: [PERMISSIONS.LTTP_ISSUE_SLIPS_READ],
+  },
   "dashboard-lttp-groups": {
     description: "Nhóm LTTP toàn cục",
     requiredPermissions: [PERMISSIONS.LTTP_GROUPS_READ],
