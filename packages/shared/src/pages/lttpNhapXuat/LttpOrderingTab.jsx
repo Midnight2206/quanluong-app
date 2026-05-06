@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback, useState, useEffect, useRef } from "react";
+import { useMemo, useCallback, useState, useEffect, useRef, memo } from "react";
 import { ClipboardCopy, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -101,6 +101,7 @@ function buildOrderSharePlainText({ orderDate, storageUnitName, supplierFilterLa
 /**
  * Giàn màu cột phiếu (nền + viền trái) — tương thích sáng/tối, in vẫn nhìn phân nhánh.
  */
+
 const SLIP_COLUMN_STYLES = [
   { bar: "bg-sky-500", cell: "bg-sky-500/[0.09] dark:bg-sky-500/15 border-sky-500/25" },
   { bar: "bg-violet-500", cell: "bg-violet-500/[0.09] dark:bg-violet-500/15 border-violet-500/25" },
@@ -111,6 +112,110 @@ const SLIP_COLUMN_STYLES = [
   { bar: "bg-orange-500", cell: "bg-orange-500/[0.09] dark:bg-orange-500/15 border-orange-500/25" },
   { bar: "bg-fuchsia-500", cell: "bg-fuchsia-500/[0.09] dark:bg-fuchsia-500/15 border-fuchsia-500/25" },
 ];
+
+/** Một nguồn sự thật cho width + sticky-left để header/body luôn thẳng hàng. */
+const ORDER_COLUMN_PX = {
+  index: 40,
+  name: 208,
+  unit: 44,
+  slip: 65,
+  total: 84,
+};
+
+const ORDER_STICKY_LEFT_PX = {
+  index: 0,
+  name: ORDER_COLUMN_PX.index,
+  unit: ORDER_COLUMN_PX.index + ORDER_COLUMN_PX.name,
+};
+
+const ORDER_COL_STYLE = {
+  index: { width: ORDER_COLUMN_PX.index, minWidth: ORDER_COLUMN_PX.index, maxWidth: ORDER_COLUMN_PX.index },
+  name: { width: ORDER_COLUMN_PX.name, minWidth: ORDER_COLUMN_PX.name, maxWidth: ORDER_COLUMN_PX.name },
+  unit: { width: ORDER_COLUMN_PX.unit, minWidth: ORDER_COLUMN_PX.unit, maxWidth: ORDER_COLUMN_PX.unit },
+  slip: { width: ORDER_COLUMN_PX.slip, minWidth: ORDER_COLUMN_PX.slip, maxWidth: ORDER_COLUMN_PX.slip },
+  total: { width: ORDER_COLUMN_PX.total, minWidth: ORDER_COLUMN_PX.total, maxWidth: ORDER_COLUMN_PX.total },
+};
+
+/**
+ * @param {{
+ *   row: { commodityId: number; name: string; measureUnit?: string | null; quantityFormatted?: string | null };
+ *   rowIndex: number;
+ *   columns: { key: string; styleIdx: number }[];
+ *   qtyBySlip: Map<string, Map<number, { quantityFormatted: string; lineNote: string | null }>>;
+ * }} props
+ */
+const LttpOrderingMatrixRow = memo(function LttpOrderingMatrixRow({ row, rowIndex, columns, qtyBySlip }) {
+  const i = rowIndex;
+  const rowBg = i % 2 === 0 ? "bg-background" : "bg-muted/75";
+  return (
+    <tr className="border-b border-border/50">
+      <td
+        className={cn(
+          "sticky z-20 border-r border-border px-1.5 py-2.5 text-center text-sm text-muted-foreground tabular-nums print:relative",
+          rowBg,
+        )}
+        style={{ ...ORDER_COL_STYLE.index, left: ORDER_STICKY_LEFT_PX.index }}
+      >
+        {i + 1}
+      </td>
+      <td
+        className={cn(
+          "sticky z-20 border-r border-border px-2 py-2.5 text-sm font-medium leading-snug text-foreground print:relative",
+          rowBg,
+        )}
+        style={{ ...ORDER_COL_STYLE.name, left: ORDER_STICKY_LEFT_PX.name }}
+      >
+        <span className="block break-words">{row.name}</span>
+      </td>
+      <td
+        className={cn(
+          "sticky z-20 border-r border-border px-1 py-2.5 text-center text-sm text-muted-foreground print:relative",
+          rowBg,
+        )}
+        style={{ ...ORDER_COL_STYLE.unit, left: ORDER_STICKY_LEFT_PX.unit }}
+      >
+        <span className="block break-words leading-snug">{row.measureUnit || "—"}</span>
+      </td>
+      {columns.map((col) => {
+        const tint = SLIP_COLUMN_STYLES[col.styleIdx];
+        const cell = qtyBySlip.get(col.key);
+        const cellData = cell?.get(row.commodityId);
+        const val = cellData?.quantityFormatted;
+        const lineNote = cellData?.lineNote;
+        const hasQty = val != null && val !== "" && val !== "0";
+        return (
+          <td
+            key={`${row.commodityId}-${col.key}`}
+            className={cn(
+              "border-l border-border/50 px-1.5 py-2.5 text-center text-sm whitespace-normal break-words",
+              tint.cell,
+              i % 2 === 0 ? "brightness-100" : "brightness-[0.78]",
+              !hasQty && !lineNote ? "text-muted-foreground/70" : "text-foreground",
+            )}
+            style={ORDER_COL_STYLE.slip}
+          >
+            <span className={cn("block tabular-nums break-all", hasQty ? "font-medium" : "")}>{val ?? "—"}</span>
+            {lineNote ? (
+              <span className="mt-0.5 block break-words text-xs font-normal leading-snug text-foreground/85">
+                {" "}
+                ({lineNote})
+              </span>
+            ) : null}
+          </td>
+        );
+      })}
+      <td
+        className={cn(
+          "border-l-2 border-primary/30 bg-primary/[0.07] px-1.5 py-2.5 text-center text-sm font-semibold tabular-nums text-primary",
+          i % 2 === 0 ? "brightness-100" : "brightness-[0.78]",
+        )}
+        style={ORDER_COL_STYLE.total}
+      >
+        {row.quantityFormatted}
+      </td>
+    </tr>
+  );
+});
 
 /**
  * Tab «Đặt hàng»: bảng ma trận mặt hàng × từng phiếu xuất trong ngày, màu phân cột.
@@ -428,7 +533,8 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             ref={tableCardRef}
             data-lttp-ordering-card
             className={cn(
-              "-mx-3 w-[calc(100%+1.5rem)] overflow-hidden border-border/80 shadow-md sm:-mx-4 sm:w-[calc(100%+2rem)] print:mx-0 print:w-full print:break-inside-avoid",
+              /* overflow-visible: overflow-hidden trên Card cắt position:sticky của thead (không neo theo viewport). */
+              "-mx-3 w-[calc(100%+1.5rem)] overflow-visible border-border/80 shadow-md sm:-mx-4 sm:w-[calc(100%+2rem)] print:mx-0 print:w-full print:break-inside-avoid",
               !forceShowTableForCapture ? "hidden lg:block print:block" : "block",
             )}
           >
@@ -441,39 +547,52 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             <CardContent className="!p-0">
               <div
                 data-lttp-ordering-table-scroll
-                className="min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain pr-3 [-webkit-overflow-scrolling:touch]"
+                style={{ maxHeight: "70vh" }}
+                className="min-w-0 overflow-auto overscroll-x-contain pr-3 [-webkit-overflow-scrolling:touch]"
               >
-                {/* Không dùng lg:table-fixed: với layout cố định, các cột trái dễ bị co < colgroup và sticky left-[15.5rem] (STT+họ tên) làm cột ĐVT lệch phải. */}
-                <table className="w-full min-w-max border-collapse text-center text-sm">
+                {/* table-fixed + colgroup width cố định giúp sticky-left ổn định và không lệch cột khi cuộn. */}
+                <table className="w-max min-w-full border-separate border-spacing-0 text-center text-sm table-fixed">
                   {/*
                     Cố định 3 cột trái (STT + tên + ĐVT) khớp sticky left — tránh cột tên giãn (sm:max-w-none) làm lệch ĐVT và các cột phiếu.
                   */}
                   <colgroup>
-                    <col className="w-10" />
-                    <col className="w-[13rem]" />
-                    <col className="w-11" />
+                    <col style={ORDER_COL_STYLE.index} />
+                    <col style={ORDER_COL_STYLE.name} />
+                    <col style={ORDER_COL_STYLE.unit} />
                     {matrix.columns.map((col) => (
-                      <col key={`cg-${col.key}`} className="min-w-[65px]" />
+                      <col key={`cg-${col.key}`} style={ORDER_COL_STYLE.slip} />
                     ))}
-                    <col className="w-[5.25rem] sm:w-24" />
+                    <col style={ORDER_COL_STYLE.total} />
                   </colgroup>
-                  <thead>
+                  <thead className="border-b border-border print:table-header-group">
                     <tr className="border-b border-border">
                       <th
                         scope="col"
-                        className="sticky left-0 z-20 w-10 min-w-10 max-w-10 border-b border-r border-border bg-muted/95 px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
+                        className={cn(
+                          "sticky top-2 z-40 border-b border-r border-border !bg-muted px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
+                          "print:relative print:top-auto print:shadow-none",
+                        )}
+                        style={{ ...ORDER_COL_STYLE.index, left: ORDER_STICKY_LEFT_PX.index }}
                       >
                         STT
                       </th>
                       <th
                         scope="col"
-                        className="sticky left-10 z-20 w-[13rem] min-w-[13rem] max-w-[13rem] border-b border-r border-border bg-muted/95 px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
+                        className={cn(
+                          "sticky top-2 z-40 border-b border-r border-border !bg-muted px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
+                          "print:relative print:top-auto print:shadow-none",
+                        )}
+                        style={{ ...ORDER_COL_STYLE.name, left: ORDER_STICKY_LEFT_PX.name }}
                       >
                         <span className="block break-words leading-snug">Tên mặt hàng</span>
                       </th>
                       <th
                         scope="col"
-                        className="sticky left-[15.5rem] z-20 w-11 min-w-11 max-w-11 border-b border-r border-border bg-muted/95 px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground backdrop-blur-sm sm:text-[10px] print:relative print:bg-muted"
+                        className={cn(
+                          "sticky top-2 z-40 border-b border-r border-border !bg-muted px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
+                          "print:relative print:top-auto print:shadow-none",
+                        )}
+                        style={{ ...ORDER_COL_STYLE.unit, left: ORDER_STICKY_LEFT_PX.unit }}
                       >
                         ĐVT
                       </th>
@@ -484,9 +603,11 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                             key={col.key}
                             scope="col"
                             className={cn(
-                              "min-w-[65px] border-b border-l border-border/60 px-1.5 py-2 align-top",
+                              "sticky top-2 z-40 border-b border-l border-border/60 !bg-muted px-1.5 py-2 align-top shadow-sm",
                               tint.cell,
+                              "print:relative print:top-auto print:shadow-none",
                             )}
+                            style={ORDER_COL_STYLE.slip}
                           >
                             <div className={cn("mb-1 h-1 w-full rounded-sm", tint.bar)} aria-hidden />
                             <div className="break-words px-0.5 text-center text-[11px] font-medium leading-snug tabular-nums text-muted-foreground sm:text-[10px]">
@@ -503,7 +624,11 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       })}
                       <th
                         scope="col"
-                        className="min-w-[4.75rem] border-b border-l-2 border-primary/40 bg-primary/12 px-1.5 py-2.5 text-center text-[11px] font-bold uppercase text-primary sm:min-w-[5.25rem] sm:text-[10px]"
+                        className={cn(
+                          "sticky top-2 z-40 border-b border-l-2 border-primary/40 !bg-muted px-1.5 py-2.5 text-center text-[11px] font-bold uppercase text-primary shadow-sm sm:text-[10px]",
+                          "print:relative print:top-auto print:shadow-none",
+                        )}
+                        style={ORDER_COL_STYLE.total}
                       >
                         Tổng
                         <br />
@@ -513,67 +638,13 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                   </thead>
                   <tbody>
                     {matrix.rows.map((row, i) => (
-                      <tr key={row.commodityId} className="border-b border-border/50">
-                        <td
-                          className={cn(
-                            "sticky left-0 z-10 w-10 min-w-10 max-w-10 border-r border-border px-1.5 py-2.5 text-center text-sm text-muted-foreground tabular-nums print:relative",
-                            i % 2 === 0 ? "bg-background" : "bg-muted/75",
-                          )}
-                        >
-                          {i + 1}
-                        </td>
-                        <td
-                          className={cn(
-                            "sticky left-10 z-10 w-[13rem] min-w-[13rem] max-w-[13rem] border-r border-border px-2 py-2.5 text-sm font-medium leading-snug text-foreground print:relative",
-                            i % 2 === 0 ? "bg-background" : "bg-muted/75",
-                          )}
-                        >
-                          <span className="block break-words">{row.name}</span>
-                        </td>
-                        <td
-                          className={cn(
-                            "sticky left-[15.5rem] z-10 w-11 min-w-11 max-w-11 border-r border-border px-1 py-2.5 text-center text-sm text-muted-foreground print:relative",
-                            i % 2 === 0 ? "bg-background" : "bg-muted/75",
-                          )}
-                        >
-                          <span className="block break-words leading-snug">{row.measureUnit || "—"}</span>
-                        </td>
-                        {matrix.columns.map((col) => {
-                          const tint = SLIP_COLUMN_STYLES[col.styleIdx];
-                          const cell = matrix.qtyBySlip.get(col.key);
-                          const cellData = cell?.get(row.commodityId);
-                          const val = cellData?.quantityFormatted;
-                          const lineNote = cellData?.lineNote;
-                          const hasQty = val != null && val !== "" && val !== "0";
-                          return (
-                            <td
-                              key={`${row.commodityId}-${col.key}`}
-                              className={cn(
-                                "min-w-[65px] border-l border-border/50 px-1.5 py-2.5 text-center text-sm whitespace-normal break-words",
-                                tint.cell,
-                                i % 2 === 0 ? "brightness-100" : "brightness-[0.78]",
-                                !hasQty && !lineNote ? "text-muted-foreground/70" : "text-foreground",
-                              )}
-                            >
-                              <span className={cn("block tabular-nums break-all", hasQty ? "font-medium" : "")}>{val ?? "—"}</span>
-                              {lineNote ? (
-                                <span className="mt-0.5 block break-words text-xs font-normal leading-snug text-foreground/85">
-                                  {" "}
-                                  ({lineNote})
-                                </span>
-                              ) : null}
-                            </td>
-                          );
-                        })}
-                        <td
-                          className={cn(
-                            "min-w-[4.75rem] border-l-2 border-primary/30 bg-primary/[0.07] px-1.5 py-2.5 text-center text-sm font-semibold tabular-nums text-primary sm:min-w-[5.25rem]",
-                            i % 2 === 0 ? "brightness-100" : "brightness-[0.78]",
-                          )}
-                        >
-                          {row.quantityFormatted}
-                        </td>
-                      </tr>
+                      <LttpOrderingMatrixRow
+                        key={row.commodityId}
+                        row={row}
+                        rowIndex={i}
+                        columns={matrix.columns}
+                        qtyBySlip={matrix.qtyBySlip}
+                      />
                     ))}
                   </tbody>
                 </table>

@@ -148,7 +148,7 @@ export function LttpLichSuXuatTab({
   }
 
   return (
-    <div className="space-y-4 text-xs">
+    <div className="border-y-[16px] border-white text-xs">
       <p className="text-[11px] text-muted-foreground">
         Kho cấp: <span className="font-medium text-foreground">{storageUnitName || `#${storageUnitId}`}</span> — lọc
         phiếu xuất đã lưu.
