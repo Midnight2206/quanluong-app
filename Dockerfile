@@ -1,4 +1,5 @@
 # Monorepo Quan Luong — một file, nhiều stage. Compose chọn bằng target.
+# Build context bắt buộc là **thư mục gốc repo** (có `quanluong-app-be/`), không build trong riêng `quanluong-app-be`.
 #   backend       → API + migrate + worker (Node)
 #   ui-dev        → Next.js `next dev` (không Nginx) — chỉ docker-compose.dev.yml
 #   ui            → Production: Nginx + Next.js apps/web (standalone)
@@ -20,6 +21,13 @@ RUN npm ci
 COPY quanluong-app-be/ ./
 RUN npx prisma generate
 
+# Gỡ devDependencies khỏi tree đã `npm ci` đầy đủ — image runtime copy `node_modules` này,
+# tránh lệch/vấn đề `npm ci --omit=dev` riêng stage so với builder (đủ pdfkit, pdf-lib, prisma, …).
+FROM backend-builder AS backend-prod-modules
+RUN npm prune --omit=dev
+# sharp có native binding + optional @img/* — prune/copy giữa stage có thể làm thiếu binary đúng OS/arch.
+RUN npm rebuild sharp --foreground-scripts
+
 # Dev: đủ devDependencies (nodemon) — docker-compose.dev.yml build target backend-dev
 FROM backend-builder AS backend-dev
 EXPOSE 3000
@@ -32,7 +40,10 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-c
 ARG DATABASE_URL=mysql://root:change-me@db:3306/quanluong
 ENV DATABASE_URL=${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
 COPY quanluong-app-be/package*.json ./
-RUN npm ci --omit=dev
+COPY --from=backend-prod-modules /app/node_modules ./node_modules
+# Khớp lại binary sharp với image runtime (bookworm-slim + kiến trúc build).
+RUN npm rebuild sharp --foreground-scripts \
+  && node --input-type=module -e "import('sharp').then(()=>console.log('sharp ok'))"
 COPY --from=backend-builder /app/prisma ./prisma
 COPY --from=backend-builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=backend-builder /app/src ./src
