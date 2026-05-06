@@ -10,7 +10,6 @@ import {
 import { createPortal, flushSync } from "react-dom";
 import {
   Loader2,
-  Printer,
   RefreshCw,
   Settings2,
   Trash2,
@@ -33,7 +32,6 @@ import {
   useUpdateLttpIssueSlipMutation,
 } from "@/features/lttp/api/lttpApi";
 import { apiRequest } from "@/services/apiRequest";
-import httpClient from "@/services/httpClient";
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { vndToVietnameseDocumentLine } from "@/utils/vndVietnameseText";
@@ -1199,45 +1197,6 @@ export function LttpPhieuXuatTab({
     });
   }, []);
 
-  async function handlePrint() {
-    if (!isEditMode || !editingSlip?.id) {
-      notifyWarning(
-        "Hãy lưu phiếu trước, sau đó mở lại ở chế độ sửa để xuất PDF chính xác.",
-      );
-      return;
-    }
-    try {
-      const resp = await httpClient({
-        url: `/lttp/issue-slips/${editingSlip.id}/print-pdf`,
-        method: "get",
-        responseType: "blob",
-      });
-      const blob = resp?.data;
-      if (!(blob instanceof Blob)) {
-        notifyError("Không lấy được file PDF.");
-        return;
-      }
-      const pdfUrl = URL.createObjectURL(blob);
-      const popup = window.open(pdfUrl, "_blank", "noopener,noreferrer");
-      if (!popup) {
-        const a = document.createElement("a");
-        a.href = pdfUrl;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.click();
-      }
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
-      notifySuccess("Đã mở bản PDF phiếu xuất.");
-    } catch (err) {
-      notifyError(
-        err?.response?.data?.message ||
-          err?.data?.message ||
-          err?.message ||
-          "Không xuất được PDF.",
-      );
-    }
-  }
-
   async function onSubmit(e) {
     e?.preventDefault();
     if (!selectedUnitId) {
@@ -1723,15 +1682,6 @@ export function LttpPhieuXuatTab({
               </span>
             </div>
           )}
-          <Button
-            type="button"
-            variant="secondary"
-            className="h-8 gap-1.5 text-xs"
-            onClick={handlePrint}
-          >
-            <Printer className="size-3.5" />
-            In / PDF
-          </Button>
         </div>
         <label className="block space-y-0.5 text-xs">
           Chú thích phiếu (chỉ dùng trên tab Đặt hàng để phân biệt phiếu — không

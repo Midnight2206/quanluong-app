@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Pencil, Printer, RotateCcw } from "lucide-react";
+import { Loader2, Pencil, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
-import httpClient from "@/services/httpClient";
 import {
   useDeleteLttpIssueSlipMutation,
   useGetLttpIssueSlipsQuery,
@@ -51,8 +50,6 @@ export function LttpLichSuXuatTab({
   const [listTo, setListTo] = useState(() => lastDayOfCurrentMonthYmd());
   const [filterRecipientId, setFilterRecipientId] = useState("");
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState(() => new Set());
-  const [batchPrintBusy, setBatchPrintBusy] = useState(false);
 
   const historyHydrateKey = useRef(null);
   /** Tránh ghi sessionStorage với state mặc định trước khi hydrate xong (layout chạy trước passive effect). */
@@ -131,99 +128,6 @@ export function LttpLichSuXuatTab({
   }, [isLoading, slips.length, page]);
 
   const [deleteSlip, { isLoading: delBusy }] = useDeleteLttpIssueSlipMutation();
-
-  useEffect(() => {
-    setSelected(new Set());
-  }, [storageUnitId, listFrom, listTo, filterRecipientId, page]);
-
-  const allIds = useMemo(() => new Set(slips.map((s) => s.id)), [slips]);
-  const allSelected = slips.length > 0 && slips.every((s) => selected.has(s.id));
-  const someSelected = slips.some((s) => selected.has(s.id));
-
-  const toggleAll = useCallback(() => {
-    if (allSelected) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(allIds));
-    }
-  }, [allSelected, allIds]);
-
-  const toggleOne = useCallback((id) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const handlePrint = useCallback(async (s) => {
-    try {
-      const resp = await httpClient({
-        url: `/lttp/issue-slips/${s.id}/print-pdf`,
-        method: "get",
-        responseType: "blob",
-      });
-      const blob = resp?.data;
-      if (!(blob instanceof Blob)) {
-        notifyError("Không lấy được file PDF.");
-        return;
-      }
-      const pdfUrl = URL.createObjectURL(blob);
-      const popup = window.open(pdfUrl, "_blank", "noopener,noreferrer");
-      if (!popup) {
-        const a = document.createElement("a");
-        a.href = pdfUrl;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.click();
-      }
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
-    } catch (err) {
-      notifyError(err?.response?.data?.message || err?.data?.message || err?.message || "Không xuất được PDF.");
-    }
-  }, []);
-
-  const handlePrintMany = useCallback(async () => {
-    const chosen = slips.filter((s) => selected.has(s.id));
-    if (!chosen.length) {
-      notifyError("Chọn ít nhất một phiếu.");
-      return;
-    }
-    setBatchPrintBusy(true);
-    try {
-      const resp = await httpClient({
-        url: "/lttp/issue-slips/print-pdfs",
-        method: "post",
-        data: { ids: chosen.map((s) => s.id) },
-        responseType: "blob",
-      });
-      const blob = resp?.data;
-      if (!(blob instanceof Blob)) {
-        notifyError("Không lấy được file PDF.");
-        return;
-      }
-      const pdfUrl = URL.createObjectURL(blob);
-      const popup = window.open(pdfUrl, "_blank", "noopener,noreferrer");
-      if (!popup) {
-        const a = document.createElement("a");
-        a.href = pdfUrl;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.click();
-      }
-      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 120_000);
-    } catch (err) {
-      notifyError(
-        err?.response?.data?.message || err?.data?.message || err?.message || "Không xuất được PDF gộp.",
-      );
-    } finally {
-      setBatchPrintBusy(false);
-    }
-  }, [slips, selected]);
 
   async function onRecall(s) {
     const ok = await confirm({
@@ -322,16 +226,6 @@ export function LttpLichSuXuatTab({
         <table className="w-full min-w-[52rem] border-collapse text-left text-[11px]">
           <thead className="bg-secondary/90">
             <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
-              <th className="w-10 px-2 py-2">
-                <input
-                  type="checkbox"
-                  className="rounded border-border"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  title="Chọn tất cả"
-                  disabled={!slips.length}
-                />
-              </th>
               <th className="px-2 py-2">Ngày xuất</th>
               <th className="px-2 py-2">Đơn vị nhận</th>
               <th className="min-w-[10rem] px-2 py-2">Chú thích phiếu</th>
@@ -343,7 +237,7 @@ export function LttpLichSuXuatTab({
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-2 py-4 text-muted-foreground">
+                <td colSpan={6} className="px-2 py-4 text-muted-foreground">
                   <Loader2 className="mr-1 inline size-3.5 animate-spin" />
                   Đang tải…
                 </td>
@@ -351,7 +245,7 @@ export function LttpLichSuXuatTab({
             ) : null}
             {!isLoading && !slips.length ? (
               <tr>
-                <td colSpan={7} className="px-2 py-4 text-muted-foreground">
+                <td colSpan={6} className="px-2 py-4 text-muted-foreground">
                   Không có phiếu phù hợp bộ lọc.
                 </td>
               </tr>
@@ -361,14 +255,6 @@ export function LttpLichSuXuatTab({
               const soPhieu = `Quyển ${s.bookMmyy} — Số ${String(s.slipNo).padStart(4, "0")}`;
               return (
                 <tr key={s.id} className="border-b border-border/50">
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="checkbox"
-                      className="rounded border-border"
-                      checked={selected.has(s.id)}
-                      onChange={() => toggleOne(s.id)}
-                    />
-                  </td>
                   <td className="px-2 py-1.5 font-medium tabular-nums">{s.issueDate}</td>
                   <td className="max-w-[12rem] truncate px-2 py-1.5" title={s.recipientUnit?.name ?? "—"}>
                     {s.recipientUnit?.name ?? "—"}
@@ -387,16 +273,6 @@ export function LttpLichSuXuatTab({
                   <td className="px-2 py-1.5 text-right tabular-nums">{formatVnd(total)}</td>
                   <td className="min-w-[13rem] whitespace-nowrap px-2 py-1.5 text-right align-middle">
                     <div className="flex flex-nowrap items-center justify-end gap-1">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 gap-0.5 px-1.5 text-[10px]"
-                        onClick={() => handlePrint(s)}
-                      >
-                        <Printer className="size-3" />
-                        In
-                      </Button>
                       {canWrite && typeof onRequestEdit === "function" ? (
                         <IconButton
                           label="Sửa phiếu"
@@ -426,24 +302,6 @@ export function LttpLichSuXuatTab({
             })}
           </tbody>
         </table>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
-        <p className="text-[10px] text-muted-foreground">
-          Đã chọn {Array.from(selected).length} trên trang này ({slips.length} / trang, {total} tổng)
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            className="h-8 gap-1.5 text-xs"
-            disabled={!someSelected || batchPrintBusy}
-            onClick={() => void handlePrintMany()}
-          >
-            {batchPrintBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Printer className="size-3.5" />}
-            In tất cả phiếu đã chọn (PDF gộp)
-          </Button>
-        </div>
       </div>
     </div>
   );

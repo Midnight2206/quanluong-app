@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useCallback, useState, useEffect, useRef } from "react";
-import { ClipboardCopy, ImageIcon, Printer, X } from "lucide-react";
+import { ClipboardCopy, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { useGetLttpDailyOrderSummaryQuery } from "@/features/lttp/api/lttpApi";
@@ -207,12 +207,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
     });
   }, [summary, orderDate, storageUnitName, supplierFilterLabel]);
 
-  const handlePrint = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.print();
-    }
-  }, []);
-
   const handleExportPngForZalo = useCallback(async () => {
     const el = orderCaptureRef.current;
     if (!el || pngExporting || isLoading || isFetching || !matrix?.rows?.length) return;
@@ -366,10 +360,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
           >
             <ClipboardCopy className="size-3.5 shrink-0" />
             Copy text đặt hàng
-          </Button>
-          <Button type="button" variant="secondary" className="h-9 shrink-0 gap-2 text-xs" onClick={handlePrint}>
-            <Printer className="size-3.5" />
-            In / PDF
           </Button>
           <Button
             type="button"
@@ -626,34 +616,30 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
           <div className="mx-auto flex h-full max-w-6xl flex-col">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-medium text-white">Ảnh toàn bộ bảng đặt hàng</p>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-8 gap-1.5 px-2 text-xs"
-                  disabled={!tablePreviewBlob || tablePreviewSharing}
-                  onClick={() => void handleShareTablePreview()}
-                >
-                  <ImageIcon className="size-3.5" />
-                  {tablePreviewSharing ? "Đang chia sẻ…" : "Chia sẻ ảnh"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-8 gap-1.5 px-2 text-xs"
-                  onClick={() => setTablePreviewOpen(false)}
-                >
-                  <X className="size-3.5" />
-                  Đóng
-                </Button>
-              </div>
+              <span className="text-[11px] text-white/75">Vuốt để xem toàn bộ ảnh</span>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-1">
+            <div className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-1 pb-16">
               {tablePreviewImageUrl ? (
                 <img src={tablePreviewImageUrl} alt="Ảnh chụp bảng đặt hàng" className="mx-auto h-auto max-w-none rounded-md" />
               ) : (
                 <p className="px-3 py-4 text-center text-sm text-white/80">Không có ảnh xem trước.</p>
               )}
+            </div>
+            <div className="sticky bottom-0 mt-2 flex items-center justify-end gap-2 rounded-md bg-black/55 p-2 backdrop-blur-sm">
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-8 gap-1.5 px-2 text-xs"
+                disabled={!tablePreviewBlob || tablePreviewSharing}
+                onClick={() => void handleShareTablePreview()}
+              >
+                <ImageIcon className="size-3.5" />
+                {tablePreviewSharing ? "Đang chia sẻ…" : "Chia sẻ ảnh"}
+              </Button>
+              <Button type="button" variant="secondary" className="h-8 gap-1.5 px-2 text-xs" onClick={() => setTablePreviewOpen(false)}>
+                <X className="size-3.5" />
+                Đóng
+              </Button>
             </div>
           </div>
         </div>
