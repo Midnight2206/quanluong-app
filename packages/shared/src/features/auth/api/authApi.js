@@ -197,6 +197,32 @@ export function useCheckGoogleDriveLinkMutation() {
   });
 }
 
+export function useGetEntertainmentCoinStateMutation() {
+  return useAuthMutation({
+    mutationFn: () => apiRequest({ url: "/auth/entertainment/coin-state", method: "get" }),
+  });
+}
+
+export function useFlipEntertainmentCoinMutation() {
+  const qc = useQueryClient();
+  return useAuthMutation({
+    mutationFn: () => apiRequest({ url: "/auth/entertainment/coin-flip", method: "post" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.auth.currentUser() });
+    },
+  });
+}
+
+export function useClaimEntertainmentCoinMutation() {
+  const qc = useQueryClient();
+  return useAuthMutation({
+    mutationFn: () => apiRequest({ url: "/auth/entertainment/coin-claim", method: "post" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.auth.currentUser() });
+    },
+  });
+}
+
 export function useUploadAvatarMutation() {
   const qc = useQueryClient();
   return useAuthMutation({

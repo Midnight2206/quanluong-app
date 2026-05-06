@@ -19,6 +19,7 @@
     "prisma:migrate:resolve": "prisma migrate resolve",
     "seed:meal-allowance": "node scripts/seed-meal-allowance-rates.js",
     "db:reset-email-verification": "node scripts/reset-email-verification.js",
+    "db:backfill-drive-template": "node scripts/backfill-google-drive-template-folders.js",
     "db:migrate": "docker compose --env-file .env.docker run --rm migrate",
     "docker:up": "docker compose --env-file .env.docker up --build",
     "docker:redis": "docker compose --env-file .env.docker up -d redis",

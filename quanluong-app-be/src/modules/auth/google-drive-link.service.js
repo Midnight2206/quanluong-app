@@ -10,6 +10,7 @@ import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { logger } from "../../shared/utils/logger.js";
 
 const MIDNIGHT_APP_FOLDER_NAME = "midnight-app";
+const CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME = "chung-tu-quyet-toan-template";
 const DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
 const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DRIVE_FOLDER_HEALTH_ATTEMPTS = 3;
@@ -90,6 +91,51 @@ async function ensureMidnightAppFolder(oauth2Client) {
     );
     throw new AppError({
       message: "Không tạo được thư mục trên Google Drive.",
+      statusCode: 502,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+
+  return created.data.id;
+}
+
+async function ensureChildFolder({ oauth2Client, parentId, folderName }) {
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const escapedName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
+  const list = await drive.files.list({
+    q: [
+      `name='${escapedName}'`,
+      `mimeType='${DRIVE_FOLDER_MIME_TYPE}'`,
+      "trashed=false",
+      `'${parentId}' in parents`,
+    ].join(" and "),
+    fields: "files(id, name, parents, driveId, webViewLink)",
+    spaces: "drive",
+    corpora: "user",
+    pageSize: 10,
+    supportsAllDrives: false,
+    includeItemsFromAllDrives: false,
+  });
+
+  const existing = list.data.files?.find((file) => !file.driveId);
+  if (existing?.id) {
+    return existing.id;
+  }
+
+  const created = await drive.files.create({
+    requestBody: {
+      name: folderName,
+      mimeType: DRIVE_FOLDER_MIME_TYPE,
+      parents: [parentId],
+    },
+    fields: "id, name, parents, driveId, webViewLink",
+    supportsAllDrives: false,
+  });
+
+  if (!created.data.id || created.data.driveId) {
+    throw new AppError({
+      message: `Không tạo được thư mục con ${folderName} trên Google Drive.`,
       statusCode: 502,
       code: ERROR_CODES.INTERNAL_SERVER_ERROR,
     });
@@ -204,6 +250,11 @@ async function exchangeCodeAndLinkDrive({ code, userId }) {
   let folderId;
   try {
     folderId = await ensureMidnightAppFolder(client);
+    await ensureChildFolder({
+      oauth2Client: client,
+      parentId: folderId,
+      folderName: CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME,
+    });
   } catch (error) {
     logger.error(
       {
@@ -271,7 +322,7 @@ async function verifyGoogleDriveLinkForUser(userId) {
   const drive = google.drive({ version: "v3", auth: client });
 
   try {
-    return await verifyDriveFolderOrClearLink({
+    const status = await verifyDriveFolderOrClearLink({
       folderId: user.googleDriveFolderId,
       getFolder: async (folderId) => {
         const res = await drive.files.get({
@@ -295,6 +346,14 @@ async function verifyGoogleDriveLinkForUser(userId) {
         await unlinkGoogleDriveForUser(userId);
       },
     });
+    if (status.status === "linked") {
+      await ensureTemplateFolderForLinkedUser({
+        oauth2Client: client,
+        userId,
+        parentFolderId: user.googleDriveFolderId,
+      });
+    }
+    return status;
   } catch (error) {
     logger.warn(
       {
@@ -307,6 +366,31 @@ async function verifyGoogleDriveLinkForUser(userId) {
       "Liên kết Google: không kiểm tra được folder làm việc, giữ nguyên liên kết",
     );
     return { status: "unchecked" };
+  }
+}
+
+async function ensureTemplateFolderForLinkedUser({
+  oauth2Client,
+  userId,
+  parentFolderId,
+}) {
+  try {
+    await ensureChildFolder({
+      oauth2Client,
+      parentId: parentFolderId,
+      folderName: CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME,
+    });
+  } catch (error) {
+    logger.warn(
+      {
+        userId,
+        parentFolderId,
+        status: error.response?.status,
+        reason: error.response?.data?.error?.errors?.[0]?.reason,
+        message: error.response?.data?.error?.message || error.message,
+      },
+      "Liên kết Google: không đảm bảo được folder template chung-tu-quyet-toan-template",
+    );
   }
 }
 

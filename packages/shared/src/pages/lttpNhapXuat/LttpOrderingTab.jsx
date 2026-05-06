@@ -317,11 +317,13 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
     if (!el || pngExporting || isLoading || isFetching || !matrix?.rows?.length) return;
     setPngExporting(true);
     try {
-      const blob = await captureElementToPngBlob(el);
+      const blob = await captureElementToPngBlob(el, { qualityMode: "fast" });
       const filename = `dat-hang-lttp-${orderDate}.png`;
       const outcome = await shareOrDownloadPng(blob, filename);
       if (outcome === "shared") {
         notifySuccess("Đã mở chia sẻ — chọn ứng dụng đích.");
+      } else if (outcome === "copied_image") {
+        notifySuccess("Đã copy ảnh vào clipboard — mở ứng dụng chat và dán ảnh (Ctrl+V).");
       } else if (outcome === "downloaded_fallback") {
         notifyWarning(
           "Ứng dụng đích không nhận ảnh qua chia sẻ (hay gặp với Zalo) — đã tải ảnh. Mở Zalo → đính kèm ảnh trong album hoặc Tệp.",
@@ -344,7 +346,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
     setForceShowTableForCapture(true);
     try {
       await new Promise((resolve) => setTimeout(resolve, 80));
-      const blob = await captureElementToPngBlob(el);
+      const blob = await captureElementToPngBlob(el, { qualityMode: "fast" });
       const nextUrl = URL.createObjectURL(blob);
       setTablePreviewImageUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -374,6 +376,8 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
       const outcome = await shareOrDownloadPng(tablePreviewBlob, filename);
       if (outcome === "shared") {
         notifySuccess("Đã mở chia sẻ — chọn ứng dụng đích.");
+      } else if (outcome === "copied_image") {
+        notifySuccess("Đã copy ảnh vào clipboard — mở ứng dụng chat và dán ảnh (Ctrl+V).");
       } else if (outcome === "downloaded_fallback") {
         notifyWarning(
           "Ứng dụng đích không nhận ảnh qua chia sẻ (hay gặp với Zalo) — đã tải ảnh. Mở Zalo → đính kèm ảnh trong album hoặc Tệp.",

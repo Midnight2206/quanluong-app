@@ -6,13 +6,12 @@
  * @param {{ toBlob: (node: HTMLElement, options?: object) => Promise<Blob | null> }} deps
  * @returns {Promise<Blob>}
  */
-/** @param {number} w @param {number} h @param {number} basePr */
-function clampPixelRatioForOutputSize(w, h, basePr) {
+/** @param {number} w @param {number} h @param {number} basePr @param {number} maxOutputPx */
+function clampPixelRatioForOutputSize(w, h, basePr, maxOutputPx) {
   const safeW = Math.max(1, w);
   const safeH = Math.max(1, h);
   let pr = basePr;
-  /** ~14MP ảnh đầu ra — giảm chậm / crash trên mobile khi bảng rất rộng */
-  const maxOutputPx = 14_000_000;
+  /** Giới hạn tổng pixel đầu ra để giảm thời gian render và tránh crash mobile. */
   const est = safeW * safeH * pr * pr;
   if (est > maxOutputPx) {
     pr = Math.sqrt(maxOutputPx / (safeW * safeH));
@@ -30,6 +29,7 @@ export async function captureElementToPngBlobWithDeps(root, opts = {}, deps) {
     tableScrollSelector = "[data-lttp-ordering-table-scroll]",
     cardSelector = "[data-lttp-ordering-card]",
     pixelRatio: pixelRatioOpt,
+    qualityMode = "balanced",
   } = opts;
 
   const scrollEl = root.querySelector(tableScrollSelector);
@@ -74,12 +74,18 @@ export async function captureElementToPngBlobWithDeps(root, opts = {}, deps) {
     const w = Math.max(root.scrollWidth, root.offsetWidth, tableW || 0);
     const h = Math.max(root.scrollHeight, root.offsetHeight);
 
-    const basePr =
-      pixelRatioOpt ??
-      (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1023px)").matches
-        ? 1.25
-        : 2);
-    const pixelRatio = clampPixelRatioForOutputSize(w, h, basePr);
+    const isMobile =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 1023px)").matches;
+
+    const defaultsByMode =
+      qualityMode === "fast"
+        ? { basePr: isMobile ? 1 : 1.25, maxOutputPx: 8_500_000 }
+        : { basePr: isMobile ? 1.25 : 1.75, maxOutputPx: 12_000_000 };
+
+    const basePr = pixelRatioOpt ?? defaultsByMode.basePr;
+    const pixelRatio = clampPixelRatioForOutputSize(w, h, basePr, defaultsByMode.maxOutputPx);
 
     const blob = await toBlob(root, {
       pixelRatio,
@@ -114,31 +120,46 @@ export function downloadBlobAsFile(blob, filename) {
 /**
  * Mobile: sheet chia sẻ. Desktop: thường tải file (trình duyệt không share file).
  * Nhiều app (vd. Zalo) có thể từ chối nhận file qua Web Share — khi đó fallback tải ảnh.
- * @returns {Promise<"shared" | "downloaded" | "downloaded_fallback" | "cancelled">}
+ * @returns {Promise<"shared" | "copied_image" | "downloaded" | "downloaded_fallback" | "cancelled">}
  */
 export async function shareOrDownloadPng(blob, filename) {
   const mime =
     blob?.type && typeof blob.type === "string" && blob.type.startsWith("image/") ? blob.type : "image/png";
   let shareAttempted = false;
   try {
-    if (
-      typeof navigator !== "undefined" &&
-      typeof File !== "undefined" &&
-      typeof navigator.share === "function" &&
-      typeof navigator.canShare === "function"
-    ) {
+    if (typeof navigator !== "undefined" && typeof File !== "undefined" && typeof navigator.share === "function") {
       const file = new File([blob], filename, { type: mime });
       const payload = { files: [file], title: filename.replace(/\.[^.]+$/, "") };
-      if (navigator.canShare(payload)) {
+      /**
+       * Một số môi trường báo `canShare(files)=false` dù vẫn share được.
+       * Ưu tiên thử `navigator.share` trực tiếp để tránh rơi xuống tải file quá sớm.
+       */
+      const canShareResult =
+        typeof navigator.canShare === "function" ? navigator.canShare(payload) : undefined;
+      if (canShareResult !== false) {
         shareAttempted = true;
         await navigator.share(payload);
         return "shared";
       }
+      // canShare trả false: vẫn thử một lần cuối, nếu không được sẽ catch và fallback download.
+      shareAttempted = true;
+      await navigator.share(payload);
+      return "shared";
     }
   } catch (e) {
     const err = /** @type {{ name?: string, code?: number }} */ (e);
     if (err?.name === "AbortError" || err?.code === 20) return "cancelled";
     /** Share lỗi sau khi chọn app đích — fallback tải file */
+  }
+  // Fallback 1: copy ảnh vào clipboard để user paste thẳng vào app chat (nhanh hơn tải file).
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+      const item = new ClipboardItem({ [mime]: blob });
+      await navigator.clipboard.write([item]);
+      return "copied_image";
+    }
+  } catch {
+    // Bỏ qua, xuống fallback tải file.
   }
   downloadBlobAsFile(blob, filename);
   return shareAttempted ? "downloaded_fallback" : "downloaded";

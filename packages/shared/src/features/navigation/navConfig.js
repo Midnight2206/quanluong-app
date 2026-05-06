@@ -1,4 +1,4 @@
-import { FileText, Home, LayoutDashboard, Soup, Users, Warehouse } from "lucide-react";
+import { FileText, Gamepad2, Home, LayoutDashboard, Soup, Users, Warehouse } from "lucide-react";
 import { getMainAppOrigin, getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 /**
@@ -7,6 +7,7 @@ import { getMainAppOrigin, getSuperadminAppOrigin } from "@/utils/superadminPort
  */
 export const mainNavItems = [
   { to: "/", label: "Trang chủ", icon: Home },
+  { to: "/giai-tri", label: "Giai tri", icon: Gamepad2 },
   {
     to: "/dashboard/units",
     label: "Bảng điều khiển",
@@ -46,6 +47,7 @@ export const mainNavItems = [
  */
 export const superadminNavItems = [
   { to: "/", label: "Trang chủ", icon: Home },
+  { to: "/giai-tri", label: "Giai tri", icon: Gamepad2 },
   {
     to: `${getSuperadminAppOrigin()}/dashboard`,
     label: "Quản trị hệ thống",
@@ -77,6 +79,7 @@ export const superadminNavItems = [
  */
 export const superadminPortalNavItems = [
   { to: `${getMainAppOrigin()}/`, label: "Ứng dụng chính", icon: Home, external: true },
+  { to: `${getMainAppOrigin()}/giai-tri`, label: "Giai tri", icon: Gamepad2, external: true },
   {
     to: "/dashboard/units",
     label: "Quản trị hệ thống",

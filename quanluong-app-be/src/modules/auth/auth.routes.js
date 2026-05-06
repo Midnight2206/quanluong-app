@@ -11,6 +11,9 @@ import {
   getAvatarJobController,
   googleDriveAuthorizeUrlController,
   googleDriveCallbackController,
+  entertainmentCoinFlipController,
+  entertainmentCoinClaimController,
+  entertainmentCoinStateController,
   googleDriveStartController,
   googleDriveStatusController,
   googleDriveUnlinkController,
@@ -51,6 +54,21 @@ authRouter.get(
 authRouter.get("/google/drive/callback", asyncHandler(googleDriveCallbackController));
 authRouter.get("/google/drive/status", authMiddleware, asyncHandler(googleDriveStatusController));
 authRouter.delete("/google/drive", authMiddleware, asyncHandler(googleDriveUnlinkController));
+authRouter.get(
+  "/entertainment/coin-state",
+  authMiddleware,
+  asyncHandler(entertainmentCoinStateController),
+);
+authRouter.post(
+  "/entertainment/coin-flip",
+  authMiddleware,
+  asyncHandler(entertainmentCoinFlipController),
+);
+authRouter.post(
+  "/entertainment/coin-claim",
+  authMiddleware,
+  asyncHandler(entertainmentCoinClaimController),
+);
 authRouter.post(
   "/register",
   sensitiveAuthEndpointRateLimit,

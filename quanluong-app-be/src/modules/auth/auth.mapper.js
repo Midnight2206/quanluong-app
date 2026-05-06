@@ -22,6 +22,9 @@ function mapCurrentUser(user, { unitPath } = {}) {
     isActive: user.isActive,
     emailVerified: Boolean(user.emailVerifiedAt),
     googleDriveFolderId: user.googleDriveFolderId || null,
+    entertainmentCoins: user.entertainmentCoins,
+    entertainmentHeadsCount: user.entertainmentHeadsCount,
+    entertainmentTailsCount: user.entertainmentTailsCount,
     registrationStatus: user.registrationStatus,
     unitPath: unitPath ?? [],
     jobTitle: user.jobTitle

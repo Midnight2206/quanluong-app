@@ -93,6 +93,7 @@ export function HomePage() {
   const [unlinkDrive, { isLoading: unlinkingDrive }] = useUnlinkGoogleDriveMutation();
   const [checkDriveLink] = useCheckGoogleDriveLinkMutation();
   const checkedDriveFolderRef = useRef(null);
+  const handledGoogleResultRef = useRef(null);
   const { confirm } = useConfirm();
   const [driveLinkBusy, setDriveLinkBusy] = useState(false);
   const apiBase = getApiBaseUrl();
@@ -100,7 +101,12 @@ export function HomePage() {
   useEffect(() => {
     const g = googleParam;
     const reason = googleReasonParam;
+    const resultKey = `${g || ""}:${reason || ""}`;
+    if ((g === "linked" || g === "error") && handledGoogleResultRef.current === resultKey) {
+      return;
+    }
     if (g === "linked") {
+      handledGoogleResultRef.current = resultKey;
       notifySuccess("Đã liên kết Google Drive. Thư mục «midnight-app» sẵn sàng cho sổ sách.");
       void refetchUser();
       const next = new URLSearchParams(searchParams.toString());
@@ -109,6 +115,7 @@ export function HomePage() {
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     } else if (g === "error") {
+      handledGoogleResultRef.current = resultKey;
       const msg =
         (reason && GOOGLE_DRIVE_ERROR_MESSAGES[reason]) || GOOGLE_DRIVE_ERROR_MESSAGES.unknown;
       notifyError(msg);
@@ -118,8 +125,8 @@ export function HomePage() {
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParams + router cố ý bỏ qua (scalar google* + pathname đủ kích hoạt)
-  }, [googleParam, googleReasonParam, pathname, refetchUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParams thay đổi mỗi render; chỉ cần scalar google* + pathname + router.
+  }, [googleParam, googleReasonParam, pathname, refetchUser, router]);
 
   useEffect(() => {
     const folderId = user?.googleDriveFolderId;
