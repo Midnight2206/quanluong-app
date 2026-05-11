@@ -50,7 +50,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
 
   return (
     <>
-      <aside className="hidden h-full w-24 shrink-0 flex-col border-r border-border bg-card text-card-foreground lg:flex">
+      <aside className="hidden h-full w-24 shrink-0 flex-col border-r border-border bg-card text-card-foreground print:hidden lg:flex">
         <nav className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 py-4" aria-label="Điều hướng chính">
           {items.map((item) => {
             const classNameBuilder = ({ isActive }) => {
@@ -91,7 +91,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
       </aside>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 flex items-stretch justify-between gap-0.5 border-t border-border bg-card/95 px-1 pt-1 backdrop-blur-md supports-[backdrop-filter]:bg-card/85 lg:hidden pb-[max(0.35rem,env(safe-area-inset-bottom))]"
+        className="fixed bottom-0 left-0 right-0 z-30 flex items-stretch justify-between gap-0.5 border-t border-border bg-card/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-md print:hidden supports-[backdrop-filter]:bg-card/85 lg:hidden"
         aria-label="Điều hướng chính"
       >
         {items.map((item) => {

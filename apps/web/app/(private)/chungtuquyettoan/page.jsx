@@ -4,7 +4,8 @@ import { quanLuongPageMeta } from "@/lib/quanLuongPageMeta";
 
 export const metadata = quanLuongPageMeta({
   title: "Chứng từ quyết toán",
-  description: "Trang nghiệp vụ chứng từ quyết toán với hệ thống API riêng.",
+  description:
+    "Chứng từ quyết toán — các tab loại chứng từ (bảng kê mua hàng, giấy đề nghị, phiếu thu chi…); bảng kê mua hàng soạn nháp và mở mẫu.",
 });
 
 export default function ChungTuQuyetToanRoutePage() {

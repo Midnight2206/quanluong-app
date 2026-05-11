@@ -756,7 +756,7 @@ export function MessengerChatDock() {
   const queue = dock.queue;
 
   return (
-    <>
+    <div className="print:hidden">
       <ChatHubPanel
         open={hubOpen}
         onClose={() => setHubOpen(false)}
@@ -852,6 +852,6 @@ export function MessengerChatDock() {
           })}
         </div>
       </div>
-    </>
+    </div>
   );
 }

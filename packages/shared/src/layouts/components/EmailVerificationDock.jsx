@@ -45,7 +45,7 @@ export function EmailVerificationDock() {
         type="button"
         onClick={() => setCollapsedPersist(false, user.id)}
         className={cn(
-          "fixed bottom-4 right-4 z-[100] flex max-w-[min(calc(100vw-2rem),20rem)] items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-left text-xs font-medium text-amber-950 shadow-lg backdrop-blur-sm transition",
+          "fixed bottom-4 right-4 z-[100] flex max-w-[min(calc(100vw-2rem),20rem)] items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-left text-xs font-medium text-amber-950 shadow-lg backdrop-blur-sm transition print:hidden",
           "hover:bg-amber-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60",
           "dark:border-amber-400/35 dark:bg-amber-500/20 dark:text-amber-100 dark:hover:bg-amber-500/30",
         )}
@@ -60,7 +60,7 @@ export function EmailVerificationDock() {
   return (
     <div
       className={cn(
-        "shrink-0 border-t border-amber-500/35 bg-amber-500/[0.12] px-3 py-3 sm:px-4",
+        "shrink-0 border-t border-amber-500/35 bg-amber-500/[0.12] px-3 py-3 print:hidden sm:px-4",
         "dark:border-amber-400/30 dark:bg-amber-500/15",
       )}
       role="region"

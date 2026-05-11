@@ -1,5 +1,6 @@
 /**
- * Liên kết Drive của user — Google Drive API v3, scope drive.file (file/thư mục do app tạo).
+ * Liên kết Drive của user — Google Drive API v3 (scope drive.file) + Sheets chỉ đọc trên file được phép.
+ * Mẫu chứng từ quyết toán lấy từ Drive của tài khoản hệ thống (CHUNG_TU_SYSTEM_DRIVE_REFRESH_TOKEN), không tạo thư mục mẫu trên Drive user.
  * Gmail gửi thư hệ thống dùng Gmail API riêng (MAIL_TRANSPORT=gmail_api + GMAIL_SENDER_*).
  */
 import { google } from "googleapis";
@@ -13,6 +14,8 @@ const MIDNIGHT_APP_FOLDER_NAME = "midnight-app";
 const CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME = "chung-tu-quyet-toan-template";
 const DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
 const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+/** Đọc metadata/lưới (namedRanges) của Google Sheets mà Drive API đã được phép truy cập. */
+const SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const DRIVE_FOLDER_HEALTH_ATTEMPTS = 3;
 const DRIVE_FOLDER_HEALTH_RETRY_DELAY_MS = 300;
 
@@ -42,6 +45,7 @@ function buildGoogleAuthUrl(state) {
       "openid",
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/drive.file",
+      SHEETS_READONLY_SCOPE,
     ],
     state,
   });
@@ -144,7 +148,7 @@ async function ensureChildFolder({ oauth2Client, parentId, folderName }) {
   return created.data.id;
 }
 
-function assertDriveFileScopeGranted(tokens) {
+function assertGoogleDriveLinkScopesGranted(tokens) {
   const grantedScopes = String(tokens.scope || "")
     .split(/\s+/)
     .filter(Boolean);
@@ -152,6 +156,15 @@ function assertDriveFileScopeGranted(tokens) {
     logger.warn({ grantedScopes }, "Liên kết Google: OAuth token thiếu scope drive.file");
     throw new AppError({
       message: "Google không cấp quyền tạo thư mục Drive cho ứng dụng.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  if (!grantedScopes.includes(SHEETS_READONLY_SCOPE)) {
+    logger.warn({ grantedScopes }, "Liên kết Google: OAuth token thiếu scope spreadsheets.readonly");
+    throw new AppError({
+      message:
+        "Google chưa cấp quyền đọc Google Sheets. Hãy gỡ quyền ứng dụng trong Google Account → Security → Third-party apps, rồi liên kết lại từ trang chủ.",
       statusCode: 400,
       code: ERROR_CODES.VALIDATION_ERROR,
     });
@@ -224,7 +237,7 @@ async function exchangeCodeAndLinkDrive({ code, userId }) {
     });
   }
 
-  assertDriveFileScopeGranted(tokens);
+  assertGoogleDriveLinkScopesGranted(tokens);
 
   client.setCredentials(tokens);
 
@@ -250,11 +263,6 @@ async function exchangeCodeAndLinkDrive({ code, userId }) {
   let folderId;
   try {
     folderId = await ensureMidnightAppFolder(client);
-    await ensureChildFolder({
-      oauth2Client: client,
-      parentId: folderId,
-      folderName: CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME,
-    });
   } catch (error) {
     logger.error(
       {
@@ -346,13 +354,6 @@ async function verifyGoogleDriveLinkForUser(userId) {
         await unlinkGoogleDriveForUser(userId);
       },
     });
-    if (status.status === "linked") {
-      await ensureTemplateFolderForLinkedUser({
-        oauth2Client: client,
-        userId,
-        parentFolderId: user.googleDriveFolderId,
-      });
-    }
     return status;
   } catch (error) {
     logger.warn(
@@ -369,36 +370,83 @@ async function verifyGoogleDriveLinkForUser(userId) {
   }
 }
 
-async function ensureTemplateFolderForLinkedUser({
-  oauth2Client,
-  userId,
-  parentFolderId,
-}) {
-  try {
-    await ensureChildFolder({
-      oauth2Client,
-      parentId: parentFolderId,
-      folderName: CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME,
+function getSystemChungTuDriveOAuthClient() {
+  const refresh = String(config.google.chungTuSystemDriveRefreshToken || "").trim();
+  if (!refresh) {
+    throw new AppError({
+      message:
+        "Chưa cấu hình Google Drive cho mẫu chứng từ quyết toán (CHUNG_TU_SYSTEM_DRIVE_REFRESH_TOKEN — refresh token tài khoản chứa thư mục mẫu, thường superadmin / GMAIL_SENDER).",
+      statusCode: 503,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
     });
-  } catch (error) {
-    logger.warn(
-      {
-        userId,
-        parentFolderId,
-        status: error.response?.status,
-        reason: error.response?.data?.error?.errors?.[0]?.reason,
-        message: error.response?.data?.error?.message || error.message,
-      },
-      "Liên kết Google: không đảm bảo được folder template chung-tu-quyet-toan-template",
-    );
   }
+  const client = getOAuthClient();
+  if (!client) {
+    throw new AppError({
+      message: "Google OAuth chưa được cấu hình (GOOGLE_CLIENT_ID / SECRET / REDIRECT_URI).",
+      statusCode: 503,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+  client.setCredentials({ refresh_token: refresh });
+  return client;
+}
+
+/**
+ * Thư mục pool mẫu trên Drive tài khoản hệ thống: `CHUNG_TU_SYSTEM_TEMPLATE_FOLDER_ID` hoặc tự tạo `midnight-app/chung-tu-quyet-toan-template`.
+ */
+async function resolveSystemChungTuTemplateFolder(oauth2Client) {
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const explicitId = String(config.google.chungTuSystemTemplateFolderId || "").trim();
+
+  if (explicitId) {
+    const meta = await drive.files.get({
+      fileId: explicitId,
+      fields: "id, name, webViewLink, mimeType, trashed, driveId",
+      supportsAllDrives: false,
+    });
+    const data = meta.data;
+    if (data.trashed || data.mimeType !== DRIVE_FOLDER_MIME_TYPE || data.driveId) {
+      throw new AppError({
+        message:
+          "CHUNG_TU_SYSTEM_TEMPLATE_FOLDER_ID không hợp lệ hoặc là Shared Drive (chỉ hỗ trợ folder trong My Drive tài khoản hệ thống).",
+        statusCode: 503,
+        code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+      });
+    }
+    return {
+      templateFolderId: data.id,
+      templateFolderWebViewLink: data.webViewLink ?? null,
+      templateFolderName: data.name ?? null,
+    };
+  }
+
+  const midnightId = await ensureMidnightAppFolder(oauth2Client);
+  const templateFolderId = await ensureChildFolder({
+    oauth2Client,
+    parentId: midnightId,
+    folderName: CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME,
+  });
+  const folderMeta = await drive.files.get({
+    fileId: templateFolderId,
+    fields: "id, name, webViewLink",
+    supportsAllDrives: false,
+  });
+  return {
+    templateFolderId,
+    templateFolderWebViewLink: folderMeta.data.webViewLink ?? null,
+    templateFolderName: folderMeta.data.name ?? null,
+  };
 }
 
 export {
   buildGoogleAuthUrl,
+  CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME,
   exchangeCodeAndLinkDrive,
   getOAuthClient,
+  getSystemChungTuDriveOAuthClient,
   MIDNIGHT_APP_FOLDER_NAME,
+  resolveSystemChungTuTemplateFolder,
   unlinkGoogleDriveForUser,
   verifyDriveFolderOrClearLink,
   verifyGoogleDriveLinkForUser,

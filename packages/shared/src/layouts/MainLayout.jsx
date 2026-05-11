@@ -62,15 +62,15 @@ export function MainLayout({ children, navItems: navItemsProp }) {
 
   return (
     <ChatDockProvider>
-      <div className="page-shell flex min-h-0 flex-col overflow-hidden print:hidden">
+      <div className="page-shell flex min-h-0 flex-col overflow-hidden">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AppHeader />
           <TargetUnitScopeProvider>
             <WorkingUnitScopeBar />
             <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               <AppSidebar items={sidebarItems} />
-              <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 pt-3 pb-[max(0.75rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] sm:px-4 sm:pt-4 sm:pb-[max(1rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] lg:px-6 lg:py-5 lg:pb-5">
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch] touch-pan-y">
+              <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 pt-3 pb-[max(0.75rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] print:h-auto print:min-h-0 print:overflow-visible sm:px-4 sm:pt-4 sm:pb-[max(1rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] lg:px-6 lg:py-5 lg:pb-5">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch] touch-pan-y print:h-auto print:min-h-0 print:overflow-visible">
                   {children}
                 </div>
                 <EmailVerificationDock />

@@ -127,6 +127,13 @@ const env = {
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   /** Khớp tuyệt đối Google Console; bỏ khoảng trắng và slash cuối để tránh redirect_uri_mismatch. */
   googleRedirectUri: (process.env.GOOGLE_REDIRECT_URI || "").trim().replace(/\/+$/, ""),
+  /**
+   * Refresh token của tài khoản Google chứa mẫu chứng từ quyết toán (thường trùng superadmin hoặc GMAIL_SENDER).
+   * OAuth cần có quyền đọc/ghi vùng mẫu (vd. `drive` hoặc `drive.metadata.readonly` + khả năng tạo file) và `spreadsheets.readonly`.
+   */
+  chungTuSystemDriveRefreshToken: process.env.CHUNG_TU_SYSTEM_DRIVE_REFRESH_TOKEN || "",
+  /** Nếu đặt — dùng thư mục này làm pool mẫu; nếu trống — tạo / tìm `midnight-app/chung-tu-quyet-toan-template` trên Drive của tài khoản đó. */
+  chungTuSystemTemplateFolderId: (process.env.CHUNG_TU_SYSTEM_TEMPLATE_FOLDER_ID || "").trim(),
   /** Thư mục gốc lưu file media (Docker: /data/media). Để trống → ./storage/media (relative cwd). */
   mediaRoot: process.env.MEDIA_ROOT?.trim()
     ? path.resolve(process.env.MEDIA_ROOT.trim())

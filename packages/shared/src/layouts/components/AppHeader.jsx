@@ -62,7 +62,7 @@ export function AppHeader() {
   };
 
   return (
-    <header className="relative z-40 flex items-center h-16 gap-3 px-4 border-b shrink-0 bg-card/95 backdrop-blur sm:px-5 lg:px-6">
+    <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b bg-card/95 px-4 backdrop-blur print:hidden sm:px-5 lg:px-6">
       <div className="flex items-center min-w-0 gap-3">
         <div className="lg:hidden">
           <div className="flex items-center gap-2">

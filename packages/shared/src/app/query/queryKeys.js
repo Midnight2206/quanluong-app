@@ -65,7 +65,11 @@ export const qk = {
   },
   chungTuQuyetToan: {
     root: ["chungTuQuyetToan"],
-    health: () => ["chungTuQuyetToan", "health"],
+    templateCatalog: (categoryKey) => [
+      "chungTuQuyetToan",
+      "templateCatalog",
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
   },
 };
 

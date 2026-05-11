@@ -43,6 +43,8 @@ const config = {
     clientId: env.googleClientId,
     clientSecret: env.googleClientSecret,
     redirectUri: env.googleRedirectUri,
+    chungTuSystemDriveRefreshToken: env.chungTuSystemDriveRefreshToken,
+    chungTuSystemTemplateFolderId: env.chungTuSystemTemplateFolderId,
   },
   security: {
     corsOrigins: env.corsOrigins,

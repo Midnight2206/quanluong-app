@@ -155,6 +155,7 @@ model User {
   lttpIssueSlipsAsRecipient LttpIssueSlip[] @relation("LttpIssueSlipRecipientUser")
   lttpFormDefaultsAsDefaultRecipientUser LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultRecipientUser")
   lttpAsDefaultForRecipientUnit          LttpRecipientUnitDefaultUser[] @relation("LttpRecipientDefaultUserUser")
+  chungTuQuyetToanTemplateConfigs        ChungTuQuyetToanTemplateConfig[]
 
   @@index([typeId])
   @@index([unitId])
@@ -162,6 +163,43 @@ model User {
   @@index([jobTitleId])
   @@index([deletedAt])
   @@index([registrationStatus])
+}
+
+/// Cấu hình «vùng / quy tắc điền dữ liệu» cho từng template Google Docs (theo user + file Drive).
+model ChungTuQuyetToanTemplateConfig {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  driveFileId   String   @db.VarChar(128)
+  /// Tên «loại chứng từ» hiển thị trong app; null = dùng tên file trên Drive.
+  displayName   String?  @db.VarChar(200)
+  fillRulesJson Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, driveFileId])
+  @@index([userId])
+}
+
+/// Danh mục mẫu chứng từ trên Drive tài khoản hệ thống — superadmin đặt tên + dán link; user có quyền chứng từ chỉ xem các mục đang bật.
+model ChungTuDriveTemplateLink {
+  id          Int      @id @default(autoincrement())
+  categoryKey String   @db.VarChar(80)
+  displayName String   @db.VarChar(200)
+  driveFileId String   @db.VarChar(128)
+  /// Link Google (Docs/Sheets/File) do superadmin dán — lưu để sửa sau.
+  linkUrl     String   @db.Text
+  mimeType    String?  @db.VarChar(128)
+  webViewLink String?  @db.VarChar(1024)
+  /// Quy tắc điền dữ liệu (v2): placeholder / vùng bảng trên Docs, named range trên Sheets + fieldKey / nguồn DB.
+  fillRulesJson Json?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([categoryKey, driveFileId])
+  @@index([categoryKey, isActive, sortOrder])
 }
 
 /// Tin nhắn 1–1 realtime (Socket.io); lưu DB để tải lại lịch sử.

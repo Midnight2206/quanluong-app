@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Pencil, RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Loader2, Pencil, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
+import httpClient from "@/services/httpClient";
 import {
   useDeleteLttpIssueSlipMutation,
   useGetLttpIssueSlipsQuery,
@@ -34,6 +35,23 @@ function lastDayOfCurrentMonthYmd() {
 }
 
 const PAGE_SIZE = 20;
+
+async function formatBlobOrJsonError(err, fallback) {
+  if (err?.response?.data instanceof Blob) {
+    const text = await err.response.data.text().catch(() => "");
+    try {
+      const j = JSON.parse(text);
+      if (j && typeof j === "object" && j.message) {
+        return String(j.message);
+      }
+    } catch {
+      /* not JSON */
+    }
+    return text.trim() || fallback;
+  }
+  const m = err?.data?.message || err?.message;
+  return typeof m === "string" && m.trim() ? m : fallback;
+}
 
 /**
  * Lịch sử phiếu xuất theo kho (storage) + lọc + in / sửa / thu hồi / in hàng loạt.
@@ -118,8 +136,9 @@ export function LttpLichSuXuatTab({
     { skip: !storageUnitId || filterRecipientId === "" },
   );
   const slips = slipsPayload?.items ?? [];
-  const total = slipsPayload?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE) || 1);
+  const total = Number(slipsPayload?.total ?? 0) || 0;
+  /** Tổng số trang; luôn ≥ 1 để hiển thị đúng kể cả khi total = 0 */
+  const pageCount = total <= 0 ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   useEffect(() => {
     if (!isLoading && slips.length === 0 && page > 1) {
@@ -128,6 +147,68 @@ export function LttpLichSuXuatTab({
   }, [isLoading, slips.length, page]);
 
   const [deleteSlip, { isLoading: delBusy }] = useDeleteLttpIssueSlipMutation();
+
+  const [printingId, setPrintingId] = useState(null);
+  const [batchPrintBusy, setBatchPrintBusy] = useState(false);
+
+  /**
+   * Phải `window.open` đồng bộ trong stack của sự kiện click — sau `await` trình duyệt coi là popup và chặn.
+   * Mở tab trống trước, sau đó gán URL blob.
+   */
+  const openIssueSlipPdf = useCallback((slipId) => {
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      notifyError("Trình duyệt chặn cửa sổ mới. Hãy cho phép popup cho trang này hoặc thử nút In trên thanh địa chỉ.");
+      return;
+    }
+    setPrintingId(slipId);
+    void (async () => {
+      try {
+        const res = await httpClient.get(`/lttp/issue-slips/${slipId}/print-pdf`, {
+          responseType: "blob",
+        });
+        const blob = new Blob([res.data], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        tab.location.href = url;
+        setTimeout(() => URL.revokeObjectURL(url), 120_000);
+      } catch (err) {
+        tab.close();
+        notifyError(await formatBlobOrJsonError(err, "Không tải được PDF phiếu xuất."));
+      } finally {
+        setPrintingId(null);
+      }
+    })();
+  }, []);
+
+  const printCurrentPagePdfs = useCallback(() => {
+    if (!slips.length) {
+      return;
+    }
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      notifyError("Trình duyệt chặn cửa sổ mới. Hãy cho phép popup cho trang này.");
+      return;
+    }
+    setBatchPrintBusy(true);
+    void (async () => {
+      try {
+        const res = await httpClient.post(
+          "/lttp/issue-slips/print-pdfs",
+          { ids: slips.map((s) => s.id) },
+          { responseType: "blob" },
+        );
+        const blob = new Blob([res.data], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        tab.location.href = url;
+        setTimeout(() => URL.revokeObjectURL(url), 120_000);
+      } catch (err) {
+        tab.close();
+        notifyError(await formatBlobOrJsonError(err, "Không gộp PDF các phiếu."));
+      } finally {
+        setBatchPrintBusy(false);
+      }
+    })();
+  }, [slips]);
 
   async function onRecall(s) {
     const ok = await confirm({
@@ -200,6 +281,17 @@ export function LttpLichSuXuatTab({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
+            variant="outline"
+            className="h-8 gap-1 text-xs"
+            disabled={isLoading || !slips.length || batchPrintBusy}
+            onClick={() => printCurrentPagePdfs()}
+            title="Gộp PDF các phiếu trên trang hiện tại"
+          >
+            {batchPrintBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Printer className="size-3.5" />}
+            In trang (PDF)
+          </Button>
+          <Button
+            type="button"
             variant="secondary"
             className="h-8 min-w-[5rem] text-xs"
             disabled={page <= 1 || isLoading}
@@ -222,8 +314,8 @@ export function LttpLichSuXuatTab({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border/60">
-        <table className="w-full min-w-[52rem] border-collapse text-left text-[11px]">
+      <div className="overflow-x-auto overflow-y-visible rounded-lg border border-border/60 pb-px">
+        <table className="mb-px w-full min-w-[52rem] border-collapse text-left text-[11px]">
           <thead className="bg-secondary/90">
             <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
               <th className="px-2 py-2">Ngày xuất</th>
@@ -231,7 +323,7 @@ export function LttpLichSuXuatTab({
               <th className="min-w-[10rem] px-2 py-2">Chú thích phiếu</th>
               <th className="px-2 py-2">Số phiếu</th>
               <th className="px-2 py-2 text-right">Thành tiền</th>
-              <th className="min-w-[13rem] whitespace-nowrap px-2 py-2 text-right">Thao tác</th>
+              <th className="min-w-[15rem] whitespace-nowrap px-2 py-2 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -271,8 +363,21 @@ export function LttpLichSuXuatTab({
                   </td>
                   <td className="px-2 py-1.5 font-mono text-[10px] text-muted-foreground">{soPhieu}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{formatVnd(total)}</td>
-                  <td className="min-w-[13rem] whitespace-nowrap px-2 py-1.5 text-right align-middle">
+                  <td className="min-w-[15rem] whitespace-nowrap px-2 py-1.5 text-right align-middle">
                     <div className="flex flex-nowrap items-center justify-end gap-1">
+                      <IconButton
+                        label="In phiếu PDF"
+                        variant="ghost"
+                        className="h-7"
+                        onClick={() => openIssueSlipPdf(s.id)}
+                        disabled={printingId === s.id || delBusy || batchPrintBusy}
+                      >
+                        {printingId === s.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Printer className="size-3.5" />
+                        )}
+                      </IconButton>
                       {canWrite && typeof onRequestEdit === "function" ? (
                         <IconButton
                           label="Sửa phiếu"

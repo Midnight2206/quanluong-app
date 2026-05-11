@@ -93,3 +93,44 @@
     @apply min-h-0 max-h-dvh h-dvh bg-app-grid bg-[size:28px_28px];
   }
 }
+
+/*
+ * In trình duyệt (BKMH / chứng từ): bỏ scale + overflow để viền bảng không bị cắt;
+ * ép đen viền ô khi máy in bỏ qua màu.
+ */
+@media print {
+  html,
+  body {
+    overflow: visible !important;
+  }
+
+  .bkmh-a4-print-host {
+    width: 595px !important;
+    height: auto !important;
+    min-height: 842px;
+    box-shadow: none !important;
+  }
+
+  .bkmh-a4-scale-box {
+    transform: none !important;
+    overflow: visible !important;
+    width: 595px !important;
+    height: auto !important;
+    min-height: 842px;
+  }
+
+  .bkmh-print-root {
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .bkmh-print-root table {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .bkmh-print-root table tbody tr:last-child td {
+    border-bottom: 1pt solid #000 !important;
+  }
+}
