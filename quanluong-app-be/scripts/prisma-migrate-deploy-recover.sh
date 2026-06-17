@@ -15,14 +15,8 @@ if [ "$rc" -ne 0 ]; then
   log "resolve 20100 exited $rc (bỏ qua)"
 fi
 
-log "optional: migrate resolve 30000 (khi bản ghi lỗi trùng tên với thư mục hiện tại)"
-set +e
-npm run prisma:migrate:resolve -- --applied "20260330130000_meal_roster_meal_allowance_rate_fk" 2>&1
-rc=$?
-set -e
-if [ "$rc" -ne 0 ]; then
-  log "resolve 30000 exited $rc (bỏ qua — sẽ thử SQL recovery)"
-fi
+# Không `resolve --applied 30000` trên DB mới — sẽ đánh dấu đã chạy mà chưa thực thi SQL.
+# Drift 20100/30000 xử lý qua SQL recovery bên dưới (chỉ cập nhật bản ghi đã tồn tại).
 
 if [ -f "prisma/recovery/rename-meal-roster-migration-metadata.sql" ]; then
   log "optional: đổi tên bản ghi _prisma_migrations 20100 → 30000 nếu còn"

@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { TabPanel } from "@/components/common/TabPanel";
 import { Card, CardContent } from "@/components/ui/Card";
 import { cn } from "@/utils/cn";
-import { BangKeMuaHangWorkspace } from "./BangKeMuaHangWorkspace.jsx";
+import { ChungTuDocumentWorkspace } from "./ChungTuDocumentWorkspace.jsx";
 import { ChungTuPlaceholderWorkspace } from "./ChungTuPlaceholderWorkspace.jsx";
 import {
   CHUNG_TU_DOC_TAB_STATUS,
@@ -20,11 +20,14 @@ const PLANNED_TAB_BADGE = (
 );
 
 function renderWorkspaceForTab(meta) {
-  if (
-    meta.status === CHUNG_TU_DOC_TAB_STATUS.AVAILABLE &&
-    meta.id === "bang-ke-mua-hang"
-  ) {
-    return <BangKeMuaHangWorkspace />;
+  if (meta.status === CHUNG_TU_DOC_TAB_STATUS.AVAILABLE && meta.mode) {
+    return (
+      <ChungTuDocumentWorkspace
+        categoryKey={meta.id}
+        mode={meta.mode}
+        subtitle={meta.subtitle}
+      />
+    );
   }
   return (
     <ChungTuPlaceholderWorkspace

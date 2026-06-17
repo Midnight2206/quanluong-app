@@ -522,8 +522,8 @@ async function buildIssueSlipPdfBuffer(slip) {
     req: Math.round(pageWidth * 0.055),
     qty: Math.round(pageWidth * 0.055),
     price: Math.round(pageWidth * 0.10),
-    amount: Math.round(pageWidth * 0.13),
-    note: Math.round(pageWidth * 0.21),
+    amount: Math.round(pageWidth * 0.10),
+    note: Math.round(pageWidth * 0.24),
   };
   widths.total = Object.values(widths).reduce((sum, v) => (Number.isFinite(v) ? sum + v : sum), 0);
   widths.note += pageWidth - widths.total;

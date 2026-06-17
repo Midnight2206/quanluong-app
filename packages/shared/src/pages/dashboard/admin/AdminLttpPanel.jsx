@@ -37,6 +37,7 @@ import {
   usePutLttpCommodityDefaultSupplierMutation,
 } from "@/features/lttp/api/lttpApi";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
+import { resolveDefaultLttpStorageUnitId, LTTP_STORAGE_UNIT_NAME } from "@/pages/lttpNhapXuat/lttpStorageUnitDefault";
 import { DASHBOARD_LTTP_SUB_ACCESS_KEY } from "@/features/route-access/routeAccessRegistry";
 import { GuardedNavLink } from "@/hocs/GuardedNavLink";
 import { useConfirm } from "@/contexts/ConfirmProvider";
@@ -141,10 +142,12 @@ export function AdminLttpPanel({
     if (workingUnitId != null) {
       return Number(workingUnitId);
     }
-    if (sortedUnits.length) {
-      return sortedUnits[0].id;
+    const fallback = sortedUnits.length ? sortedUnits[0].id : defaultUnitId;
+    const storage = sortedUnits.find((u) => String(u.name ?? "") === LTTP_STORAGE_UNIT_NAME);
+    if (storage) {
+      return Number(storage.id);
     }
-    return defaultUnitId;
+    return resolveDefaultLttpStorageUnitId(sortedUnits, fallback);
   }, [groupsOnly, canPickAnyUnit, workingUnitId, sortedUnits, defaultUnitId]);
 
   const selectedUnitLabel = useMemo(() => {

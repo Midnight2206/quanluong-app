@@ -156,6 +156,10 @@ model User {
   lttpFormDefaultsAsDefaultRecipientUser LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultRecipientUser")
   lttpAsDefaultForRecipientUnit          LttpRecipientUnitDefaultUser[] @relation("LttpRecipientDefaultUserUser")
   chungTuQuyetToanTemplateConfigs        ChungTuQuyetToanTemplateConfig[]
+  chungTuDocumentsCreated                ChungTuDocument[] @relation("ChungTuDocumentCreatedBy")
+  chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
+  chungTuExcelTemplatesCreated           ChungTuExcelTemplate[] @relation("ChungTuExcelTemplateCreatedBy")
+  chungTuExcelExportsCreated             ChungTuExcelExportHistory[] @relation("ChungTuExcelExportCreatedBy")
 
   @@index([typeId])
   @@index([unitId])
@@ -200,6 +204,116 @@ model ChungTuDriveTemplateLink {
 
   @@unique([categoryKey, driveFileId])
   @@index([categoryKey, isActive, sortOrder])
+}
+
+/// Quy tắc điền dữ liệu (fillRules v2) cho mẫu trong folder Drive theo category — không cần đăng ký catalog.
+model ChungTuTemplateFillConfig {
+  id              Int      @id @default(autoincrement())
+  categoryKey     String   @db.VarChar(80)
+  driveFileId     String   @db.VarChar(128)
+  templateName    String?  @db.VarChar(255)
+  fillRulesJson   Json
+  updatedById     Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  updatedBy       User?    @relation("ChungTuTemplateFillConfigUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([categoryKey, driveFileId])
+  @@index([categoryKey])
+}
+
+/// Header / chữ ký mặc định chứng từ quyết toán theo đơn vị kho LTTP.
+model ChungTuUnitProfile {
+  id                   Int      @id @default(autoincrement())
+  unitId               Int      @unique
+  donViCapTren         String?  @db.VarChar(255)
+  boPhan               String?  @db.VarChar(255)
+  quyenSo              String?  @db.VarChar(32)
+  noTaiKhoan           String?  @db.VarChar(128)
+  coTaiKhoan           String?  @db.VarChar(128)
+  signerLabelWriter    String?  @db.VarChar(128)
+  signerLabelApprover  String?  @db.VarChar(128)
+  signerLabelThird     String?  @db.VarChar(128)
+  signerWriter         String?  @db.VarChar(191)
+  signerApprover       String?  @db.VarChar(191)
+  signerThird          String?  @db.VarChar(191)
+  signerNguoiMua       String?  @db.VarChar(191)
+  signerPhuTrachBoPhan String?  @db.VarChar(191)
+  signerTaiChinh       String?  @db.VarChar(191)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  unit                 Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+}
+
+/// Bản ghi chứng từ quyết toán (nguồn gốc DB); Google Sheet là bản mirror.
+model ChungTuDocument {
+  id                  Int            @id @default(autoincrement())
+  documentKey         String         @unique @db.VarChar(200)
+  unitId              Int
+  categoryKey         String         @db.VarChar(80)
+  periodDate          DateTime?      @db.Date
+  issueSlipId         Int?
+  templateDriveFileId String         @db.VarChar(128)
+  templateName        String?        @db.VarChar(255)
+  outputDriveFileId   String?        @db.VarChar(128)
+  outputWebViewLink   String?        @db.VarChar(1024)
+  settingsJson        Json
+  status              String         @default("draft") @db.VarChar(32)
+  lastSyncedAt        DateTime?
+  sourceDataHash      String?        @db.VarChar(64)
+  createdById         Int
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  unit                Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  issueSlip           LttpIssueSlip? @relation(fields: [issueSlipId], references: [id], onDelete: SetNull)
+  createdBy           User           @relation("ChungTuDocumentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([unitId, categoryKey, periodDate])
+  @@index([issueSlipId])
+  @@index([unitId, categoryKey])
+}
+
+/// Template Excel local cho chứng từ quyết toán. Output sinh ra để tải về, không lưu dài hạn.
+model ChungTuExcelTemplate {
+  id               Int      @id @default(autoincrement())
+  categoryKey      String   @db.VarChar(80)
+  displayName      String   @db.VarChar(200)
+  originalFilename String   @db.VarChar(255)
+  storagePath      String   @db.VarChar(1024)
+  fileSize         Int
+  checksum         String   @db.VarChar(64)
+  metadataJson     Json
+  mappingJson      Json?
+  isActive         Boolean  @default(true)
+  createdById      Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdBy        User     @relation("ChungTuExcelTemplateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  exports          ChungTuExcelExportHistory[]
+
+  @@index([categoryKey, isActive, updatedAt])
+  @@index([createdById])
+  @@index([checksum])
+}
+
+/// Lịch sử metadata các lần xuất Excel; không lưu file output.
+model ChungTuExcelExportHistory {
+  id            Int      @id @default(autoincrement())
+  templateId    Int
+  categoryKey   String   @db.VarChar(80)
+  periodMonth   String   @db.VarChar(7)
+  unitIdsJson   Json
+  lineCount     Int      @default(0)
+  totalAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  metadataJson  Json?
+  createdById   Int
+  createdAt     DateTime @default(now())
+  template      ChungTuExcelTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  createdBy     User     @relation("ChungTuExcelExportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([categoryKey, periodMonth])
+  @@index([templateId, createdAt])
+  @@index([createdById, createdAt])
 }
 
 /// Tin nhắn 1–1 realtime (Socket.io); lưu DB để tải lại lịch sử.
@@ -359,6 +473,8 @@ model Unit {
   selectedMealRates         UnitSelectedMealRate[]
   mealRosterDayExtraSplits  MealRosterDayExtraSplit[]
   unitMealPeriodSplits      UnitMealPeriodSplit[]
+  chungTuUnitProfile        ChungTuUnitProfile?
+  chungTuDocuments          ChungTuDocument[]
 
   @@index([parentId])
   @@index([path])
@@ -570,6 +686,7 @@ model LttpIssueSlip {
   recipientUnit Unit?  @relation("LttpIssueSlipRecipientUnit", fields: [recipientUnitId], references: [id], onDelete: SetNull)
   recipientUser User?  @relation("LttpIssueSlipRecipientUser", fields: [recipientUserId], references: [id], onDelete: SetNull)
   lines         LttpIssueSlipLine[]
+  chungTuDocuments ChungTuDocument[]
 
   @@index([unitId, issueDate])
   @@index([unitId, bookMmyy, slipNo])

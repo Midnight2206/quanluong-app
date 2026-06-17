@@ -179,6 +179,25 @@ function createEmptyFillRulesV2(templateKind = "document") {
     },
     sheets: {
       namedRanges: [],
+      detailTable: null,
+    },
+    print: {
+      pdf: {
+        pageSize: "A4",
+        orientation: "portrait",
+        marginTopCm: 1.5,
+        marginRightCm: 1.5,
+        marginBottomCm: 1.5,
+        marginLeftCm: 1.5,
+        fontSizePt: 11,
+        table: {
+          headerLabels: [],
+          amountFieldKey: "thanhTien",
+          carryInLabel: "Mang sang",
+          carryOutLabel: "Cộng sang trang",
+          totalLabel: "Tổng thành tiền",
+        },
+      },
     },
     meta: {
       templateKind: templateKind === "spreadsheet" ? "spreadsheet" : "document",
@@ -217,13 +236,82 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
     anchorEnd: toString(x?.anchorEnd),
     mode: toString(x?.mode) || "table",
   });
-  const normalizeNamedRange = (x) => ({
-    rangeName: toString(x?.rangeName),
-    sheetName: toString(x?.sheetName),
-    rule: x?.rule === "static" ? "static" : "field",
-    fieldKey: toString(x?.fieldKey),
-    value: toString(x?.value),
-  });
+  const normalizeNamedRange = (x) => {
+    let rule = "field";
+    if (x?.rule === "static") rule = "static";
+    else if (x?.rule === "charGrid") rule = "charGrid";
+    return {
+      rangeName: toString(x?.rangeName),
+      sheetName: toString(x?.sheetName),
+      rule,
+      fieldKey: toString(x?.fieldKey),
+      value: toString(x?.value),
+    };
+  };
+  const normalizeDetailTable = (x) => {
+    if (!x || typeof x !== "object" || Array.isArray(x)) {
+      return null;
+    }
+    const columns = toArray(x.columns)
+      .map((col) => (typeof col === "string" ? col.trim() : toString(col?.fieldKey)))
+      .filter(Boolean);
+    if (!columns.length) {
+      return null;
+    }
+    return {
+      sheetName: toString(x.sheetName),
+      startRow: Number.isFinite(Number(x.startRow)) ? Number(x.startRow) : 8,
+      startCol: Number.isFinite(Number(x.startCol)) ? Number(x.startCol) : 0,
+      columns,
+      repeatHeaderEveryRows:
+        Number.isFinite(Number(x.repeatHeaderEveryRows)) && Number(x.repeatHeaderEveryRows) > 0
+          ? Number(x.repeatHeaderEveryRows)
+          : 0,
+      repeatHeaderLabels: toArray(x.repeatHeaderLabels)
+        .map((label) => toString(label))
+        .filter(Boolean),
+      pageRowsFirst:
+        Number.isFinite(Number(x.pageRowsFirst)) && Number(x.pageRowsFirst) > 0
+          ? Number(x.pageRowsFirst)
+          : 0,
+      pageRowsNext:
+        Number.isFinite(Number(x.pageRowsNext)) && Number(x.pageRowsNext) > 0
+          ? Number(x.pageRowsNext)
+          : 0,
+      amountFieldKey: toString(x.amountFieldKey) || "thanhTien",
+      labelFieldKey: toString(x.labelFieldKey) || "tenHang",
+      carryInLabel: toString(x.carryInLabel) || "Mang sang",
+      carryOutLabel: toString(x.carryOutLabel) || "Cộng sang trang",
+    };
+  };
+  const normalizePdfPrint = (x) => {
+    const defaults = createEmptyFillRulesV2(safeKind).print.pdf;
+    const src = x && typeof x === "object" && !Array.isArray(x) ? x : {};
+    const table = src.table && typeof src.table === "object" && !Array.isArray(src.table) ? src.table : {};
+    const numberOrDefault = (value, fallback, min, max) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    };
+    return {
+      pageSize: src.pageSize === "A4" ? "A4" : defaults.pageSize,
+      orientation: src.orientation === "landscape" ? "landscape" : "portrait",
+      marginTopCm: numberOrDefault(src.marginTopCm, defaults.marginTopCm, 0.5, 5),
+      marginRightCm: numberOrDefault(src.marginRightCm, defaults.marginRightCm, 0.5, 5),
+      marginBottomCm: numberOrDefault(src.marginBottomCm, defaults.marginBottomCm, 0.5, 5),
+      marginLeftCm: numberOrDefault(src.marginLeftCm, defaults.marginLeftCm, 0.5, 5),
+      fontSizePt: numberOrDefault(src.fontSizePt, defaults.fontSizePt, 8, 16),
+      table: {
+        headerLabels: toArray(table.headerLabels)
+          .map((label) => toString(label))
+          .filter(Boolean),
+        amountFieldKey: toString(table.amountFieldKey) || defaults.table.amountFieldKey,
+        carryInLabel: toString(table.carryInLabel) || defaults.table.carryInLabel,
+        carryOutLabel: toString(table.carryOutLabel) || defaults.table.carryOutLabel,
+        totalLabel: toString(table.totalLabel) || defaults.table.totalLabel,
+      },
+    };
+  };
 
   const isV2 = Number(raw.version) >= 2 || raw.docs || raw.sheets;
   if (!isV2) {
@@ -233,7 +321,8 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
         placeholders: toArray(raw.placeholders).map(normalizePlaceholder),
         regions: toArray(raw.regions).map(normalizeRegion),
       },
-      sheets: { namedRanges: [] },
+      sheets: { namedRanges: [], detailTable: null },
+      print: { pdf: normalizePdfPrint(raw.print?.pdf) },
       meta: { templateKind: safeKind },
     };
   }
@@ -246,6 +335,10 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
     },
     sheets: {
       namedRanges: toArray(raw.sheets?.namedRanges).map(normalizeNamedRange),
+      detailTable: normalizeDetailTable(raw.sheets?.detailTable),
+    },
+    print: {
+      pdf: normalizePdfPrint(raw.print?.pdf),
     },
     meta: {
       templateKind: raw.meta?.templateKind === "spreadsheet" || safeKind === "spreadsheet" ? "spreadsheet" : "document",

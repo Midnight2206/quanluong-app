@@ -18,9 +18,10 @@ services:
     volumes:
       - ./quanluong-app-be/src:/app/src
       - ./quanluong-app-be/prisma:/app/prisma
+      - ./quanluong-app-be/scripts:/app/scripts
       - ./quanluong-app-be/prisma.config.ts:/app/prisma.config.ts
       - media_data:/data/media
-    command: ["npm", "run", "dev"]
+    command: ["sh", "-c", "npx prisma generate && npm run dev"]
 
   worker-email:
     # Tag khác app để tránh lỗi parallel export cùng tên image; cùng Dockerfile target, layer cache tái dùng.
@@ -32,8 +33,9 @@ services:
     volumes:
       - ./quanluong-app-be/src:/app/src
       - ./quanluong-app-be/prisma:/app/prisma
+      - ./quanluong-app-be/scripts:/app/scripts
       - ./quanluong-app-be/prisma.config.ts:/app/prisma.config.ts
-    command: ["npm", "run", "worker:email-verification:dev"]
+    command: ["sh", "-c", "npx prisma generate && npm run worker:email-verification:dev"]
 
   worker-media:
     image: quanluong-backend:dev-worker
@@ -44,9 +46,10 @@ services:
     volumes:
       - ./quanluong-app-be/src:/app/src
       - ./quanluong-app-be/prisma:/app/prisma
+      - ./quanluong-app-be/scripts:/app/scripts
       - ./quanluong-app-be/prisma.config.ts:/app/prisma.config.ts
       - media_data:/data/media
-    command: ["npm", "run", "worker:avatar-processing:dev"]
+    command: ["sh", "-c", "npx prisma generate && npm run worker:avatar-processing:dev"]
 
   ui:
     build:

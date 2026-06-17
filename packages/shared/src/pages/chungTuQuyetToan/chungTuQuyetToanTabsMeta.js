@@ -1,6 +1,5 @@
 /**
  * Các «loại» chứng từ hiển thị dạng tab cấp 1 trên Chứng từ quyết toán.
- * Mở rộng: thêm entry + `{ id, label }` không trùng; `status: "available"` cần gắn panel trong page.
  */
 
 export const CHUNG_TU_DOC_TAB_STATUS = Object.freeze({
@@ -8,7 +7,7 @@ export const CHUNG_TU_DOC_TAB_STATUS = Object.freeze({
   PLANNED: "planned",
 });
 
-/** @typedef {{ id: string, label: string, status: "available"|"planned", subtitle: string, hint?: string }} ChungTuDocTabMeta */
+/** @typedef {{ id: string, label: string, status: "available"|"planned", mode?: "by-date"|"by-slip", subtitle: string, hint?: string }} ChungTuDocTabMeta */
 
 /** @type {ChungTuDocTabMeta[]} */
 export const CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS = [
@@ -16,7 +15,23 @@ export const CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS = [
     id: "bang-ke-mua-hang",
     label: "Bảng kê mua hàng",
     status: CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
-    subtitle: "Theo mẫu ban hành — soạn nội dung nháp cục bộ, chọn file mẫu Google (nếu có trong danh mục).",
+    mode: "by-date",
+    subtitle:
+      "Tổng hợp dòng LTTP theo ngày → Google Sheets (mẫu C34). Chọn kho, ngày, mẫu Drive rồi Tạo / Đồng bộ.",
+  },
+  {
+    id: "phieu-xuat-kho",
+    label: "Phiếu xuất kho",
+    status: CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
+    mode: "by-slip",
+    subtitle: "Một phiếu xuất LTTP → Google Sheets (SS14-QN10). Chọn phiếu theo ngày.",
+  },
+  {
+    id: "phieu-nhap-kho",
+    label: "Phiếu nhập kho",
+    status: CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
+    mode: "by-date",
+    subtitle: "Tổng hợp nhập theo ngày từ dòng phiếu xuất LTTP trong ngày.",
   },
   {
     id: "giay-de-nghi-thanh-toan",
@@ -36,12 +51,6 @@ export const CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS = [
     label: "Bảng kê chuyển nhượng",
     status: CHUNG_TU_DOC_TAB_STATUS.PLANNED,
     subtitle: "Bảng kê chứng từ chuyển nhượng vật tư, hàng hoá.",
-  },
-  {
-    id: "phieu-nhap-xuat-kho",
-    label: "Phiếu nhập · xuất kho",
-    status: CHUNG_TU_DOC_TAB_STATUS.PLANNED,
-    subtitle: "Liên kết kho và chứng từ quyết toán chi phí đầu vào.",
   },
   {
     id: "bien-ban-kiem-ke",

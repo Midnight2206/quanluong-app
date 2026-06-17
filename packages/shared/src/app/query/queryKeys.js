@@ -70,6 +70,32 @@ export const qk = {
       "templateCatalog",
       categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
     ],
+    categoryTemplates: (categoryKey) => ["chungTuQuyetToan", "categoryTemplates", String(categoryKey)],
+    templateFillMapping: (categoryKey, driveFileId) => [
+      "chungTuQuyetToan",
+      "templateFillMapping",
+      String(categoryKey),
+      String(driveFileId),
+    ],
+    unitProfile: (unitId) => ["chungTuQuyetToan", "unitProfile", String(unitId)],
+    documents: (unitId, categoryKey) => [
+      "chungTuQuyetToan",
+      "documents",
+      String(unitId),
+      String(categoryKey),
+    ],
+    document: (documentKey) => ["chungTuQuyetToan", "document", String(documentKey)],
+    excelTemplates: (categoryKey) => [
+      "chungTuQuyetToan",
+      "excelTemplates",
+      String(categoryKey ?? ""),
+    ],
+    excelTemplate: (id) => ["chungTuQuyetToan", "excelTemplate", String(id ?? "")],
+    excelExportHistory: (categoryKey) => [
+      "chungTuQuyetToan",
+      "excelExportHistory",
+      String(categoryKey ?? ""),
+    ],
   },
 };
 

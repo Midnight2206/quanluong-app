@@ -58,7 +58,7 @@ export function LoginPage() {
             type="text"
             autoComplete="username"
             className="w-full px-4 py-3 text-sm transition border outline-none rounded-2xl bg-background ring-0 focus:border-primary"
-            placeholder="superadmin hoặc superadmin@quanluong.local"
+            placeholder="username hoặc email đã đăng ký"
             {...register("identifier")}
             id="ql-login-identifier"
           />

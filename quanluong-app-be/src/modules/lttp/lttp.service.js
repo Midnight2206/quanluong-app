@@ -9,6 +9,7 @@ import {
   assertTargetUnitIsStrictDescendantOf,
   assertUnitIdInScope,
 } from "../../shared/units/unit-scope.service.js";
+import { markChungTuDocumentsStaleForLttpIssueSlipChange } from "../chung-tu-quyet-toan/chung-tu-document.service.js";
 import { LTTP_OTHER_GROUP_CODE } from "./lttp.constants.js";
 
 const commodityInclude = {
@@ -1126,6 +1127,12 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 },
   );
   await recalculateLttpPartnerDebtsForUnit(storageUnitId);
+  await markChungTuDocumentsStaleForLttpIssueSlipChange({
+    unitId: storageUnitId,
+    recipientUnitId,
+    issueDate: issueD,
+    issueSlipId: slip.id,
+  });
   return mapIssueSlip(slip);
 }
 
@@ -1343,6 +1350,20 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 10000 },
   );
   await recalculateLttpPartnerDebtsForUnit(storageUnitId);
+  await markChungTuDocumentsStaleForLttpIssueSlipChange({
+    unitId: storageUnitId,
+    recipientUnitId: existing.recipientUnitId,
+    issueDate: existing.issueDate,
+    issueSlipId: existing.id,
+  });
+  if (Number(existing.recipientUnitId) !== Number(recipientUnitId)) {
+    await markChungTuDocumentsStaleForLttpIssueSlipChange({
+      unitId: storageUnitId,
+      recipientUnitId,
+      issueDate: existing.issueDate,
+      issueSlipId: existing.id,
+    });
+  }
   return mapIssueSlip(slip);
 }
 
@@ -1404,6 +1425,12 @@ async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveU
   });
 
   await recalculateLttpPartnerDebtsForUnit(storageUnitId);
+  await markChungTuDocumentsStaleForLttpIssueSlipChange({
+    unitId: storageUnitId,
+    recipientUnitId: existing.recipientUnitId,
+    issueDate: existing.issueDate,
+    issueSlipId: existing.id,
+  });
   const slip = await prisma.lttpIssueSlip.findUnique({
     where: { id: existing.id },
     include: issueSlipInclude,
@@ -1734,6 +1761,12 @@ async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope) {
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
   await prisma.lttpIssueSlip.delete({ where: { id: slip.id } });
   await recalculateLttpPartnerDebtsForUnit(slip.unitId);
+  await markChungTuDocumentsStaleForLttpIssueSlipChange({
+    unitId: slip.unitId,
+    recipientUnitId: slip.recipientUnitId,
+    issueDate: slip.issueDate,
+    issueSlipId: slip.id,
+  });
   return { ok: true };
 }
 

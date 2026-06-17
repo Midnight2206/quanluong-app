@@ -110,6 +110,152 @@ const templateFieldRegistryQuerySchema = z.object({
   categoryKey: z.string().max(80).optional(),
 });
 
+const excelTemplateQuerySchema = z.object({
+  categoryKey: z.string().min(1).max(80),
+});
+
+const excelTemplateUploadBodySchema = z.object({
+  categoryKey: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(80)),
+  displayName: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(200)),
+});
+
+const excelTemplateIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const excelTemplateMappingBodySchema = z.object({
+  mapping: z.unknown().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const categoryKeyParamSchema = z.object({
+  categoryKey: z.string().min(1).max(80),
+});
+
+const categoryTemplateDriveParamsSchema = z.object({
+  categoryKey: z.string().min(1).max(80),
+  driveFileId: z
+    .string()
+    .min(8)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/),
+});
+
+const putCategoryTemplateFillMappingBodySchema = z
+  .object({
+    fillRules: z.unknown(),
+  })
+  .superRefine((data, ctx) => {
+    const v = data.fillRules;
+    if (v == null || typeof v !== "object" || Array.isArray(v)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "fillRules phải là object JSON (không phải mảng).",
+        path: ["fillRules"],
+      });
+    }
+  });
+
+const unitIdQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+});
+
+const chungTuUnitProfilePutBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  donViCapTren: z.string().max(255).nullable().optional(),
+  boPhan: z.string().max(255).nullable().optional(),
+  quyenSo: z.string().max(32).nullable().optional(),
+  noTaiKhoan: z.string().max(128).nullable().optional(),
+  coTaiKhoan: z.string().max(128).nullable().optional(),
+  signerLabelWriter: z.string().max(128).nullable().optional(),
+  signerLabelApprover: z.string().max(128).nullable().optional(),
+  signerLabelThird: z.string().max(128).nullable().optional(),
+  signerWriter: z.string().max(191).nullable().optional(),
+  signerApprover: z.string().max(191).nullable().optional(),
+  signerThird: z.string().max(191).nullable().optional(),
+  signerNguoiMua: z.string().max(191).nullable().optional(),
+  signerPhuTrachBoPhan: z.string().max(191).nullable().optional(),
+  signerTaiChinh: z.string().max(191).nullable().optional(),
+});
+
+const chungTuDocumentsListQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  categoryKey: z.string().min(1).max(80),
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
+const documentKeyParamSchema = z.object({
+  documentKey: z.string().min(8).max(200),
+});
+
+const chungTuDocumentBaseBodySchema = z.object({
+  categoryKey: z.string().min(1).max(80),
+  unitId: z.coerce.number().int().positive(),
+  periodDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  periodMonth: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .optional(),
+  unitIds: z.array(z.coerce.number().int().positive()).max(500).optional(),
+  issueSlipId: z.coerce.number().int().positive().optional(),
+  templateDriveFileId: z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/).optional(),
+  settings: z.record(z.unknown()).optional(),
+});
+
+function refineChungTuDocumentBody(data, ctx) {
+  if (data.categoryKey === "phieu-xuat-kho") {
+    if (!data.issueSlipId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu xuất kho cần issueSlipId.",
+        path: ["issueSlipId"],
+      });
+    }
+  } else if (data.categoryKey === "bang-ke-mua-hang") {
+    if (!data.periodMonth) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Bảng kê mua hàng cần periodMonth (YYYY-MM).",
+        path: ["periodMonth"],
+      });
+    }
+  } else if (!data.periodDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Chứng từ theo ngày cần periodDate (YYYY-MM-DD).",
+      path: ["periodDate"],
+    });
+  }
+}
+
+const chungTuDocumentCreateBodySchema = chungTuDocumentBaseBodySchema
+  .extend({
+    templateDriveFileId: z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/),
+  })
+  .superRefine(refineChungTuDocumentBody);
+
+const chungTuContextPreviewBodySchema = chungTuDocumentBaseBodySchema.superRefine(
+  refineChungTuDocumentBody,
+);
+
+const excelBkmhExportBodySchema = z.object({
+  templateId: z.coerce.number().int().positive(),
+  unitId: z.coerce.number().int().positive(),
+  periodMonth: z.string().regex(/^\d{4}-\d{2}$/),
+  unitIds: z.array(z.coerce.number().int().positive()).min(1).max(500),
+  settings: z.record(z.unknown()).optional(),
+});
+
 export {
   driveImportBodySchema,
   driveImportQuerySchema,
@@ -121,5 +267,19 @@ export {
   templateCatalogPatchBodySchema,
   templateCatalogQuerySchema,
   templateFieldRegistryQuerySchema,
+  excelTemplateQuerySchema,
+  excelTemplateUploadBodySchema,
+  excelTemplateIdParamSchema,
+  excelTemplateMappingBodySchema,
   putTemplateFillRulesBodySchema,
+  categoryKeyParamSchema,
+  categoryTemplateDriveParamsSchema,
+  putCategoryTemplateFillMappingBodySchema,
+  unitIdQuerySchema,
+  chungTuUnitProfilePutBodySchema,
+  chungTuDocumentsListQuerySchema,
+  documentKeyParamSchema,
+  chungTuDocumentCreateBodySchema,
+  chungTuContextPreviewBodySchema,
+  excelBkmhExportBodySchema,
 };
