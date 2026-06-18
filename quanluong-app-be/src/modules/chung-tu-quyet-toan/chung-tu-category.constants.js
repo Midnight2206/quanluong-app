@@ -36,14 +36,27 @@ export const CHUNG_TU_DOCUMENT_STATUS = Object.freeze({
   LOCKED: "locked",
 });
 
+/** Cấu hình in Google Sheets mặc định — 40 dòng/trang, 18pt/dòng; wrap đọc từ template. */
+export const CHUNG_TU_DEFAULT_SHEET_PRINT = Object.freeze({
+  rowsPerPage: 40,
+  rowHeightPt: 18,
+  enabled: true,
+  amountFieldKey: "thanhTien",
+  labelFieldKey: "tenHang",
+  carryInLabel: "Mang sang",
+  carryOutLabel: "Cộng sang trang",
+});
+
 /** Cấu hình ghi bảng chi tiết mặc định (0-based row/col) khi chưa có fillRules. */
 export const CHUNG_TU_DEFAULT_SHEET_TABLE = Object.freeze({
   [CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG]: {
     startRow: 8,
     startCol: 0,
     columns: ["stt", "tenHang", "dvt", "nguoiBan", "soLuong", "donGia", "thanhTien"],
-    repeatHeaderEveryRows: 28,
+    repeatHeaderEveryRows: 40,
     repeatHeaderLabels: ["STT", "Tên hàng", "ĐVT", "Người bán", "Số lượng", "Đơn giá", "Thành tiền"],
+    rowsPerPage: 40,
+    rowHeightPt: 18,
   },
   [CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO]: {
     startRow: 8,

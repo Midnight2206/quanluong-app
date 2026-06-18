@@ -122,6 +122,58 @@ function buildCarrySheetRow({ columns, labelFieldKey, amountFieldKey, label, amo
   return row;
 }
 
+/** Phân trang cố định theo số dòng/lưới (40 dòng/trang), không theo chiều cao wrap. */
+function paginateChungTuSheetFixedRows({
+  rows,
+  rowsPerPage,
+  amountFieldKey = "thanhTien",
+}) {
+  const data = Array.isArray(rows) ? rows : [];
+  const pageSize = Math.max(1, Number(rowsPerPage) || 1);
+
+  if (!data.length) {
+    return [
+      {
+        pageIndex: 0,
+        carryIn: 0,
+        pageAmount: 0,
+        carryOut: null,
+        rows: [],
+      },
+    ];
+  }
+
+  const pages = [];
+  let index = 0;
+  let carryIn = 0;
+
+  while (index < data.length) {
+    const pageIndex = pages.length;
+    let maxData = pageSize;
+    if (pageIndex > 0) maxData -= 1;
+    const willHaveNext = index + maxData < data.length;
+    if (willHaveNext) maxData -= 1;
+    maxData = Math.max(1, maxData);
+
+    const pageRows = data.slice(index, index + maxData);
+    const pageAmount = pageRows.reduce((sum, row) => sum + amountFromRow(row, amountFieldKey), 0);
+    index += pageRows.length;
+    const hasContinuation = index < data.length;
+    const carryOut = hasContinuation ? carryIn + pageAmount : null;
+
+    pages.push({
+      pageIndex,
+      carryIn,
+      pageAmount,
+      carryOut,
+      rows: pageRows,
+    });
+    carryIn = carryOut ?? 0;
+  }
+
+  return pages;
+}
+
 function buildChungTuSheetPrintRows({
   detailRows,
   columns,
@@ -146,13 +198,21 @@ function buildChungTuSheetPrintRows({
   let carryIn = 0;
   while (index < rows.length) {
     const pageIndex = pages.length;
-    const take = pageIndex === 0 ? firstRows : nextRows;
-    const pageRows = rows.slice(index, index + take);
+    const pageSize = pageIndex === 0 ? firstRows : nextRows;
+    const hasNextPage = index < rows.length; // tentative
+    let maxData = pageSize;
+    if (pageIndex > 0) maxData -= 1;
+    const willHaveNext = index + maxData < rows.length;
+    if (willHaveNext) maxData -= 1;
+    maxData = Math.max(1, maxData);
+    const pageRows = rows.slice(index, index + maxData);
     const pageAmount = pageRows.reduce((sum, row) => sum + amountFromRow(row, amountFieldKey), 0);
     index += pageRows.length;
-    const hasNextPage = index < rows.length;
-    const carryOut = hasNextPage ? carryIn + pageAmount : null;
+    const hasContinuation = index < rows.length;
+    const carryOut = hasContinuation ? carryIn + pageAmount : null;
     pages.push({
+      pageIndex,
+      pageSize,
       carryIn,
       carryOut,
       rows: pageRows,
@@ -161,8 +221,11 @@ function buildChungTuSheetPrintRows({
   }
   const values = [];
   for (const page of pages) {
+    const hasNextPage = page.carryOut != null;
+    const pageBlock = [];
+
     if (page.carryIn > 0) {
-      values.push(
+      pageBlock.push(
         buildCarrySheetRow({
           columns: cols,
           labelFieldKey,
@@ -173,10 +236,13 @@ function buildChungTuSheetPrintRows({
       );
     }
     for (const row of page.rows) {
-      values.push(detailRowToCells(row, cols));
+      pageBlock.push(detailRowToCells(row, cols));
     }
-    if (page.carryOut != null) {
-      values.push(
+    if (hasNextPage) {
+      while (pageBlock.length < page.pageSize - 1) {
+        pageBlock.push(cols.map(() => ""));
+      }
+      pageBlock.push(
         buildCarrySheetRow({
           columns: cols,
           labelFieldKey,
@@ -186,6 +252,7 @@ function buildChungTuSheetPrintRows({
         }),
       );
     }
+    values.push(...pageBlock);
   }
   return values;
 }
@@ -194,5 +261,6 @@ export {
   amountFromRow,
   buildChungTuSheetPrintRows,
   paginateChungTuPrintRows,
+  paginateChungTuSheetFixedRows,
   parseVietnameseNumber,
 };

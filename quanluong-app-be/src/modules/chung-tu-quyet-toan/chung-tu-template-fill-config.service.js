@@ -5,7 +5,7 @@ import { ERROR_CODES } from "../../errors/error-codes.js";
 import { assertTemplateInCategoryFolder } from "./chung-tu-drive-folders.service.js";
 import { normalizeFillRulesV2 } from "./chung-tu-quyet-toan.service.js";
 import { getContextFieldRegistryForCategory } from "./chung-tu-context-field-registry.js";
-import { CHUNG_TU_DEFAULT_SHEET_TABLE } from "./chung-tu-category.constants.js";
+import { CHUNG_TU_DEFAULT_SHEET_TABLE, CHUNG_TU_DEFAULT_SHEET_PRINT } from "./chung-tu-category.constants.js";
 
 const GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 
@@ -14,15 +14,9 @@ const CONTEXT_DERIVED_FIELDS = Object.freeze([
   { fieldKey: "thang", label: "Tháng (mm)" },
   { fieldKey: "nam", label: "Năm (yyyy)" },
   { fieldKey: "ngayThangNam", label: "Ngày tháng năm (Ngày dd tháng mm năm yyyy)" },
-  { fieldKey: "ngayChungTu", label: "Ngày chứng từ (YYYY-MM-DD)" },
-  { fieldKey: "so", label: "Số chứng từ (alias ngắn)" },
+  { fieldKey: "so", label: "Số" },
   { fieldKey: "soChungTu", label: "Số chứng từ" },
-  { fieldKey: "quyenSo", label: "Quyển số" },
-  { fieldKey: "tongTien", label: "Tổng tiền (định dạng)" },
   { fieldKey: "tongTienBangChu", label: "Tổng tiền bằng chữ" },
-  { fieldKey: "recipientDisplayName", label: "Người nhận (phiếu xuất)" },
-  { fieldKey: "warehouseFrom", label: "Xuất tại kho" },
-  { fieldKey: "printLine2", label: "Dòng in 2" },
 ]);
 
 function assertFillRulesObject(value) {
@@ -59,14 +53,14 @@ function defaultDetailTableForCategory(categoryKey) {
     startRow: def.startRow,
     startCol: def.startCol,
     columns: [...def.columns],
-    repeatHeaderEveryRows: Number(def.repeatHeaderEveryRows ?? 0),
+    repeatHeaderEveryRows: Number(def.repeatHeaderEveryRows ?? CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage),
     repeatHeaderLabels: Array.isArray(def.repeatHeaderLabels) ? [...def.repeatHeaderLabels] : [],
-    pageRowsFirst: Number(def.repeatHeaderEveryRows ?? 0),
-    pageRowsNext: Number(def.repeatHeaderEveryRows ?? 0),
-    amountFieldKey: "thanhTien",
-    labelFieldKey: "tenHang",
-    carryInLabel: "Mang sang",
-    carryOutLabel: "Cộng sang trang",
+    rowsPerPage: Number(def.rowsPerPage ?? CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage),
+    rowHeightPt: Number(def.rowHeightPt ?? CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt),
+    amountFieldKey: CHUNG_TU_DEFAULT_SHEET_PRINT.amountFieldKey,
+    labelFieldKey: CHUNG_TU_DEFAULT_SHEET_PRINT.labelFieldKey,
+    carryInLabel: CHUNG_TU_DEFAULT_SHEET_PRINT.carryInLabel,
+    carryOutLabel: CHUNG_TU_DEFAULT_SHEET_PRINT.carryOutLabel,
   };
 }
 
@@ -89,14 +83,14 @@ function applyDefaultDetailTableOptions(fillRules, categoryKey) {
       Array.isArray(table.repeatHeaderLabels) && table.repeatHeaderLabels.length
         ? table.repeatHeaderLabels
         : def.repeatHeaderLabels,
-    pageRowsFirst:
-      Number.isFinite(Number(table.pageRowsFirst)) && Number(table.pageRowsFirst) > 0
-        ? Number(table.pageRowsFirst)
-        : Number(def.pageRowsFirst ?? 0),
-    pageRowsNext:
-      Number.isFinite(Number(table.pageRowsNext)) && Number(table.pageRowsNext) > 0
-        ? Number(table.pageRowsNext)
-        : Number(def.pageRowsNext ?? 0),
+    rowsPerPage:
+      Number.isFinite(Number(table.rowsPerPage)) && Number(table.rowsPerPage) > 0
+        ? Number(table.rowsPerPage)
+        : Number(def.rowsPerPage ?? CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage),
+    rowHeightPt:
+      Number.isFinite(Number(table.rowHeightPt)) && Number(table.rowHeightPt) > 0
+        ? Number(table.rowHeightPt)
+        : Number(def.rowHeightPt ?? CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt),
     amountFieldKey: table.amountFieldKey || def.amountFieldKey,
     labelFieldKey: table.labelFieldKey || def.labelFieldKey,
     carryInLabel: table.carryInLabel || def.carryInLabel,
@@ -230,11 +224,18 @@ async function fetchSpreadsheetNamedRanges(oauth2Client, driveFileId, fileName) 
 }
 
 /** Ưu tiên: FillConfig → catalog link → mặc định bảng chi tiết. */
-export async function loadFillRulesForCategoryTemplate(templateDriveFileId, categoryKey) {
+export async function loadFillRulesForCategoryTemplate(
+  templateDriveFileId,
+  categoryKey,
+  { skipTemplateNamedRangeFetch = false } = {},
+) {
   const registry = getContextFieldRegistryForCategory(categoryKey);
   const fieldKeys = buildKnownFieldKeys(registry);
   let namedRangesPayload = null;
   async function fetchTemplateNamedRangesForMerge() {
+    if (skipTemplateNamedRangeFetch) {
+      return { items: [] };
+    }
     if (namedRangesPayload) return namedRangesPayload;
     const { oauth2Client, meta } = await assertTemplateInCategoryFolder({
       categoryKey,
@@ -263,10 +264,10 @@ export async function loadFillRulesForCategoryTemplate(templateDriveFileId, cate
   });
   if (cfg?.fillRulesJson) {
     const payload = await fetchTemplateNamedRangesForMerge();
-    return applyDefaultDetailTableOptions(
-      mergeMissingNamedRangeMappings(cfg.fillRulesJson, payload.items, fieldKeys),
-      categoryKey,
-    );
+    const merged = skipTemplateNamedRangeFetch
+      ? normalizeFillRulesV2(cfg.fillRulesJson, "spreadsheet")
+      : mergeMissingNamedRangeMappings(cfg.fillRulesJson, payload.items, fieldKeys);
+    return applyDefaultDetailTableOptions(merged, categoryKey);
   }
 
   const catalog = await prisma.chungTuDriveTemplateLink.findFirst({
@@ -275,10 +276,18 @@ export async function loadFillRulesForCategoryTemplate(templateDriveFileId, cate
   });
   if (catalog?.fillRulesJson) {
     const payload = await fetchTemplateNamedRangesForMerge();
-    return applyDefaultDetailTableOptions(
-      mergeMissingNamedRangeMappings(catalog.fillRulesJson, payload.items, fieldKeys),
-      categoryKey,
-    );
+    const merged = skipTemplateNamedRangeFetch
+      ? normalizeFillRulesV2(catalog.fillRulesJson, "spreadsheet")
+      : mergeMissingNamedRangeMappings(catalog.fillRulesJson, payload.items, fieldKeys);
+    return applyDefaultDetailTableOptions(merged, categoryKey);
+  }
+
+  if (skipTemplateNamedRangeFetch) {
+    throw new AppError({
+      message: "Chưa cấu hình map template — không thể đồng bộ Google Sheets.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
   }
 
   const fillRules = normalizeFillRulesV2(null, "spreadsheet");

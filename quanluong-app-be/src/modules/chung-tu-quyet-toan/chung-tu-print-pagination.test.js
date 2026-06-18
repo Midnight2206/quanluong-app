@@ -57,6 +57,28 @@ test("paginateChungTuPrintRows keeps empty documents printable", () => {
   ]);
 });
 
+test("paginateChungTuPrintRows reserves carry slots for 40-row sheet pages", () => {
+  const pages = paginateChungTuPrintRows({
+    rows: Array.from({ length: 50 }, (_, i) => ({
+      stt: i + 1,
+      tenHang: `Hàng ${i + 1}`,
+      thanhTien: "1.000",
+    })),
+    firstPageBodyHeight: 40,
+    nextPageBodyHeight: 40,
+    rowHeight: () => 1,
+    carryRowHeight: 1,
+    transferRowHeight: 1,
+    amountFieldKey: "thanhTien",
+  });
+  assert.equal(pages.length, 2);
+  assert.equal(pages[0].rows.length, 39);
+  assert.equal(pages[0].carryOut, 39000);
+  assert.equal(pages[1].carryIn, 39000);
+  assert.equal(pages[1].rows.length, 11);
+  assert.equal(pages[1].carryOut, null);
+});
+
 test("buildChungTuSheetPrintRows injects carry rows for Google Sheets table values", () => {
   const values = buildChungTuSheetPrintRows({
     detailRows: [
@@ -77,6 +99,8 @@ test("buildChungTuSheetPrintRows injects carry rows for Google Sheets table valu
   assert.deepEqual(values, [
     [1, "Gạo", "10.000"],
     [2, "Thịt", "20.000"],
+    ["", "Cộng sang trang", 30000],
+    ["", "Mang sang", 30000],
     [3, "Rau", "30.000"],
     ["", "Cộng sang trang", 60000],
     ["", "Mang sang", 60000],

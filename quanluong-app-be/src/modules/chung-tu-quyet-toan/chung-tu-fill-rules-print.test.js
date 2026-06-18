@@ -10,14 +10,18 @@ test("normalizeFillRulesV2 keeps pdf print settings with safe defaults", () => {
       sheets: {
         detailTable: {
           columns: ["stt", "tenHang", "thanhTien"],
-          pageRowsFirst: 28,
-          pageRowsNext: 30,
+          rowsPerPage: 40,
+          rowHeightPt: 18,
           carryInLabel: "Mang sang",
           carryOutLabel: "Cộng sang trang",
           amountFieldKey: "thanhTien",
         },
       },
       print: {
+        sheets: {
+          rowsPerPage: 40,
+          rowHeightPt: 18,
+        },
         pdf: {
           pageSize: "A4",
           orientation: "portrait",
@@ -46,7 +50,9 @@ test("normalizeFillRulesV2 keeps pdf print settings with safe defaults", () => {
   assert.equal(fillRules.print.pdf.table.amountFieldKey, "thanhTien");
   assert.equal(fillRules.print.pdf.table.carryInLabel, "Mang sang");
   assert.equal(fillRules.print.pdf.table.carryOutLabel, "Cộng sang trang");
-  assert.equal(fillRules.sheets.detailTable.pageRowsFirst, 28);
-  assert.equal(fillRules.sheets.detailTable.pageRowsNext, 30);
+  assert.equal(fillRules.sheets.detailTable.rowsPerPage, 40);
+  assert.equal(fillRules.sheets.detailTable.rowHeightPt, 18);
+  assert.equal(fillRules.print.sheets.rowsPerPage, 40);
+  assert.equal(fillRules.print.sheets.rowHeightPt, 18);
   assert.equal(fillRules.sheets.detailTable.amountFieldKey, "thanhTien");
 });

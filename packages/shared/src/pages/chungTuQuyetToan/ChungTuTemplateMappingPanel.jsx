@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Save } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -20,6 +20,16 @@ const DETAIL_COLUMN_OPTIONS = [
   { key: "ghiChu", label: "Ghi chú" },
 ];
 
+const DETAIL_COLUMN_LABELS = Object.fromEntries(
+  DETAIL_COLUMN_OPTIONS.map((col) => [col.key, col.label]),
+);
+
+const DEFAULT_SHEET_PRINT = {
+  rowsPerPage: 40,
+  rowHeightPt: 18,
+  enabled: true,
+};
+
 function buildFieldOptions(fieldRegistry) {
   const seen = new Set();
   const options = [];
@@ -30,11 +40,8 @@ function buildFieldOptions(fieldRegistry) {
     options.push({ fieldKey, label: label || fieldKey, group });
   };
 
-  for (const f of fieldRegistry?.formFields ?? []) {
-    push(f.fieldKey, f.label, "Thông tin in / form");
-  }
   for (const f of fieldRegistry?.derivedFields ?? []) {
-    push(f.fieldKey, f.label, "Tự tính / ngày tháng");
+    push(f.fieldKey, f.label, "Tự động từ dữ liệu");
   }
   for (const t of fieldRegistry?.dbTables ?? []) {
     for (const c of t.columns ?? []) {
@@ -42,7 +49,7 @@ function buildFieldOptions(fieldRegistry) {
     }
   }
 
-  return options.sort((a, b) => a.label.localeCompare(b.label, "vi"));
+  return options;
 }
 
 function namedRangeColCount(grid) {
@@ -65,7 +72,14 @@ function emptyFillRules() {
       namedRanges: [],
       detailTable: null,
     },
+    print: {
+      sheets: { ...DEFAULT_SHEET_PRINT },
+    },
   };
+}
+
+function columnLabel(key) {
+  return DETAIL_COLUMN_LABELS[key] ?? key;
 }
 
 /**
@@ -85,7 +99,16 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
 
   useEffect(() => {
     if (!data?.fillRules) return;
-    setFillRules(data.fillRules);
+    setFillRules({
+      ...data.fillRules,
+      print: {
+        ...data.fillRules.print,
+        sheets: {
+          ...DEFAULT_SHEET_PRINT,
+          ...(data.fillRules.print?.sheets ?? {}),
+        },
+      },
+    });
     setSaveOk(false);
   }, [data?.fillRules, driveFileId]);
 
@@ -93,6 +116,11 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
 
   const namedRanges = fillRules?.sheets?.namedRanges ?? [];
   const detailTable = fillRules?.sheets?.detailTable;
+  const selectedColumns = detailTable?.columns ?? [];
+  const availableColumns = DETAIL_COLUMN_OPTIONS.filter(
+    (col) => !selectedColumns.includes(col.key),
+  );
+
   const namedRangeMetaByName = useMemo(() => {
     const map = new Map();
     for (const item of data?.namedRanges ?? []) {
@@ -121,15 +149,23 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
     setSaveOk(false);
   };
 
-  const toggleDetailColumn = (colKey) => {
-    const cols = [...(detailTable?.columns ?? [])];
-    const idx = cols.indexOf(colKey);
-    if (idx >= 0) {
-      cols.splice(idx, 1);
-    } else {
-      cols.push(colKey);
-    }
-    updateDetailTable({ columns: cols });
+  const addDetailColumn = (colKey) => {
+    if (!colKey || selectedColumns.includes(colKey)) return;
+    updateDetailTable({ columns: [...selectedColumns, colKey] });
+  };
+
+  const removeDetailColumn = (colKey) => {
+    updateDetailTable({ columns: selectedColumns.filter((key) => key !== colKey) });
+  };
+
+  const moveDetailColumn = (index, direction) => {
+    const next = [...selectedColumns];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    const tmp = next[index];
+    next[index] = next[target];
+    next[target] = tmp;
+    updateDetailTable({ columns: next });
   };
 
   const handleSave = async () => {
@@ -156,18 +192,26 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
                   startRow: Number(detailTable.startRow ?? 8),
                   startCol: Number(detailTable.startCol ?? 0),
                   columns: detailTable.columns,
-                  repeatHeaderEveryRows: Number(detailTable.repeatHeaderEveryRows ?? 0),
+                  repeatHeaderEveryRows: Number(
+                    detailTable.repeatHeaderEveryRows ?? DEFAULT_SHEET_PRINT.rowsPerPage,
+                  ),
                   repeatHeaderLabels: Array.isArray(detailTable.repeatHeaderLabels)
                     ? detailTable.repeatHeaderLabels
                     : [],
-                  pageRowsFirst: Number(detailTable.pageRowsFirst ?? 0),
-                  pageRowsNext: Number(detailTable.pageRowsNext ?? 0),
+                  rowsPerPage: DEFAULT_SHEET_PRINT.rowsPerPage,
+                  rowHeightPt: DEFAULT_SHEET_PRINT.rowHeightPt,
                   amountFieldKey: detailTable.amountFieldKey || "thanhTien",
                   labelFieldKey: detailTable.labelFieldKey || "tenHang",
                   carryInLabel: detailTable.carryInLabel || "Mang sang",
                   carryOutLabel: detailTable.carryOutLabel || "Cộng sang trang",
                 }
               : null,
+          },
+          print: {
+            sheets: {
+              ...DEFAULT_SHEET_PRINT,
+              ...(fillRules.print?.sheets ?? {}),
+            },
           },
         },
       });
@@ -221,22 +265,23 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
         ) : null}
       </div>
 
-      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-[10px] leading-relaxed text-muted-foreground">
-        <p className="font-semibold text-foreground">Chữ ký (4 ô lưới ký tự)</p>
+      <div className="rounded-lg border border-border/70 bg-muted/20 p-2.5 text-[10px] leading-relaxed text-muted-foreground">
+        <p className="font-semibold text-foreground">In / phân trang (chuẩn)</p>
         <p className="mt-1">
-          Trên Sheets: vẽ hàng ô vuông (viền từng ô) cho tên người ký → chọn <strong>cả hàng</strong> →
-          Dữ liệu → Vùng đặt tên, ví dụ{" "}
-          <span className="font-mono">grid_nguoiMua</span>, <span className="font-mono">grid_phuTrachBoPhan</span>
-          … Trong bảng map bên dưới chọn kiểu <strong>Lưới ký tự</strong> và field tương ứng. App sẽ tách từng
-          chữ cái vào từng ô.
+          Mỗi trang <strong>40 dòng</strong> (budget in), chiều cao cơ bản <strong>18pt/dòng</strong>.
+          Ô wrap thêm 1 dòng → trừ 1 trong 40 và hàng cao thêm 18pt sau khi đồng bộ. App gọi{" "}
+          <span className="font-mono">autoResizeDimensions</span> rồi chốt chiều cao theo số dòng wrap.
+        </p>
+        <p className="mt-1">
+          App chỉ fill: <strong>số</strong>, <strong>ngày tháng năm</strong>, <strong>tổng tiền bằng chữ</strong>{" "}
+          và bảng chi tiết LTTP. Đơn vị, chữ ký, tiêu đề… để cố định trên template.
         </p>
       </div>
 
       {namedRanges.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          Mẫu chưa có Named range trên Google Sheets. Trên Sheets: chọn ô → Dữ liệu → Named ranges,
-          đặt tên trùng fieldKey (vd. <span className="font-mono">donViSo</span>) hoặc map thủ công
-          sau khi tạo.
+          Mẫu chưa có Named range. Trên Sheets: chọn ô → Dữ liệu → Named ranges, đặt tên rồi map field
+          bên dưới.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border/80">
@@ -253,61 +298,62 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
                 const meta = namedRangeMetaByName.get(nr.rangeName);
                 const boxCount = namedRangeColCount(meta?.grid);
                 return (
-                <tr key={nr.rangeName || idx} className="border-b border-border/50 last:border-0">
-                  <td className="px-2 py-1.5">
-                    <span className="font-mono text-[11px]">{nr.rangeName}</span>
-                    {boxCount > 1 ? (
-                      <span className="mt-0.5 block text-[9px] text-muted-foreground">
-                        {boxCount} ô ngang
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <select
-                      className="w-full min-w-[100px] rounded border border-border bg-background px-1.5 py-1 text-xs"
-                      value={ruleSelectValue(nr.rule)}
-                      disabled={!canWrite}
-                      onChange={(e) => {
-                        const nextRule = e.target.value;
-                        updateNamedRange(idx, {
-                          rule: nextRule,
-                          fieldKey: nextRule === "static" ? "" : nr.fieldKey,
-                          value: nextRule === "field" || nextRule === "charGrid" ? "" : nr.value,
-                        });
-                      }}
-                    >
-                      <option value="field">Một ô</option>
-                      <option value="charGrid">Lưới ký tự</option>
-                      <option value="static">Cố định</option>
-                    </select>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    {nr.rule === "static" ? (
-                      <input
-                        type="text"
-                        className="w-full rounded border border-border bg-background px-1.5 py-1 text-xs"
-                        value={nr.value ?? ""}
-                        disabled={!canWrite}
-                        onChange={(e) => updateNamedRange(idx, { value: e.target.value })}
-                      />
-                    ) : (
+                  <tr key={nr.rangeName || idx} className="border-b border-border/50 last:border-0">
+                    <td className="px-2 py-1.5">
+                      <span className="font-mono text-[11px]">{nr.rangeName}</span>
+                      {boxCount > 1 ? (
+                        <span className="mt-0.5 block text-[9px] text-muted-foreground">
+                          {boxCount} ô ngang
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-2 py-1.5">
                       <select
-                        className="w-full min-w-[160px] rounded border border-border bg-background px-1.5 py-1 text-xs"
-                        value={nr.fieldKey ?? ""}
+                        className="w-full min-w-[100px] rounded border border-border bg-background px-1.5 py-1 text-xs"
+                        value={ruleSelectValue(nr.rule)}
                         disabled={!canWrite}
-                        onChange={(e) => updateNamedRange(idx, { fieldKey: e.target.value })}
+                        onChange={(e) => {
+                          const nextRule = e.target.value;
+                          updateNamedRange(idx, {
+                            rule: nextRule,
+                            fieldKey: nextRule === "static" ? "" : nr.fieldKey,
+                            value: nextRule === "field" || nextRule === "charGrid" ? "" : nr.value,
+                          });
+                        }}
                       >
-                        <option value="">— Chọn field —</option>
-                        {fieldOptions.map((opt) => (
-                          <option key={opt.fieldKey} value={opt.fieldKey}>
-                            {opt.label} ({opt.fieldKey})
-                          </option>
-                        ))}
+                        <option value="field">Một ô</option>
+                        <option value="charGrid">Lưới ký tự</option>
+                        <option value="static">Cố định (template)</option>
                       </select>
-                    )}
-                  </td>
-                </tr>
-              );
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {nr.rule === "static" ? (
+                        <input
+                          type="text"
+                          className="w-full rounded border border-border bg-background px-1.5 py-1 text-xs"
+                          value={nr.value ?? ""}
+                          disabled={!canWrite}
+                          onChange={(e) => updateNamedRange(idx, { value: e.target.value })}
+                          placeholder="Giữ nguyên trên template"
+                        />
+                      ) : (
+                        <select
+                          className="w-full min-w-[160px] rounded border border-border bg-background px-1.5 py-1 text-xs"
+                          value={nr.fieldKey ?? ""}
+                          disabled={!canWrite}
+                          onChange={(e) => updateNamedRange(idx, { fieldKey: e.target.value })}
+                        >
+                          <option value="">— Chọn field —</option>
+                          {fieldOptions.map((opt) => (
+                            <option key={opt.fieldKey} value={opt.fieldKey}>
+                              {opt.label} ({opt.fieldKey})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                  </tr>
+                );
               })}
             </tbody>
           </table>
@@ -349,140 +395,77 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
               onChange={(e) => updateDetailTable({ startCol: Number(e.target.value) })}
             />
           </label>
-          <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Lặp tiêu đề sau N dòng</span>
-            <input
-              type="number"
-              min={0}
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.repeatHeaderEveryRows ?? 0}
-              disabled={!canWrite}
-              onChange={(e) => updateDetailTable({ repeatHeaderEveryRows: Number(e.target.value) })}
-            />
-          </label>
-          <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Trang đầu: số dòng dữ liệu</span>
-            <input
-              type="number"
-              min={0}
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.pageRowsFirst ?? 0}
-              disabled={!canWrite}
-              onChange={(e) => updateDetailTable({ pageRowsFirst: Number(e.target.value) })}
-            />
-          </label>
-          <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Trang sau: số dòng dữ liệu</span>
-            <input
-              type="number"
-              min={0}
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.pageRowsNext ?? 0}
-              disabled={!canWrite}
-              onChange={(e) => updateDetailTable({ pageRowsNext: Number(e.target.value) })}
-            />
-          </label>
-          <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Cột cộng lũy kế</span>
-            <select
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.amountFieldKey ?? "thanhTien"}
-              disabled={!canWrite}
-              onChange={(e) => updateDetailTable({ amountFieldKey: e.target.value })}
-            >
-              {DETAIL_COLUMN_OPTIONS.map((col) => (
-                <option key={col.key} value={col.key}>
-                  {col.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Cột ghi nhãn carry</span>
-            <select
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.labelFieldKey ?? "tenHang"}
-              disabled={!canWrite}
-              onChange={(e) => updateDetailTable({ labelFieldKey: e.target.value })}
-            >
-              {DETAIL_COLUMN_OPTIONS.map((col) => (
-                <option key={col.key} value={col.key}>
-                  {col.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Nhãn Mang sang</span>
-            <input
-              type="text"
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.carryInLabel ?? "Mang sang"}
-              disabled={!canWrite}
-              onChange={(e) => updateDetailTable({ carryInLabel: e.target.value })}
-            />
-          </label>
-          <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Nhãn Cộng sang trang</span>
-            <input
-              type="text"
-              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.carryOutLabel ?? "Cộng sang trang"}
-              disabled={!canWrite}
-              onChange={(e) => updateDetailTable({ carryOutLabel: e.target.value })}
-            />
-          </label>
+
+        <div className="space-y-1">
+          <span className="text-[10px] text-muted-foreground">Thứ tự cột xuất ra sheet</span>
+          {selectedColumns.length === 0 ? (
+            <p className="text-[10px] text-muted-foreground">Chưa chọn cột nào.</p>
+          ) : (
+            <ul className="space-y-1">
+              {selectedColumns.map((colKey, index) => (
+                <li
+                  key={colKey}
+                  className="flex items-center gap-2 rounded border border-border/70 bg-background/80 px-2 py-1"
+                >
+                  <span className="min-w-0 flex-1 text-xs font-medium">{columnLabel(colKey)}</span>
+                  <span className="font-mono text-[10px] text-muted-foreground">{colKey}</span>
+                  {canWrite ? (
+                    <div className="flex gap-0.5">
+                      <button
+                        type="button"
+                        className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                        disabled={index === 0}
+                        onClick={() => moveDetailColumn(index, -1)}
+                        aria-label="Lên"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                        disabled={index === selectedColumns.length - 1}
+                        onClick={() => moveDetailColumn(index, 1)}
+                        aria-label="Xuống"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded px-1.5 text-[10px] text-destructive hover:bg-destructive/10"
+                        onClick={() => removeDetailColumn(colKey)}
+                      >
+                        Bỏ
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        <label className="block space-y-0.5">
-          <span className="text-[10px] text-muted-foreground">
-            Tiêu đề lặp (phân cách bằng dấu |, để trống sẽ dùng fieldKey)
-          </span>
-          <input
-            type="text"
-            className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-            value={(detailTable?.repeatHeaderLabels ?? []).join(" | ")}
-            disabled={!canWrite}
-            onChange={(e) =>
-              updateDetailTable({
-                repeatHeaderLabels: e.target.value
-                  .split("|")
-                  .map((part) => part.trim()),
-              })
-            }
-          />
-        </label>
-        <div className="flex flex-wrap gap-1.5">
-          {DETAIL_COLUMN_OPTIONS.map((col) => {
-            const active = (detailTable?.columns ?? []).includes(col.key);
-            return (
+
+        {canWrite && availableColumns.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {availableColumns.map((col) => (
               <button
                 key={col.key}
                 type="button"
-                disabled={!canWrite}
-                className={`rounded border px-2 py-0.5 text-[10px] transition ${
-                  active
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/40"
-                }`}
-                onClick={() => toggleDetailColumn(col.key)}
+                className="rounded border border-dashed border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:border-primary hover:text-primary"
+                onClick={() => addDetailColumn(col.key)}
               >
-                {col.label}
+                + {col.label}
               </button>
-            );
-          })}
-        </div>
-        {(detailTable?.columns ?? []).length > 0 ? (
-          <p className="text-[10px] text-muted-foreground">
-            Thứ tự cột: {(detailTable?.columns ?? []).join(" → ")}
-          </p>
+            ))}
+          </div>
         ) : null}
       </div>
 
       {saveError ? <p className="text-xs text-destructive">{saveError}</p> : null}
       {saveOk ? (
-        <p className="text-xs text-emerald-700 dark:text-emerald-300">Đã lưu map — tạo/đồng bộ chứng từ sẽ dùng cấu hình này.</p>
+        <p className="text-xs text-emerald-700 dark:text-emerald-300">
+          Đã lưu map — tạo/đồng bộ chứng từ sẽ dùng cấu hình này.
+        </p>
       ) : null}
     </div>
   );

@@ -4,13 +4,25 @@ import { ERROR_CODES } from "../../errors/error-codes.js";
 import { CHUNG_TU_DEFAULT_SHEET_TABLE } from "./chung-tu-category.constants.js";
 import { loadFillRulesForCategoryTemplate } from "./chung-tu-template-fill-config.service.js";
 import { resolveTemplateSheetTitle } from "./chung-tu-monthly-sheets.js";
-import { buildChungTuSheetPrintRows } from "./chung-tu-print-pagination.js";
+import {
+  buildAutoResizeRowsRequest,
+  buildPerRowHeightUpdateRequests,
+  buildPerRowHeightUpdateRequestsFromPlacements,
+  buildSheetPrintOutput,
+  buildWrapTextRepeatCellRequest,
+  fetchSheetTemplateColumnMeta,
+} from "./chung-tu-sheet-print-pagination.js";
 
 const GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 const DEFAULT_DETAIL_TABLE_CLEAR_ROWS = 1000;
+const SPREADSHEET_META_CACHE_TTL_MS = 2 * 60 * 1000;
+const DETAIL_TABLE_COLUMN_META_CACHE_KEY = "__detail_table_column_meta__";
 const SKIPPED_NAMED_RANGE_FIELD_KEYS_BY_CATEGORY = Object.freeze({
   "bang-ke-mua-hang": new Set(["hoTenNguoiMua", "mauSo"]),
 });
+
+/** @type {Map<string, { expiresAt: number, data: object }>} */
+const spreadsheetMetaCache = new Map();
 
 function contextFieldValue(context, fieldKey) {
   if (!fieldKey) return "";
@@ -31,33 +43,67 @@ function colLetter(index) {
 }
 
 async function loadFillRulesForTemplate(templateDriveFileId, categoryKey) {
-  return loadFillRulesForCategoryTemplate(templateDriveFileId, categoryKey);
-}
-
-async function fetchSpreadsheetSheetTitles(sheetsApi, spreadsheetId) {
-  const sheets = await fetchSpreadsheetSheets(sheetsApi, spreadsheetId);
-  const visible = sheets.filter((sh) => !sh.hidden).map((sh) => sh.title);
-  return visible.length ? visible : sheets.map((sh) => sh.title);
-}
-
-async function fetchSpreadsheetSheets(sheetsApi, spreadsheetId) {
-  const meta = await sheetsApi.spreadsheets.get({
-    spreadsheetId,
-    fields: "sheets.properties(sheetId,title,hidden,index)",
+  return loadFillRulesForCategoryTemplate(templateDriveFileId, categoryKey, {
+    skipTemplateNamedRangeFetch: true,
   });
+}
+
+function invalidateSpreadsheetMetaCache(spreadsheetId) {
+  if (spreadsheetId) spreadsheetMetaCache.delete(String(spreadsheetId));
+}
+
+function parseSpreadsheetMetaResponse(raw) {
   const sheets = [];
-  for (const sh of meta.data.sheets ?? []) {
+  const titleToSheetId = new Map();
+  const sheetIdToTitle = new Map();
+  for (const sh of raw?.sheets ?? []) {
     const sheetId = sh.properties?.sheetId;
     const title = String(sh.properties?.title ?? "").trim();
     if (sheetId == null || !title) continue;
-    sheets.push({
+    const entry = {
       sheetId: Number(sheetId),
       title,
       hidden: Boolean(sh.properties?.hidden),
       index: Number(sh.properties?.index ?? 0),
-    });
+    };
+    sheets.push(entry);
+    titleToSheetId.set(title, entry.sheetId);
+    sheetIdToTitle.set(entry.sheetId, title);
   }
-  return sheets;
+  return {
+    sheets,
+    titleToSheetId,
+    sheetIdToTitle,
+    namedRanges: raw?.namedRanges ?? [],
+  };
+}
+
+async function fetchSpreadsheetMeta(sheetsApi, spreadsheetId, { bypassCache = false } = {}) {
+  const key = String(spreadsheetId);
+  const now = Date.now();
+  if (!bypassCache) {
+    const cached = spreadsheetMetaCache.get(key);
+    if (cached && cached.expiresAt > now) return cached.data;
+  }
+  const res = await sheetsApi.spreadsheets.get({
+    spreadsheetId,
+    fields: "sheets.properties(sheetId,title,hidden,index),namedRanges",
+  });
+  const data = parseSpreadsheetMetaResponse(res.data);
+  spreadsheetMetaCache.set(key, { data, expiresAt: now + SPREADSHEET_META_CACHE_TTL_MS });
+  return data;
+}
+
+async function fetchSpreadsheetSheetTitles(sheetsApi, spreadsheetId, spreadsheetMeta = null) {
+  const sheets = spreadsheetMeta?.sheets ?? (await fetchSpreadsheetMeta(sheetsApi, spreadsheetId)).sheets;
+  const visible = sheets.filter((sh) => !sh.hidden).map((sh) => sh.title);
+  return visible.length ? visible : sheets.map((sh) => sh.title);
+}
+
+async function fetchSpreadsheetSheets(sheetsApi, spreadsheetId, spreadsheetMeta = null) {
+  if (spreadsheetMeta?.sheets) return spreadsheetMeta.sheets;
+  const meta = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
+  return meta.sheets;
 }
 
 /** Ưu tiên sheet cấu hình nếu tồn tại; không thì sheet xuất hiện nhiều nhất trong named ranges; cuối cùng là sheet đầu tiên. */
@@ -86,20 +132,8 @@ function resolveDetailTableSheetTitle(configuredName, availableTitles, namedRang
   return available[0] ?? configured ?? "Sheet1";
 }
 
-async function resolveNamedRangeBounds(sheetsApi, spreadsheetId, rangeName) {
-  const meta = await sheetsApi.spreadsheets.get({
-    spreadsheetId,
-    fields: "sheets.properties(sheetId,title),namedRanges",
-  });
-  const sheetIdToTitle = new Map();
-  for (const sh of meta.data.sheets ?? []) {
-    const sid = sh.properties?.sheetId;
-    if (sid != null) sheetIdToTitle.set(Number(sid), String(sh.properties?.title ?? ""));
-  }
-  const nr = (meta.data.namedRanges ?? []).find((x) => x.name === rangeName);
-  if (!nr?.range) {
-    return null;
-  }
+function namedRangeToBounds(nr, sheetIdToTitle) {
+  if (!nr?.range) return null;
   const r = nr.range;
   const sheetTitle = sheetIdToTitle.get(Number(r.sheetId)) ?? "Sheet1";
   const safeSheet = `'${sheetTitle.replace(/'/g, "''")}'`;
@@ -166,11 +200,11 @@ function shouldSkipNamedRangeUpdate(categoryKey, rule) {
   return skipped.has(fieldKey) || skipped.has(rangeName);
 }
 
-async function ensureMonthlySheets({ sheetsApi, spreadsheetId, sheetNames }) {
+async function ensureMonthlySheets({ sheetsApi, spreadsheetId, sheetNames, spreadsheetMeta = null }) {
   const wanted = (sheetNames ?? []).map((name) => String(name ?? "").trim()).filter(Boolean);
-  if (!wanted.length) return;
+  if (!wanted.length) return spreadsheetMeta;
 
-  let sheets = await fetchSpreadsheetSheets(sheetsApi, spreadsheetId);
+  let sheets = await fetchSpreadsheetSheets(sheetsApi, spreadsheetId, spreadsheetMeta);
   const existingTitles = new Set(sheets.map((sh) => sh.title));
   const sourceTitle = resolveTemplateSheetTitle(sheets.map((sh) => sh.title));
   const sourceSheet = sheets.find((sh) => sh.title === sourceTitle);
@@ -194,22 +228,31 @@ async function ensureMonthlySheets({ sheetsApi, spreadsheetId, sheetNames }) {
     });
     existingTitles.add(sheetName);
   }
-  if (!requests.length) return;
+  if (!requests.length) return spreadsheetMeta;
 
   await sheetsApi.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: { requests },
   });
+  invalidateSpreadsheetMetaCache(spreadsheetId);
+  return fetchSpreadsheetMeta(sheetsApi, spreadsheetId, { bypassCache: true });
 }
 
-async function buildNamedRangeBounds(sheetsApi, spreadsheetId, namedRanges) {
+async function buildNamedRangeBounds(sheetsApi, spreadsheetId, namedRanges, spreadsheetMeta = null) {
+  const meta = spreadsheetMeta ?? (await fetchSpreadsheetMeta(sheetsApi, spreadsheetId));
+  const wanted = new Set(
+    (namedRanges ?? [])
+      .map((nr) => String(nr.rangeName ?? "").trim())
+      .filter(Boolean),
+  );
   const bounds = new Map();
-  for (const nr of namedRanges ?? []) {
-    if (!nr.rangeName || bounds.has(nr.rangeName)) continue;
-    const b = await resolveNamedRangeBounds(sheetsApi, spreadsheetId, nr.rangeName);
-    if (b) bounds.set(nr.rangeName, b);
+  for (const nr of meta.namedRanges ?? []) {
+    const name = String(nr.name ?? "").trim();
+    if (!name || !wanted.has(name) || bounds.has(name)) continue;
+    const b = namedRangeToBounds(nr, meta.sheetIdToTitle);
+    if (b) bounds.set(name, b);
   }
-  return bounds;
+  return { bounds, meta };
 }
 
 function pushContextNamedRangeUpdates({ data, fillRules, namedRangeBounds, context, sheetName, categoryKey }) {
@@ -239,6 +282,14 @@ function pushContextNamedRangeUpdates({ data, fillRules, namedRangeBounds, conte
   }
 }
 
+function resolveSheetIdByTitle(sheetTitle, spreadsheetMeta) {
+  if (!spreadsheetMeta) return null;
+  const fromMap = spreadsheetMeta.titleToSheetId?.get(sheetTitle);
+  if (fromMap != null) return fromMap;
+  const found = spreadsheetMeta.sheets?.find((sh) => sh.title === sheetTitle);
+  return found?.sheetId ?? spreadsheetMeta.sheets?.[0]?.sheetId ?? null;
+}
+
 function pushContextDetailTableUpdate({
   data,
   clearRanges,
@@ -249,6 +300,7 @@ function pushContextDetailTableUpdate({
   sheetTitles,
   namedRangeSheetTitles,
   clearRowCount,
+  columnMeta,
 }) {
   const defaultTable = CHUNG_TU_DEFAULT_SHEET_TABLE[categoryKey] ?? null;
   const tableCfgRaw = fillRules.sheets?.detailTable ?? defaultTable;
@@ -262,47 +314,68 @@ function pushContextDetailTableUpdate({
     resolveDetailTableSheetTitle(tableCfgRaw.sheetName, sheetTitles, namedRangeSheetTitles);
   const startRow = tableCfgRaw.startRow ?? defaultTable?.startRow ?? 8;
   const startCol = tableCfgRaw.startCol ?? defaultTable?.startCol ?? 0;
-  const pageRowsFirst =
-    Number.isFinite(Number(tableCfgRaw.pageRowsFirst)) && Number(tableCfgRaw.pageRowsFirst) > 0
-      ? Number(tableCfgRaw.pageRowsFirst)
-      : 0;
-  const pageRowsNext =
-    Number.isFinite(Number(tableCfgRaw.pageRowsNext)) && Number(tableCfgRaw.pageRowsNext) > 0
-      ? Number(tableCfgRaw.pageRowsNext)
-      : 0;
-  const useSheetCarryRows = pageRowsFirst > 0 && pageRowsNext > 0;
-  const values = useSheetCarryRows
-    ? buildChungTuSheetPrintRows({
-        detailRows,
-        columns,
-        pageRowsFirst,
-        pageRowsNext,
-        amountFieldKey: tableCfgRaw.amountFieldKey || "thanhTien",
-        labelFieldKey: tableCfgRaw.labelFieldKey || "tenHang",
-        carryInLabel: tableCfgRaw.carryInLabel || "Mang sang",
-        carryOutLabel: tableCfgRaw.carryOutLabel || "Cộng sang trang",
-      })
-    : buildDetailTableValues({
-        detailRows,
-        columns,
-      });
-  const clearRows = Math.max(
+  const printSheets = fillRules.print?.sheets ?? {};
+  const printOutput = buildSheetPrintOutput({
+    detailRows,
+    columns,
+    tableCfg: tableCfgRaw,
+    printSheets: {
+      ...printSheets,
+      columnMeta,
+    },
+  });
+  const { values, rowLineUnits, printProfile, mode, placements, totalRowSpan } = printOutput;
+  const rowSpan = Math.max(
     Number(clearRowCount) || DEFAULT_DETAIL_TABLE_CLEAR_ROWS,
-    values.length || detailRows.length,
+    totalRowSpan || values.length || detailRows.length,
   );
 
-  if (clearRanges && clearRows > 0 && columns.length > 0) {
+  if (clearRanges && rowSpan > 0 && columns.length > 0) {
     clearRanges.push(
       buildTableRangeA1({
         sheetName: sheetTitle,
         startRow,
         startCol,
-        rowCount: clearRows,
+        rowCount: rowSpan,
         colCount: columns.length,
       }),
     );
   }
   if (detailRows.length <= 0) return;
+
+  if (mode === "placed" && placements?.length) {
+    for (const placement of placements) {
+      const absRow = startRow + placement.rowOffset;
+      data.push({
+        range: buildTableRangeA1({
+          sheetName: sheetTitle,
+          startRow: absRow,
+          startCol,
+          rowCount: 1,
+          colCount: columns.length,
+        }),
+        values: [placement.values],
+      });
+    }
+    data.push({
+      range: null,
+      values: [],
+      __printMeta: {
+        sheetTitle,
+        startRow,
+        startCol,
+        totalRowSpan: rowSpan,
+        mode: "placed",
+        placements: placements.map((p) => ({
+          absoluteRow0: startRow + p.rowOffset,
+          lineUnits: p.lineUnits,
+        })),
+        colCount: columns.length,
+        printProfile,
+      },
+    });
+    return;
+  }
 
   const range = buildTableRangeA1({
     sheetName: sheetTitle,
@@ -311,7 +384,114 @@ function pushContextDetailTableUpdate({
     rowCount: values.length,
     colCount: columns.length,
   });
-  data.push({ range, values });
+  data.push({
+    range,
+    values,
+    __printMeta: {
+      sheetTitle,
+      startRow,
+      startCol,
+      rowCount: values.length,
+      totalRowSpan: values.length,
+      mode: "contiguous",
+      rowLineUnits,
+      colCount: columns.length,
+      printProfile,
+    },
+  });
+}
+
+async function loadDetailTableColumnMeta({
+  sheetsApi,
+  spreadsheetId,
+  fillRules,
+  categoryKey,
+  sheetTitle,
+}) {
+  const defaultTable = CHUNG_TU_DEFAULT_SHEET_TABLE[categoryKey] ?? null;
+  const tableCfg = fillRules.sheets?.detailTable ?? defaultTable;
+  if (!tableCfg?.columns?.length) return null;
+  const templateRow = Number.isFinite(Number(tableCfg.templateRow))
+    ? Number(tableCfg.templateRow)
+    : Number(tableCfg.startRow ?? defaultTable?.startRow ?? 8);
+  try {
+    return await fetchSheetTemplateColumnMeta(sheetsApi, spreadsheetId, {
+      sheetTitle,
+      templateRow0: templateRow,
+      startCol0: Number(tableCfg.startCol ?? defaultTable?.startCol ?? 0),
+      columns: tableCfg.columns,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function applySheetPrintFormatting({ sheetsApi, spreadsheetId, dataUpdates, spreadsheetMeta }) {
+  const requests = [];
+  const sheetIdCache = new Map();
+  let metaForSheets = spreadsheetMeta;
+  for (const item of dataUpdates) {
+    const meta = item.__printMeta;
+    if (!meta?.printProfile?.enabled) continue;
+    const sheetTitle = meta.sheetTitle;
+    if (!sheetTitle) continue;
+    let sheetId = sheetIdCache.get(sheetTitle);
+    if (sheetId == null) {
+      if (!metaForSheets) {
+        metaForSheets = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
+      }
+      sheetId = resolveSheetIdByTitle(sheetTitle, metaForSheets);
+      sheetIdCache.set(sheetTitle, sheetId);
+    }
+    if (sheetId == null) continue;
+
+    const rowSpan = meta.totalRowSpan || meta.rowCount || 0;
+    if (!rowSpan) continue;
+
+    const wrapReq = buildWrapTextRepeatCellRequest({
+      sheetId,
+      startRow0: meta.startRow,
+      startCol0: meta.startCol ?? 0,
+      rowCount: rowSpan,
+      colCount: meta.colCount ?? 1,
+    });
+    if (wrapReq) requests.push(wrapReq);
+
+    const autoResize = buildAutoResizeRowsRequest({
+      sheetId,
+      startRow0: meta.startRow,
+      rowCount: rowSpan,
+    });
+    if (autoResize) requests.push(autoResize);
+
+    if (meta.mode === "placed" && Array.isArray(meta.placements) && meta.placements.length) {
+      requests.push(
+        ...buildPerRowHeightUpdateRequestsFromPlacements({
+          sheetId,
+          placements: meta.placements,
+          rowHeightPt: meta.printProfile.rowHeightPt,
+        }),
+      );
+    } else if (Array.isArray(meta.rowLineUnits) && meta.rowLineUnits.length) {
+      requests.push(
+        ...buildPerRowHeightUpdateRequests({
+          sheetId,
+          startRow0: meta.startRow,
+          rowLineUnits: meta.rowLineUnits,
+          rowHeightPt: meta.printProfile.rowHeightPt,
+        }),
+      );
+    }
+  }
+  if (!requests.length) return;
+  try {
+    await sheetsApi.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests },
+    });
+  } catch {
+    // Định dạng in là tùy chọn; dữ liệu đã ghi vẫn hợp lệ.
+  }
 }
 
 export async function syncSpreadsheetFromContext({
@@ -340,14 +520,28 @@ export async function syncSpreadsheetFromContext({
   const sheetContexts = Array.isArray(context.sheetContexts) ? context.sheetContexts : [];
   if (sheetContexts.length > 0) {
     const sheetNames = sheetContexts.map((ctx) => ctx.sheetName).filter(Boolean);
-    await ensureMonthlySheets({ sheetsApi, spreadsheetId, sheetNames });
-    const namedRangeBounds = await buildNamedRangeBounds(
+    let spreadsheetMeta = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
+    spreadsheetMeta = await ensureMonthlySheets({
+      sheetsApi,
+      spreadsheetId,
+      sheetNames,
+      spreadsheetMeta,
+    });
+    const { bounds: namedRangeBounds, meta: boundsMeta } = await buildNamedRangeBounds(
       sheetsApi,
       spreadsheetId,
       fillRules.sheets?.namedRanges,
+      spreadsheetMeta,
     );
+    spreadsheetMeta = boundsMeta;
     const data = [];
     const clearRanges = [];
+    const columnMetaCache = new Map();
+    const templateSheetForColumnMeta = resolveDetailTableSheetTitle(
+      fillRules.sheets?.detailTable?.sheetName,
+      sheetNames,
+      sheetNames,
+    );
     for (const ctx of sheetContexts) {
       const sheetName = ctx.sheetName;
       pushContextNamedRangeUpdates({
@@ -358,6 +552,17 @@ export async function syncSpreadsheetFromContext({
         sheetName,
         categoryKey,
       });
+      let columnMeta = columnMetaCache.get(DETAIL_TABLE_COLUMN_META_CACHE_KEY);
+      if (columnMeta === undefined) {
+        columnMeta = await loadDetailTableColumnMeta({
+          sheetsApi,
+          spreadsheetId,
+          fillRules,
+          categoryKey,
+          sheetTitle: templateSheetForColumnMeta,
+        });
+        columnMetaCache.set(DETAIL_TABLE_COLUMN_META_CACHE_KEY, columnMeta);
+      }
       pushContextDetailTableUpdate({
         data,
         clearRanges,
@@ -368,19 +573,28 @@ export async function syncSpreadsheetFromContext({
         sheetTitles: sheetNames,
         namedRangeSheetTitles: sheetNames,
         clearRowCount: DEFAULT_DETAIL_TABLE_CLEAR_ROWS,
+        columnMeta,
       });
     }
-    return commitSheetValueUpdates({ sheetsApi, spreadsheetId, data, clearRanges });
+    return commitSheetValueUpdates({
+      sheetsApi,
+      spreadsheetId,
+      data,
+      clearRanges,
+      spreadsheetMeta,
+    });
   }
 
-  const sheetTitles = await fetchSpreadsheetSheetTitles(sheetsApi, spreadsheetId);
+  const spreadsheetMeta = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
+  const sheetTitles = await fetchSpreadsheetSheetTitles(sheetsApi, spreadsheetId, spreadsheetMeta);
   const namedRangeSheetTitles = [];
   const data = [];
   const clearRanges = [];
-  const namedRangeBounds = await buildNamedRangeBounds(
+  const { bounds: namedRangeBounds } = await buildNamedRangeBounds(
     sheetsApi,
     spreadsheetId,
     fillRules.sheets?.namedRanges,
+    spreadsheetMeta,
   );
 
   for (const nr of fillRules.sheets?.namedRanges ?? []) {
@@ -416,15 +630,41 @@ export async function syncSpreadsheetFromContext({
     context,
     sheetTitles,
     namedRangeSheetTitles,
+    columnMeta: await loadDetailTableColumnMeta({
+      sheetsApi,
+      spreadsheetId,
+      fillRules,
+      categoryKey,
+      sheetTitle: resolveDetailTableSheetTitle(
+        fillRules.sheets?.detailTable?.sheetName,
+        sheetTitles,
+        namedRangeSheetTitles,
+      ),
+    }),
   });
 
-  return commitSheetValueUpdates({ sheetsApi, spreadsheetId, data, clearRanges });
+  return commitSheetValueUpdates({
+    sheetsApi,
+    spreadsheetId,
+    data,
+    clearRanges,
+    spreadsheetMeta,
+  });
 }
 
-async function commitSheetValueUpdates({ sheetsApi, spreadsheetId, data, clearRanges = [] }) {
+async function commitSheetValueUpdates({
+  sheetsApi,
+  spreadsheetId,
+  data,
+  clearRanges = [],
+  spreadsheetMeta = null,
+}) {
   if (data.length === 0 && clearRanges.length === 0) {
     return { updatedRanges: 0 };
   }
+
+  const printMetaItems = data.filter((item) => item.__printMeta);
+  const payload = data.filter((item) => item.range).map(({ range, values }) => ({ range, values }));
 
   try {
     if (clearRanges.length > 0) {
@@ -433,13 +673,21 @@ async function commitSheetValueUpdates({ sheetsApi, spreadsheetId, data, clearRa
         requestBody: { ranges: clearRanges },
       });
     }
-    if (data.length > 0) {
+    if (payload.length > 0) {
       await sheetsApi.spreadsheets.values.batchUpdate({
         spreadsheetId,
         requestBody: {
           valueInputOption: "USER_ENTERED",
-          data,
+          data: payload,
         },
+      });
+    }
+    if (printMetaItems.length > 0) {
+      await applySheetPrintFormatting({
+        sheetsApi,
+        spreadsheetId,
+        dataUpdates: printMetaItems,
+        spreadsheetMeta,
       });
     }
   } catch (error) {
@@ -455,5 +703,5 @@ async function commitSheetValueUpdates({ sheetsApi, spreadsheetId, data, clearRa
     });
   }
 
-  return { updatedRanges: data.length, clearedRanges: clearRanges.length };
+  return { updatedRanges: payload.length, clearedRanges: clearRanges.length };
 }

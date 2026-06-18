@@ -4,6 +4,7 @@ import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { logger } from "../../shared/utils/logger.js";
+import { CHUNG_TU_DEFAULT_SHEET_PRINT } from "./chung-tu-category.constants.js";
 import {
   getOAuthClient,
   getSystemChungTuDriveOAuthClient,
@@ -198,6 +199,11 @@ function createEmptyFillRulesV2(templateKind = "document") {
           totalLabel: "Tổng thành tiền",
         },
       },
+      sheets: {
+        rowsPerPage: CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage,
+        rowHeightPt: CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt,
+        enabled: true,
+      },
     },
     meta: {
       templateKind: templateKind === "spreadsheet" ? "spreadsheet" : "document",
@@ -266,10 +272,20 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
       repeatHeaderEveryRows:
         Number.isFinite(Number(x.repeatHeaderEveryRows)) && Number(x.repeatHeaderEveryRows) > 0
           ? Number(x.repeatHeaderEveryRows)
-          : 0,
+          : CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage,
       repeatHeaderLabels: toArray(x.repeatHeaderLabels)
         .map((label) => toString(label))
         .filter(Boolean),
+      rowsPerPage:
+        Number.isFinite(Number(x.rowsPerPage)) && Number(x.rowsPerPage) > 0
+          ? Number(x.rowsPerPage)
+          : Number.isFinite(Number(x.pageRowsFirst)) && Number(x.pageRowsFirst) > 0
+            ? Number(x.pageRowsFirst)
+            : CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage,
+      rowHeightPt:
+        Number.isFinite(Number(x.rowHeightPt)) && Number(x.rowHeightPt) > 0
+          ? Number(x.rowHeightPt)
+          : CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt,
       pageRowsFirst:
         Number.isFinite(Number(x.pageRowsFirst)) && Number(x.pageRowsFirst) > 0
           ? Number(x.pageRowsFirst)
@@ -282,6 +298,25 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
       labelFieldKey: toString(x.labelFieldKey) || "tenHang",
       carryInLabel: toString(x.carryInLabel) || "Mang sang",
       carryOutLabel: toString(x.carryOutLabel) || "Cộng sang trang",
+    };
+  };
+  const normalizeSheetsPrint = (x) => {
+    const defaults = createEmptyFillRulesV2(safeKind).print.sheets;
+    const src = x && typeof x === "object" && !Array.isArray(x) ? x : {};
+    const numberOrDefault = (value, fallback, min, max) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(min, Math.min(max, n));
+    };
+    return {
+      rowsPerPage: numberOrDefault(
+        src.rowsPerPage,
+        defaults.rowsPerPage,
+        1,
+        200,
+      ),
+      rowHeightPt: numberOrDefault(src.rowHeightPt, defaults.rowHeightPt, 8, 48),
+      enabled: src.enabled !== false,
     };
   };
   const normalizePdfPrint = (x) => {
@@ -322,7 +357,7 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
         regions: toArray(raw.regions).map(normalizeRegion),
       },
       sheets: { namedRanges: [], detailTable: null },
-      print: { pdf: normalizePdfPrint(raw.print?.pdf) },
+      print: { pdf: normalizePdfPrint(raw.print?.pdf), sheets: normalizeSheetsPrint(raw.print?.sheets) },
       meta: { templateKind: safeKind },
     };
   }
@@ -339,6 +374,7 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
     },
     print: {
       pdf: normalizePdfPrint(raw.print?.pdf),
+      sheets: normalizeSheetsPrint(raw.print?.sheets),
     },
     meta: {
       templateKind: raw.meta?.templateKind === "spreadsheet" || safeKind === "spreadsheet" ? "spreadsheet" : "document",
