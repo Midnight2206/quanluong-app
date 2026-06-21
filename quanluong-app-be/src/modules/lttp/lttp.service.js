@@ -8,8 +8,14 @@ import { UNIT_ENTITY_FORK_KIND } from "../../shared/unit-data-fork/unit-entity-f
 import {
   assertTargetUnitIsStrictDescendantOf,
   assertUnitIdInScope,
+  getSubtreeUnitIds,
+  getUnitBreadcrumbChain,
 } from "../../shared/units/unit-scope.service.js";
-import { markChungTuDocumentsStaleForLttpIssueSlipChange } from "../chung-tu-quyet-toan/chung-tu-document.service.js";
+import { resolvePrivateStorageUnitId } from "../../shared/data-scope/unit-data-policy.service.js";
+import {
+  markChungTuDocumentsStaleForLttpIssueSlipChange,
+  markChungTuDocumentsStaleForStorageUnit,
+} from "../chung-tu-quyet-toan/chung-tu-document.service.js";
 import { LTTP_OTHER_GROUP_CODE } from "./lttp.constants.js";
 
 const commodityInclude = {
@@ -834,6 +840,7 @@ const issueSlipInclude = {
   createdBy: { select: { id: true, username: true, profile: { select: { fullName: true } } } },
   recipientUnit: { select: { id: true, name: true } },
   recipientUser: { select: { id: true, username: true, profile: { select: { fullName: true } } } },
+  buyerUser: { select: { id: true, username: true, profile: { select: { fullName: true } } } },
 };
 
 function mapIssueSlip(slip) {
@@ -864,6 +871,15 @@ function mapIssueSlip(slip) {
     signerWriter: slip.signerWriter,
     signerRecipient: slip.signerRecipient,
     signerApprover: slip.signerApprover,
+    buyerUserId: slip.buyerUserId,
+    buyerDisplayName: slip.buyerDisplayName,
+    buyerUser: slip.buyerUser
+      ? {
+          id: slip.buyerUser.id,
+          username: slip.buyerUser.username,
+          fullName: slip.buyerUser.profile?.fullName ?? null,
+        }
+      : null,
     createdAt: slip.createdAt.toISOString(),
     updatedAt: slip.updatedAt.toISOString(),
     createdBy: slip.createdBy
@@ -912,7 +928,34 @@ function mapIssueFormDefaultsRow(row) {
     signerApprover: row.signerApprover,
     defaultRecipientUnitId: row.defaultRecipientUnitId,
     defaultRecipientUserId: row.defaultRecipientUserId,
+    defaultBuyerUserId: row.defaultBuyerUserId,
   };
+}
+
+function displayNameFromUserRow(user) {
+  if (!user) return "";
+  const fullName = user.profile?.fullName != null ? String(user.profile.fullName).trim() : "";
+  if (fullName) return fullName;
+  return String(user.username ?? "").trim();
+}
+
+async function resolveBuyerFields(payload, storageUnitId) {
+  let buyerUserId = null;
+  let buyerDisplayName = payload.buyerDisplayName?.trim() || null;
+  if (payload.buyerUserId != null && payload.buyerUserId !== "") {
+    const buId = Number(payload.buyerUserId);
+    if (!Number.isInteger(buId) || buId <= 0) {
+      throw new AppError({
+        message: "Người mua hàng (user) không hợp lệ",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    const bu = await assertBuyerUserAllowedForStorage(buId, storageUnitId);
+    buyerUserId = buId;
+    buyerDisplayName = buyerDisplayName || displayNameFromUserRow(bu);
+  }
+  return { buyerUserId, buyerDisplayName };
 }
 
 async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataScope) {
@@ -1071,6 +1114,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
   const warehouseFrom = payload.warehouseFrom?.trim() || null;
   const signerWriter = payload.signerWriter?.trim() || null;
   const signerApprover = payload.signerApprover?.trim() || null;
+  const { buyerUserId, buyerDisplayName } = await resolveBuyerFields(payload, storageUnitId);
 
   assertLttpPrismaDelegates();
 
@@ -1104,6 +1148,8 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
           signerWriter,
           signerRecipient,
           signerApprover,
+          buyerUserId,
+          buyerDisplayName,
         },
       });
       await tx.lttpIssueSlipLine.createMany({
@@ -1307,6 +1353,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
   const warehouseFrom = payload.warehouseFrom?.trim() || null;
   const signerWriter = payload.signerWriter?.trim() || null;
   const signerApprover = payload.signerApprover?.trim() || null;
+  const { buyerUserId, buyerDisplayName } = await resolveBuyerFields(payload, storageUnitId);
 
   assertLttpPrismaDelegates();
 
@@ -1327,6 +1374,8 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
           signerWriter,
           signerRecipient,
           signerApprover,
+          buyerUserId,
+          buyerDisplayName,
         },
       });
       await tx.lttpIssueSlipLine.createMany({
@@ -2832,6 +2881,13 @@ async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope)
       defaultRecipientUnitId = u.unitId;
     }
   }
+  let defaultBuyerUserId =
+    rest.defaultBuyerUserId != null && rest.defaultBuyerUserId !== ""
+      ? Number(rest.defaultBuyerUserId)
+      : null;
+  if (defaultBuyerUserId != null) {
+    await assertBuyerUserAllowedForStorage(defaultBuyerUserId, storageUnitId);
+  }
   assertLttpPrismaDelegates();
   const row = await prisma.lttpUnitIssueFormDefaults.upsert({
     where: { unitId: storageUnitId },
@@ -2851,6 +2907,7 @@ async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope)
       signerApprover: rest.signerApprover?.trim() || null,
       defaultRecipientUnitId,
       defaultRecipientUserId,
+      defaultBuyerUserId,
     },
     update: {
       printLine1: rest.printLine1?.trim() || null,
@@ -2867,9 +2924,133 @@ async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope)
       signerApprover: rest.signerApprover?.trim() || null,
       defaultRecipientUnitId,
       defaultRecipientUserId,
+      defaultBuyerUserId,
     },
   });
   return { unitId: storageUnitId, ok: true, id: row.id };
+}
+
+async function resolveBuyerPickUnitIds(logicalUnitId) {
+  const uid = Number(logicalUnitId);
+  const { storageUnitId } = await resolvePrivateStorageUnitId({
+    logicalUnitId: uid,
+    dataKind: "LTTP_COMMODITY",
+  });
+  const rootId = storageUnitId ?? uid;
+  const subtreeIds = await getSubtreeUnitIds(rootId);
+  const chain = await getUnitBreadcrumbChain(uid);
+  const ancestorIds = chain.map((u) => u.id);
+  const rootIdx = ancestorIds.indexOf(rootId);
+  const upToRoot = rootIdx >= 0 ? ancestorIds.slice(0, rootIdx + 1) : ancestorIds;
+  return [...new Set([...subtreeIds, ...upToRoot])];
+}
+
+async function assertBuyerUserAllowedForStorage(userId, storageUnitId) {
+  const pickUnitIds = await resolveBuyerPickUnitIds(storageUnitId);
+  const u = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      deletedAt: null,
+      isActive: true,
+      unitId: { in: pickUnitIds.length ? pickUnitIds : [storageUnitId] },
+    },
+    include: { profile: { select: { fullName: true } } },
+  });
+  if (!u) {
+    throw new AppError({
+      message: "Người mua phải thuộc đơn vị kho hoặc nhánh con của kho đã chọn.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  return u;
+}
+
+async function listBuyerUsers({ unitId }, scope, effectiveUnitIds) {
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  const pickUnitIds = await resolveBuyerPickUnitIds(unitId);
+  if (!pickUnitIds.length) {
+    return [];
+  }
+  const rows = await prisma.user.findMany({
+    where: {
+      unitId: { in: pickUnitIds },
+      deletedAt: null,
+      isActive: true,
+    },
+    select: { id: true, username: true, unitId: true, profile: { select: { fullName: true } } },
+    orderBy: { id: "asc" },
+  });
+  return rows.map((u) => ({
+    id: u.id,
+    username: u.username,
+    fullName: u.profile?.fullName ?? null,
+    unitId: u.unitId,
+  }));
+}
+
+async function listBuyerDefaultsInScope(effectiveUnitIds) {
+  if (!Array.isArray(effectiveUnitIds) || effectiveUnitIds.length === 0) {
+    return { items: [] };
+  }
+  assertLttpPrismaDelegates();
+  const rows = await prisma.lttpUnitIssueFormDefaults.findMany({
+    where: { unitId: { in: effectiveUnitIds } },
+    select: { unitId: true, defaultBuyerUserId: true },
+  });
+  return {
+    items: rows.map((r) => ({ unitId: r.unitId, userId: r.defaultBuyerUserId })),
+  };
+}
+
+async function putBuyerDefaultForUnit(
+  { unitId, userId: userIdIn, applyToAllSlips = true },
+  scope,
+  effectiveUnitIds,
+  dataScope,
+) {
+  assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  const storageUnitId = dataScope.storageUnitId;
+  const userId = userIdIn != null && userIdIn !== "" ? Number(userIdIn) : null;
+  let buyerDisplayName = null;
+  if (userId != null) {
+    if (!Number.isInteger(userId) || userId <= 0) {
+      throw new AppError({
+        message: "userId không hợp lệ",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    const u = await assertBuyerUserAllowedForStorage(userId, storageUnitId);
+    buyerDisplayName = displayNameFromUserRow(u) || null;
+  }
+  assertLttpPrismaDelegates();
+  await prisma.lttpUnitIssueFormDefaults.upsert({
+    where: { unitId: storageUnitId },
+    create: { unitId: storageUnitId, defaultBuyerUserId: userId },
+    update: { defaultBuyerUserId: userId },
+  });
+
+  let slipsUpdated = 0;
+  if (applyToAllSlips !== false) {
+    const slipData =
+      userId != null
+        ? { buyerUserId: userId, buyerDisplayName }
+        : { buyerUserId: null, buyerDisplayName: null };
+    const updated = await prisma.lttpIssueSlip.updateMany({
+      where: { unitId: storageUnitId },
+      data: slipData,
+    });
+    slipsUpdated = updated.count;
+    if (slipsUpdated > 0) {
+      await markChungTuDocumentsStaleForStorageUnit(storageUnitId);
+    }
+  }
+
+  return { unitId: storageUnitId, userId, slipsUpdated, applyToAllSlips: applyToAllSlips !== false };
 }
 
 async function listRecipientUsers({ unitId }, scope, effectiveUnitIds) {
@@ -2893,9 +3074,9 @@ async function getRecipientDefaultUserByUnit({ recipientUnitId }, scope, effecti
   assertLttpPrismaDelegates();
   const row = await prisma.lttpRecipientUnitDefaultUser.findUnique({
     where: { recipientUnitId },
-    select: { defaultUserId: true },
+    select: { defaultUserId: true, address: true },
   });
-  return { recipientUnitId, userId: row?.defaultUserId ?? null };
+  return { recipientUnitId, userId: row?.defaultUserId ?? null, address: row?.address ?? null };
 }
 
 async function listRecipientDefaultUsersInScope(effectiveUnitIds) {
@@ -2905,14 +3086,18 @@ async function listRecipientDefaultUsersInScope(effectiveUnitIds) {
   assertLttpPrismaDelegates();
   const rows = await prisma.lttpRecipientUnitDefaultUser.findMany({
     where: { recipientUnitId: { in: effectiveUnitIds } },
-    select: { recipientUnitId: true, defaultUserId: true },
+    select: { recipientUnitId: true, defaultUserId: true, address: true },
   });
   return {
-    items: rows.map((r) => ({ recipientUnitId: r.recipientUnitId, userId: r.defaultUserId })),
+    items: rows.map((r) => ({
+      recipientUnitId: r.recipientUnitId,
+      userId: r.defaultUserId,
+      address: r.address ?? null,
+    })),
   };
 }
 
-async function putRecipientDefaultUser({ recipientUnitId, userId: userIdIn }, scope, effectiveUnitIds) {
+async function putRecipientDefaultUser({ recipientUnitId, userId: userIdIn, address }, scope, effectiveUnitIds) {
   const rid = Number(recipientUnitId);
   if (!Number.isInteger(rid) || rid <= 0) {
     throw new AppError({
@@ -2952,12 +3137,21 @@ async function putRecipientDefaultUser({ recipientUnitId, userId: userIdIn }, sc
     }
   }
   assertLttpPrismaDelegates();
+  const addressValue =
+    address === undefined ? undefined : address?.trim() ? address.trim() : null;
   await prisma.lttpRecipientUnitDefaultUser.upsert({
     where: { recipientUnitId: rid },
-    create: { recipientUnitId: rid, defaultUserId: userId },
-    update: { defaultUserId: userId },
+    create: {
+      recipientUnitId: rid,
+      defaultUserId: userId,
+      ...(addressValue !== undefined ? { address: addressValue } : {}),
+    },
+    update: {
+      defaultUserId: userId,
+      ...(addressValue !== undefined ? { address: addressValue } : {}),
+    },
   });
-  return { ok: true, recipientUnitId: rid, userId };
+  return { ok: true, recipientUnitId: rid, userId, address: addressValue ?? null };
 }
 
 /**
@@ -3641,6 +3835,8 @@ export {
   listIssueSlips,
   listPriceTables,
   listRecipientDefaultUsersInScope,
+  listBuyerDefaultsInScope,
+  listBuyerUsers,
   listRecipientUsers,
   getRecipientDefaultUserByUnit,
   patchCommodity,
@@ -3648,6 +3844,7 @@ export {
   patchPriceTable,
   recalculateLttpPartnerDebtsForUnit,
   putRecipientDefaultUser,
+  putBuyerDefaultForUnit,
   resolveIssueSlipLine,
   resyncIssueSlipLinePricesFromEffectiveTable,
   updateIssueSlip,

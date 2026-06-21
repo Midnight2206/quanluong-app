@@ -1,11 +1,12 @@
-import { google } from "googleapis";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
-  getSystemChungTuDriveOAuthClient,
+  createSystemChungTuDriveOAuthClient,
   MIDNIGHT_APP_FOLDER_NAME,
   resolveSystemChungTuTemplateFolder,
 } from "../auth/google-drive-link.service.js";
+import { createDriveClient } from "../../shared/utils/google-drive-fetch.api.js";
+import { isDescendantOfFolder } from "./chung-tu-drive-file.util.js";
 import {
   assertKnownCategoryKey,
   CHUNG_TU_GENERATED_ROOT_FOLDER_NAME,
@@ -17,7 +18,7 @@ const GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 const GOOGLE_DOC_MIME = "application/vnd.google-apps.document";
 
 async function ensureChildFolder({ oauth2Client, parentId, folderName }) {
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const escapedName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const list = await drive.files.list({
     q: [
@@ -50,7 +51,7 @@ async function ensureChildFolder({ oauth2Client, parentId, folderName }) {
 }
 
 async function ensureMidnightAppFolder(oauth2Client) {
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const escaped = MIDNIGHT_APP_FOLDER_NAME.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const list = await drive.files.list({
     q: [`name='${escaped}'`, `mimeType='${DRIVE_FOLDER_MIME}'`, "trashed=false"].join(" and "),
@@ -71,9 +72,14 @@ async function ensureMidnightAppFolder(oauth2Client) {
 }
 
 async function getDriveContext() {
-  const oauth2Client = getSystemChungTuDriveOAuthClient();
+  const oauth2Client = await createSystemChungTuDriveOAuthClient();
   const templateRoot = await resolveSystemChungTuTemplateFolder(oauth2Client);
-  return { oauth2Client, templateRootFolderId: templateRoot.templateFolderId };
+  return {
+    oauth2Client,
+    templateRootFolderId: templateRoot.templateFolderId,
+    templateRootFolderName: templateRoot.templateFolderName ?? CHUNG_TU_TEMPLATE_ROOT_FOLDER_NAME,
+    templateRootWebViewLink: templateRoot.templateFolderWebViewLink ?? null,
+  };
 }
 
 async function resolveCategoryFolderId(categoryKey) {
@@ -84,7 +90,7 @@ async function resolveCategoryFolderId(categoryKey) {
     parentId: templateRootFolderId,
     folderName: meta.folderName,
   });
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const folderMeta = await drive.files.get({
     fileId: folderId,
     fields: "id, name, webViewLink",
@@ -107,7 +113,7 @@ async function resolveGeneratedUnitFolderId(unitId) {
       code: ERROR_CODES.VALIDATION_ERROR,
     });
   }
-  const oauth2Client = getSystemChungTuDriveOAuthClient();
+  const oauth2Client = await createSystemChungTuDriveOAuthClient();
   const midnightId = await ensureMidnightAppFolder(oauth2Client);
   const generatedRootId = await ensureChildFolder({
     oauth2Client,
@@ -126,7 +132,7 @@ async function listCategoryTemplates({ categoryKey }) {
   const meta = assertKnownCategoryKey(categoryKey);
   const { oauth2Client, categoryFolderId, categoryFolderName, categoryFolderWebViewLink } =
     await resolveCategoryFolderId(categoryKey);
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const items = [];
   let pageToken;
   do {
@@ -169,7 +175,7 @@ async function listCategoryTemplates({ categoryKey }) {
 
 async function assertTemplateInCategoryFolder({ categoryKey, driveFileId }) {
   const { oauth2Client, categoryFolderId } = await resolveCategoryFolderId(categoryKey);
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   let data;
   try {
     const res = await drive.files.get({
@@ -196,11 +202,15 @@ async function assertTemplateInCategoryFolder({ categoryKey, driveFileId }) {
     });
   }
   if (!data.parents?.includes(categoryFolderId)) {
-    throw new AppError({
-      message: `File mẫu không nằm trong thư mục ${categoryKey}.`,
-      statusCode: 404,
-      code: ERROR_CODES.NOT_FOUND,
-    });
+    const drive = createDriveClient(oauth2Client);
+    const nested = await isDescendantOfFolder(drive, driveFileId, categoryFolderId);
+    if (!nested) {
+      throw new AppError({
+        message: `File mẫu không nằm trong thư mục ${categoryKey}.`,
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    }
   }
   if (data.mimeType !== GOOGLE_SHEET_MIME && data.mimeType !== GOOGLE_DOC_MIME) {
     throw new AppError({
@@ -214,7 +224,7 @@ async function assertTemplateInCategoryFolder({ categoryKey, driveFileId }) {
 
 async function copyTemplateToUnitFolder({ templateDriveFileId, unitId, title }) {
   const { oauth2Client, unitFolderId } = await resolveGeneratedUnitFolderId(unitId);
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const copied = await drive.files.copy({
     fileId: templateDriveFileId,
     requestBody: {
@@ -235,6 +245,7 @@ async function copyTemplateToUnitFolder({ templateDriveFileId, unitId, title }) 
 export {
   assertTemplateInCategoryFolder,
   copyTemplateToUnitFolder,
+  getDriveContext,
   listCategoryTemplates,
   resolveCategoryFolderId,
   resolveGeneratedUnitFolderId,

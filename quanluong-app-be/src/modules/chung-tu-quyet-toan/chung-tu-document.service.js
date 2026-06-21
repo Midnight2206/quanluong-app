@@ -2,24 +2,30 @@ import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
+  CHUNG_TU_AGGREGATION_MODES,
   CHUNG_TU_CATEGORY_KEYS,
   CHUNG_TU_DOCUMENT_STATUS,
   assertKnownCategoryKey,
-  getCategoryMeta,
+  getAggregationModeLabel,
+  normalizeAggregationMode,
 } from "./chung-tu-category.constants.js";
 import { buildChungTuDocumentKey } from "./chung-tu-document-key.js";
+import {
+  persistBkmhSnapshots,
+  listBkmhSnapshotsForDocument,
+} from "./chung-tu-bkmh-snapshot.service.js";
 import {
   assertTemplateInCategoryFolder,
   copyTemplateToUnitFolder,
 } from "./chung-tu-drive-folders.service.js";
 import { resolveChungTuContext } from "./chung-tu-data-resolver.service.js";
 import { syncSpreadsheetFromContext } from "./chung-tu-sheet-sync.service.js";
-import { exportGoogleSheetPdfBuffer } from "./chung-tu-sheet-pdf-export.service.js";
-import { normalizeMonthUnitIds, normalizePeriodMonth } from "./chung-tu-monthly-sheets.js";
+import { normalizeMonthUnitIds, normalizePeriodMonth, lastDayOfMonth } from "./chung-tu-monthly-sheets.js";
 import {
   getSystemDriveFileAvailability,
   trashSystemDriveFileIfExists,
 } from "./chung-tu-drive-file-state.js";
+import { resolveTemplateSelectionMeta } from "./chung-tu-template-tree.service.js";
 
 function assertUnitInEffectiveBranch(unitId, effectiveUnitIds) {
   const uid = Number(unitId);
@@ -42,12 +48,57 @@ function assertUnitIdsInEffectiveBranch(unitIds, effectiveUnitIds) {
   }
 }
 
-function resolveSelectedBkmhUnitIds({ unitIds, unitId, effectiveUnitIds }) {
+function resolveSelectedUnitIds({ unitIds, unitId, effectiveUnitIds }) {
   const selected = normalizeMonthUnitIds(unitIds);
   if (selected.length) return selected;
   const scoped = normalizeMonthUnitIds(effectiveUnitIds);
   if (scoped.length) return scoped;
   return normalizeMonthUnitIds([unitId]);
+}
+
+function readDocumentSettings(row) {
+  return row.settingsJson && typeof row.settingsJson === "object" ? row.settingsJson : {};
+}
+
+function resolveStoredPeriodMonth(row) {
+  const settings = readDocumentSettings(row);
+  return String(settings.__periodMonth ?? row.periodDate?.toISOString?.().slice(0, 7) ?? "").trim() || null;
+}
+
+function resolveStoredSelectedUnitIds(row, effectiveUnitIds) {
+  const settings = readDocumentSettings(row);
+  const fromSettings = normalizeMonthUnitIds(settings.__selectedUnitIds ?? settings.__bkmhUnitIds);
+  if (fromSettings.length) return fromSettings;
+  return resolveSelectedUnitIds({ unitIds: undefined, unitId: row.unitId, effectiveUnitIds });
+}
+
+function formatMonthYear(periodMonth) {
+  const value = String(periodMonth ?? "").trim();
+  const m = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!m) return value;
+  return `${m[2]}/${m[1]}`;
+}
+
+function enrichDocumentRow(row, { unitName = null, selectedUnitNames = [] } = {}) {
+  const settings = readDocumentSettings(row);
+  const periodMonth = resolveStoredPeriodMonth(row);
+  const aggregationMode = settings.__aggregationMode
+    ? normalizeAggregationMode(settings.__aggregationMode)
+    : periodMonth
+      ? CHUNG_TU_AGGREGATION_MODES.BY_DAY
+      : null;
+  const base = mapDocumentRow(row);
+  return {
+    ...base,
+    documentName: settings.__templateDisplayName ?? row.templateName ?? "",
+    documentCode: settings.__templateDriveFileName ?? row.templateName ?? "",
+    periodMonth,
+    aggregationMode,
+    aggregationModeLabel: aggregationMode ? getAggregationModeLabel(aggregationMode) : "",
+    unitName,
+    selectedUnitNames,
+    storageUnitName: unitName,
+  };
 }
 
 function mapDocumentRow(row) {
@@ -102,16 +153,24 @@ async function assertDocumentOutputAvailable(row, { deleteIfMissing = false } = 
   return row;
 }
 
-function buildOutputTitle({ categoryKey, unitName, periodDate, periodMonth, issueSlipId, templateName }) {
-  const meta = getCategoryMeta(categoryKey);
-  const label = meta?.label ?? categoryKey;
-  if (categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO) {
-    return `${label} — ${unitName ?? ""} — PX #${issueSlipId}`.trim();
+function buildOutputTitle({
+  templateDisplayName,
+  templateName,
+  unitName,
+  periodDate,
+  periodMonth,
+  issueSlipId,
+  categoryKey,
+}) {
+  if (periodMonth) {
+    const label = String(templateDisplayName ?? templateName ?? "").trim();
+    const monthLabel = formatMonthYear(periodMonth);
+    return `${label} — ${unitName ?? ""} — ${monthLabel}`.trim();
   }
-  if (categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG && periodMonth) {
-    return `${label} — ${unitName ?? ""} — ${periodMonth}`.trim() || templateName || label;
+  if (categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO && issueSlipId) {
+    return `${templateDisplayName ?? templateName ?? "Phiếu xuất kho"} — ${unitName ?? ""} — PX #${issueSlipId}`.trim();
   }
-  return `${label} — ${unitName ?? ""} — ${periodDate ?? ""}`.trim() || templateName || label;
+  return `${templateDisplayName ?? templateName ?? categoryKey} — ${unitName ?? ""} — ${periodDate ?? ""}`.trim();
 }
 
 function dateToYmd(date) {
@@ -133,12 +192,11 @@ function monthBoundsFromYmd(ymd) {
   };
 }
 
-function bkmhDocumentIncludesUnit(row, unitId, periodMonth) {
-  if (row.categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) return false;
-  const settings = row.settingsJson && typeof row.settingsJson === "object" ? row.settingsJson : {};
-  const savedMonth = String(settings.__periodMonth ?? row.periodDate?.toISOString().slice(0, 7) ?? "");
-  if (savedMonth && savedMonth !== periodMonth) return false;
-  const selectedIds = normalizeMonthUnitIds(settings.__bkmhUnitIds);
+function monthlyDocumentIncludesUnit(row, unitId, periodMonth) {
+  const savedMonth = resolveStoredPeriodMonth(row);
+  if (!savedMonth) return false;
+  if (savedMonth !== periodMonth) return false;
+  const selectedIds = resolveStoredSelectedUnitIds(row, null);
   if (selectedIds.length) {
     return selectedIds.includes(Number(unitId));
   }
@@ -152,8 +210,11 @@ async function getUnitName(unitId) {
 
 async function listChungTuDocuments({ unitId, categoryKey, from, to, effectiveUnitIds }) {
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
-  assertKnownCategoryKey(categoryKey);
-  const where = { unitId: Number(unitId), categoryKey };
+  const where = { unitId: Number(unitId) };
+  if (categoryKey) {
+    assertKnownCategoryKey(categoryKey);
+    where.categoryKey = categoryKey;
+  }
   if (from || to) {
     where.periodDate = {};
     if (from) where.periodDate.gte = new Date(`${from}T00:00:00.000Z`);
@@ -162,9 +223,65 @@ async function listChungTuDocuments({ unitId, categoryKey, from, to, effectiveUn
   const rows = await prisma.chungTuDocument.findMany({
     where,
     orderBy: [{ periodDate: "desc" }, { updatedAt: "desc" }],
-    take: 100,
+    take: 200,
   });
-  return rows.map(mapDocumentRow);
+  const storageUnitName = await getUnitName(unitId);
+  const allSelectedIds = new Set();
+  for (const row of rows) {
+    for (const id of resolveStoredSelectedUnitIds(row, effectiveUnitIds)) {
+      allSelectedIds.add(id);
+    }
+  }
+  const unitRows =
+    allSelectedIds.size > 0
+      ? await prisma.unit.findMany({
+          where: { id: { in: [...allSelectedIds] } },
+          select: { id: true, name: true },
+        })
+      : [];
+  const unitNameById = new Map(unitRows.map((u) => [Number(u.id), u.name ?? ""]));
+  return rows.map((row) => {
+    const selectedIds = resolveStoredSelectedUnitIds(row, effectiveUnitIds);
+    const selectedUnitNames = selectedIds.map((id) => unitNameById.get(id) ?? `Đơn vị #${id}`);
+    return enrichDocumentRow(row, { unitName: storageUnitName, selectedUnitNames });
+  });
+}
+
+function sameUnitIdSet(a, b) {
+  const left = [...normalizeMonthUnitIds(a)].sort((x, y) => x - y);
+  const right = [...normalizeMonthUnitIds(b)].sort((x, y) => x - y);
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false;
+  }
+  return true;
+}
+
+async function findExistingMonthlyChungTuDocument({ categoryKey, unitId, periodMonth, unitIds }) {
+  const month = normalizePeriodMonth(periodMonth);
+  const ids = normalizeMonthUnitIds(unitIds);
+  const uid = Number(unitId);
+  const monthEnd = lastDayOfMonth(month);
+  const candidates = await prisma.chungTuDocument.findMany({
+    where: {
+      unitId: uid,
+      categoryKey,
+      periodDate: {
+        gte: new Date(`${month}-01T00:00:00.000Z`),
+        lte: new Date(`${monthEnd}T23:59:59.999Z`),
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 30,
+  });
+  for (const row of candidates) {
+    const savedMonth = resolveStoredPeriodMonth(row);
+    const savedUnits = resolveStoredSelectedUnitIds(row, null);
+    if (savedMonth === month && sameUnitIdSet(savedUnits, ids)) {
+      return row;
+    }
+  }
+  return null;
 }
 
 async function getChungTuDocumentByKey({ documentKey, effectiveUnitIds }) {
@@ -178,7 +295,18 @@ async function getChungTuDocumentByKey({ documentKey, effectiveUnitIds }) {
   }
   assertUnitInEffectiveBranch(row.unitId, effectiveUnitIds);
   const available = await assertDocumentOutputAvailable(row, { deleteIfMissing: true });
-  return mapDocumentRow(available);
+  const unitName = await getUnitName(row.unitId);
+  const selectedIds = resolveStoredSelectedUnitIds(available, effectiveUnitIds);
+  const unitRows =
+    selectedIds.length > 0
+      ? await prisma.unit.findMany({
+          where: { id: { in: selectedIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+  const unitNameById = new Map(unitRows.map((u) => [Number(u.id), u.name ?? ""]));
+  const selectedUnitNames = selectedIds.map((id) => unitNameById.get(id) ?? `Đơn vị #${id}`);
+  return enrichDocumentRow(available, { unitName, selectedUnitNames });
 }
 
 async function previewChungTuContext({
@@ -188,16 +316,16 @@ async function previewChungTuContext({
   periodMonth,
   issueSlipId,
   unitIds,
+  aggregationMode,
   settings,
   effectiveUnitIds,
 }) {
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
-  const selectedBkmhUnitIds =
-    categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG && periodMonth
-      ? resolveSelectedBkmhUnitIds({ unitIds, unitId, effectiveUnitIds })
-      : undefined;
-  if (selectedBkmhUnitIds) {
-    assertUnitIdsInEffectiveBranch(selectedBkmhUnitIds, effectiveUnitIds);
+  const selectedUnitIds = periodMonth
+    ? resolveSelectedUnitIds({ unitIds, unitId, effectiveUnitIds })
+    : undefined;
+  if (selectedUnitIds) {
+    assertUnitIdsInEffectiveBranch(selectedUnitIds, effectiveUnitIds);
   }
   const { context, sourceDataHash } = await resolveChungTuContext({
     categoryKey,
@@ -205,7 +333,8 @@ async function previewChungTuContext({
     periodDate,
     periodMonth,
     issueSlipId,
-    unitIds: selectedBkmhUnitIds,
+    unitIds: selectedUnitIds,
+    aggregationMode,
     settings,
   });
   return { context, sourceDataHash };
@@ -218,17 +347,15 @@ async function resolveDocumentSourceHash(row, effectiveUnitIds) {
 
 async function resolveDocumentContextForRow(row, effectiveUnitIds) {
   const periodDate = row.periodDate ? row.periodDate.toISOString().slice(0, 10) : null;
-  const periodMonth =
-    row.categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
-      ? row.settingsJson?.__periodMonth || periodDate?.slice(0, 7)
-      : undefined;
-  const unitIds =
-    row.categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
-      ? resolveSelectedBkmhUnitIds({
-          unitIds: row.settingsJson?.__bkmhUnitIds,
-          unitId: row.unitId,
-          effectiveUnitIds,
-        })
+  const settings = readDocumentSettings(row);
+  const periodMonth = resolveStoredPeriodMonth(row) ?? undefined;
+  const unitIds = periodMonth
+    ? resolveStoredSelectedUnitIds(row, effectiveUnitIds)
+    : undefined;
+  const aggregationMode = settings.__aggregationMode
+    ? normalizeAggregationMode(settings.__aggregationMode)
+    : periodMonth
+      ? CHUNG_TU_AGGREGATION_MODES.BY_DAY
       : undefined;
   if (unitIds) {
     assertUnitIdsInEffectiveBranch(unitIds, effectiveUnitIds);
@@ -240,6 +367,7 @@ async function resolveDocumentContextForRow(row, effectiveUnitIds) {
     periodMonth,
     issueSlipId: row.issueSlipId,
     unitIds,
+    aggregationMode,
     settings: row.settingsJson,
   });
 }
@@ -265,36 +393,93 @@ async function createOrGetChungTuDocument({
   periodMonth,
   issueSlipId,
   unitIds,
+  aggregationMode,
   templateDriveFileId,
+  templateDisplayName,
   settings,
   createdById,
   effectiveUnitIds,
 }) {
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
   const meta = assertKnownCategoryKey(categoryKey);
-  const selectedBkmhUnitIds =
-    categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG && periodMonth
-      ? resolveSelectedBkmhUnitIds({ unitIds, unitId, effectiveUnitIds })
-      : undefined;
-  if (selectedBkmhUnitIds) {
-    assertUnitIdsInEffectiveBranch(selectedBkmhUnitIds, effectiveUnitIds);
+  const selectedUnitIds = periodMonth
+    ? resolveSelectedUnitIds({ unitIds, unitId, effectiveUnitIds })
+    : undefined;
+  if (selectedUnitIds) {
+    assertUnitIdsInEffectiveBranch(selectedUnitIds, effectiveUnitIds);
   }
   const safePeriodMonth = periodMonth ? normalizePeriodMonth(periodMonth) : undefined;
+  const safeAggregationMode = safePeriodMonth
+    ? normalizeAggregationMode(aggregationMode)
+    : undefined;
   const documentKey = buildChungTuDocumentKey({
     categoryKey,
     unitId,
-    periodDate: meta.mode === "by-date" ? periodDate : undefined,
+    periodDate: meta.mode === "by-date" && !safePeriodMonth ? periodDate : undefined,
     periodMonth: safePeriodMonth,
-    issueSlipId: meta.mode === "by-slip" ? issueSlipId : undefined,
-    unitIds: selectedBkmhUnitIds,
+    issueSlipId: meta.mode === "by-slip" && !safePeriodMonth ? issueSlipId : undefined,
+    unitIds: selectedUnitIds,
+    aggregationMode: safeAggregationMode,
+    templateDriveFileId: safePeriodMonth ? templateDriveFileId : undefined,
   });
 
   const existing = await prisma.chungTuDocument.findUnique({ where: { documentKey } });
-  if (existing) {
+  let resolvedExisting = existing;
+  const monthlyCategories = new Set([
+    CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+    CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO,
+  ]);
+  if (
+    !resolvedExisting &&
+    monthlyCategories.has(categoryKey) &&
+    safePeriodMonth &&
+    selectedUnitIds?.length
+  ) {
+    resolvedExisting = await findExistingMonthlyChungTuDocument({
+      categoryKey,
+      unitId,
+      periodMonth: safePeriodMonth,
+      unitIds: selectedUnitIds,
+    });
+    if (resolvedExisting && resolvedExisting.documentKey !== documentKey) {
+      const keyTaken = await prisma.chungTuDocument.findUnique({ where: { documentKey } });
+      if (!keyTaken) {
+        resolvedExisting = await prisma.chungTuDocument.update({
+          where: { id: resolvedExisting.id },
+          data: { documentKey },
+        });
+      }
+    }
+  }
+  if (resolvedExisting) {
     try {
-      const available = await assertDocumentOutputAvailable(existing, { deleteIfMissing: true });
-      const refreshed = await refreshDocumentSyncStatus(available, effectiveUnitIds);
-      return { document: mapDocumentRow(refreshed), created: false };
+      const available = await assertDocumentOutputAvailable(resolvedExisting, { deleteIfMissing: true });
+      if (selectedUnitIds && safePeriodMonth) {
+        const prevSettings = readDocumentSettings(available);
+        await prisma.chungTuDocument.update({
+          where: { id: available.id },
+          data: {
+            settingsJson: {
+              ...prevSettings,
+              __periodMonth: safePeriodMonth,
+              __selectedUnitIds: selectedUnitIds,
+              __bkmhUnitIds: selectedUnitIds,
+              __aggregationMode: safeAggregationMode,
+              __templateDisplayName:
+                prevSettings.__templateDisplayName ??
+                (String(templateDisplayName ?? "").trim() || null),
+            },
+          },
+        });
+      }
+      const synced = await syncChungTuDocument({
+        documentKey: available.documentKey,
+        userId: createdById,
+        effectiveUnitIds,
+        snapshotEventType: "sync",
+      });
+      return { document: synced, created: false };
     } catch (error) {
       if (!(error instanceof AppError && error.statusCode === 404)) {
         throw error;
@@ -307,14 +492,29 @@ async function createOrGetChungTuDocument({
     driveFileId: templateDriveFileId,
   });
 
+  let templateSelectionMeta = null;
+  try {
+    templateSelectionMeta = await resolveTemplateSelectionMeta({ driveFileId: templateDriveFileId });
+  } catch {
+    templateSelectionMeta = null;
+  }
+  const resolvedDisplayName =
+    templateSelectionMeta?.fullDocumentName ||
+    String(templateDisplayName ?? "").trim() ||
+    templateMeta.name ||
+    null;
+  const resolvedDriveFileName =
+    templateSelectionMeta?.driveFileName || templateMeta.name || null;
+
   const unitName = await getUnitName(unitId);
   const title = buildOutputTitle({
-    categoryKey,
+    templateDisplayName: resolvedDisplayName,
+    templateName: templateMeta.name,
     unitName,
     periodDate,
     periodMonth: safePeriodMonth,
     issueSlipId,
-    templateName: templateMeta.name,
+    categoryKey,
   });
 
   const copied = await copyTemplateToUnitFolder({
@@ -324,16 +524,22 @@ async function createOrGetChungTuDocument({
   });
 
   const settingsJson = settings && typeof settings === "object" ? { ...settings } : {};
-  if (selectedBkmhUnitIds) {
+  if (selectedUnitIds && safePeriodMonth) {
     settingsJson.__periodMonth = safePeriodMonth;
-    settingsJson.__bkmhUnitIds = selectedBkmhUnitIds;
+    settingsJson.__selectedUnitIds = selectedUnitIds;
+    settingsJson.__bkmhUnitIds = selectedUnitIds;
+    settingsJson.__aggregationMode = safeAggregationMode;
+    settingsJson.__templateDisplayName = resolvedDisplayName;
+    settingsJson.__templateDriveFileName = resolvedDriveFileName;
+    if (templateSelectionMeta?.folderPath?.length) {
+      settingsJson.__templateFolderPath = templateSelectionMeta.folderPath;
+    }
   }
-  const periodDateValue =
-    categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG && safePeriodMonth
-      ? new Date(`${safePeriodMonth}-01T00:00:00.000Z`)
-      : meta.mode === "by-date" && periodDate
-        ? new Date(`${periodDate}T00:00:00.000Z`)
-        : null;
+  const periodDateValue = safePeriodMonth
+    ? new Date(`${safePeriodMonth}-01T00:00:00.000Z`)
+    : meta.mode === "by-date" && periodDate
+      ? new Date(`${periodDate}T00:00:00.000Z`)
+      : null;
 
   const row = await prisma.chungTuDocument.create({
     data: {
@@ -341,7 +547,7 @@ async function createOrGetChungTuDocument({
       unitId: Number(unitId),
       categoryKey,
       periodDate: periodDateValue,
-      issueSlipId: meta.mode === "by-slip" ? Number(issueSlipId) : null,
+      issueSlipId: meta.mode === "by-slip" && !safePeriodMonth ? Number(issueSlipId) : null,
       templateDriveFileId,
       templateName: templateMeta.name ?? null,
       outputDriveFileId: copied.outputDriveFileId,
@@ -357,6 +563,7 @@ async function createOrGetChungTuDocument({
     userId: createdById,
     effectiveUnitIds,
     oauth2Client,
+    snapshotEventType: "create",
   });
 
   return { document: synced, created: true };
@@ -418,7 +625,6 @@ async function markChungTuDocumentsStaleForLttpIssueSlipChange({
   }
   if (monthBounds) {
     or.push({
-      categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
       periodDate: { gte: monthBounds.start, lte: monthBounds.end },
     });
   }
@@ -438,8 +644,14 @@ async function markChungTuDocumentsStaleForLttpIssueSlipChange({
   });
   const ids = candidates
     .filter((row) => {
-      if (row.categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) return true;
-      return bkmhDocumentIncludesUnit(row, bkmhUnitId, monthBounds?.periodMonth);
+      const savedMonth = resolveStoredPeriodMonth(row);
+      if (savedMonth && monthBounds) {
+        return monthlyDocumentIncludesUnit(row, bkmhUnitId, monthBounds.periodMonth);
+      }
+      if (row.categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG && monthBounds) {
+        return monthlyDocumentIncludesUnit(row, bkmhUnitId, monthBounds.periodMonth);
+      }
+      return true;
     })
     .map((row) => row.id);
   if (!ids.length) {
@@ -452,11 +664,28 @@ async function markChungTuDocumentsStaleForLttpIssueSlipChange({
   return { updatedCount: updated.count };
 }
 
+/** Đánh dấu stale mọi chứng từ (trừ khóa) của đơn vị kho — sau khi gán hàng loạt người mua trên phiếu LTTP. */
+async function markChungTuDocumentsStaleForStorageUnit(storageUnitId) {
+  const uid = Number(storageUnitId);
+  if (!Number.isInteger(uid) || uid <= 0) {
+    return { updatedCount: 0 };
+  }
+  const updated = await prisma.chungTuDocument.updateMany({
+    where: {
+      unitId: uid,
+      status: { not: CHUNG_TU_DOCUMENT_STATUS.LOCKED },
+    },
+    data: { status: CHUNG_TU_DOCUMENT_STATUS.STALE },
+  });
+  return { updatedCount: updated.count };
+}
+
 async function syncChungTuDocument({
   documentKey,
   userId: _userId,
   effectiveUnitIds,
   oauth2Client: externalClient,
+  snapshotEventType = "sync",
 }) {
   let row = await prisma.chungTuDocument.findUnique({ where: { documentKey } });
   if (!row) {
@@ -496,68 +725,53 @@ async function syncChungTuDocument({
     oauth2Client = asserted.oauth2Client;
   }
 
-  await syncSpreadsheetFromContext({
+  const settings =
+    row.settingsJson && typeof row.settingsJson === "object" ? row.settingsJson : {};
+  const layoutRowCountBySheet = settings._layoutDetailRowCountBySheet ?? null;
+
+  const syncResult = await syncSpreadsheetFromContext({
     oauth2Client,
     spreadsheetId: row.outputDriveFileId,
     templateDriveFileId: row.templateDriveFileId,
     categoryKey: row.categoryKey,
     context,
+    layoutRowCountBySheet,
   });
 
   const isStale = row.sourceDataHash && row.sourceDataHash !== sourceDataHash;
+  const nextSettings = { ...settings };
+  if (syncResult?.layoutRowCountBySheet) {
+    nextSettings._layoutDetailRowCountBySheet = syncResult.layoutRowCountBySheet;
+  }
   const updated = await prisma.chungTuDocument.update({
     where: { id: row.id },
     data: {
       lastSyncedAt: new Date(),
       sourceDataHash,
       status: CHUNG_TU_DOCUMENT_STATUS.SYNCED,
+      settingsJson: nextSettings,
     },
   });
+
+  if (row.categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) {
+    const periodMonth = resolveStoredPeriodMonth(updated);
+    if (periodMonth) {
+      const snapSettings = readDocumentSettings(updated);
+      await persistBkmhSnapshots({
+        documentId: updated.id,
+        context,
+        periodMonth,
+        aggregationMode: snapSettings.__aggregationMode,
+        sourceDataHash,
+        eventType: snapshotEventType,
+      });
+    }
+  }
 
   return {
     ...mapDocumentRow(updated),
     wasStale: Boolean(isStale),
     lineCount: context.detailRows?.length ?? 0,
-  };
-}
-
-async function buildChungTuDocumentPdf({ documentKey, effectiveUnitIds }) {
-  let row = await prisma.chungTuDocument.findUnique({ where: { documentKey } });
-  if (!row) {
-    throw new AppError({
-      message: "Không tìm thấy chứng từ.",
-      statusCode: 404,
-      code: ERROR_CODES.NOT_FOUND,
-    });
-  }
-  assertUnitInEffectiveBranch(row.unitId, effectiveUnitIds);
-  row = await assertDocumentOutputAvailable(row, { deleteIfMissing: true });
-  if (row.status !== CHUNG_TU_DOCUMENT_STATUS.LOCKED) {
-    await syncChungTuDocument({ documentKey, effectiveUnitIds });
-    row = await prisma.chungTuDocument.findUnique({ where: { documentKey } });
-  } else {
-    row = await refreshDocumentSyncStatus(row, effectiveUnitIds);
-  }
-  if (row.status !== CHUNG_TU_DOCUMENT_STATUS.SYNCED && row.status !== CHUNG_TU_DOCUMENT_STATUS.LOCKED) {
-    throw new AppError({
-      message: "Chứng từ chưa đồng bộ với dữ liệu LTTP hiện tại. Hãy bấm Đồng bộ trước khi in PDF.",
-      statusCode: 409,
-      code: ERROR_CODES.VALIDATION_ERROR,
-    });
-  }
-  const { oauth2Client } = await assertTemplateInCategoryFolder({
-    categoryKey: row.categoryKey,
-    driveFileId: row.templateDriveFileId,
-  });
-  const buffer = await exportGoogleSheetPdfBuffer({
-    oauth2Client,
-    spreadsheetId: row.outputDriveFileId,
-  });
-  const safeKey = String(row.documentKey ?? "chung-tu").replace(/[^A-Za-z0-9_.-]+/g, "_");
-  return {
-    buffer,
-    filename: `${safeKey}.pdf`,
-    document: mapDocumentRow(row),
   };
 }
 
@@ -587,14 +801,37 @@ async function checkDocumentStale({ documentKey, effectiveUnitIds }) {
   };
 }
 
+async function listBkmhSnapshotsByDocumentKey({ documentKey, effectiveUnitIds }) {
+  const row = await prisma.chungTuDocument.findUnique({ where: { documentKey } });
+  if (!row) {
+    throw new AppError({
+      message: "Không tìm thấy chứng từ.",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+  assertUnitInEffectiveBranch(row.unitId, effectiveUnitIds);
+  if (row.categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) {
+    throw new AppError({
+      message: "Snapshot chỉ áp dụng cho bảng kê mua hàng.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  const items = await listBkmhSnapshotsForDocument(row.id);
+  return { documentKey, items };
+}
+
 export {
   listChungTuDocuments,
   getChungTuDocumentByKey,
   previewChungTuContext,
   createOrGetChungTuDocument,
   deleteChungTuDocument,
-  buildChungTuDocumentPdf,
   markChungTuDocumentsStaleForLttpIssueSlipChange,
+  markChungTuDocumentsStaleForStorageUnit,
   syncChungTuDocument,
   checkDocumentStale,
+  listBkmhSnapshotsForDocument,
+  listBkmhSnapshotsByDocumentKey,
 };

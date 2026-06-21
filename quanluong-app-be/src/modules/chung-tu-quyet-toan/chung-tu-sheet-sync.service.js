@@ -1,25 +1,43 @@
-import { google } from "googleapis";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
-import { CHUNG_TU_DEFAULT_SHEET_TABLE } from "./chung-tu-category.constants.js";
-import { loadFillRulesForCategoryTemplate } from "./chung-tu-template-fill-config.service.js";
+import { createDriveClient } from "../../shared/utils/google-drive-fetch.api.js";
+import { createSheetsClient } from "../../shared/utils/google-sheets-fetch.api.js";
+import { CHUNG_TU_DEFAULT_SHEET_TABLE, excelColumnLetter } from "./chung-tu-category.constants.js";
+import { detailColumnFieldKeys } from "./chung-tu-detail-field-catalog.js";
+import {
+  enrichFillRulesWithSpreadsheetMeta,
+  formatDerivedNamedRangeValue,
+  loadFillRulesForCategoryTemplate,
+} from "./chung-tu-template-fill-config.service.js";
+import { getDerivedNamedRangeSetForCategory } from "./chung-tu-category.constants.js";
 import { resolveTemplateSheetTitle } from "./chung-tu-monthly-sheets.js";
 import {
-  buildAutoResizeRowsRequest,
+  buildApplyDataRowFormatsRequest,
+  buildCopyTemplateRowFormatRequest,
+  buildDeleteExtraDataRowsRequest,
+  buildDetailTableFillPlan,
+  buildInsertDataRowsRequestFromPlan,
   buildPerRowHeightUpdateRequests,
-  buildPerRowHeightUpdateRequestsFromPlacements,
-  buildSheetPrintOutput,
-  buildWrapTextRepeatCellRequest,
+  buildTotalRowAmountCellA1,
   fetchSheetTemplateColumnMeta,
+  fetchTemplateRowCellFormats,
+  resolveNamedRangeTargetCell,
+  resolveOverflowFormatTarget,
 } from "./chung-tu-sheet-print-pagination.js";
 
 const GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
-const DEFAULT_DETAIL_TABLE_CLEAR_ROWS = 1000;
+/** Fill named range tự động (ngày, số, tổng bằng chữ) — ghi sau khi layout bảng chi tiết. */
+const NAMED_RANGE_SYNC_ENABLED = true;
+const DEFAULT_PREVIOUS_DATA_ROW_COUNT = 1;
 const SPREADSHEET_META_CACHE_TTL_MS = 2 * 60 * 1000;
 const DETAIL_TABLE_COLUMN_META_CACHE_KEY = "__detail_table_column_meta__";
-const SKIPPED_NAMED_RANGE_FIELD_KEYS_BY_CATEGORY = Object.freeze({
-  "bang-ke-mua-hang": new Set(["hoTenNguoiMua", "mauSo"]),
-});
+
+function shouldSkipNamedRangeUpdate(categoryKey, rule) {
+  if (rule?.rule === "static") return true;
+  const fieldKey = String(rule?.fieldKey ?? "").trim();
+  const allowed = getDerivedNamedRangeSetForCategory(categoryKey);
+  return !fieldKey || !allowed.has(fieldKey);
+}
 
 /** @type {Map<string, { expiresAt: number, data: object }>} */
 const spreadsheetMetaCache = new Map();
@@ -28,23 +46,37 @@ function contextFieldValue(context, fieldKey) {
   if (!fieldKey) return "";
   const v = context[fieldKey];
   if (v == null) return "";
-  if (typeof v === "number" || typeof v === "boolean") return String(v);
-  return String(v);
+  const raw =
+    typeof v === "number" || typeof v === "boolean" ? String(v) : String(v);
+  return formatDerivedNamedRangeValue(fieldKey, raw);
 }
 
 function colLetter(index) {
-  let n = index;
-  let s = "";
-  while (n >= 0) {
-    s = String.fromCharCode((n % 26) + 65) + s;
-    n = Math.floor(n / 26) - 1;
-  }
-  return s;
+  return excelColumnLetter(index);
 }
 
 async function loadFillRulesForTemplate(templateDriveFileId, categoryKey) {
   return loadFillRulesForCategoryTemplate(templateDriveFileId, categoryKey, {
+    requireSavedDetailTable: true,
     skipTemplateNamedRangeFetch: true,
+  });
+}
+
+function assertTemplateDetailTableConfigured(fillRules, { templateDriveFileId, categoryKey } = {}) {
+  const table = fillRules?.sheets?.detailTable;
+  const mappings = Array.isArray(table?.columnMappings) ? table.columnMappings : [];
+  const legacyCols = Array.isArray(table?.columns) ? table.columns : [];
+  const hasMappings = mappings.some((item) => String(item?.fieldKey ?? "").trim());
+  const hasLegacy = legacyCols.some((col) => String(col ?? "").trim());
+  if (table && (hasMappings || hasLegacy)) {
+    return;
+  }
+  throw new AppError({
+    message:
+      "Mẫu Google Sheets này chưa có cấu hình map bảng chi tiết. Mở «Map dữ liệu → ô mẫu» trên đúng mẫu đang dùng, cấu hình cột/dòng rồi bấm «Lưu map».",
+    statusCode: 400,
+    code: ERROR_CODES.VALIDATION_ERROR,
+    details: { templateDriveFileId, categoryKey },
   });
 }
 
@@ -150,23 +182,7 @@ function namedRangeToBounds(nr, sheetIdToTitle) {
   return { sheetTitle, startRow, startCol, rowCount, colCount, a1Range, a1SingleCell };
 }
 
-function expandTextToCharGrid(text, boxCount) {
-  const chars = [...String(text ?? "").trim().normalize("NFC")];
-  const row = [];
-  for (let i = 0; i < boxCount; i += 1) {
-    row.push(chars[i] ?? "");
-  }
-  return row;
-}
-
 function buildTableRangeA1({ sheetName, startRow, startCol, rowCount, colCount }) {
-  const safeSheet = `'${String(sheetName || "Sheet1").replace(/'/g, "''")}'`;
-  const start = `${colLetter(startCol)}${startRow + 1}`;
-  const end = `${colLetter(startCol + colCount - 1)}${startRow + rowCount}`;
-  return `${safeSheet}!${start}:${end}`;
-}
-
-function buildRangeFromBounds({ sheetName, startRow, startCol, rowCount, colCount }) {
   const safeSheet = `'${String(sheetName || "Sheet1").replace(/'/g, "''")}'`;
   const start = `${colLetter(startCol)}${startRow + 1}`;
   const end = `${colLetter(startCol + colCount - 1)}${startRow + rowCount}`;
@@ -188,16 +204,6 @@ function detailRowToCells(row, columns) {
 
 function buildDetailTableValues({ detailRows, columns }) {
   return detailRows.map((row) => detailRowToCells(row, columns));
-}
-
-function shouldSkipNamedRangeUpdate(categoryKey, rule) {
-  const skipped = SKIPPED_NAMED_RANGE_FIELD_KEYS_BY_CATEGORY[categoryKey];
-  if (rule?.rule === "static") return false;
-  const fieldKey = String(rule?.fieldKey ?? "").trim();
-  if (!fieldKey) return true;
-  if (!skipped) return false;
-  const rangeName = String(rule?.rangeName ?? "").trim();
-  return skipped.has(fieldKey) || skipped.has(rangeName);
 }
 
 async function ensureMonthlySheets({ sheetsApi, spreadsheetId, sheetNames, spreadsheetMeta = null }) {
@@ -255,29 +261,27 @@ async function buildNamedRangeBounds(sheetsApi, spreadsheetId, namedRanges, spre
   return { bounds, meta };
 }
 
-function pushContextNamedRangeUpdates({ data, fillRules, namedRangeBounds, context, sheetName, categoryKey }) {
+function pushContextNamedRangeUpdates({
+  namedRangeWrites,
+  fillRules,
+  namedRangeBounds,
+  context,
+  sheetName,
+  categoryKey,
+}) {
+  if (!NAMED_RANGE_SYNC_ENABLED) return;
   for (const nr of fillRules.sheets?.namedRanges ?? []) {
     if (!nr.rangeName) continue;
     if (shouldSkipNamedRangeUpdate(categoryKey, nr)) continue;
     const bounds = namedRangeBounds.get(nr.rangeName);
     if (!bounds) continue;
     const targetSheetName = sheetName || bounds.sheetTitle;
-
-    if (nr.rule === "charGrid") {
-      const raw =
-        nr.rule === "static" ? String(nr.value ?? "") : contextFieldValue(context, nr.fieldKey);
-      data.push({
-        range: buildRangeFromBounds({ ...bounds, sheetName: targetSheetName }),
-        values: [expandTextToCharGrid(raw, bounds.colCount)],
-      });
-      continue;
-    }
-
-    const value =
-      nr.rule === "static" ? String(nr.value ?? "") : contextFieldValue(context, nr.fieldKey);
-    data.push({
-      range: buildSingleCellFromBounds({ ...bounds, sheetName: targetSheetName }),
-      values: [[value]],
+    const value = contextFieldValue(context, nr.fieldKey);
+    if (!value) continue;
+    namedRangeWrites.push({
+      rangeName: nr.rangeName,
+      sheetName: targetSheetName,
+      value,
     });
   }
 }
@@ -290,115 +294,98 @@ function resolveSheetIdByTitle(sheetTitle, spreadsheetMeta) {
   return found?.sheetId ?? spreadsheetMeta.sheets?.[0]?.sheetId ?? null;
 }
 
+function resolvePreviousDataRowCount(layoutBySheet, sheetName) {
+  if (!layoutBySheet || typeof layoutBySheet !== "object") {
+    return DEFAULT_PREVIOUS_DATA_ROW_COUNT;
+  }
+  const key = String(sheetName ?? "").trim();
+  const stored = key ? layoutBySheet[key] : layoutBySheet.__default;
+  const n = Number(stored);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_PREVIOUS_DATA_ROW_COUNT;
+}
+
 function pushContextDetailTableUpdate({
   data,
-  clearRanges,
+  layoutJobs,
   fillRules,
   categoryKey,
   context,
   sheetName,
   sheetTitles,
   namedRangeSheetTitles,
-  clearRowCount,
   columnMeta,
+  previousDataRowCount,
 }) {
-  const defaultTable = CHUNG_TU_DEFAULT_SHEET_TABLE[categoryKey] ?? null;
-  const tableCfgRaw = fillRules.sheets?.detailTable ?? defaultTable;
+  const tableCfgRaw = fillRules.sheets?.detailTable;
   const detailRows = Array.isArray(context.detailRows) ? context.detailRows : [];
-  if (!tableCfgRaw) return;
+  if (!tableCfgRaw || detailRows.length <= 0) return null;
 
   const columns =
-    tableCfgRaw.columns ?? (Array.isArray(defaultTable?.columns) ? defaultTable.columns : []);
+    detailColumnFieldKeys(tableCfgRaw).length > 0
+      ? detailColumnFieldKeys(tableCfgRaw)
+      : tableCfgRaw.columns ?? [];
   const sheetTitle =
     sheetName ||
     resolveDetailTableSheetTitle(tableCfgRaw.sheetName, sheetTitles, namedRangeSheetTitles);
-  const startRow = tableCfgRaw.startRow ?? defaultTable?.startRow ?? 8;
-  const startCol = tableCfgRaw.startCol ?? defaultTable?.startCol ?? 0;
-  const printSheets = fillRules.print?.sheets ?? {};
-  const printOutput = buildSheetPrintOutput({
+  const plan = buildDetailTableFillPlan({
     detailRows,
     columns,
     tableCfg: tableCfgRaw,
-    printSheets: {
-      ...printSheets,
-      columnMeta,
-    },
+    printSheets: fillRules.print?.sheets ?? {},
+    context,
+    columnMeta,
   });
-  const { values, rowLineUnits, printProfile, mode, placements, totalRowSpan } = printOutput;
-  const rowSpan = Math.max(
-    Number(clearRowCount) || DEFAULT_DETAIL_TABLE_CLEAR_ROWS,
-    totalRowSpan || values.length || detailRows.length,
-  );
+  if (!plan.dataRowCount) return null;
 
-  if (clearRanges && rowSpan > 0 && columns.length > 0) {
-    clearRanges.push(
-      buildTableRangeA1({
-        sheetName: sheetTitle,
-        startRow,
-        startCol,
-        rowCount: rowSpan,
-        colCount: columns.length,
-      }),
-    );
-  }
-  if (detailRows.length <= 0) return;
-
-  if (mode === "placed" && placements?.length) {
-    for (const placement of placements) {
-      const absRow = startRow + placement.rowOffset;
-      data.push({
-        range: buildTableRangeA1({
-          sheetName: sheetTitle,
-          startRow: absRow,
-          startCol,
-          rowCount: 1,
-          colCount: columns.length,
-        }),
-        values: [placement.values],
-      });
-    }
-    data.push({
-      range: null,
-      values: [],
-      __printMeta: {
-        sheetTitle,
-        startRow,
-        startCol,
-        totalRowSpan: rowSpan,
-        mode: "placed",
-        placements: placements.map((p) => ({
-          absoluteRow0: startRow + p.rowOffset,
-          lineUnits: p.lineUnits,
-        })),
-        colCount: columns.length,
-        printProfile,
-      },
-    });
-    return;
-  }
+  layoutJobs.push({
+    sheetTitle,
+    plan,
+    columns: plan.fieldKeys ?? columns,
+    previousDataRowCount: resolvePreviousDataRowCount(
+      typeof previousDataRowCount === "object" ? previousDataRowCount : null,
+      sheetTitle,
+    ),
+  });
 
   const range = buildTableRangeA1({
     sheetName: sheetTitle,
-    startRow,
-    startCol,
-    rowCount: values.length,
-    colCount: columns.length,
+    startRow: plan.startRow,
+    startCol: plan.writeStartCol ?? plan.startCol,
+    rowCount: plan.dataRowCount,
+    colCount: plan.writeColCount ?? columns.length,
   });
+  data.push({ range, values: plan.values });
+
   data.push({
-    range,
-    values,
+    range: buildTotalRowAmountCellA1({
+      sheetName: sheetTitle,
+      totalRow0: plan.totalRow0,
+      startCol0: plan.writeStartCol ?? plan.startCol,
+      columns: plan.fieldKeys ?? columns,
+      amountFieldKey: plan.amountFieldKey,
+      columnMappings: plan.columnMappings,
+    }),
+    values: [[String(plan.totalAmount ?? "")]],
+  });
+
+  data.push({
+    range: null,
+    values: [],
     __printMeta: {
       sheetTitle,
-      startRow,
-      startCol,
-      rowCount: values.length,
-      totalRowSpan: values.length,
-      mode: "contiguous",
-      rowLineUnits,
-      colCount: columns.length,
-      printProfile,
+      startRow: plan.startRow,
+      startCol: plan.startCol,
+      dataRowCount: plan.dataRowCount,
+      rowLineUnits: plan.rowLineUnits,
+      rowHeightPt: plan.rowHeightPt,
+      colCount: plan.writeColCount ?? columns.length,
+      amountColIndex: (plan.columnMappings ?? []).findIndex(
+        (item) => item.fieldKey === plan.amountFieldKey,
+      ),
     },
   });
+
+  return { sheetTitle, dataRowCount: plan.dataRowCount };
 }
 
 async function loadDetailTableColumnMeta({
@@ -410,7 +397,11 @@ async function loadDetailTableColumnMeta({
 }) {
   const defaultTable = CHUNG_TU_DEFAULT_SHEET_TABLE[categoryKey] ?? null;
   const tableCfg = fillRules.sheets?.detailTable ?? defaultTable;
-  if (!tableCfg?.columns?.length) return null;
+  const hasMappings = Array.isArray(tableCfg?.columnMappings) && tableCfg.columnMappings.length > 0;
+  if (!tableCfg?.columns?.length && !hasMappings) return null;
+  const fieldKeys = hasMappings
+    ? tableCfg.columnMappings.map((item) => item.fieldKey).filter(Boolean)
+    : tableCfg.columns;
   const templateRow = Number.isFinite(Number(tableCfg.templateRow))
     ? Number(tableCfg.templateRow)
     : Number(tableCfg.startRow ?? defaultTable?.startRow ?? 8);
@@ -419,20 +410,109 @@ async function loadDetailTableColumnMeta({
       sheetTitle,
       templateRow0: templateRow,
       startCol0: Number(tableCfg.startCol ?? defaultTable?.startCol ?? 0),
-      columns: tableCfg.columns,
+      columns: fieldKeys,
     });
   } catch {
     return null;
   }
 }
 
-async function applySheetPrintFormatting({ sheetsApi, spreadsheetId, dataUpdates, spreadsheetMeta }) {
+async function applyDetailTableLayout({
+  sheetsApi,
+  spreadsheetId,
+  layoutJobs,
+  spreadsheetMeta,
+}) {
+  if (!layoutJobs?.length) return spreadsheetMeta;
+
+  const requests = [];
+  let metaForSheets = spreadsheetMeta;
+
+  for (const job of layoutJobs) {
+    const { sheetTitle, plan, columns, previousDataRowCount } = job;
+    let sheetId = metaForSheets?.titleToSheetId?.get(sheetTitle);
+    if (sheetId == null) {
+      if (!metaForSheets) {
+        metaForSheets = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
+      }
+      sheetId = resolveSheetIdByTitle(sheetTitle, metaForSheets);
+    }
+    if (sheetId == null) continue;
+
+    const insertReq = buildInsertDataRowsRequestFromPlan({
+      sheetId,
+      plan,
+      previousDataRowCount,
+    });
+    const deleteReq = buildDeleteExtraDataRowsRequest({
+      sheetId,
+      plan,
+      previousDataRowCount,
+    });
+    if (deleteReq) requests.push(deleteReq);
+    if (insertReq) requests.push(insertReq);
+
+    const writeStartCol = plan.writeStartCol ?? plan.startCol;
+    const writeColCount = plan.writeColCount ?? columns.length;
+    const { overflowCount, destStartRow } = resolveOverflowFormatTarget(plan);
+
+    if (overflowCount > 0) {
+      let templateFormats = null;
+      try {
+        templateFormats = await fetchTemplateRowCellFormats(sheetsApi, spreadsheetId, {
+          sheetTitle,
+          row0: plan.templateRow,
+          startCol0: writeStartCol,
+          colCount: writeColCount,
+        });
+      } catch {
+        templateFormats = null;
+      }
+
+      const applyFormatReq = templateFormats?.length
+        ? buildApplyDataRowFormatsRequest({
+            sheetId,
+            templateRowFormats: templateFormats,
+            startRow0: destStartRow,
+            dataRowCount: overflowCount,
+            startCol0: writeStartCol,
+          })
+        : null;
+
+      if (applyFormatReq) {
+        requests.push(applyFormatReq);
+      } else {
+        const copyDataFormatReq = buildCopyTemplateRowFormatRequest({
+          sheetId,
+          templateRow0: plan.templateRow,
+          startRow0: plan.startRow,
+          dataRowCount: plan.dataRowCount,
+          startCol0: writeStartCol,
+          colCount: writeColCount,
+          totalTemplateRow0: plan.totalTemplateRow,
+        });
+        if (copyDataFormatReq) requests.push(copyDataFormatReq);
+      }
+    }
+  }
+
+  if (!requests.length) return metaForSheets;
+
+  await sheetsApi.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests },
+  });
+  invalidateSpreadsheetMetaCache(spreadsheetId);
+  return fetchSpreadsheetMeta(sheetsApi, spreadsheetId, { bypassCache: true });
+}
+
+async function applySheetRowHeights({ sheetsApi, spreadsheetId, dataUpdates, spreadsheetMeta }) {
   const requests = [];
   const sheetIdCache = new Map();
   let metaForSheets = spreadsheetMeta;
   for (const item of dataUpdates) {
     const meta = item.__printMeta;
-    if (!meta?.printProfile?.enabled) continue;
+    if (!meta?.rowLineUnits?.length) continue;
     const sheetTitle = meta.sheetTitle;
     if (!sheetTitle) continue;
     let sheetId = sheetIdCache.get(sheetTitle);
@@ -444,44 +524,14 @@ async function applySheetPrintFormatting({ sheetsApi, spreadsheetId, dataUpdates
       sheetIdCache.set(sheetTitle, sheetId);
     }
     if (sheetId == null) continue;
-
-    const rowSpan = meta.totalRowSpan || meta.rowCount || 0;
-    if (!rowSpan) continue;
-
-    const wrapReq = buildWrapTextRepeatCellRequest({
-      sheetId,
-      startRow0: meta.startRow,
-      startCol0: meta.startCol ?? 0,
-      rowCount: rowSpan,
-      colCount: meta.colCount ?? 1,
-    });
-    if (wrapReq) requests.push(wrapReq);
-
-    const autoResize = buildAutoResizeRowsRequest({
-      sheetId,
-      startRow0: meta.startRow,
-      rowCount: rowSpan,
-    });
-    if (autoResize) requests.push(autoResize);
-
-    if (meta.mode === "placed" && Array.isArray(meta.placements) && meta.placements.length) {
-      requests.push(
-        ...buildPerRowHeightUpdateRequestsFromPlacements({
-          sheetId,
-          placements: meta.placements,
-          rowHeightPt: meta.printProfile.rowHeightPt,
-        }),
-      );
-    } else if (Array.isArray(meta.rowLineUnits) && meta.rowLineUnits.length) {
-      requests.push(
-        ...buildPerRowHeightUpdateRequests({
-          sheetId,
-          startRow0: meta.startRow,
-          rowLineUnits: meta.rowLineUnits,
-          rowHeightPt: meta.printProfile.rowHeightPt,
-        }),
-      );
-    }
+    requests.push(
+      ...buildPerRowHeightUpdateRequests({
+        sheetId,
+        startRow0: meta.startRow,
+        rowLineUnits: meta.rowLineUnits,
+        rowHeightPt: meta.rowHeightPt,
+      }),
+    );
   }
   if (!requests.length) return;
   try {
@@ -490,7 +540,7 @@ async function applySheetPrintFormatting({ sheetsApi, spreadsheetId, dataUpdates
       requestBody: { requests },
     });
   } catch {
-    // Định dạng in là tùy chọn; dữ liệu đã ghi vẫn hợp lệ.
+    // Chiều cao hàng là tùy chọn.
   }
 }
 
@@ -500,8 +550,9 @@ export async function syncSpreadsheetFromContext({
   templateDriveFileId,
   categoryKey,
   context,
+  layoutRowCountBySheet = null,
 }) {
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const fileMeta = await drive.files.get({
     fileId: spreadsheetId,
     fields: "mimeType",
@@ -515,27 +566,39 @@ export async function syncSpreadsheetFromContext({
     });
   }
 
-  const fillRules = await loadFillRulesForTemplate(templateDriveFileId, categoryKey);
-  const sheetsApi = google.sheets({ version: "v4", auth: oauth2Client });
+  const fillRulesBase = await loadFillRulesForTemplate(templateDriveFileId, categoryKey);
+  assertTemplateDetailTableConfigured(fillRulesBase, { templateDriveFileId, categoryKey });
+  const sheetsApi = createSheetsClient(oauth2Client);
   const sheetContexts = Array.isArray(context.sheetContexts) ? context.sheetContexts : [];
   if (sheetContexts.length > 0) {
     const sheetNames = sheetContexts.map((ctx) => ctx.sheetName).filter(Boolean);
     let spreadsheetMeta = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
+    const fillRules = enrichFillRulesWithSpreadsheetMeta(
+      fillRulesBase,
+      spreadsheetMeta,
+      categoryKey,
+    );
     spreadsheetMeta = await ensureMonthlySheets({
       sheetsApi,
       spreadsheetId,
       sheetNames,
       spreadsheetMeta,
     });
-    const { bounds: namedRangeBounds, meta: boundsMeta } = await buildNamedRangeBounds(
-      sheetsApi,
-      spreadsheetId,
-      fillRules.sheets?.namedRanges,
-      spreadsheetMeta,
-    );
-    spreadsheetMeta = boundsMeta;
+    let namedRangeBounds = new Map();
+    if (NAMED_RANGE_SYNC_ENABLED) {
+      const boundsResult = await buildNamedRangeBounds(
+        sheetsApi,
+        spreadsheetId,
+        fillRules.sheets?.namedRanges,
+        spreadsheetMeta,
+      );
+      namedRangeBounds = boundsResult.bounds;
+      spreadsheetMeta = boundsResult.meta;
+    }
     const data = [];
-    const clearRanges = [];
+    const namedRangeWrites = [];
+    const layoutJobs = [];
+    const layoutResults = [];
     const columnMetaCache = new Map();
     const templateSheetForColumnMeta = resolveDetailTableSheetTitle(
       fillRules.sheets?.detailTable?.sheetName,
@@ -545,7 +608,7 @@ export async function syncSpreadsheetFromContext({
     for (const ctx of sheetContexts) {
       const sheetName = ctx.sheetName;
       pushContextNamedRangeUpdates({
-        data,
+        namedRangeWrites,
         fillRules,
         namedRangeBounds,
         context: ctx,
@@ -563,68 +626,78 @@ export async function syncSpreadsheetFromContext({
         });
         columnMetaCache.set(DETAIL_TABLE_COLUMN_META_CACHE_KEY, columnMeta);
       }
-      pushContextDetailTableUpdate({
+      const layoutResult = pushContextDetailTableUpdate({
         data,
-        clearRanges,
+        layoutJobs,
         fillRules,
         categoryKey,
         context: ctx,
         sheetName,
         sheetTitles: sheetNames,
         namedRangeSheetTitles: sheetNames,
-        clearRowCount: DEFAULT_DETAIL_TABLE_CLEAR_ROWS,
         columnMeta,
+        previousDataRowCount: layoutRowCountBySheet,
       });
+      if (layoutResult) layoutResults.push(layoutResult);
     }
     return commitSheetValueUpdates({
       sheetsApi,
       spreadsheetId,
       data,
-      clearRanges,
+      layoutJobs,
       spreadsheetMeta,
+      layoutResults,
+      templateSpreadsheetId: templateDriveFileId,
+      formatTemplateSheetTitle: resolveTemplateSheetTitle(
+        fillRules.sheets?.detailTable?.sheetName
+          ? [fillRules.sheets.detailTable.sheetName, ...sheetNames]
+          : sheetNames,
+      ),
+      fillRules,
+      namedRangeWrites,
     });
   }
 
   const spreadsheetMeta = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
+  const fillRules = enrichFillRulesWithSpreadsheetMeta(
+    fillRulesBase,
+    spreadsheetMeta,
+    categoryKey,
+  );
   const sheetTitles = await fetchSpreadsheetSheetTitles(sheetsApi, spreadsheetId, spreadsheetMeta);
   const namedRangeSheetTitles = [];
   const data = [];
-  const clearRanges = [];
-  const { bounds: namedRangeBounds } = await buildNamedRangeBounds(
-    sheetsApi,
-    spreadsheetId,
-    fillRules.sheets?.namedRanges,
-    spreadsheetMeta,
-  );
+  const namedRangeWrites = [];
+  const layoutJobs = [];
+  const layoutResults = [];
+  if (NAMED_RANGE_SYNC_ENABLED) {
+    const { bounds: namedRangeBounds } = await buildNamedRangeBounds(
+      sheetsApi,
+      spreadsheetId,
+      fillRules.sheets?.namedRanges,
+      spreadsheetMeta,
+    );
 
-  for (const nr of fillRules.sheets?.namedRanges ?? []) {
-    if (!nr.rangeName) continue;
-    if (shouldSkipNamedRangeUpdate(categoryKey, nr)) continue;
-    const bounds = namedRangeBounds.get(nr.rangeName);
-    if (!bounds) continue;
-    if (bounds.sheetTitle) namedRangeSheetTitles.push(bounds.sheetTitle);
+    for (const nr of fillRules.sheets?.namedRanges ?? []) {
+      if (!nr.rangeName) continue;
+      if (shouldSkipNamedRangeUpdate(categoryKey, nr)) continue;
+      const bounds = namedRangeBounds.get(nr.rangeName);
+      if (!bounds) continue;
+      if (bounds.sheetTitle) namedRangeSheetTitles.push(bounds.sheetTitle);
 
-    if (nr.rule === "charGrid") {
-      const raw =
-        nr.rule === "static" ? String(nr.value ?? "") : contextFieldValue(context, nr.fieldKey);
-      data.push({
-        range: bounds.a1Range,
-        values: [expandTextToCharGrid(raw, bounds.colCount)],
+      const value = contextFieldValue(context, nr.fieldKey);
+      if (!value) continue;
+      namedRangeWrites.push({
+        rangeName: nr.rangeName,
+        sheetName: bounds.sheetTitle,
+        value,
       });
-      continue;
     }
-
-    const value =
-      nr.rule === "static" ? String(nr.value ?? "") : contextFieldValue(context, nr.fieldKey);
-    data.push({
-      range: bounds.a1SingleCell,
-      values: [[value]],
-    });
   }
 
-  pushContextDetailTableUpdate({
+  const layoutResult = pushContextDetailTableUpdate({
     data,
-    clearRanges,
+    layoutJobs,
     fillRules,
     categoryKey,
     context,
@@ -641,36 +714,120 @@ export async function syncSpreadsheetFromContext({
         namedRangeSheetTitles,
       ),
     }),
+    previousDataRowCount: layoutRowCountBySheet,
   });
+  if (layoutResult) layoutResults.push(layoutResult);
 
   return commitSheetValueUpdates({
     sheetsApi,
     spreadsheetId,
     data,
-    clearRanges,
+    layoutJobs,
     spreadsheetMeta,
+    layoutResults,
+    templateSpreadsheetId: templateDriveFileId,
+    formatTemplateSheetTitle: resolveTemplateSheetTitle(
+      fillRules.sheets?.detailTable?.sheetName
+        ? [fillRules.sheets.detailTable.sheetName, ...sheetTitles]
+        : sheetTitles,
+    ),
+    fillRules,
+    namedRangeWrites,
   });
+}
+
+async function applyDeferredNamedRangeWrites({
+  sheetsApi,
+  spreadsheetId,
+  fillRules,
+  namedRangeWrites,
+  layoutJobs = [],
+  spreadsheetMeta: _spreadsheetMeta,
+}) {
+  if (!NAMED_RANGE_SYNC_ENABLED || !namedRangeWrites?.length) return 0;
+
+  const { bounds: namedRangeBounds } = await buildNamedRangeBounds(
+    sheetsApi,
+    spreadsheetId,
+    fillRules.sheets?.namedRanges,
+    await fetchSpreadsheetMeta(sheetsApi, spreadsheetId, { bypassCache: true }),
+  );
+
+  const detailTable = fillRules?.sheets?.detailTable ?? {};
+  const layoutPlanBySheet = new Map(
+    (layoutJobs ?? []).map((job) => [String(job.sheetTitle ?? "").trim(), job.plan]),
+  );
+  const namedRangeRules = fillRules?.sheets?.namedRanges ?? [];
+
+  const payload = [];
+  for (const item of namedRangeWrites) {
+    const nrRule = namedRangeRules.find(
+      (rule) => String(rule.rangeName ?? "").trim() === String(item.rangeName ?? "").trim(),
+    );
+    const bounds = namedRangeBounds.get(item.rangeName);
+    const sheetKey = String(item.sheetName || bounds?.sheetTitle || nrRule?.sheetName || "").trim();
+    const layoutPlan =
+      (sheetKey ? layoutPlanBySheet.get(sheetKey) : null) ?? layoutJobs?.[0]?.plan ?? null;
+    const target = resolveNamedRangeTargetCell({
+      nrRule,
+      bounds,
+      detailTable,
+      layoutPlan,
+    });
+    if (!target) continue;
+    const targetSheetName = sheetKey || target.sheetTitle;
+    payload.push({
+      range: buildSingleCellFromBounds({
+        sheetName: targetSheetName,
+        startRow: target.startRow,
+        startCol: target.startCol,
+      }),
+      values: [[item.value]],
+    });
+  }
+
+  if (!payload.length) return 0;
+
+  await sheetsApi.spreadsheets.values.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data: payload,
+    },
+  });
+  return payload.length;
 }
 
 async function commitSheetValueUpdates({
   sheetsApi,
   spreadsheetId,
   data,
-  clearRanges = [],
+  layoutJobs = [],
   spreadsheetMeta = null,
+  layoutResults = [],
+  templateSpreadsheetId = null,
+  formatTemplateSheetTitle = "",
+  fillRules = null,
+  namedRangeWrites = [],
 }) {
-  if (data.length === 0 && clearRanges.length === 0) {
-    return { updatedRanges: 0 };
+  if (data.length === 0 && layoutJobs.length === 0 && !namedRangeWrites?.length) {
+    return { updatedRanges: 0, layoutRowCountBySheet: null };
   }
 
   const printMetaItems = data.filter((item) => item.__printMeta);
   const payload = data.filter((item) => item.range).map(({ range, values }) => ({ range, values }));
+  let namedRangeUpdated = 0;
 
   try {
-    if (clearRanges.length > 0) {
-      await sheetsApi.spreadsheets.values.batchClear({
+    let meta = spreadsheetMeta;
+    if (layoutJobs.length > 0) {
+      meta = await applyDetailTableLayout({
+        sheetsApi,
         spreadsheetId,
-        requestBody: { ranges: clearRanges },
+        layoutJobs,
+        spreadsheetMeta: meta,
+        templateSpreadsheetId,
+        formatTemplateSheetTitle,
       });
     }
     if (payload.length > 0) {
@@ -682,12 +839,22 @@ async function commitSheetValueUpdates({
         },
       });
     }
+    if (namedRangeWrites?.length && fillRules) {
+      namedRangeUpdated = await applyDeferredNamedRangeWrites({
+        sheetsApi,
+        spreadsheetId,
+        fillRules,
+        namedRangeWrites,
+        layoutJobs,
+        spreadsheetMeta: meta,
+      });
+    }
     if (printMetaItems.length > 0) {
-      await applySheetPrintFormatting({
+      await applySheetRowHeights({
         sheetsApi,
         spreadsheetId,
         dataUpdates: printMetaItems,
-        spreadsheetMeta,
+        spreadsheetMeta: meta,
       });
     }
   } catch (error) {
@@ -703,5 +870,20 @@ async function commitSheetValueUpdates({
     });
   }
 
-  return { updatedRanges: payload.length, clearedRanges: clearRanges.length };
+  let layoutRowCountBySheet = null;
+  if (layoutResults.length > 0) {
+    layoutRowCountBySheet = {};
+    for (const item of layoutResults) {
+      if (item?.sheetTitle) {
+        layoutRowCountBySheet[item.sheetTitle] = item.dataRowCount;
+      } else {
+        layoutRowCountBySheet.__default = item.dataRowCount;
+      }
+    }
+  }
+
+  return {
+    updatedRanges: payload.length + namedRangeUpdated,
+    layoutRowCountBySheet,
+  };
 }

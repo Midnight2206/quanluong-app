@@ -1,6 +1,6 @@
 /**
- * Field app tự fill — chỉ số, ngày tháng năm, tổng tiền bằng chữ.
- * Các field khác (đơn vị, chữ ký, …) user khai báo cố định trên template.
+ * Field app tự fill từ dữ liệu LTTP — ngày/tháng/năm, số, quyển số, tổng tiền bằng chữ, bảng chi tiết.
+ * Named range trên template: camelCase trùng fieldKey (ngay, soChungTu, quyenSo, …).
  */
 
 const REGISTRY_BY_CATEGORY = Object.freeze({
@@ -17,6 +17,8 @@ const REGISTRY_BY_CATEGORY = Object.freeze({
           { column: "tenHang", fieldKeyHint: "tenHang", source: "db" },
           { column: "dvt", fieldKeyHint: "dvt", source: "db" },
           { column: "nguoiBan", fieldKeyHint: "nguoiBan", source: "db" },
+          { column: "yeuCau", fieldKeyHint: "yeuCau", source: "db" },
+          { column: "thucXuat", fieldKeyHint: "thucXuat", source: "db" },
           { column: "soLuong", fieldKeyHint: "soLuong", source: "db" },
           { column: "donGia", fieldKeyHint: "donGia", source: "db" },
           { column: "thanhTien", fieldKeyHint: "thanhTien", source: "derived" },
@@ -37,6 +39,8 @@ const REGISTRY_BY_CATEGORY = Object.freeze({
           { column: "tenHang", fieldKeyHint: "tenHang", source: "db" },
           { column: "maSo", fieldKeyHint: "maSo", source: "db" },
           { column: "dvt", fieldKeyHint: "dvt", source: "db" },
+          { column: "yeuCau", fieldKeyHint: "yeuCau", source: "db" },
+          { column: "thucXuat", fieldKeyHint: "thucXuat", source: "db" },
           { column: "soLuong", fieldKeyHint: "soLuong", source: "db" },
           { column: "donGia", fieldKeyHint: "donGia", source: "db" },
           { column: "thanhTien", fieldKeyHint: "thanhTien", source: "derived" },
@@ -52,13 +56,13 @@ const REGISTRY_BY_CATEGORY = Object.freeze({
     dbTables: [
       {
         dbTable: "lttp_issue_slip_lines",
-        label: "Dòng tổng hợp theo ngày",
+        label: "Dòng tổng hợp theo tháng",
         columns: [
           { column: "stt", fieldKeyHint: "stt", source: "row_index" },
           { column: "tenHang", fieldKeyHint: "tenHang", source: "db" },
           { column: "dvt", fieldKeyHint: "dvt", source: "db" },
-          { column: "nguoiBan", fieldKeyHint: "nguoiBan", source: "db" },
-          { column: "soLuong", fieldKeyHint: "soLuong", source: "db" },
+          { column: "yeuCau", fieldKeyHint: "yeuCau", source: "db" },
+          { column: "thucNhap", fieldKeyHint: "thucNhap", source: "db" },
           { column: "donGia", fieldKeyHint: "donGia", source: "db" },
           { column: "thanhTien", fieldKeyHint: "thanhTien", source: "derived" },
         ],

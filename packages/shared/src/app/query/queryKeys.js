@@ -48,6 +48,8 @@ export const qk = {
       String(recipientUnitId ?? ""),
     ],
     receivingDefaultRecipientsList: () => ["lttp", "receivingDefaultRecipientsList"],
+    buyerDefaultsList: () => ["lttp", "buyerDefaultsList"],
+    buyerUsers: (unitId) => ["lttp", "buyerUsers", String(unitId)],
     dailyOrderSummary: (unitId, date, supplierFilter) => [
       "lttp",
       "dailyOrderSummary",
@@ -70,6 +72,12 @@ export const qk = {
       "templateCatalog",
       categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
     ],
+    templateTree: (folderId, categoryKey) => [
+      "chungTuQuyetToan",
+      "templateTree",
+      String(folderId ?? "root"),
+      String(categoryKey ?? ""),
+    ],
     categoryTemplates: (categoryKey) => ["chungTuQuyetToan", "categoryTemplates", String(categoryKey)],
     templateFillMapping: (categoryKey, driveFileId) => [
       "chungTuQuyetToan",
@@ -82,20 +90,9 @@ export const qk = {
       "chungTuQuyetToan",
       "documents",
       String(unitId),
-      String(categoryKey),
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
     ],
     document: (documentKey) => ["chungTuQuyetToan", "document", String(documentKey)],
-    excelTemplates: (categoryKey) => [
-      "chungTuQuyetToan",
-      "excelTemplates",
-      String(categoryKey ?? ""),
-    ],
-    excelTemplate: (id) => ["chungTuQuyetToan", "excelTemplate", String(id ?? "")],
-    excelExportHistory: (categoryKey) => [
-      "chungTuQuyetToan",
-      "excelExportHistory",
-      String(categoryKey ?? ""),
-    ],
   },
 };
 

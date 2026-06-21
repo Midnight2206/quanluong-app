@@ -5,9 +5,7 @@ import { qk } from "@/app/query/queryKeys";
 import { apiRequest, withUnwrap } from "@/services/apiRequest";
 import { useWrappedMutation } from "@/lib/useWrappedMutation";
 
-function invalidateLttpData(qc) {
-  qc.invalidateQueries({ queryKey: qk.lttp.root });
-}
+import { invalidateLttpData } from "./lttpApiInvalidate.js";
 
 export function useGetLttpFoodGroupsQuery(_arg, options = {}) {
   const { skip, ...rest } = options;
@@ -374,6 +372,11 @@ export function usePutLttpReceivingDefaultRecipientMutation() {
     },
   });
 }
+
+export {
+  useGetLttpBuyerDefaultsListQuery,
+  usePutLttpBuyerDefaultMutation,
+} from "./lttpBuyerDefaultsApi.js";
 
 export function useGetLttpDailyOrderSummaryQuery(arg, options = {}) {
   const { unitId, date, supplierFilter = "all" } = arg || {};

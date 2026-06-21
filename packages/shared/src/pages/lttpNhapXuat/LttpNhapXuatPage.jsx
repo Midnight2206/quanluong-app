@@ -15,6 +15,7 @@ import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpOrderingTab } from "./LttpOrderingTab";
 import { LttpNguoiNhanBulkModal } from "./LttpNguoiNhanBulkModal";
+import { LttpNguoiMuaBulkModal } from "./LttpNguoiMuaBulkModal";
 import { readStoredManualUnitId, writeStoredManualUnitId } from "./lttpNhapXuatSessionPersist";
 
 const LTTP_TAB_PERSIST_ID = "lttp-nhap-xuat";
@@ -89,6 +90,7 @@ export function LttpNhapXuatPage() {
 
   const [manualUnitId, setManualUnitId] = useState(null);
   const [bulkRecipientOpen, setBulkRecipientOpen] = useState(false);
+  const [bulkBuyerOpen, setBulkBuyerOpen] = useState(false);
   const [editingSlip, setEditingSlip] = useState(null);
   const [tabRemountKey, setTabRemountKey] = useState(0);
 
@@ -221,26 +223,45 @@ export function LttpNhapXuatPage() {
             </select>
           </label>
           {canWrite ? (
-            <Button
-              type="button"
-              variant="secondary"
-              className="h-9 w-full gap-2 text-xs sm:w-auto"
-              onClick={() => setBulkRecipientOpen(true)}
-            >
-              <Users className="size-3.5" />
-              Cài người nhận theo đơn vị nhận
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-9 w-full gap-2 text-xs sm:w-auto"
+                onClick={() => setBulkBuyerOpen(true)}
+              >
+                <Users className="size-3.5" />
+                Cài người mua theo đơn vị kho
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-9 w-full gap-2 text-xs sm:w-auto"
+                onClick={() => setBulkRecipientOpen(true)}
+              >
+                <Users className="size-3.5" />
+                Cài người nhận theo đơn vị nhận
+              </Button>
+            </div>
           ) : null}
         </div>
       ) : null}
 
       {canWrite ? (
-        <LttpNguoiNhanBulkModal
-          open={bulkRecipientOpen}
-          onClose={() => setBulkRecipientOpen(false)}
-          units={unitsForKhoDropdown}
-          canWrite={canWrite}
-        />
+        <>
+          <LttpNguoiMuaBulkModal
+            open={bulkBuyerOpen}
+            onClose={() => setBulkBuyerOpen(false)}
+            units={unitsForKhoDropdown}
+            canWrite={canWrite}
+          />
+          <LttpNguoiNhanBulkModal
+            open={bulkRecipientOpen}
+            onClose={() => setBulkRecipientOpen(false)}
+            units={unitsForKhoDropdown}
+            canWrite={canWrite}
+          />
+        </>
       ) : null}
 
       <Card className="shadow-soft">

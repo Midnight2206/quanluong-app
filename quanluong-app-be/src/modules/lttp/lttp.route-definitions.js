@@ -422,6 +422,43 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "listBuyerUsers",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/buyer-users",
+    pathRoute: "/api/lttp/buyer-users",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "Danh sách user người mua theo đơn vị kho (LTTP)",
+      description:
+        "Gợi ý chọn người mua thuộc đơn vị kho hoặc nhánh cha/con trong phạm vi LTTP.",
+    },
+  },
+  {
+    key: "listBuyerDefaultUsers",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/buyer-default-users",
+    pathRoute: "/api/lttp/buyer-default-users",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "Danh sách cấu hình người mua theo đơn vị kho (LTTP)",
+      description: "Tất cả cặp đơn vị kho → user người mua mặc định trong phạm vi cây đơn vị.",
+    },
+  },
+  {
+    key: "putBuyerDefaultUser",
+    method: "PUT",
+    module: LTTP_MODULE_NAME,
+    path: "/buyer-default-user",
+    pathRoute: "/api/lttp/buyer-default-user",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Lưu người mua mặc định theo đơn vị kho (LTTP)",
+      description: "Gán/bỏ user người mua mặc định cho một đơn vị kho.",
+    },
+  },
+  {
     key: "printIssueSlipPdf",
     method: "GET",
     module: LTTP_MODULE_NAME,

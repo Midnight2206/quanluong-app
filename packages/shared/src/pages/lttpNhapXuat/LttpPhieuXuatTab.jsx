@@ -31,6 +31,7 @@ import {
   useResyncLttpIssueSlipPricesMutation,
   useUpdateLttpIssueSlipMutation,
 } from "@/features/lttp/api/lttpApi";
+import { useGetLttpBuyerUsersQuery } from "@/features/lttp/api/lttpBuyerDefaultsApi";
 import { apiRequest } from "@/services/apiRequest";
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
@@ -433,6 +434,8 @@ export function LttpPhieuXuatTab({
   const [recipientUnitLabel, setRecipientUnitLabel] = useState("");
   const [recipientUnitId, setRecipientUnitId] = useState(null);
   const [recipientUserId, setRecipientUserId] = useState("");
+  const [buyerUserId, setBuyerUserId] = useState("");
+  const [buyerDisplayName, setBuyerDisplayName] = useState("");
   const [warehouseFrom, setWarehouseFrom] = useState("Quân nhu");
   const [signerWriter, setSignerWriter] = useState("");
   const [signerRecipient, setSignerRecipient] = useState("");
@@ -449,6 +452,7 @@ export function LttpPhieuXuatTab({
   const prevCreateUnitRef = useRef(null);
   const skipRecipientResetAfterDraftRef = useRef(false);
   const skipReceivingDefAfterDraftRef = useRef(false);
+  const skipBuyerDefAfterDraftRef = useRef(false);
   const draftPersistAllowedRef = useRef(false);
 
   const defLoadedKey = useRef(null);
@@ -525,6 +529,15 @@ export function LttpPhieuXuatTab({
       setRecipientUserId(
         draft.recipientUserId != null ? String(draft.recipientUserId) : "",
       );
+      setBuyerUserId(
+        draft.buyerUserId != null ? String(draft.buyerUserId) : "",
+      );
+      setBuyerDisplayName(
+        draft.buyerDisplayName != null ? String(draft.buyerDisplayName) : "",
+      );
+      skipBuyerDefAfterDraftRef.current =
+        draft.buyerUserId != null &&
+        String(draft.buyerUserId).trim() !== "";
       setRecipientName(
         draft.recipientName != null ? String(draft.recipientName) : "",
       );
@@ -584,6 +597,10 @@ export function LttpPhieuXuatTab({
       staleTime: 5 * 60 * 1000,
     },
   );
+  const { data: buyerUsers = [] } = useGetLttpBuyerUsersQuery(selectedUnitId, {
+      skip: !selectedUnitId,
+      staleTime: 5 * 60 * 1000,
+    });
   const { data: receivingDef, isSuccess: receivingDefSuccess } =
     useGetLttpReceivingDefaultRecipientQuery(recipientUnitId, {
       skip: !recipientUnitId,
@@ -666,6 +683,8 @@ export function LttpPhieuXuatTab({
     setRecipientUserId("");
     setRecipientName("");
     setSignerRecipient("");
+    setBuyerUserId("");
+    setBuyerDisplayName("");
     defLoadedKey.current = null;
   }, [selectedUnitId, isEditMode]);
 
@@ -729,6 +748,39 @@ export function LttpPhieuXuatTab({
     }
     defLoadedKey.current = selectedUnitId;
   }, [formDefPayload, selectedUnitId, isEditMode]);
+
+  /** Người mua mặc định theo đơn vị kho — sau khi tải form defaults. */
+  useEffect(() => {
+    if (selectedUnitId == null || formDefPayload?.unitId !== selectedUnitId) {
+      return;
+    }
+    if (isEditMode) {
+      return;
+    }
+    if (skipBuyerDefAfterDraftRef.current) {
+      skipBuyerDefAfterDraftRef.current = false;
+      return;
+    }
+    const defaultId = formDefPayload?.defaults?.defaultBuyerUserId;
+    if (defaultId != null) {
+      setBuyerUserId(String(defaultId));
+    }
+  }, [formDefPayload, selectedUnitId, isEditMode]);
+
+  /** Tên người mua trên form theo user đang chọn. */
+  useEffect(() => {
+    if (!buyerUserId) {
+      if (!isEditMode) {
+        setBuyerDisplayName("");
+      }
+      return;
+    }
+    const p = buyerUsers.find((x) => String(x.id) === String(buyerUserId));
+    const name = displayNameFromRecipientUserRow(p);
+    if (name) {
+      setBuyerDisplayName(name);
+    }
+  }, [buyerUserId, buyerUsers, isEditMode]);
 
   useEffect(() => {
     if (recipientUnitId == null) {
@@ -877,6 +929,8 @@ export function LttpPhieuXuatTab({
       editingSlip.recipientUserId ?? "",
       editingSlip.recipientUnitId ?? "",
       editingSlip.signerRecipient ?? "",
+      editingSlip.buyerUserId ?? "",
+      editingSlip.buyerDisplayName ?? "",
     ].join("|");
     if (editHydrateSigRef.current === hydrateSig) {
       return;
@@ -893,6 +947,12 @@ export function LttpPhieuXuatTab({
         ? String(editingSlip.recipientUserId)
         : "",
     );
+    setBuyerUserId(
+      editingSlip.buyerUserId != null ? String(editingSlip.buyerUserId) : "",
+    );
+    if (editingSlip.buyerDisplayName != null) {
+      setBuyerDisplayName(String(editingSlip.buyerDisplayName));
+    }
     if (editingSlip.printLine1 != null) {
       setPrintHeaderLine1(editingSlip.printLine1);
     }
@@ -946,6 +1006,8 @@ export function LttpPhieuXuatTab({
         recipientName,
         recipientUnitId,
         recipientUserId,
+        buyerUserId,
+        buyerDisplayName,
         warehouseFrom,
         signerWriter,
         signerRecipient,
@@ -982,6 +1044,8 @@ export function LttpPhieuXuatTab({
     recipientName,
     recipientUnitId,
     recipientUserId,
+    buyerUserId,
+    buyerDisplayName,
     warehouseFrom,
     signerWriter,
     signerRecipient,
@@ -1247,6 +1311,8 @@ export function LttpPhieuXuatTab({
       recipientUnitId: recipientUnitId ?? selectedUnitId,
       recipientUserId: recipientUserId ? Number(recipientUserId) : null,
       recipientDisplayName: recipientName?.trim() || null,
+      buyerUserId: buyerUserId ? Number(buyerUserId) : null,
+      buyerDisplayName: buyerDisplayName?.trim() || null,
       printLine1: printHeaderLine1?.trim() || null,
       printLine2: printHeaderLine2?.trim() || null,
       formMauSo: formMauSo?.trim() || null,
@@ -1682,6 +1748,22 @@ export function LttpPhieuXuatTab({
               </span>
             </div>
           )}
+          <label className="min-w-[16rem] flex-1 space-y-0.5 text-xs">
+            Người mua hàng
+            <select
+              className={cn(inputClass, "mt-0.5 block")}
+              value={buyerUserId}
+              onChange={(e) => setBuyerUserId(e.target.value)}
+              disabled={!canWrite}
+            >
+              <option value="">— Chọn người mua —</option>
+              {buyerUsers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.fullName || u.username}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <label className="block space-y-0.5 text-xs">
           Chú thích phiếu (chỉ dùng trên tab Đặt hàng để phân biệt phiếu — không

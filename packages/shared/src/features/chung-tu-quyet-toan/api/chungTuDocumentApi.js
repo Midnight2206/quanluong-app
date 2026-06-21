@@ -3,14 +3,25 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/app/query/queryKeys";
 import { apiRequest } from "@/services/apiRequest";
-import httpClient from "@/services/httpClient";
 import { useWrappedMutation } from "@/lib/useWrappedMutation";
-import { getApiBaseUrl } from "@/utils/runtimeEnv";
 
 function invalidateChungTuDocuments(qc, unitId, categoryKey) {
   qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.documents(unitId, categoryKey) });
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.documents(unitId) });
   qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.root });
 }
+
+export const CHUNG_TU_AGGREGATION_MODES = Object.freeze({
+  BY_DAY: "by-day",
+  BY_UNIT: "by-unit",
+  FULL: "full",
+});
+
+export const CHUNG_TU_AGGREGATION_MODE_OPTIONS = Object.freeze([
+  { value: CHUNG_TU_AGGREGATION_MODES.BY_DAY, label: "Theo ngày", hint: "Mỗi sheet = một ngày trong tháng." },
+  { value: CHUNG_TU_AGGREGATION_MODES.BY_UNIT, label: "Theo đơn vị", hint: "Mỗi sheet = tổng cả tháng của một đơn vị." },
+  { value: CHUNG_TU_AGGREGATION_MODES.FULL, label: "Toàn bộ", hint: "Gộp tất cả đơn vị và ngày vào một sheet." },
+]);
 
 export function useChungTuCategoryTemplatesQuery(categoryKey, options = {}) {
   const { skip, ...rest } = options;
@@ -61,18 +72,18 @@ export function usePutChungTuUnitProfileMutation() {
 
 export function useChungTuDocumentsQuery({ unitId, categoryKey }, options = {}) {
   const { skip, ...rest } = options;
+  const cat =
+    categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : undefined;
   return useQuery({
-    queryKey: qk.chungTuQuyetToan.documents(unitId, categoryKey),
+    queryKey: qk.chungTuQuyetToan.documents(unitId, cat),
     queryFn: () =>
       apiRequest({
         url: "/chungtuquyettoan/documents",
         method: "get",
-        params: { unitId, categoryKey },
+        params: { unitId, ...(cat ? { categoryKey: cat } : {}) },
       }),
     select: (data) => (Array.isArray(data?.items) ? data.items : []),
-    enabled: Boolean(
-      skip !== true && unitId != null && unitId !== "" && String(categoryKey ?? "").trim(),
-    ),
+    enabled: Boolean(skip !== true && unitId != null && unitId !== ""),
     ...rest,
   });
 }
@@ -103,12 +114,12 @@ export function useSyncChungTuDocumentMutation() {
       return { ...data, unitId, categoryKey };
     },
     onSuccess: (result) => {
-      if (result?.unitId && result?.categoryKey) {
+      if (result?.unitId) {
         invalidateChungTuDocuments(qc, result.unitId, result.categoryKey);
       }
     },
     onError: (_error, variables) => {
-      if (variables?.unitId && variables?.categoryKey) {
+      if (variables?.unitId) {
         invalidateChungTuDocuments(qc, variables.unitId, variables.categoryKey);
       }
     },
@@ -126,12 +137,12 @@ export function useOpenChungTuDocumentMutation() {
       return { ...data, unitId, categoryKey };
     },
     onSuccess: (result) => {
-      if (result?.unitId && result?.categoryKey) {
+      if (result?.unitId) {
         invalidateChungTuDocuments(qc, result.unitId, result.categoryKey);
       }
     },
     onError: (_error, variables) => {
-      if (variables?.unitId && variables?.categoryKey) {
+      if (variables?.unitId) {
         invalidateChungTuDocuments(qc, variables.unitId, variables.categoryKey);
       }
     },
@@ -149,16 +160,11 @@ export function useDeleteChungTuDocumentMutation() {
       return { ...data, unitId, categoryKey };
     },
     onSuccess: (result) => {
-      if (result?.unitId && result?.categoryKey) {
+      if (result?.unitId) {
         invalidateChungTuDocuments(qc, result.unitId, result.categoryKey);
       }
     },
   });
-}
-
-export function buildChungTuDocumentPrintPdfUrl(documentKey) {
-  const base = getApiBaseUrl();
-  return `${base}/chungtuquyettoan/documents/${encodeURIComponent(documentKey)}/print-pdf`;
 }
 
 export function useChungTuContextPreviewMutation() {
@@ -188,100 +194,6 @@ export function useChungTuTemplateFillMappingQuery(
       }),
     enabled: Boolean(skip !== true && cat.length > 0 && fileId.length > 0),
     ...rest,
-  });
-}
-
-export function useChungTuExcelTemplatesQuery(categoryKey, options = {}) {
-  const { skip, ...rest } = options;
-  const key = String(categoryKey ?? "").trim();
-  return useQuery({
-    queryKey: qk.chungTuQuyetToan.excelTemplates(key),
-    queryFn: () =>
-      apiRequest({
-        url: "/chungtuquyettoan/excel-templates",
-        method: "get",
-        params: { categoryKey: key },
-      }),
-    select: (data) => (Array.isArray(data?.items) ? data.items : []),
-    enabled: Boolean(skip !== true && key),
-    ...rest,
-  });
-}
-
-export function useUploadChungTuExcelTemplateMutation() {
-  const qc = useQueryClient();
-  return useWrappedMutation({
-    mutationFn: ({ categoryKey, displayName, file }) => {
-      const form = new FormData();
-      form.append("categoryKey", categoryKey);
-      form.append("displayName", displayName);
-      form.append("file", file);
-      return apiRequest({
-        url: "/chungtuquyettoan/excel-templates",
-        method: "post",
-        data: form,
-      });
-    },
-    onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.excelTemplates(variables?.categoryKey) });
-    },
-  });
-}
-
-export function usePutChungTuExcelTemplateMappingMutation() {
-  const qc = useQueryClient();
-  return useWrappedMutation({
-    mutationFn: ({ id, mapping, isActive }) =>
-      apiRequest({
-        url: `/chungtuquyettoan/excel-templates/${encodeURIComponent(id)}/mapping`,
-        method: "put",
-        data: { mapping, isActive },
-      }),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.excelTemplates(data?.categoryKey) });
-      qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.excelTemplate(data?.id) });
-    },
-  });
-}
-
-export function useChungTuExcelExportHistoryQuery(categoryKey, options = {}) {
-  const { skip, ...rest } = options;
-  const key = String(categoryKey ?? "").trim();
-  return useQuery({
-    queryKey: qk.chungTuQuyetToan.excelExportHistory(key),
-    queryFn: () =>
-      apiRequest({
-        url: "/chungtuquyettoan/excel-exports/history",
-        method: "get",
-        params: { categoryKey: key },
-      }),
-    select: (data) => (Array.isArray(data?.items) ? data.items : []),
-    enabled: Boolean(skip !== true && key),
-    ...rest,
-  });
-}
-
-export function useExportBkmhExcelMutation() {
-  const qc = useQueryClient();
-  return useWrappedMutation({
-    mutationFn: async (body) => {
-      const res = await httpClient({
-        url: "/chungtuquyettoan/excel-exports/bkmh",
-        method: "post",
-        data: body,
-        responseType: "blob",
-      });
-      const disposition = res.headers?.["content-disposition"] ?? "";
-      const filenameMatch = String(disposition).match(/filename="?([^"]+)"?/i);
-      return {
-        blob: res.data,
-        filename: filenameMatch?.[1] || `bang-ke-mua-hang-${body.periodMonth}.xlsx`,
-        categoryKey: "bang-ke-mua-hang",
-      };
-    },
-    onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.excelExportHistory(result?.categoryKey) });
-    },
   });
 }
 

@@ -1,9 +1,6 @@
-import {
-  amountFromRow,
-  buildChungTuSheetPrintRows,
-  paginateChungTuPrintRows,
-} from "./chung-tu-print-pagination.js";
+import { amountFromRow } from "./chung-tu-row-amount.util.js";
 import { CHUNG_TU_DEFAULT_SHEET_PRINT } from "./chung-tu-category.constants.js";
+import { resolveDetailColumnMappings } from "./chung-tu-detail-field-catalog.js";
 
 function estimateCharsPerLine(columnWidthPx) {
   const w = Number(columnWidthPx) || 72;
@@ -15,33 +12,35 @@ function isWrapEnabled(format) {
   return strategy === "WRAP" || strategy === "LEGACY_WRAP";
 }
 
-function normalizeSheetPrintConfig(tableCfg = {}, printSheets = {}) {
+function normalizeSheetTableConfig(tableCfg = {}, printSheets = {}) {
   const merged = { ...printSheets, ...tableCfg };
-  const rowsPerPage =
-    Number.isFinite(Number(merged.rowsPerPage)) && Number(merged.rowsPerPage) > 0
-      ? Number(merged.rowsPerPage)
-      : Number.isFinite(Number(merged.pageRowsFirst)) && Number(merged.pageRowsFirst) > 0
-        ? Number(merged.pageRowsFirst)
-        : CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage;
   const rowHeightPt =
     Number.isFinite(Number(merged.rowHeightPt)) && Number(merged.rowHeightPt) > 0
       ? Number(merged.rowHeightPt)
       : CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt;
 
+  const startRow =
+    Number.isFinite(Number(merged.startRow)) && Number(merged.startRow) >= 0
+      ? Number(merged.startRow)
+      : 8;
+  const templateRow =
+    Number.isFinite(Number(merged.templateRow)) && Number(merged.templateRow) >= 0
+      ? Number(merged.templateRow)
+      : startRow;
+  const totalTemplateRow =
+    Number.isFinite(Number(merged.totalTemplateRow)) && Number(merged.totalTemplateRow) >= 0
+      ? Number(merged.totalTemplateRow)
+      : startRow + 1;
+
   return {
-    enabled: merged.paginationEnabled !== false && merged.enabled !== false,
-    rowsPerPage,
+    startRow,
+    startCol: Number.isFinite(Number(merged.startCol)) && Number(merged.startCol) >= 0 ? Number(merged.startCol) : 0,
+    templateRow,
+    totalTemplateRow,
     rowHeightPt,
     amountFieldKey: String(merged.amountFieldKey ?? "thanhTien").trim() || "thanhTien",
+    totalLabel: String(merged.totalLabel ?? "Tổng cộng").trim() || "Tổng cộng",
     labelFieldKey: String(merged.labelFieldKey ?? "tenHang").trim() || "tenHang",
-    carryInLabel: String(merged.carryInLabel ?? "Mang sang").trim() || "Mang sang",
-    carryOutLabel: String(merged.carryOutLabel ?? "Cộng sang trang").trim() || "Cộng sang trang",
-    templateRow:
-      Number.isFinite(Number(merged.templateRow)) && Number(merged.templateRow) >= 0
-        ? Number(merged.templateRow)
-        : Number.isFinite(Number(merged.startRow))
-          ? Number(merged.startRow)
-          : 8,
   };
 }
 
@@ -78,288 +77,153 @@ function estimateRowUnits(row, columns, columnMeta) {
   return maxLines;
 }
 
-function buildCarryDetailRow({ kind, amount, label, labelFieldKey, amountFieldKey }) {
-  return {
-    __carryRow: kind,
-    [labelFieldKey]: label,
-    [amountFieldKey]: amount,
-  };
+function resolveDataSlotsInTemplate(cfg) {
+  return Math.max(1, Number(cfg.totalTemplateRow) - Number(cfg.startRow));
 }
 
-function buildPaddingDetailRow() {
-  return { __padding: true };
+function resolveTotalRowIndex(cfg, dataRowCount) {
+  const slots = resolveDataSlotsInTemplate(cfg);
+  const count = Math.max(0, Number(dataRowCount) || 0);
+  return Number(cfg.totalTemplateRow) + Math.max(0, count - slots);
 }
 
-function computePlacedRowSpan(pages, rowsPerPage) {
-  if (!pages.length) return 0;
-  let span = 0;
-  for (let i = 0; i < pages.length; i += 1) {
-    const page = pages[i];
-    if (page.carryOut != null) {
-      span += rowsPerPage;
-    } else {
-      const dataStart = i > 0 ? 1 : 0;
-      span = i * rowsPerPage + dataStart + page.rows.length;
-    }
-  }
-  return span;
-}
+/**
+ * Vị trí ghi named range sau khi chèn dòng data.
+ * Ô footer (>= totalTemplateRow) dịch theo totalRow0 — không dùng bounds API vì insert tại totalTemplateRow
+ * khiến named range trên Google Sheets có thể không dịch theo hàng tổng.
+ */
+function resolveNamedRangeTargetCell({ nrRule, bounds, detailTable, layoutPlan }) {
+  const tableCfg = detailTable && typeof detailTable === "object" ? detailTable : {};
+  const totalTemplateRow = Number(tableCfg.totalTemplateRow);
+  const templateRow = Number(nrRule?.templateRowIndex ?? bounds?.startRow);
+  const startCol = Number(nrRule?.templateColIndex ?? bounds?.startCol ?? 0);
+  const sheetTitle =
+    String(bounds?.sheetTitle ?? nrRule?.sheetName ?? tableCfg.sheetName ?? "").trim() || "Sheet1";
 
-function buildDenseGridFromPlacements(placements, totalRowSpan, columns) {
-  const colCount = Math.max(columns.length, 1);
-  const span = Math.max(Number(totalRowSpan) || 0, 0);
-  const values = Array.from({ length: span }, () => Array(colCount).fill(""));
-  const rowLineUnits = Array.from({ length: span }, () => 1);
-  for (const placement of placements ?? []) {
-    const offset = Number(placement.rowOffset);
-    if (!Number.isFinite(offset) || offset < 0 || offset >= span) continue;
-    values[offset] = placement.values;
-    rowLineUnits[offset] = Math.max(1, Number(placement.lineUnits) || 1);
-  }
-  return { values, rowLineUnits };
-}
-
-/** Gán dòng vào ô thực tế trên lưới 40 hàng/trang; wrap trừ ngân sách trang, mỗi mục dữ liệu = 1 hàng sheet. */
-function buildPaginatedPlacements(detailRows, printProfile, columns) {
-  const rows = Array.isArray(detailRows) ? detailRows : [];
-  const cols = (Array.isArray(columns) ? columns : []).filter(Boolean);
-  if (!rows.length || !cols.length) {
-    return { placements: [], totalRowSpan: 0, pages: [] };
-  }
-
-  const rowsPerPage = printProfile.rowsPerPage;
-  const columnMeta = printProfile.columnMeta ?? {};
-  const pages = paginateChungTuPrintRows({
-    rows,
-    firstPageBodyHeight: rowsPerPage,
-    nextPageBodyHeight: rowsPerPage,
-    rowHeight: (row) => estimateRowUnits(row, cols, columnMeta),
-    carryRowHeight: 1,
-    transferRowHeight: 1,
-    amountFieldKey: printProfile.amountFieldKey,
-  });
-
-  const placements = [];
-  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
-    const page = pages[pageIndex];
-    const pageBase = pageIndex * rowsPerPage;
-    let nextOffset = pageBase;
-
-    if (page.carryIn > 0) {
-      const carryRow = buildCarryDetailRow({
-        kind: "carry-in",
-        amount: page.carryIn,
-        label: printProfile.carryInLabel,
-        labelFieldKey: printProfile.labelFieldKey,
-        amountFieldKey: printProfile.amountFieldKey,
-      });
-      placements.push({
-        rowOffset: nextOffset,
-        values: detailRowToCells(carryRow, cols),
-        lineUnits: 1,
-      });
-      nextOffset += 1;
-    }
-
-    for (let i = 0; i < page.rows.length; i += 1) {
-      const row = page.rows[i];
-      const lineUnits = Math.max(
-        1,
-        Number(page.rowHeights?.[i]) ||
-          rowLineUnitsForOutputRow(row, cols, columnMeta),
-      );
-      placements.push({
-        rowOffset: nextOffset,
-        values: detailRowToCells(row, cols),
-        lineUnits,
-      });
-      nextOffset += 1;
-    }
-
-    if (page.carryOut != null) {
-      const carryOutOffset = pageBase + rowsPerPage - 1;
-      while (nextOffset < carryOutOffset) {
-        placements.push({
-          rowOffset: nextOffset,
-          values: detailRowToCells(buildPaddingDetailRow(), cols),
-          lineUnits: 1,
-        });
-        nextOffset += 1;
-      }
-      const carryRow = buildCarryDetailRow({
-        kind: "carry-out",
-        amount: page.carryOut,
-        label: printProfile.carryOutLabel,
-        labelFieldKey: printProfile.labelFieldKey,
-        amountFieldKey: printProfile.amountFieldKey,
-      });
-      placements.push({
-        rowOffset: carryOutOffset,
-        values: detailRowToCells(carryRow, cols),
-        lineUnits: 1,
-      });
+  if (
+    Number.isFinite(totalTemplateRow) &&
+    Number.isFinite(templateRow) &&
+    templateRow >= totalTemplateRow
+  ) {
+    const totalRow0 = Number(layoutPlan?.totalRow0);
+    if (Number.isFinite(totalRow0)) {
+      return {
+        sheetTitle,
+        startRow: totalRow0 + (templateRow - totalTemplateRow),
+        startCol,
+      };
     }
   }
 
-  return {
-    placements,
-    totalRowSpan: computePlacedRowSpan(pages, rowsPerPage),
-    pages,
-  };
-}
-
-function expandDetailRowsWithCarryRows(detailRows, printProfile, columns) {
-  if (!printProfile?.enabled) return Array.isArray(detailRows) ? detailRows : [];
-  const { placements } = buildPaginatedPlacements(detailRows, printProfile, columns);
-  return placements
-    .slice()
-    .sort((a, b) => a.rowOffset - b.rowOffset)
-    .map((p) => {
-      const obj = {};
-      columns.forEach((col, idx) => {
-        obj[col] = p.values[idx];
-      });
-      const label = p.values[columns.indexOf(printProfile.labelFieldKey)] ?? "";
-      const amount = p.values[columns.indexOf(printProfile.amountFieldKey)];
-      if (label === printProfile.carryInLabel) {
-        obj.__carryRow = "carry-in";
-      } else if (label === printProfile.carryOutLabel) {
-        obj.__carryRow = "carry-out";
-      }
-      return obj;
-    });
-}
-
-function detailRowToCells(row, columns) {
-  if (row?.__padding) {
-    return columns.map(() => "");
-  }
-  return columns.map((col) => {
-    const v = row?.[col];
-    if (v == null) return "";
-    return v;
-  });
-}
-
-function buildDetailTableValues({ detailRows, columns }) {
-  return detailRows.map((row) => detailRowToCells(row, columns));
-}
-
-function buildChungTuSheetPrintRowsWithWrap({ detailRows, columns, printProfile }) {
-  const cols = (Array.isArray(columns) ? columns : []).filter(Boolean);
-  const rows = Array.isArray(detailRows) ? detailRows : [];
-  if (!cols.length || !rows.length) {
+  if (bounds) {
     return {
+      sheetTitle: bounds.sheetTitle,
+      startRow: bounds.startRow,
+      startCol: bounds.startCol,
+    };
+  }
+  if (Number.isFinite(templateRow)) {
+    return { sheetTitle, startRow: templateRow, startCol };
+  }
+  return null;
+}
+
+function resolveRowOverflowCount(cfg, dataRowCount) {
+  const slots = resolveDataSlotsInTemplate(cfg);
+  const count = Math.max(0, Number(dataRowCount) || 0);
+  return Math.max(0, count - slots);
+}
+
+function resolveRowInsertIndex(cfg, previousDataRowCount) {
+  const prevOverflow = resolveRowOverflowCount(cfg, previousDataRowCount);
+  return Number(cfg.totalTemplateRow) + prevOverflow;
+}
+
+function detailRowToCells(row, columnMappings) {
+  const mappings = Array.isArray(columnMappings) ? columnMappings : [];
+  if (!mappings.length) return [];
+  const cols = mappings.map((item) => Number(item.col));
+  const startCol = Math.min(...cols);
+  const endCol = Math.max(...cols);
+  const width = endCol - startCol + 1;
+  const cells = Array(width).fill("");
+  for (const mapping of mappings) {
+    const offset = Number(mapping.col) - startCol;
+    const v = row?.[mapping.fieldKey];
+    cells[offset] = v == null ? "" : v;
+  }
+  return cells;
+}
+
+function resolveTableWriteWindow(columnMappings, fallbackStartCol = 0) {
+  const mappings = Array.isArray(columnMappings) ? columnMappings : [];
+  if (!mappings.length) {
+    return { startCol: Number(fallbackStartCol) || 0, colCount: 0 };
+  }
+  const cols = mappings.map((item) => Number(item.col));
+  const startCol = Math.min(...cols);
+  const endCol = Math.max(...cols);
+  return { startCol, colCount: endCol - startCol + 1 };
+}
+
+function resolveTotalAmount(context, detailRows, amountFieldKey) {
+  const fromContext = context?.tongTienSo;
+  if (Number.isFinite(Number(fromContext))) return Number(fromContext);
+  return (detailRows ?? []).reduce((sum, row) => sum + amountFromRow(row, amountFieldKey), 0);
+}
+
+function resolveTotalAmountDisplay(context, detailRows, amountFieldKey) {
+  if (context?.tongTien != null && String(context.tongTien).trim()) {
+    return context.tongTien;
+  }
+  return resolveTotalAmount(context, detailRows, amountFieldKey);
+}
+
+/** Kế hoạch fill bảng chi tiết: N dòng dữ liệu + giữ dòng tổng mẫu (chỉ ghi thành tiền). */
+function buildDetailTableFillPlan({ detailRows, columns, tableCfg, printSheets, context, columnMeta }) {
+  const rows = Array.isArray(detailRows) ? detailRows : [];
+  const cfg = normalizeSheetTableConfig(tableCfg, printSheets);
+  const columnMappings = resolveDetailColumnMappings(
+    { ...tableCfg, columns: columns ?? tableCfg?.columns },
+    cfg.startCol,
+  );
+  const fieldKeys = columnMappings.map((item) => item.fieldKey);
+  const writeWindow = resolveTableWriteWindow(columnMappings, cfg.startCol);
+  const meta = columnMeta ?? {};
+  const dataSlotsInTemplate = resolveDataSlotsInTemplate(cfg);
+
+  if (!columnMappings.length || !rows.length) {
+    return {
+      ...cfg,
+      columnMappings,
+      fieldKeys,
+      writeStartCol: writeWindow.startCol,
+      writeColCount: writeWindow.colCount,
+      dataSlotsInTemplate,
+      dataRowCount: 0,
       values: [],
-      expandedRows: [],
       rowLineUnits: [],
-      placements: [],
-      totalRowSpan: 0,
+      totalRow0: resolveTotalRowIndex(cfg, 0),
+      totalAmount: resolveTotalAmountDisplay(context, rows, cfg.amountFieldKey),
     };
   }
 
-  if (!printProfile?.enabled) {
-    const values = buildDetailTableValues({ detailRows: rows, columns: cols });
-    return {
-      values,
-      expandedRows: rows,
-      rowLineUnits: rows.map(() => 1),
-      placements: rows.map((row, index) => ({
-        rowOffset: index,
-        values: detailRowToCells(row, cols),
-        lineUnits: 1,
-      })),
-      totalRowSpan: rows.length,
-    };
-  }
+  const values = rows.map((row) => detailRowToCells(row, columnMappings));
+  const rowLineUnits = rows.map((row) => estimateRowUnits(row, fieldKeys, meta));
 
-  const { placements, totalRowSpan } = buildPaginatedPlacements(rows, printProfile, cols);
-  const dense = buildDenseGridFromPlacements(placements, totalRowSpan, cols);
   return {
-    values: dense.values,
-    expandedRows: dense.values,
-    rowLineUnits: dense.rowLineUnits,
-    placements,
-    totalRowSpan,
-  };
-}
-
-function rowLineUnitsForOutputRow(row, columns, columnMeta) {
-  if (row?.__carryRow || row?.__padding) return 1;
-  return estimateRowUnits(row, columns, columnMeta);
-}
-
-function buildSheetPrintOutput({ detailRows, columns, tableCfg, printSheets }) {
-  const printProfile = normalizeSheetPrintConfig(tableCfg, printSheets);
-  if (printSheets?.columnMeta) {
-    printProfile.columnMeta = printSheets.columnMeta;
-  }
-  const cols = (Array.isArray(columns) ? columns : []).filter(Boolean);
-  const rows = Array.isArray(detailRows) ? detailRows : [];
-
-  const pageRowsFirst = Number(tableCfg?.pageRowsFirst);
-  const pageRowsNext = Number(tableCfg?.pageRowsNext);
-  if (!printProfile.enabled && pageRowsFirst > 0 && pageRowsNext > 0) {
-    const values = buildChungTuSheetPrintRows({
-      detailRows: rows,
-      columns: cols,
-      pageRowsFirst,
-      pageRowsNext,
-      amountFieldKey: printProfile.amountFieldKey,
-      labelFieldKey: printProfile.labelFieldKey,
-      carryInLabel: printProfile.carryInLabel,
-      carryOutLabel: printProfile.carryOutLabel,
-    });
-    return {
-      values,
-      rowLineUnits: values.map(() => 1),
-      printProfile,
-    };
-  }
-
-  if (printProfile.enabled) {
-    const wrapped = buildChungTuSheetPrintRowsWithWrap({
-      detailRows: rows,
-      columns: cols,
-      printProfile: {
-        ...printProfile,
-        columnMeta: printProfile.columnMeta ?? {},
-      },
-    });
-    return {
-      mode: "contiguous",
-      placements: wrapped.placements,
-      totalRowSpan: wrapped.totalRowSpan,
-      values: wrapped.values,
-      rowLineUnits: wrapped.rowLineUnits,
-      printProfile,
-    };
-  }
-
-  const values = buildDetailTableValues({ detailRows: rows, columns: cols });
-  return {
-    mode: "contiguous",
+    ...cfg,
+    columnMappings,
+    fieldKeys,
+    writeStartCol: writeWindow.startCol,
+    writeColCount: writeWindow.colCount,
+    dataSlotsInTemplate,
+    dataRowCount: rows.length,
     values,
-    rowLineUnits: values.map(() => 1),
-    totalRowSpan: values.length,
-    printProfile,
+    rowLineUnits,
+    totalRow0: resolveTotalRowIndex(cfg, rows.length),
+    totalAmount: resolveTotalAmountDisplay(context, rows, cfg.amountFieldKey),
   };
-}
-
-function buildChungTuSheetPrintRowsLegacyOrWrap({ detailRows, columns, tableCfg, printSheets }) {
-  return buildSheetPrintOutput({ detailRows, columns, tableCfg, printSheets }).values;
-}
-
-/** Vị trí ngắt trang (0-based row index) — mỗi đúng rowsPerPage dòng dữ liệu từ startRow. */
-function collectSheetPageBreakRowIndices({ startRow0, outputRowCount, rowsPerPage }) {
-  const start = Number(startRow0) || 0;
-  const count = Number(outputRowCount) || 0;
-  const step = Number(rowsPerPage) || CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage;
-  const indices = [];
-  for (let offset = step; offset < count; offset += step) {
-    indices.push(start + offset);
-  }
-  return indices;
 }
 
 async function fetchSheetTemplateColumnMeta(
@@ -395,26 +259,6 @@ function ptToPixelSize(pt) {
   return Math.round(n * (96 / 72));
 }
 
-function buildRowHeightUpdateRequests({ sheetId, startRow0, rowCount, rowHeightPt }) {
-  if (!Number.isFinite(Number(sheetId)) || !rowCount || rowCount <= 0) return [];
-  const pixelSize = ptToPixelSize(rowHeightPt);
-  return [
-    {
-      updateDimensionProperties: {
-        range: {
-          sheetId: Number(sheetId),
-          dimension: "ROWS",
-          startIndex: Number(startRow0),
-          endIndex: Number(startRow0) + Number(rowCount),
-        },
-        properties: { pixelSize },
-        fields: "pixelSize",
-      },
-    },
-  ];
-}
-
-/** Mỗi dòng wrap thêm 1 unit → chiều cao hàng = units × rowHeightPt. */
 function buildPerRowHeightUpdateRequests({ sheetId, startRow0, rowLineUnits, rowHeightPt }) {
   if (!Number.isFinite(Number(sheetId)) || !Array.isArray(rowLineUnits) || !rowLineUnits.length) {
     return [];
@@ -439,86 +283,302 @@ function buildPerRowHeightUpdateRequests({ sheetId, startRow0, rowLineUnits, row
   return requests;
 }
 
-/** Chiều cao từng hàng theo vị trí tuyệt đối (0-based). */
-function buildPerRowHeightUpdateRequestsFromPlacements({ sheetId, placements, rowHeightPt }) {
-  if (!Number.isFinite(Number(sheetId)) || !Array.isArray(placements) || !placements.length) {
-    return [];
-  }
-  const basePt = Number(rowHeightPt) || CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt;
-  const requests = [];
-  for (const p of placements) {
-    const absoluteRow0 = Number(p.absoluteRow0);
-    if (!Number.isFinite(absoluteRow0)) continue;
-    const units = Math.max(1, Number(p.lineUnits) || 1);
-    requests.push({
-      updateDimensionProperties: {
-        range: {
-          sheetId: Number(sheetId),
-          dimension: "ROWS",
-          startIndex: absoluteRow0,
-          endIndex: absoluteRow0 + 1,
-        },
-        properties: { pixelSize: ptToPixelSize(basePt * units) },
-        fields: "pixelSize",
+function buildCopyTemplateRowFormatRequest({
+  sheetId,
+  templateRow0,
+  startRow0,
+  dataRowCount,
+  startCol0,
+  colCount,
+  totalTemplateRow0,
+}) {
+  if (!Number.isFinite(Number(sheetId)) || !dataRowCount || dataRowCount <= 0) return null;
+  const startRow = Number(startRow0);
+  const totalTemplateRow = Number.isFinite(Number(totalTemplateRow0))
+    ? Number(totalTemplateRow0)
+    : startRow + 1;
+  const dataSlots = Math.max(1, totalTemplateRow - startRow);
+  const overflowCount = Math.max(0, Number(dataRowCount) - dataSlots);
+  if (!overflowCount) return null;
+
+  const startCol = Number(startCol0) || 0;
+  const endCol = startCol + Math.max(Number(colCount) || 1, 1);
+  const destStartRow = startRow + dataSlots;
+  return {
+    copyPaste: {
+      source: {
+        sheetId: Number(sheetId),
+        startRowIndex: Number(templateRow0),
+        endRowIndex: Number(templateRow0) + 1,
+        startColumnIndex: startCol,
+        endColumnIndex: endCol,
       },
-    });
-  }
-  return requests;
+      destination: {
+        sheetId: Number(sheetId),
+        startRowIndex: destStartRow,
+        endRowIndex: destStartRow + overflowCount,
+        startColumnIndex: startCol,
+        endColumnIndex: endCol,
+      },
+      pasteType: "PASTE_FORMAT",
+    },
+  };
 }
 
-function buildAutoResizeRowsRequest({ sheetId, startRow0, rowCount }) {
-  if (!Number.isFinite(Number(sheetId)) || !rowCount || rowCount <= 0) return null;
+function resolveOverflowFormatTarget(plan) {
+  const startRow = Number(plan?.startRow);
+  const totalTemplateRow = Number(plan?.totalTemplateRow);
+  if (!Number.isFinite(startRow) || !Number.isFinite(totalTemplateRow)) {
+    return { overflowCount: 0, destStartRow: startRow, dataSlots: 1 };
+  }
+  const dataSlots = Math.max(1, totalTemplateRow - startRow);
+  const overflowCount = Math.max(0, Number(plan?.dataRowCount) - dataSlots);
   return {
-    autoResizeDimensions: {
-      dimensions: {
+    overflowCount,
+    destStartRow: startRow + dataSlots,
+    dataSlots,
+  };
+}
+
+function buildCopyTotalRowFormatRequest({
+  sheetId,
+  totalTemplateRow0,
+  totalRow0,
+  startCol0,
+  colCount,
+}) {
+  if (!Number.isFinite(Number(sheetId))) return null;
+  const startCol = Number(startCol0) || 0;
+  const endCol = startCol + Math.max(Number(colCount) || 1, 1);
+  const sourceRow = Number(totalTemplateRow0);
+  const destRow = Number(totalRow0);
+  if (!Number.isFinite(sourceRow) || !Number.isFinite(destRow)) return null;
+  if (sourceRow === destRow) return null;
+  return {
+    copyPaste: {
+      source: {
+        sheetId: Number(sheetId),
+        startRowIndex: sourceRow,
+        endRowIndex: sourceRow + 1,
+        startColumnIndex: startCol,
+        endColumnIndex: endCol,
+      },
+      destination: {
+        sheetId: Number(sheetId),
+        startRowIndex: destRow,
+        endRowIndex: destRow + 1,
+        startColumnIndex: startCol,
+        endColumnIndex: endCol,
+      },
+      pasteType: "PASTE_FORMAT",
+    },
+  };
+}
+
+function buildInsertDataRowsRequest({ sheetId, insertAtRow0, insertCount }) {
+  const count = Number(insertCount);
+  if (!Number.isFinite(count) || count <= 0) return null;
+  const at = Number(insertAtRow0);
+  if (!Number.isFinite(at) || at < 0) return null;
+  return {
+    insertDimension: {
+      range: {
         sheetId: Number(sheetId),
         dimension: "ROWS",
-        startIndex: Number(startRow0),
-        endIndex: Number(startRow0) + Number(rowCount),
+        startIndex: at,
+        endIndex: at + count,
+      },
+      inheritFromBefore: true,
+    },
+  };
+}
+
+function buildInsertDataRowsRequestFromPlan({ sheetId, plan, previousDataRowCount }) {
+  const prev = Math.max(0, Number(previousDataRowCount) || 0);
+  const next = Math.max(0, Number(plan?.dataRowCount) || 0);
+  const prevOverflow = resolveRowOverflowCount(plan, prev);
+  const nextOverflow = resolveRowOverflowCount(plan, next);
+  const insertCount = Math.max(0, nextOverflow - prevOverflow);
+  if (!insertCount) return null;
+  const insertAtRow0 = Number(plan.totalTemplateRow) + prevOverflow;
+  return buildInsertDataRowsRequest({ sheetId, insertAtRow0, insertCount });
+}
+
+function buildDeleteExtraDataRowsRequest({ sheetId, plan, previousDataRowCount }) {
+  const prev = Math.max(0, Number(previousDataRowCount) || 0);
+  const next = Math.max(0, Number(plan?.dataRowCount) || 0);
+  const prevOverflow = resolveRowOverflowCount(plan, prev);
+  const nextOverflow = resolveRowOverflowCount(plan, next);
+  const deleteCount = Math.max(0, prevOverflow - nextOverflow);
+  if (!deleteCount) return null;
+  const deleteAtRow0 = Number(plan.totalTemplateRow) + nextOverflow;
+  return {
+    deleteDimension: {
+      range: {
+        sheetId: Number(sheetId),
+        dimension: "ROWS",
+        startIndex: deleteAtRow0,
+        endIndex: deleteAtRow0 + deleteCount,
       },
     },
   };
 }
 
-function buildWrapTextRepeatCellRequest({ sheetId, startRow0, startCol0, rowCount, colCount }) {
-  if (!Number.isFinite(Number(sheetId)) || !rowCount || !colCount) return null;
+function buildTableCellA1({ sheetName, row0, col0 }) {
+  const safeSheet = `'${String(sheetName || "Sheet1").replace(/'/g, "''")}'`;
+  let n = Number(col0) || 0;
+  let col = "";
+  while (n >= 0) {
+    col = String.fromCharCode((n % 26) + 65) + col;
+    n = Math.floor(n / 26) - 1;
+  }
+  return `${safeSheet}!${col}${Number(row0) + 1}`;
+}
+
+async function fetchTemplateRowCellFormats(
+  sheetsApi,
+  spreadsheetId,
+  { sheetTitle, row0, startCol0, colCount },
+) {
+  const count = Math.max(Number(colCount) || 1, 1);
+  const safeSheet = `'${String(sheetTitle || "Sheet1").replace(/'/g, "''")}'`;
+  const row1 = Number(row0) + 1;
+  const startCol1 = Number(startCol0) + 1;
+  const endCol1 = Number(startCol0) + count;
+  const range = `${safeSheet}!R${row1}C${startCol1}:R${row1}C${endCol1}`;
+
+  const res = await sheetsApi.spreadsheets.get({
+    spreadsheetId,
+    ranges: [range],
+    includeGridData: true,
+    fields: "sheets(data(rowData(values(userEnteredFormat,effectiveFormat))),properties(title)",
+  });
+  const sheet =
+    (res.data.sheets ?? []).find(
+      (item) => String(item.properties?.title ?? "") === String(sheetTitle),
+    ) ?? res.data.sheets?.[0];
+  const values = sheet?.data?.[0]?.rowData?.[0]?.values ?? [];
+  const formats = [];
+  for (let i = 0; i < count; i += 1) {
+    const cell = values[i];
+    const fmt = cell?.userEnteredFormat ?? cell?.effectiveFormat;
+    formats.push(fmt ? { userEnteredFormat: fmt } : {});
+  }
+  return formats;
+}
+
+async function fetchTemplateTotalRowCellFormats(
+  sheetsApi,
+  spreadsheetId,
+  { sheetTitle, totalTemplateRow0, startCol0, colCount },
+) {
+  return fetchTemplateRowCellFormats(sheetsApi, spreadsheetId, {
+    sheetTitle,
+    row0: totalTemplateRow0,
+    startCol0,
+    colCount,
+  });
+}
+
+function buildApplyDataRowFormatsRequest({
+  sheetId,
+  templateRowFormats,
+  startRow0,
+  dataRowCount,
+  startCol0,
+}) {
+  const count = Math.max(0, Number(dataRowCount) || 0);
+  if (!Number.isFinite(Number(sheetId)) || !count || !Array.isArray(templateRowFormats)) {
+    return null;
+  }
+  const startCol = Number(startCol0) || 0;
+  const rowValues = templateRowFormats.map((item) =>
+    item?.userEnteredFormat ? { userEnteredFormat: item.userEnteredFormat } : {},
+  );
+  if (!rowValues.length) return null;
   return {
-    repeatCell: {
+    updateCells: {
       range: {
         sheetId: Number(sheetId),
         startRowIndex: Number(startRow0),
-        endRowIndex: Number(startRow0) + Number(rowCount),
-        startColumnIndex: Number(startCol0),
-        endColumnIndex: Number(startCol0) + Number(colCount),
+        endRowIndex: Number(startRow0) + count,
+        startColumnIndex: startCol,
+        endColumnIndex: startCol + rowValues.length,
       },
-      cell: {
-        userEnteredFormat: {
-          wrapStrategy: "WRAP",
-          verticalAlignment: "TOP",
-        },
-      },
-      fields: "userEnteredFormat.wrapStrategy,userEnteredFormat.verticalAlignment",
+      rows: Array.from({ length: count }, () => ({ values: rowValues })),
+      fields: "userEnteredFormat",
     },
   };
+}
+
+function buildApplyTotalRowFormatRequest({ sheetId, totalRow0, startCol0, cellFormats }) {
+  if (!Number.isFinite(Number(sheetId)) || !Array.isArray(cellFormats) || !cellFormats.length) {
+    return null;
+  }
+  return {
+    updateCells: {
+      range: {
+        sheetId: Number(sheetId),
+        startRowIndex: Number(totalRow0),
+        endRowIndex: Number(totalRow0) + 1,
+        startColumnIndex: Number(startCol0) || 0,
+        endColumnIndex: (Number(startCol0) || 0) + cellFormats.length,
+      },
+      rows: [
+        {
+          values: cellFormats.map((item) =>
+            item?.userEnteredFormat ? { userEnteredFormat: item.userEnteredFormat } : {},
+          ),
+        },
+      ],
+      fields: "userEnteredFormat",
+    },
+  };
+}
+
+function buildTotalRowAmountCellA1({ sheetName, totalRow0, startCol0, columns, amountFieldKey, columnMappings }) {
+  const mappings = Array.isArray(columnMappings) ? columnMappings : [];
+  const key = String(amountFieldKey ?? "thanhTien").trim() || "thanhTien";
+  const fromMapping = mappings.find((item) => item.fieldKey === key);
+  if (fromMapping) {
+    return buildTableCellA1({
+      sheetName,
+      row0: totalRow0,
+      col0: Number(fromMapping.col),
+    });
+  }
+  const legacyColumns = Array.isArray(columns) ? columns : [];
+  const amountIndex = legacyColumns.indexOf(key);
+  const amountCol = amountIndex >= 0 ? amountIndex : Math.max(legacyColumns.length - 1, 0);
+  return buildTableCellA1({
+    sheetName,
+    row0: totalRow0,
+    col0: (Number(startCol0) || 0) + amountCol,
+  });
 }
 
 export {
   amountFromRow,
-  buildAutoResizeRowsRequest,
-  buildChungTuSheetPrintRowsLegacyOrWrap,
-  buildChungTuSheetPrintRowsWithWrap,
-  buildColumnMetaFromGridData,
-  buildDenseGridFromPlacements,
+  buildApplyDataRowFormatsRequest,
+  buildApplyTotalRowFormatRequest,
+  buildCopyTemplateRowFormatRequest,
+  resolveOverflowFormatTarget,
+  buildCopyTotalRowFormatRequest,
+  buildDeleteExtraDataRowsRequest,
+  buildDetailTableFillPlan,
+  buildInsertDataRowsRequest,
+  buildInsertDataRowsRequestFromPlan,
   buildPerRowHeightUpdateRequests,
-  buildPaginatedPlacements,
-  buildPerRowHeightUpdateRequestsFromPlacements,
-  buildSheetPrintOutput,
-  buildWrapTextRepeatCellRequest,
-  collectSheetPageBreakRowIndices,
+  buildTableCellA1,
+  buildTotalRowAmountCellA1,
+  fetchTemplateRowCellFormats,
+  fetchTemplateTotalRowCellFormats,
   estimateRowUnits,
-  expandDetailRowsWithCarryRows,
   fetchSheetTemplateColumnMeta,
-  normalizeSheetPrintConfig,
-  buildRowHeightUpdateRequests,
-  rowLineUnitsForOutputRow,
+  normalizeSheetTableConfig,
+  resolveDataSlotsInTemplate,
+  resolveNamedRangeTargetCell,
+  resolveRowInsertIndex,
+  resolveRowOverflowCount,
+  resolveTotalRowIndex,
 };

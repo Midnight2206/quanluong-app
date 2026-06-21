@@ -1,13 +1,15 @@
 import path from "node:path";
-import { google } from "googleapis";
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { logger } from "../../shared/utils/logger.js";
+import { createDriveClient } from "../../shared/utils/google-drive-fetch.api.js";
+import { createSheetsClient } from "../../shared/utils/google-sheets-fetch.api.js";
 import { CHUNG_TU_DEFAULT_SHEET_PRINT } from "./chung-tu-category.constants.js";
 import {
   getOAuthClient,
   getSystemChungTuDriveOAuthClient,
+  createSystemChungTuDriveOAuthClient,
   resolveSystemChungTuTemplateFolder,
 } from "../auth/google-drive-link.service.js";
 
@@ -83,8 +85,11 @@ function isPdfBuffer(buffer) {
  * @see https://developers.google.com/drive/api/guides/manage-uploads
  */
 async function driveResumableCreateUpload(oauth2Client, { metadata, sourceMime, buffer }) {
-  const tokenResponse = await oauth2Client.getAccessToken();
-  const accessToken = tokenResponse?.token;
+  let accessToken = oauth2Client.credentials?.access_token;
+  if (!accessToken) {
+    const tokenResponse = await oauth2Client.getAccessToken();
+    accessToken = tokenResponse?.token;
+  }
   if (!accessToken) {
     throw new AppError({
       message: "Không lấy được access token Google.",
@@ -183,26 +188,8 @@ function createEmptyFillRulesV2(templateKind = "document") {
       detailTable: null,
     },
     print: {
-      pdf: {
-        pageSize: "A4",
-        orientation: "portrait",
-        marginTopCm: 1.5,
-        marginRightCm: 1.5,
-        marginBottomCm: 1.5,
-        marginLeftCm: 1.5,
-        fontSizePt: 11,
-        table: {
-          headerLabels: [],
-          amountFieldKey: "thanhTien",
-          carryInLabel: "Mang sang",
-          carryOutLabel: "Cộng sang trang",
-          totalLabel: "Tổng thành tiền",
-        },
-      },
       sheets: {
-        rowsPerPage: CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage,
         rowHeightPt: CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt,
-        enabled: true,
       },
     },
     meta: {
@@ -252,52 +239,51 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
       rule,
       fieldKey: toString(x?.fieldKey),
       value: toString(x?.value),
+      templateRowIndex: Number.isFinite(Number(x?.templateRowIndex)) ? Number(x.templateRowIndex) : null,
+      templateColIndex: Number.isFinite(Number(x?.templateColIndex)) ? Number(x.templateColIndex) : null,
     };
   };
   const normalizeDetailTable = (x) => {
     if (!x || typeof x !== "object" || Array.isArray(x)) {
       return null;
     }
-    const columns = toArray(x.columns)
+    const columnMappings = toArray(x.columnMappings)
+      .map((item, index) => ({
+        col: Number.isFinite(Number(item?.col)) ? Number(item.col) : index,
+        label: toString(item?.label),
+        fieldKey: toString(item?.fieldKey),
+      }))
+      .filter((item) => item.fieldKey);
+    const legacyColumns = toArray(x.columns)
       .map((col) => (typeof col === "string" ? col.trim() : toString(col?.fieldKey)))
       .filter(Boolean);
+    const columns = columnMappings.length
+      ? columnMappings.map((item) => item.fieldKey)
+      : legacyColumns;
     if (!columns.length) {
       return null;
     }
+    const startRow = Number.isFinite(Number(x.startRow)) ? Number(x.startRow) : 8;
+    const templateRow = Number.isFinite(Number(x.templateRow)) ? Number(x.templateRow) : startRow;
+    const totalTemplateRow = Number.isFinite(Number(x.totalTemplateRow))
+      ? Number(x.totalTemplateRow)
+      : startRow + 1;
     return {
       sheetName: toString(x.sheetName),
-      startRow: Number.isFinite(Number(x.startRow)) ? Number(x.startRow) : 8,
+      headerRow: Number.isFinite(Number(x.headerRow)) ? Number(x.headerRow) : null,
+      startRow,
       startCol: Number.isFinite(Number(x.startCol)) ? Number(x.startCol) : 0,
+      templateRow,
+      totalTemplateRow,
       columns,
-      repeatHeaderEveryRows:
-        Number.isFinite(Number(x.repeatHeaderEveryRows)) && Number(x.repeatHeaderEveryRows) > 0
-          ? Number(x.repeatHeaderEveryRows)
-          : CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage,
-      repeatHeaderLabels: toArray(x.repeatHeaderLabels)
-        .map((label) => toString(label))
-        .filter(Boolean),
-      rowsPerPage:
-        Number.isFinite(Number(x.rowsPerPage)) && Number(x.rowsPerPage) > 0
-          ? Number(x.rowsPerPage)
-          : Number.isFinite(Number(x.pageRowsFirst)) && Number(x.pageRowsFirst) > 0
-            ? Number(x.pageRowsFirst)
-            : CHUNG_TU_DEFAULT_SHEET_PRINT.rowsPerPage,
+      columnMappings: columnMappings.length ? columnMappings : undefined,
       rowHeightPt:
         Number.isFinite(Number(x.rowHeightPt)) && Number(x.rowHeightPt) > 0
           ? Number(x.rowHeightPt)
           : CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt,
-      pageRowsFirst:
-        Number.isFinite(Number(x.pageRowsFirst)) && Number(x.pageRowsFirst) > 0
-          ? Number(x.pageRowsFirst)
-          : 0,
-      pageRowsNext:
-        Number.isFinite(Number(x.pageRowsNext)) && Number(x.pageRowsNext) > 0
-          ? Number(x.pageRowsNext)
-          : 0,
       amountFieldKey: toString(x.amountFieldKey) || "thanhTien",
       labelFieldKey: toString(x.labelFieldKey) || "tenHang",
-      carryInLabel: toString(x.carryInLabel) || "Mang sang",
-      carryOutLabel: toString(x.carryOutLabel) || "Cộng sang trang",
+      totalLabel: toString(x.totalLabel) || CHUNG_TU_DEFAULT_SHEET_PRINT.totalLabel,
     };
   };
   const normalizeSheetsPrint = (x) => {
@@ -309,42 +295,12 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
       return Math.max(min, Math.min(max, n));
     };
     return {
-      rowsPerPage: numberOrDefault(
-        src.rowsPerPage,
-        defaults.rowsPerPage,
-        1,
-        200,
+      rowHeightPt: numberOrDefault(
+        src.rowHeightPt,
+        defaults.rowHeightPt ?? CHUNG_TU_DEFAULT_SHEET_PRINT.rowHeightPt,
+        8,
+        48,
       ),
-      rowHeightPt: numberOrDefault(src.rowHeightPt, defaults.rowHeightPt, 8, 48),
-      enabled: src.enabled !== false,
-    };
-  };
-  const normalizePdfPrint = (x) => {
-    const defaults = createEmptyFillRulesV2(safeKind).print.pdf;
-    const src = x && typeof x === "object" && !Array.isArray(x) ? x : {};
-    const table = src.table && typeof src.table === "object" && !Array.isArray(src.table) ? src.table : {};
-    const numberOrDefault = (value, fallback, min, max) => {
-      const n = Number(value);
-      if (!Number.isFinite(n)) return fallback;
-      return Math.max(min, Math.min(max, n));
-    };
-    return {
-      pageSize: src.pageSize === "A4" ? "A4" : defaults.pageSize,
-      orientation: src.orientation === "landscape" ? "landscape" : "portrait",
-      marginTopCm: numberOrDefault(src.marginTopCm, defaults.marginTopCm, 0.5, 5),
-      marginRightCm: numberOrDefault(src.marginRightCm, defaults.marginRightCm, 0.5, 5),
-      marginBottomCm: numberOrDefault(src.marginBottomCm, defaults.marginBottomCm, 0.5, 5),
-      marginLeftCm: numberOrDefault(src.marginLeftCm, defaults.marginLeftCm, 0.5, 5),
-      fontSizePt: numberOrDefault(src.fontSizePt, defaults.fontSizePt, 8, 16),
-      table: {
-        headerLabels: toArray(table.headerLabels)
-          .map((label) => toString(label))
-          .filter(Boolean),
-        amountFieldKey: toString(table.amountFieldKey) || defaults.table.amountFieldKey,
-        carryInLabel: toString(table.carryInLabel) || defaults.table.carryInLabel,
-        carryOutLabel: toString(table.carryOutLabel) || defaults.table.carryOutLabel,
-        totalLabel: toString(table.totalLabel) || defaults.table.totalLabel,
-      },
     };
   };
 
@@ -357,7 +313,7 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
         regions: toArray(raw.regions).map(normalizeRegion),
       },
       sheets: { namedRanges: [], detailTable: null },
-      print: { pdf: normalizePdfPrint(raw.print?.pdf), sheets: normalizeSheetsPrint(raw.print?.sheets) },
+      print: { sheets: normalizeSheetsPrint(raw.print?.sheets) },
       meta: { templateKind: safeKind },
     };
   }
@@ -373,7 +329,6 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
       detailTable: normalizeDetailTable(raw.sheets?.detailTable),
     },
     print: {
-      pdf: normalizePdfPrint(raw.print?.pdf),
       sheets: normalizeSheetsPrint(raw.print?.sheets),
     },
     meta: {
@@ -412,7 +367,7 @@ async function getUserMidnightDriveContext(userId) {
 
 /** Drive tài khoản hệ thống — thư mục mẫu chứng từ (CHUNG_TU_SYSTEM_*). Không dùng Drive của user thường. */
 async function getSystemChungTuDriveContext() {
-  const oauth2Client = getSystemChungTuDriveOAuthClient();
+  const oauth2Client = await createSystemChungTuDriveOAuthClient();
   const folder = await resolveSystemChungTuTemplateFolder(oauth2Client);
   return {
     oauth2Client,
@@ -427,7 +382,7 @@ async function assertGoogleDocInTemplateFolder({
   templateFolderId,
   driveFileId,
 }) {
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   let data;
   try {
     const res = await drive.files.get({
@@ -491,7 +446,7 @@ async function listDriveTemplates({ userId }) {
   const { oauth2Client, templateFolderId, templateFolderWebViewLink, templateFolderName } =
     await getSystemChungTuDriveContext();
 
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const items = [];
   let pageToken;
   do {
@@ -671,7 +626,7 @@ async function listSpreadsheetNamedRanges({ userId, driveFileId }) {
     });
   }
 
-  const sheetsApi = google.sheets({ version: "v4", auth: oauth2Client });
+  const sheetsApi = createSheetsClient(oauth2Client);
   let res;
   try {
     res = await sheetsApi.spreadsheets.get({
@@ -829,7 +784,7 @@ async function importFileToGoogleWorkspace({
     }
   }
 
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const full = await drive.files.get({
     fileId: raw.id,
     fields: "id, name, mimeType, webViewLink, parents",
@@ -976,7 +931,7 @@ async function importOfficeBinaryToSystemTemplateFolder({
     }
   }
 
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const drive = createDriveClient(oauth2Client);
   const full = await drive.files.get({
     fileId: raw.id,
     fields: "id, name, mimeType, webViewLink, parents",

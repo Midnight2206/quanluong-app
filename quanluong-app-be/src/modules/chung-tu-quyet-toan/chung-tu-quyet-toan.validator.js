@@ -110,24 +110,6 @@ const templateFieldRegistryQuerySchema = z.object({
   categoryKey: z.string().max(80).optional(),
 });
 
-const excelTemplateQuerySchema = z.object({
-  categoryKey: z.string().min(1).max(80),
-});
-
-const excelTemplateUploadBodySchema = z.object({
-  categoryKey: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(80)),
-  displayName: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(200)),
-});
-
-const excelTemplateIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
-
-const excelTemplateMappingBodySchema = z.object({
-  mapping: z.unknown().optional(),
-  isActive: z.boolean().optional(),
-});
-
 const categoryKeyParamSchema = z.object({
   categoryKey: z.string().min(1).max(80),
 });
@@ -178,9 +160,11 @@ const chungTuUnitProfilePutBodySchema = z.object({
   signerTaiChinh: z.string().max(191).nullable().optional(),
 });
 
+const chungTuAggregationModeSchema = z.enum(["by-day", "by-unit", "full"]).optional();
+
 const chungTuDocumentsListQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
-  categoryKey: z.string().min(1).max(80),
+  categoryKey: z.string().min(1).max(80).optional(),
   from: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -207,12 +191,24 @@ const chungTuDocumentBaseBodySchema = z.object({
     .regex(/^\d{4}-\d{2}$/)
     .optional(),
   unitIds: z.array(z.coerce.number().int().positive()).max(500).optional(),
+  aggregationMode: chungTuAggregationModeSchema,
   issueSlipId: z.coerce.number().int().positive().optional(),
   templateDriveFileId: z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/).optional(),
+  templateDisplayName: z.string().max(200).optional(),
   settings: z.record(z.unknown()).optional(),
 });
 
 function refineChungTuDocumentBody(data, ctx) {
+  if (data.periodMonth) {
+    if (!data.unitIds?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Chứng từ theo tháng cần chọn ít nhất một đơn vị (unitIds).",
+        path: ["unitIds"],
+      });
+    }
+    return;
+  }
   if (data.categoryKey === "phieu-xuat-kho") {
     if (!data.issueSlipId) {
       ctx.addIssue({
@@ -221,15 +217,9 @@ function refineChungTuDocumentBody(data, ctx) {
         path: ["issueSlipId"],
       });
     }
-  } else if (data.categoryKey === "bang-ke-mua-hang") {
-    if (!data.periodMonth) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Bảng kê mua hàng cần periodMonth (YYYY-MM).",
-        path: ["periodMonth"],
-      });
-    }
-  } else if (!data.periodDate) {
+    return;
+  }
+  if (!data.periodDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Chứng từ theo ngày cần periodDate (YYYY-MM-DD).",
@@ -248,12 +238,17 @@ const chungTuContextPreviewBodySchema = chungTuDocumentBaseBodySchema.superRefin
   refineChungTuDocumentBody,
 );
 
-const excelBkmhExportBodySchema = z.object({
-  templateId: z.coerce.number().int().positive(),
-  unitId: z.coerce.number().int().positive(),
-  periodMonth: z.string().regex(/^\d{4}-\d{2}$/),
-  unitIds: z.array(z.coerce.number().int().positive()).min(1).max(500),
-  settings: z.record(z.unknown()).optional(),
+const templateTreeQuerySchema = z.object({
+  folderId: z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/).optional(),
+  categoryKey: z.string().min(1).max(80).optional(),
+});
+
+const templateTreeFileParamsSchema = z.object({
+  driveFileId: z
+    .string()
+    .min(8)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/),
 });
 
 export {
@@ -267,10 +262,6 @@ export {
   templateCatalogPatchBodySchema,
   templateCatalogQuerySchema,
   templateFieldRegistryQuerySchema,
-  excelTemplateQuerySchema,
-  excelTemplateUploadBodySchema,
-  excelTemplateIdParamSchema,
-  excelTemplateMappingBodySchema,
   putTemplateFillRulesBodySchema,
   categoryKeyParamSchema,
   categoryTemplateDriveParamsSchema,
@@ -281,5 +272,6 @@ export {
   documentKeyParamSchema,
   chungTuDocumentCreateBodySchema,
   chungTuContextPreviewBodySchema,
-  excelBkmhExportBodySchema,
+  templateTreeQuerySchema,
+  templateTreeFileParamsSchema,
 };

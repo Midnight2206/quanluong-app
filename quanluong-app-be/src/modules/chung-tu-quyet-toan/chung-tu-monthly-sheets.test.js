@@ -60,10 +60,11 @@ test("buildChungTuDocumentKey supports monthly BKMH with selected units", () => 
   assert.equal(
     buildChungTuDocumentKey({
       categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+      unitId: 9,
       periodMonth: "2026-04",
       unitIds: [3, 1, 3, 2],
     }),
-    "bang-ke-mua-hang:m:2026-04:units:1,2,3",
+    "bang-ke-mua-hang:m:2026-04:u:9:units:1,2,3",
   );
 });
 

@@ -37,3 +37,57 @@ export function resolveTemplateSheetTitle(sheetTitles) {
   const firstDaySheet = titles.find((title) => /^\d{2}$/.test(title));
   return firstDaySheet ?? titles[0] ?? "";
 }
+
+/** Ngày cuối tháng dạng YYYY-MM-DD (UTC). */
+export function lastDayOfMonth(periodMonth) {
+  const month = normalizePeriodMonth(periodMonth);
+  const [yearText, monthText] = month.split("-");
+  const year = Number(yearText);
+  const monthIndex = Number(monthText);
+  const dayCount = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
+  return `${month}-${String(dayCount).padStart(2, "0")}`;
+}
+
+/** Google Sheets tab title — loại ký tự cấm, giới hạn độ dài. */
+export function sanitizeSheetTitle(name, { maxLen = 31 } = {}) {
+  const raw = String(name ?? "").trim();
+  const cleaned = raw
+    .replace(/[\[\]:*?/\\]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+  const limit = Math.max(Number(maxLen) || 31, 1);
+  if (!cleaned) return "Sheet";
+  return cleaned.length > limit ? cleaned.slice(0, limit).trim() : cleaned;
+}
+
+/**
+ * @param {number[]} unitIds
+ * @param {Map<number, string>|Record<number, string>} unitNameById
+ * @returns {{ unitId: number, sheetTitle: string }[]}
+ */
+export function buildUnitSheetTitles(unitIds, unitNameById) {
+  const ids = normalizeMonthUnitIds(unitIds);
+  const nameMap =
+    unitNameById instanceof Map
+      ? unitNameById
+      : new Map(
+          Object.entries(unitNameById ?? {}).map(([k, v]) => [Number(k), String(v ?? "")]),
+        );
+  const usedTitles = new Set();
+  const result = [];
+  for (const unitId of ids) {
+    const baseName = nameMap.get(unitId)?.trim() || `Đơn vị ${unitId}`;
+    let title = sanitizeSheetTitle(baseName);
+    if (usedTitles.has(title)) {
+      const suffix = ` (${unitId})`;
+      const maxBase = Math.max(31 - suffix.length, 1);
+      title = `${sanitizeSheetTitle(baseName, { maxLen: maxBase })}${suffix}`;
+    }
+    if (usedTitles.has(title)) {
+      title = sanitizeSheetTitle(`Đơn vị ${unitId}`);
+    }
+    usedTitles.add(title);
+    result.push({ unitId, sheetTitle: title });
+  }
+  return result;
+}

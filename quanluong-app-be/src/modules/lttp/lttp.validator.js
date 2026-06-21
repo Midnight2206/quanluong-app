@@ -160,6 +160,8 @@ const createIssueSlipBodySchema = z.object({
   signerWriter: z.string().max(191).optional().nullable(),
   signerRecipient: z.string().max(191).optional().nullable(),
   signerApprover: z.string().max(191).optional().nullable(),
+  buyerUserId: z.coerce.number().int().positive().optional().nullable(),
+  buyerDisplayName: z.string().max(191).optional().nullable(),
 });
 
 const updateIssueSlipBodySchema = z.object({
@@ -175,6 +177,8 @@ const updateIssueSlipBodySchema = z.object({
   signerWriter: z.string().max(191).optional().nullable(),
   signerRecipient: z.string().max(191).optional().nullable(),
   signerApprover: z.string().max(191).optional().nullable(),
+  buyerUserId: z.coerce.number().int().positive().optional().nullable(),
+  buyerDisplayName: z.string().max(191).optional().nullable(),
 });
 
 const listIssueSlipsQuerySchema = z.object({
@@ -259,11 +263,14 @@ const upsertIssueFormDefaultsBodySchema = z.object({
   signerApprover: z.string().max(191).optional().nullable(),
   defaultRecipientUnitId: z.coerce.number().int().positive().optional().nullable(),
   defaultRecipientUserId: z.coerce.number().int().positive().optional().nullable(),
+  defaultBuyerUserId: z.coerce.number().int().positive().optional().nullable(),
 });
 
 const listRecipientUsersQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
 });
+
+const listBuyerUsersQuerySchema = listRecipientUsersQuerySchema;
 
 const recipientDefaultByUnitQuerySchema = z.object({
   recipientUnitId: z.coerce.number().int().positive(),
@@ -272,6 +279,14 @@ const recipientDefaultByUnitQuerySchema = z.object({
 const putRecipientDefaultUserBodySchema = z.object({
   recipientUnitId: z.coerce.number().int().positive(),
   userId: z.coerce.number().int().positive().optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+});
+
+const putBuyerDefaultUserBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  userId: z.coerce.number().int().positive().optional().nullable(),
+  /** Mặc định true: gán người mua cho mọi phiếu xuất của đơn vị kho. */
+  applyToAllSlips: z.boolean().optional().default(true),
 });
 
 const lttpSupplierQuerySchema = z.object({
@@ -325,6 +340,7 @@ export {
   createLttpSupplierBodySchema,
   patchLttpSupplierBodySchema,
   listRecipientUsersQuerySchema,
+  listBuyerUsersQuerySchema,
   nextIssueSlipSerialQuerySchema,
   listPriceTablesQuerySchema,
   patchCommodityBodySchema,
@@ -333,6 +349,7 @@ export {
   foodGroupIdParamsSchema,
   priceTableParamsSchema,
   putRecipientDefaultUserBodySchema,
+  putBuyerDefaultUserBodySchema,
   recipientDefaultByUnitQuerySchema,
   updateIssueSlipBodySchema,
   upsertIssueFormDefaultsBodySchema,

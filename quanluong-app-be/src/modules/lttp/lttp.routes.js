@@ -41,6 +41,8 @@ import {
   listIssueSlipsController,
   listPriceTablesController,
   listRecipientDefaultUsersInScopeController,
+  listBuyerDefaultsInScopeController,
+  listBuyerUsersController,
   listRecipientUsersController,
   patchCommodityController,
   patchFoodGroupController,
@@ -49,6 +51,7 @@ import {
   patchPriceTableController,
   putIssueFormDefaultsController,
   putRecipientDefaultUserController,
+  putBuyerDefaultForUnitController,
   resolveIssueSlipLineController,
   resyncIssueSlipPricesController,
   updateIssueSlipController,
@@ -73,6 +76,7 @@ import {
   dailyOrderSummaryQuerySchema,
   listIssueSlipsQuerySchema,
   listRecipientUsersQuerySchema,
+  listBuyerUsersQuerySchema,
   nextIssueSlipSerialQuerySchema,
   listPriceTablesQuerySchema,
   lttpSupplierQuerySchema,
@@ -84,6 +88,7 @@ import {
   patchPriceTableBodySchema,
   priceTableParamsSchema,
   putRecipientDefaultUserBodySchema,
+  putBuyerDefaultUserBodySchema,
   recipientDefaultByUnitQuerySchema,
   updateIssueSlipBodySchema,
   upsertIssueFormDefaultsBodySchema,
@@ -241,6 +246,27 @@ lttpRouter.put(
   validateRequest({ body: putRecipientDefaultUserBodySchema }),
   permissionMiddleware([routePermissions.putRecipientDefaultUser]),
   asyncHandler(putRecipientDefaultUserController),
+);
+
+lttpRouter.get(
+  "/buyer-users",
+  validateRequest({ query: listBuyerUsersQuerySchema }),
+  permissionMiddleware([routePermissions.listBuyerUsers]),
+  asyncHandler(listBuyerUsersController),
+);
+
+lttpRouter.get(
+  "/buyer-default-users",
+  permissionMiddleware([routePermissions.listBuyerDefaultUsers]),
+  asyncHandler(listBuyerDefaultsInScopeController),
+);
+
+lttpRouter.put(
+  "/buyer-default-user",
+  validateRequest({ body: putBuyerDefaultUserBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.putBuyerDefaultUser]),
+  asyncHandler(putBuyerDefaultForUnitController),
 );
 
 lttpRouter.post(

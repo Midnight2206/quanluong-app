@@ -1,33 +1,20 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Loader2, Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   useChungTuTemplateFillMappingQuery,
   usePutChungTuTemplateFillMappingMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
-
-const DETAIL_COLUMN_OPTIONS = [
-  { key: "stt", label: "STT" },
-  { key: "tenHang", label: "Tên hàng" },
-  { key: "maSo", label: "Mã số" },
-  { key: "dvt", label: "ĐVT" },
-  { key: "nguoiBan", label: "Người bán" },
-  { key: "soLuong", label: "Số lượng" },
-  { key: "donGia", label: "Đơn giá" },
-  { key: "thanhTien", label: "Thành tiền" },
-  { key: "ghiChu", label: "Ghi chú" },
-];
-
-const DETAIL_COLUMN_LABELS = Object.fromEntries(
-  DETAIL_COLUMN_OPTIONS.map((col) => [col.key, col.label]),
-);
+import {
+  CHUNG_TU_DETAIL_FIELD_CATALOG,
+  detailFieldLabel,
+} from "@/pages/chungTuQuyetToan/chungTuDetailFieldCatalog";
+import { excelColumnLetter, mergeColumnMappingsWithSuggestedSlots } from "@/pages/chungTuQuyetToan/chungTuFormat";
 
 const DEFAULT_SHEET_PRINT = {
-  rowsPerPage: 40,
   rowHeightPt: 18,
-  enabled: true,
 };
 
 function buildFieldOptions(fieldRegistry) {
@@ -43,26 +30,16 @@ function buildFieldOptions(fieldRegistry) {
   for (const f of fieldRegistry?.derivedFields ?? []) {
     push(f.fieldKey, f.label, "Tự động từ dữ liệu");
   }
+  for (const f of fieldRegistry?.detailFields ?? CHUNG_TU_DETAIL_FIELD_CATALOG) {
+    push(f.fieldKey, f.label, "Cột bảng chi tiết");
+  }
   for (const t of fieldRegistry?.dbTables ?? []) {
     for (const c of t.columns ?? []) {
-      push(c.fieldKeyHint, c.column, "Cột bảng chi tiết");
+      push(c.fieldKeyHint, c.column, "Cột bảng chi tiết (legacy)");
     }
   }
 
   return options;
-}
-
-function namedRangeColCount(grid) {
-  if (!grid) return 1;
-  const start = Number(grid.startColumnIndex ?? 0);
-  const end = Number(grid.endColumnIndex ?? start + 1);
-  return Math.max(1, end - start);
-}
-
-function ruleSelectValue(rule) {
-  if (rule === "static") return "static";
-  if (rule === "charGrid") return "charGrid";
-  return "field";
 }
 
 function emptyFillRules() {
@@ -78,8 +55,50 @@ function emptyFillRules() {
   };
 }
 
-function columnLabel(key) {
-  return DETAIL_COLUMN_LABELS[key] ?? key;
+function resolveColumnMappings(detailTable, sheetHeaders, suggestedColumnSlots) {
+  const saved = Array.isArray(detailTable?.columnMappings) ? detailTable.columnMappings : [];
+
+  if (Array.isArray(suggestedColumnSlots) && suggestedColumnSlots.length) {
+    return mergeColumnMappingsWithSuggestedSlots(saved, suggestedColumnSlots);
+  }
+
+  const mapSaved = (items) =>
+    items.map((item) => ({
+      col: Number(item.col),
+      label: String(item.label ?? "").trim() || detailFieldLabel(item.fieldKey),
+      fieldKey: String(item.fieldKey ?? "").trim(),
+    }));
+
+  if (saved.length) {
+    return mapSaved(saved);
+  }
+
+  const headerRows = sheetHeaders?.headerRows ?? [];
+  if (!headerRows.length) {
+    const legacy = Array.isArray(detailTable?.columns) ? detailTable.columns : [];
+    const startCol = Number(detailTable?.startCol ?? 0);
+    return legacy.map((fieldKey, index) => ({
+      col: startCol + index,
+      label: detailFieldLabel(fieldKey),
+      fieldKey: String(fieldKey ?? "").trim(),
+    }));
+  }
+
+  let best = headerRows[0];
+  let bestScore = -1;
+  for (const row of headerRows) {
+    const score = row.cells?.filter((cell) => cell.fieldKey).length ?? 0;
+    if (score > bestScore) {
+      best = row;
+      bestScore = score;
+    }
+  }
+
+  return (best?.cells ?? []).map((cell) => ({
+    col: Number(cell.col),
+    label: String(cell.label ?? "").trim(),
+    fieldKey: String(cell.fieldKey ?? "").trim(),
+  }));
 }
 
 /**
@@ -113,32 +132,21 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
   }, [data?.fillRules, driveFileId]);
 
   const fieldOptions = useMemo(() => buildFieldOptions(data?.fieldRegistry), [data?.fieldRegistry]);
-
-  const namedRanges = fillRules?.sheets?.namedRanges ?? [];
-  const detailTable = fillRules?.sheets?.detailTable;
-  const selectedColumns = detailTable?.columns ?? [];
-  const availableColumns = DETAIL_COLUMN_OPTIONS.filter(
-    (col) => !selectedColumns.includes(col.key),
+  const detailFieldOptions = useMemo(
+    () => fieldOptions.filter((opt) => opt.group.includes("Cột bảng")),
+    [fieldOptions],
   );
 
-  const namedRangeMetaByName = useMemo(() => {
-    const map = new Map();
-    for (const item of data?.namedRanges ?? []) {
-      if (item?.name) map.set(item.name, item);
-    }
-    return map;
-  }, [data?.namedRanges]);
-
-  const updateNamedRange = (index, patch) => {
-    setFillRules((prev) => {
-      const next = { ...prev, sheets: { ...prev.sheets } };
-      const rows = [...(next.sheets.namedRanges ?? [])];
-      rows[index] = { ...rows[index], ...patch };
-      next.sheets.namedRanges = rows;
-      return next;
-    });
-    setSaveOk(false);
-  };
+  const detailTable = fillRules?.sheets?.detailTable;
+  const columnMappings = useMemo(
+    () =>
+      resolveColumnMappings(
+        detailTable,
+        data?.sheetHeaders,
+        data?.suggestedColumnSlots,
+      ),
+    [detailTable, data?.sheetHeaders, data?.suggestedColumnSlots],
+  );
 
   const updateDetailTable = (patch) => {
     setFillRules((prev) => {
@@ -149,61 +157,56 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
     setSaveOk(false);
   };
 
-  const addDetailColumn = (colKey) => {
-    if (!colKey || selectedColumns.includes(colKey)) return;
-    updateDetailTable({ columns: [...selectedColumns, colKey] });
-  };
-
-  const removeDetailColumn = (colKey) => {
-    updateDetailTable({ columns: selectedColumns.filter((key) => key !== colKey) });
-  };
-
-  const moveDetailColumn = (index, direction) => {
-    const next = [...selectedColumns];
-    const target = index + direction;
-    if (target < 0 || target >= next.length) return;
-    const tmp = next[index];
-    next[index] = next[target];
-    next[target] = tmp;
-    updateDetailTable({ columns: next });
+  const updateColumnMapping = (index, patch) => {
+    const next = columnMappings.map((item, i) => (i === index ? { ...item, ...patch } : item));
+    updateDetailTable({
+      columnMappings: next,
+      columns: next.map((item) => item.fieldKey).filter(Boolean),
+      amountFieldKey:
+        next.find((item) => item.fieldKey === "thanhTien")?.fieldKey ||
+        detailTable?.amountFieldKey ||
+        "thanhTien",
+      labelFieldKey:
+        next.find((item) => item.fieldKey === "tenHang")?.fieldKey ||
+        detailTable?.labelFieldKey ||
+        "tenHang",
+    });
   };
 
   const handleSave = async () => {
     setSaveError(null);
     setSaveOk(false);
     try {
+      const mappings = columnMappings.filter((item) => item.fieldKey);
       await putMapping({
         categoryKey,
         driveFileId,
         fillRules: {
           version: 2,
           sheets: {
-            namedRanges: namedRanges.map((nr) => ({
-              rangeName: nr.rangeName,
-              sheetName: nr.sheetName ?? "",
-              rule:
-                nr.rule === "static" ? "static" : nr.rule === "charGrid" ? "charGrid" : "field",
-              fieldKey: nr.rule === "static" ? "" : (nr.fieldKey ?? ""),
-              value: nr.rule === "static" ? (nr.value ?? "") : "",
-            })),
-            detailTable: detailTable?.columns?.length
+            namedRanges: [],
+            detailTable: mappings.length
               ? {
-                  sheetName: detailTable.sheetName || "Sheet1",
-                  startRow: Number(detailTable.startRow ?? 8),
-                  startCol: Number(detailTable.startCol ?? 0),
-                  columns: detailTable.columns,
-                  repeatHeaderEveryRows: Number(
-                    detailTable.repeatHeaderEveryRows ?? DEFAULT_SHEET_PRINT.rowsPerPage,
+                  sheetName: detailTable?.sheetName || data?.sheetHeaders?.sheetTitle || "Sheet1",
+                  headerRow:
+                    detailTable?.headerRow ??
+                    data?.sheetHeaders?.headerRows?.[0]?.rowNumber ??
+                    null,
+                  startRow: Number(detailTable?.startRow ?? 8),
+                  startCol: Number(
+                    detailTable?.startCol ??
+                      (mappings.length ? Math.min(...mappings.map((m) => m.col)) : 0),
                   ),
-                  repeatHeaderLabels: Array.isArray(detailTable.repeatHeaderLabels)
-                    ? detailTable.repeatHeaderLabels
-                    : [],
-                  rowsPerPage: DEFAULT_SHEET_PRINT.rowsPerPage,
+                  templateRow: Number(detailTable?.templateRow ?? detailTable?.startRow ?? 8),
+                  totalTemplateRow: Number(
+                    detailTable?.totalTemplateRow ?? Number(detailTable?.startRow ?? 8) + 1,
+                  ),
+                  columnMappings: mappings,
+                  columns: mappings.map((item) => item.fieldKey),
                   rowHeightPt: DEFAULT_SHEET_PRINT.rowHeightPt,
-                  amountFieldKey: detailTable.amountFieldKey || "thanhTien",
-                  labelFieldKey: detailTable.labelFieldKey || "tenHang",
-                  carryInLabel: detailTable.carryInLabel || "Mang sang",
-                  carryOutLabel: detailTable.carryOutLabel || "Cộng sang trang",
+                  amountFieldKey: detailTable?.amountFieldKey || "thanhTien",
+                  labelFieldKey: detailTable?.labelFieldKey || "tenHang",
+                  totalLabel: detailTable?.totalLabel || "Tổng cộng",
                 }
               : null,
           },
@@ -228,7 +231,7 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
     return (
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Đang tải map Named range…
+        Đang tải map mẫu…
       </p>
     );
   }
@@ -266,115 +269,35 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
       </div>
 
       <div className="rounded-lg border border-border/70 bg-muted/20 p-2.5 text-[10px] leading-relaxed text-muted-foreground">
-        <p className="font-semibold text-foreground">In / phân trang (chuẩn)</p>
+        <p className="font-semibold text-foreground">Ghi bảng chi tiết</p>
         <p className="mt-1">
-          Mỗi trang <strong>40 dòng</strong> (budget in), chiều cao cơ bản <strong>18pt/dòng</strong>.
-          Ô wrap thêm 1 dòng → trừ 1 trong 40 và hàng cao thêm 18pt sau khi đồng bộ. App gọi{" "}
-          <span className="font-mono">autoResizeDimensions</span> rồi chốt chiều cao theo số dòng wrap.
+          Dòng tổng trên mẫu (<strong>dòng tổng mẫu</strong>) được giữ nguyên định dạng — app chỉ
+          ghi <strong>ô thành tiền</strong>. Khi có nhiều dòng LTTP, app chèn thêm dòng dữ liệu
+          phía trên dòng tổng mẫu.
         </p>
         <p className="mt-1">
-          App chỉ fill: <strong>số</strong>, <strong>ngày tháng năm</strong>, <strong>tổng tiền bằng chữ</strong>{" "}
-          và bảng chi tiết LTTP. Đơn vị, chữ ký, tiêu đề… để cố định trên template.
+          Chọn logic fill cho từng cột (A, B, C, …). Với mẫu có tiêu đề bị merge, app vẫn hiển
+          thị đủ các cột cố định theo loại chứng từ.
         </p>
       </div>
 
-      {namedRanges.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Mẫu chưa có Named range. Trên Sheets: chọn ô → Dữ liệu → Named ranges, đặt tên rồi map field
-          bên dưới.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border/80">
-          <table className="w-full min-w-[480px] text-left text-xs">
-            <thead>
-              <tr className="border-b border-border bg-muted/40 text-[10px] uppercase text-muted-foreground">
-                <th className="px-2 py-1.5 font-semibold">Named range</th>
-                <th className="px-2 py-1.5 font-semibold">Kiểu</th>
-                <th className="px-2 py-1.5 font-semibold">Dữ liệu nguồn</th>
-              </tr>
-            </thead>
-            <tbody>
-              {namedRanges.map((nr, idx) => {
-                const meta = namedRangeMetaByName.get(nr.rangeName);
-                const boxCount = namedRangeColCount(meta?.grid);
-                return (
-                  <tr key={nr.rangeName || idx} className="border-b border-border/50 last:border-0">
-                    <td className="px-2 py-1.5">
-                      <span className="font-mono text-[11px]">{nr.rangeName}</span>
-                      {boxCount > 1 ? (
-                        <span className="mt-0.5 block text-[9px] text-muted-foreground">
-                          {boxCount} ô ngang
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-2 py-1.5">
-                      <select
-                        className="w-full min-w-[100px] rounded border border-border bg-background px-1.5 py-1 text-xs"
-                        value={ruleSelectValue(nr.rule)}
-                        disabled={!canWrite}
-                        onChange={(e) => {
-                          const nextRule = e.target.value;
-                          updateNamedRange(idx, {
-                            rule: nextRule,
-                            fieldKey: nextRule === "static" ? "" : nr.fieldKey,
-                            value: nextRule === "field" || nextRule === "charGrid" ? "" : nr.value,
-                          });
-                        }}
-                      >
-                        <option value="field">Một ô</option>
-                        <option value="charGrid">Lưới ký tự</option>
-                        <option value="static">Cố định (template)</option>
-                      </select>
-                    </td>
-                    <td className="px-2 py-1.5">
-                      {nr.rule === "static" ? (
-                        <input
-                          type="text"
-                          className="w-full rounded border border-border bg-background px-1.5 py-1 text-xs"
-                          value={nr.value ?? ""}
-                          disabled={!canWrite}
-                          onChange={(e) => updateNamedRange(idx, { value: e.target.value })}
-                          placeholder="Giữ nguyên trên template"
-                        />
-                      ) : (
-                        <select
-                          className="w-full min-w-[160px] rounded border border-border bg-background px-1.5 py-1 text-xs"
-                          value={nr.fieldKey ?? ""}
-                          disabled={!canWrite}
-                          onChange={(e) => updateNamedRange(idx, { fieldKey: e.target.value })}
-                        >
-                          <option value="">— Chọn field —</option>
-                          {fieldOptions.map((opt) => (
-                            <option key={opt.fieldKey} value={opt.fieldKey}>
-                              {opt.label} ({opt.fieldKey})
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
       <div className="space-y-2 rounded-lg border border-border/80 bg-muted/20 p-2.5">
-        <h5 className="text-[10px] font-semibold uppercase text-foreground">Bảng chi tiết (dòng LTTP)</h5>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <h5 className="text-[10px] font-semibold uppercase text-foreground">
+          Cột bảng chi tiết
+        </h5>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <label className="space-y-0.5">
             <span className="text-[10px] text-muted-foreground">Tên sheet</span>
             <input
               type="text"
               className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.sheetName ?? "Sheet1"}
+              value={detailTable?.sheetName ?? data?.sheetHeaders?.sheetTitle ?? "Sheet1"}
               disabled={!canWrite}
               onChange={(e) => updateDetailTable({ sheetName: e.target.value })}
             />
           </label>
           <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Dòng bắt đầu (0-based)</span>
+            <span className="text-[10px] text-muted-foreground">Dòng dữ liệu đầu (0-based)</span>
             <input
               type="number"
               min={0}
@@ -385,80 +308,94 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
             />
           </label>
           <label className="space-y-0.5">
-            <span className="text-[10px] text-muted-foreground">Cột bắt đầu (0-based)</span>
+            <span className="text-[10px] text-muted-foreground">Dòng mẫu định dạng (0-based)</span>
             <input
               type="number"
               min={0}
               className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
-              value={detailTable?.startCol ?? 0}
+              value={detailTable?.templateRow ?? detailTable?.startRow ?? 8}
               disabled={!canWrite}
-              onChange={(e) => updateDetailTable({ startCol: Number(e.target.value) })}
+              onChange={(e) => updateDetailTable({ templateRow: Number(e.target.value) })}
+            />
+          </label>
+          <label className="space-y-0.5">
+            <span className="text-[10px] text-muted-foreground">Dòng tổng mẫu (0-based)</span>
+            <input
+              type="number"
+              min={0}
+              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+              value={
+                detailTable?.totalTemplateRow ?? Number(detailTable?.startRow ?? 8) + 1
+              }
+              disabled={!canWrite}
+              onChange={(e) => updateDetailTable({ totalTemplateRow: Number(e.target.value) })}
+            />
+          </label>
+          <label className="space-y-0.5">
+            <span className="text-[10px] text-muted-foreground">Dòng tiêu đề cột (0-based)</span>
+            <input
+              type="number"
+              min={0}
+              className="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+              value={
+                detailTable?.headerRow ??
+                data?.sheetHeaders?.headerRows?.[0]?.rowNumber ??
+                ""
+              }
+              disabled={!canWrite}
+              onChange={(e) => updateDetailTable({ headerRow: Number(e.target.value) })}
             />
           </label>
         </div>
 
-        <div className="space-y-1">
-          <span className="text-[10px] text-muted-foreground">Thứ tự cột xuất ra sheet</span>
-          {selectedColumns.length === 0 ? (
-            <p className="text-[10px] text-muted-foreground">Chưa chọn cột nào.</p>
-          ) : (
-            <ul className="space-y-1">
-              {selectedColumns.map((colKey, index) => (
-                <li
-                  key={colKey}
-                  className="flex items-center gap-2 rounded border border-border/70 bg-background/80 px-2 py-1"
-                >
-                  <span className="min-w-0 flex-1 text-xs font-medium">{columnLabel(colKey)}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground">{colKey}</span>
-                  {canWrite ? (
-                    <div className="flex gap-0.5">
-                      <button
-                        type="button"
-                        className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-                        disabled={index === 0}
-                        onClick={() => moveDetailColumn(index, -1)}
-                        aria-label="Lên"
+        {columnMappings.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground">
+            Không đọc được tiêu đề cột từ mẫu — kiểm tra dòng header trên Google Sheets.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-border/80">
+            <table className="w-full min-w-[520px] text-left text-xs">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-[10px] uppercase text-muted-foreground">
+                  <th className="px-2 py-1.5 font-semibold">Cột / tiêu đề</th>
+                  <th className="px-2 py-1.5 font-semibold">Vị trí</th>
+                  <th className="px-2 py-1.5 font-semibold">Logic fill dữ liệu</th>
+                </tr>
+              </thead>
+              <tbody>
+                {columnMappings.map((mapping, index) => (
+                  <tr key={`${mapping.col}-${mapping.label}`} className="border-b border-border/50">
+                    <td className="px-2 py-1.5 font-medium">
+                      {(mapping.fieldKey ? detailFieldLabel(mapping.fieldKey) : null) ||
+                        mapping.label ||
+                        "—"}
+                    </td>
+                    <td className="px-2 py-1.5 font-mono text-[10px] text-muted-foreground">
+                      {excelColumnLetter(mapping.col)} ({mapping.col})
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <select
+                        className="w-full min-w-[180px] rounded border border-border bg-background px-1.5 py-1 text-xs"
+                        value={mapping.fieldKey ?? ""}
+                        disabled={!canWrite}
+                        onChange={(e) =>
+                          updateColumnMapping(index, { fieldKey: e.target.value })
+                        }
                       >
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
-                        disabled={index === selectedColumns.length - 1}
-                        onClick={() => moveDetailColumn(index, 1)}
-                        aria-label="Xuống"
-                      >
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded px-1.5 text-[10px] text-destructive hover:bg-destructive/10"
-                        onClick={() => removeDetailColumn(colKey)}
-                      >
-                        Bỏ
-                      </button>
-                    </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {canWrite && availableColumns.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {availableColumns.map((col) => (
-              <button
-                key={col.key}
-                type="button"
-                className="rounded border border-dashed border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:border-primary hover:text-primary"
-                onClick={() => addDetailColumn(col.key)}
-              >
-                + {col.label}
-              </button>
-            ))}
+                        <option value="">— Không fill —</option>
+                        {detailFieldOptions.map((opt) => (
+                          <option key={opt.fieldKey} value={opt.fieldKey}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ) : null}
+        )}
       </div>
 
       {saveError ? <p className="text-xs text-destructive">{saveError}</p> : null}

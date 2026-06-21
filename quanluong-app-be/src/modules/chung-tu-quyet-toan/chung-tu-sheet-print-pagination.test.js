@@ -2,20 +2,35 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  buildChungTuSheetPrintRowsWithWrap,
-  buildPaginatedPlacements,
+  buildCopyTemplateRowFormatRequest,
+  buildDeleteExtraDataRowsRequest,
+  buildDetailTableFillPlan,
+  buildInsertDataRowsRequestFromPlan,
   buildPerRowHeightUpdateRequests,
-  buildSheetPrintOutput,
+  buildTotalRowAmountCellA1,
   estimateRowUnits,
-  expandDetailRowsWithCarryRows,
-  normalizeSheetPrintConfig,
+  normalizeSheetTableConfig,
+  resolveOverflowFormatTarget,
+  resolveNamedRangeTargetCell,
+  resolveTotalRowIndex,
 } from "./chung-tu-sheet-print-pagination.js";
 
-test("normalizeSheetPrintConfig defaults to 40 rows and 18pt", () => {
-  const cfg = normalizeSheetPrintConfig({}, {});
-  assert.equal(cfg.rowsPerPage, 40);
+test("normalizeSheetTableConfig defaults start/template/total rows", () => {
+  const cfg = normalizeSheetTableConfig({ startRow: 8 }, {});
+  assert.equal(cfg.startRow, 8);
+  assert.equal(cfg.templateRow, 8);
+  assert.equal(cfg.totalTemplateRow, 9);
   assert.equal(cfg.rowHeightPt, 18);
-  assert.equal(cfg.enabled, true);
+});
+
+test("resolveTotalRowIndex keeps template total row for single data line", () => {
+  const cfg = normalizeSheetTableConfig({ startRow: 8, totalTemplateRow: 9 }, {});
+  assert.equal(resolveTotalRowIndex(cfg, 1), 9);
+});
+
+test("resolveTotalRowIndex shifts total row only when data exceeds template slots", () => {
+  const cfg = normalizeSheetTableConfig({ startRow: 8, totalTemplateRow: 9 }, {});
+  assert.equal(resolveTotalRowIndex(cfg, 4), 12);
 });
 
 test("estimateRowUnits scales row height for wrapped text", () => {
@@ -34,147 +49,144 @@ test("estimateRowUnits scales row height for wrapped text", () => {
   assert.ok(long > 1);
 });
 
-test("estimateRowUnits reduces how many rows fit before carry-out", () => {
-  const columns = ["stt", "tenHang", "thanhTien"];
-  const printProfile = {
-    enabled: true,
-    rowsPerPage: 10,
-    rowHeightPt: 18,
-    amountFieldKey: "thanhTien",
-    labelFieldKey: "tenHang",
-    carryInLabel: "Mang sang",
-    carryOutLabel: "Cộng sang trang",
-    columnMeta: {
-      tenHang: { width: 70, wrapText: true },
-      thanhTien: { width: 72, wrapText: false },
-    },
-  };
-  const longName = "123456789012345678901234567890";
-  const detailRows = [
-    ...Array.from({ length: 7 }, (_, i) => ({
-      stt: i + 1,
-      tenHang: `Hàng ${i + 1}`,
-      thanhTien: "1.000",
-    })),
-    { stt: 8, tenHang: longName, thanhTien: "1.000" },
-    { stt: 9, tenHang: "Hàng 9", thanhTien: "1.000" },
-  ];
-  const units = estimateRowUnits(detailRows[7], columns, printProfile.columnMeta);
-  assert.equal(units, 3);
-  const { pages, placements } = buildPaginatedPlacements(detailRows, printProfile, columns);
-  assert.equal(pages[0].rows.length, 7);
-  assert.ok(pages[0].carryOut != null);
-  assert.equal(pages[1].rows[0].stt, 8);
-  const carryOutPage1 = placements.find((p) => p.rowOffset === 9);
-  const carryInPage2 = placements.find((p) => p.rowOffset === 10);
-  assert.ok(carryOutPage1);
-  assert.ok(carryInPage2);
-  assert.equal(carryOutPage1.values[1], "Cộng sang trang");
-  assert.equal(carryInPage2.values[1], "Mang sang");
-});
-
-test("buildPaginatedPlacements pins carry rows to fixed page slots", () => {
-  const columns = ["stt", "tenHang", "thanhTien"];
-  const printProfile = {
-    enabled: true,
-    rowsPerPage: 40,
-    rowHeightPt: 18,
-    amountFieldKey: "thanhTien",
-    labelFieldKey: "tenHang",
-    carryInLabel: "Mang sang",
-    carryOutLabel: "Cộng sang trang",
-    columnMeta: {
-      tenHang: { width: 72, wrapText: false },
-      thanhTien: { width: 72, wrapText: false },
-    },
-  };
-  const detailRows = Array.from({ length: 50 }, (_, i) => ({
-    stt: i + 1,
-    tenHang: `Hàng ${i + 1}`,
-    thanhTien: "1.000",
-  }));
-  const { placements, totalRowSpan } = buildPaginatedPlacements(detailRows, printProfile, columns);
-  const carryOutPage1 = placements.find((p) => p.rowOffset === 39);
-  const carryInPage2 = placements.find((p) => p.rowOffset === 40);
-  assert.ok(carryOutPage1);
-  assert.ok(carryInPage2);
-  assert.equal(carryOutPage1.values[1], "Cộng sang trang");
-  assert.equal(carryInPage2.values[1], "Mang sang");
-  assert.equal(totalRowSpan, 52);
-});
-
-test("expandDetailRowsWithCarryRows respects 40-row page budget", () => {
-  const columns = ["stt", "tenHang", "thanhTien"];
-  const printProfile = {
-    enabled: true,
-    rowsPerPage: 40,
-    rowHeightPt: 18,
-    amountFieldKey: "thanhTien",
-    labelFieldKey: "tenHang",
-    carryInLabel: "Mang sang",
-    carryOutLabel: "Cộng sang trang",
-    columnMeta: {
-      tenHang: { width: 72, wrapText: false },
-      thanhTien: { width: 72, wrapText: false },
-    },
-  };
-  const detailRows = Array.from({ length: 45 }, (_, i) => ({
-    stt: i + 1,
-    tenHang: `Hàng ${i + 1}`,
-    thanhTien: "1.000",
-  }));
-  const expanded = expandDetailRowsWithCarryRows(detailRows, printProfile, columns);
-  assert.ok(expanded.length > 45);
-  assert.equal(expanded.filter((row) => row.__carryRow === "carry-out").length, 1);
-});
-
-test("buildSheetPrintOutput returns contiguous dense grid with carry rows", () => {
-  const output = buildSheetPrintOutput({
-    detailRows: Array.from({ length: 50 }, (_, i) => ({
-      stt: i + 1,
-      tenHang: `Hàng ${i + 1}`,
-      thanhTien: "1.000",
-    })),
+test("buildDetailTableFillPlan uses total template row and column mappings", () => {
+  const plan = buildDetailTableFillPlan({
+    detailRows: [
+      { stt: 1, tenHang: "Gạo", thanhTien: "10.000" },
+      { stt: 2, tenHang: "Thịt", thanhTien: "20.000" },
+    ],
     columns: ["stt", "tenHang", "thanhTien"],
     tableCfg: {
       startRow: 8,
-      rowsPerPage: 40,
-      rowHeightPt: 18,
+      startCol: 0,
+      totalTemplateRow: 9,
+      columnMappings: [
+        { col: 0, label: "STT", fieldKey: "stt" },
+        { col: 1, label: "Tên hàng", fieldKey: "tenHang" },
+        { col: 6, label: "Thành tiền", fieldKey: "thanhTien" },
+      ],
     },
-    printSheets: {
-      columnMeta: {
-        tenHang: { width: 72, wrapText: false },
-        thanhTien: { width: 72, wrapText: false },
-      },
+    context: { tongTien: "30.000", tongTienSo: 30000 },
+    columnMeta: {
+      tenHang: { width: 72, wrapText: false },
+      thanhTien: { width: 72, wrapText: false },
     },
   });
-  assert.equal(output.mode, "contiguous");
-  assert.equal(output.values.length, 52);
-  assert.equal(output.values[0][0], 1);
-  assert.equal(output.values[38][0], 39);
-  assert.equal(output.values[39][1], "Cộng sang trang");
-  assert.equal(output.values[40][1], "Mang sang");
-  assert.equal(output.values[41][0], 40);
-  assert.equal(output.rowLineUnits.length, 52);
+  assert.equal(plan.dataRowCount, 2);
+  assert.equal(plan.totalRow0, 10);
+  assert.equal(plan.writeStartCol, 0);
+  assert.equal(plan.writeColCount, 7);
+  assert.deepEqual(plan.values[0][1], "Gạo");
+  assert.equal(plan.totalAmount, "30.000");
 });
 
-test("buildChungTuSheetPrintRowsWithWrap outputs sheet cell matrix", () => {
-  const result = buildChungTuSheetPrintRowsWithWrap({
-    detailRows: [{ stt: 1, tenHang: "Gạo", thanhTien: "10.000" }],
+test("buildTotalRowAmountCellA1 targets mapped amount column", () => {
+  const range = buildTotalRowAmountCellA1({
+    sheetName: "01",
+    totalRow0: 10,
+    startCol0: 0,
     columns: ["stt", "tenHang", "thanhTien"],
-    printProfile: {
-      enabled: true,
-      rowsPerPage: 40,
-      rowHeightPt: 18,
-      amountFieldKey: "thanhTien",
-      labelFieldKey: "tenHang",
-      carryInLabel: "Mang sang",
-      carryOutLabel: "Cộng sang trang",
-      columnMeta: {},
-    },
+    amountFieldKey: "thanhTien",
+    columnMappings: [
+      { col: 0, fieldKey: "stt" },
+      { col: 1, fieldKey: "tenHang" },
+      { col: 6, fieldKey: "thanhTien" },
+    ],
   });
-  assert.deepEqual(result.values, [[1, "Gạo", "10.000"]]);
-  assert.deepEqual(result.rowLineUnits, [1]);
+  assert.equal(range, "'01'!G11");
+});
+
+test("buildInsertDataRowsRequestFromPlan inserts before shifted total row", () => {
+  const plan = buildDetailTableFillPlan({
+    detailRows: [
+      { stt: 1, tenHang: "A", thanhTien: "1" },
+      { stt: 2, tenHang: "B", thanhTien: "2" },
+      { stt: 3, tenHang: "C", thanhTien: "3" },
+      { stt: 4, tenHang: "D", thanhTien: "4" },
+    ],
+    columns: ["stt", "tenHang", "thanhTien"],
+    tableCfg: { startRow: 8, totalTemplateRow: 9 },
+    context: {},
+    columnMeta: {},
+  });
+  const req = buildInsertDataRowsRequestFromPlan({
+    sheetId: 1,
+    plan,
+    previousDataRowCount: 1,
+  });
+  assert.equal(req.insertDimension.range.startIndex, 9);
+  assert.equal(req.insertDimension.range.endIndex, 12);
+  assert.equal(
+    buildInsertDataRowsRequestFromPlan({
+      sheetId: 1,
+      plan,
+      previousDataRowCount: 4,
+    }),
+    null,
+  );
+});
+
+test("buildInsertDataRowsRequestFromPlan skips insert when template still has data slots", () => {
+  const plan = buildDetailTableFillPlan({
+    detailRows: [
+      { stt: 1, tenHang: "A", thanhTien: "1" },
+      { stt: 2, tenHang: "B", thanhTien: "2" },
+    ],
+    columns: ["stt", "tenHang", "thanhTien"],
+    tableCfg: { startRow: 8, totalTemplateRow: 13 },
+    context: {},
+    columnMeta: {},
+  });
+  assert.equal(plan.totalRow0, 13);
+  assert.equal(
+    buildInsertDataRowsRequestFromPlan({
+      sheetId: 1,
+      plan,
+      previousDataRowCount: 1,
+    }),
+    null,
+  );
+});
+
+test("buildDeleteExtraDataRowsRequest removes only overflow rows before total", () => {
+  const plan = buildDetailTableFillPlan({
+    detailRows: [
+      { stt: 1, tenHang: "A", thanhTien: "1" },
+      { stt: 2, tenHang: "B", thanhTien: "2" },
+    ],
+    columns: ["stt", "tenHang", "thanhTien"],
+    tableCfg: { startRow: 8, totalTemplateRow: 9 },
+    context: {},
+    columnMeta: {},
+  });
+  const req = buildDeleteExtraDataRowsRequest({
+    sheetId: 1,
+    plan,
+    previousDataRowCount: 5,
+  });
+  assert.equal(req.deleteDimension.range.startIndex, 10);
+  assert.equal(req.deleteDimension.range.endIndex, 13);
+});
+
+test("buildDeleteExtraDataRowsRequest skips delete when shrinking within template slots", () => {
+  const plan = buildDetailTableFillPlan({
+    detailRows: [
+      { stt: 1, tenHang: "A", thanhTien: "1" },
+      { stt: 2, tenHang: "B", thanhTien: "2" },
+    ],
+    columns: ["stt", "tenHang", "thanhTien"],
+    tableCfg: { startRow: 8, totalTemplateRow: 13 },
+    context: {},
+    columnMeta: {},
+  });
+  assert.equal(
+    buildDeleteExtraDataRowsRequest({
+      sheetId: 1,
+      plan,
+      previousDataRowCount: 4,
+    }),
+    null,
+  );
 });
 
 test("buildPerRowHeightUpdateRequests scales height by wrap line units", () => {
@@ -185,10 +197,78 @@ test("buildPerRowHeightUpdateRequests scales height by wrap line units", () => {
     rowHeightPt: 18,
   });
   assert.equal(requests.length, 3);
-  assert.equal(requests[0].updateDimensionProperties.range.startIndex, 8);
-  assert.equal(requests[1].updateDimensionProperties.range.startIndex, 9);
   assert.ok(
     requests[1].updateDimensionProperties.properties.pixelSize >
       requests[0].updateDimensionProperties.properties.pixelSize,
   );
+});
+
+test("buildCopyTemplateRowFormatRequest only formats overflow rows beyond template slots", () => {
+  const req = buildCopyTemplateRowFormatRequest({
+    sheetId: 1,
+    templateRow0: 13,
+    startRow0: 13,
+    dataRowCount: 5,
+    startCol0: 0,
+    colCount: 10,
+    totalTemplateRow0: 14,
+  });
+  assert.ok(req?.copyPaste);
+  assert.equal(req.copyPaste.source.startRowIndex, 13);
+  assert.equal(req.copyPaste.destination.startRowIndex, 14);
+  assert.equal(req.copyPaste.destination.endRowIndex, 18);
+  assert.equal(
+    buildCopyTemplateRowFormatRequest({
+      sheetId: 1,
+      templateRow0: 13,
+      startRow0: 13,
+      dataRowCount: 1,
+      startCol0: 0,
+      colCount: 10,
+      totalTemplateRow0: 14,
+    }),
+    null,
+  );
+});
+
+test("resolveOverflowFormatTarget matches insert row math", () => {
+  const plan = buildDetailTableFillPlan({
+    detailRows: [
+      { stt: 1, tenHang: "A", thanhTien: "1" },
+      { stt: 2, tenHang: "B", thanhTien: "2" },
+      { stt: 3, tenHang: "C", thanhTien: "3" },
+      { stt: 4, tenHang: "D", thanhTien: "4" },
+    ],
+    columns: ["stt", "tenHang", "thanhTien"],
+    tableCfg: { startRow: 13, totalTemplateRow: 14 },
+    context: {},
+    columnMeta: {},
+  });
+  const target = resolveOverflowFormatTarget(plan);
+  assert.equal(target.dataSlots, 1);
+  assert.equal(target.overflowCount, 3);
+  assert.equal(target.destStartRow, 14);
+});
+
+test("resolveNamedRangeTargetCell shifts footer named range with total row", () => {
+  const detailTable = { totalTemplateRow: 14, sheetName: "NHẬP" };
+  const layoutPlan = { totalRow0: 113 };
+  const target = resolveNamedRangeTargetCell({
+    nrRule: { templateRowIndex: 14, templateColIndex: 0, sheetName: "NHẬP" },
+    bounds: { sheetTitle: "NHẬP", startRow: 14, startCol: 0 },
+    detailTable,
+    layoutPlan,
+  });
+  assert.equal(target.startRow, 113);
+  assert.equal(target.startCol, 0);
+});
+
+test("resolveNamedRangeTargetCell keeps header named range at template row", () => {
+  const target = resolveNamedRangeTargetCell({
+    nrRule: { templateRowIndex: 5, templateColIndex: 2 },
+    bounds: { sheetTitle: "NHẬP", startRow: 5, startCol: 2 },
+    detailTable: { totalTemplateRow: 14 },
+    layoutPlan: { totalRow0: 113 },
+  });
+  assert.equal(target.startRow, 5);
 });

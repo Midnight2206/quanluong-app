@@ -33,12 +33,15 @@ import {
   listIssueSlips,
   listPriceTables,
   listRecipientDefaultUsersInScope,
+  listBuyerDefaultsInScope,
+  listBuyerUsers,
   listRecipientUsers,
   patchCommodity,
   patchFoodGroup,
   patchLttpSupplier,
   patchPriceTable,
   putRecipientDefaultUser,
+  putBuyerDefaultForUnit,
   resolveIssueSlipLine,
   resyncIssueSlipLinePricesFromEffectiveTable,
   updateIssueSlip,
@@ -594,6 +597,15 @@ async function putIssueFormDefaultsController(req, res) {
   return respondSuccess(res, { message: "Đã lưu mẫu in", data });
 }
 
+async function listBuyerUsersController(req, res) {
+  const data = await listBuyerUsers(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+  );
+  return respondSuccess(res, { message: "Danh sách user người mua theo đơn vị kho", data });
+}
+
 async function listRecipientUsersController(req, res) {
   const data = await listRecipientUsers(
     req.validatedQuery,
@@ -624,6 +636,24 @@ async function putRecipientDefaultUserController(req, res) {
     req.effectiveUnitIds,
   );
   return respondSuccess(res, { message: "Đã lưu người nhận mặc định theo đơn vị nhận", data });
+}
+
+async function listBuyerDefaultsInScopeController(req, res) {
+  const data = await listBuyerDefaultsInScope(req.effectiveUnitIds);
+  return respondSuccess(res, { message: "Danh sách cấu hình người mua theo đơn vị kho", data });
+}
+
+async function putBuyerDefaultForUnitController(req, res) {
+  const data = await putBuyerDefaultForUnit(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã lưu người mua và áp dụng cho phiếu xuất",
+    data,
+  });
 }
 
 export {
@@ -666,6 +696,9 @@ export {
   patchPriceTableController,
   putIssueFormDefaultsController,
   putRecipientDefaultUserController,
+  listBuyerDefaultsInScopeController,
+  listBuyerUsersController,
+  putBuyerDefaultForUnitController,
   resolveIssueSlipLineController,
   resyncIssueSlipPricesController,
   updateIssueSlipController,

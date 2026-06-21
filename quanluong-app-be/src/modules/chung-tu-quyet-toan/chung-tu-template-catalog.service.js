@@ -1,9 +1,9 @@
-import { google } from "googleapis";
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { logger } from "../../shared/utils/logger.js";
-import { getSystemChungTuDriveOAuthClient } from "../auth/google-drive-link.service.js";
+import { createDriveClient } from "../../shared/utils/google-drive-fetch.api.js";
+import { createSystemChungTuDriveOAuthClient } from "../auth/google-drive-link.service.js";
 import {
   assertJsonObject,
   importOfficeBinaryToSystemTemplateFolder,
@@ -45,8 +45,8 @@ export function parseGoogleDriveFileIdFromUrl(input) {
 }
 
 async function fetchDriveFileMetaSystem(driveFileId) {
-  const oauth2Client = getSystemChungTuDriveOAuthClient();
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  const oauth2Client = await createSystemChungTuDriveOAuthClient();
+  const drive = createDriveClient(oauth2Client);
   try {
     const res = await drive.files.get({
       fileId: driveFileId,

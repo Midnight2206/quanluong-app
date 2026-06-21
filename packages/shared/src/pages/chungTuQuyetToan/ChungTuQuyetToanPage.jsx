@@ -5,56 +5,33 @@ import { useMemo } from "react";
 import { TabPanel } from "@/components/common/TabPanel";
 import { Card, CardContent } from "@/components/ui/Card";
 import { cn } from "@/utils/cn";
-import { ChungTuDocumentWorkspace } from "./ChungTuDocumentWorkspace.jsx";
+import { ChungTuCategoryWorkspace } from "./ChungTuCategoryWorkspace.jsx";
 import { ChungTuPlaceholderWorkspace } from "./ChungTuPlaceholderWorkspace.jsx";
 import {
-  CHUNG_TU_DOC_TAB_STATUS,
-  CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS,
-  DEFAULT_CHUNG_TU_DOC_TAB_ID,
-} from "./chungTuQuyetToanTabsMeta.js";
-
-const PLANNED_TAB_BADGE = (
-  <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground sm:text-[10px]">
-    Sắp có
-  </span>
-);
-
-function renderWorkspaceForTab(meta) {
-  if (meta.status === CHUNG_TU_DOC_TAB_STATUS.AVAILABLE && meta.mode) {
-    return (
-      <ChungTuDocumentWorkspace
-        categoryKey={meta.id}
-        mode={meta.mode}
-        subtitle={meta.subtitle}
-      />
-    );
-  }
-  return (
-    <ChungTuPlaceholderWorkspace
-      label={meta.label}
-      subtitle={meta.subtitle}
-      hint={meta.hint}
-    />
-  );
-}
+  CHUNG_TU_CATEGORY_CONFIG_LIST,
+  DEFAULT_CHUNG_TU_CATEGORY_KEY,
+} from "./chungTuCategoryConfig";
+import { CHUNG_TU_DOC_TAB_STATUS } from "./chungTuQuyetToanTabsMeta";
 
 export function ChungTuQuyetToanPage() {
   const tabs = useMemo(
     () =>
-      CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS.map((meta) => ({
-        id: meta.id,
-        label: meta.label,
-        badge:
-          meta.status === CHUNG_TU_DOC_TAB_STATUS.PLANNED
-            ? PLANNED_TAB_BADGE
-            : undefined,
-        panel: renderWorkspaceForTab(meta),
-      })),
-    [],
-  );
-
-  const tabSummary = useMemo(
-    () => CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS.map((t) => t.label).join(" · "),
+      CHUNG_TU_CATEGORY_CONFIG_LIST.map((config) => {
+        const isAvailable = config.status === CHUNG_TU_DOC_TAB_STATUS.AVAILABLE;
+        return {
+          id: config.categoryKey,
+          label: config.label,
+          panel: isAvailable ? (
+            <ChungTuCategoryWorkspace categoryKey={config.categoryKey} />
+          ) : (
+            <ChungTuPlaceholderWorkspace
+              label={config.label}
+              subtitle={config.subtitle}
+              hint={config.hint}
+            />
+          ),
+        };
+      }),
     [],
   );
 
@@ -69,8 +46,8 @@ export function ChungTuQuyetToanPage() {
       <Card className="shadow-soft overflow-hidden">
         <CardContent className="p-0">
           <TabPanel
-            persistId="chungtu-document-tabs-v2"
-            defaultTabId={DEFAULT_CHUNG_TU_DOC_TAB_ID}
+            persistId="chungtu-doc-type-tabs-v1"
+            defaultTabId={DEFAULT_CHUNG_TU_CATEGORY_KEY}
             equalWidthTabs={false}
             scrollablePanel={false}
             stickyTabList

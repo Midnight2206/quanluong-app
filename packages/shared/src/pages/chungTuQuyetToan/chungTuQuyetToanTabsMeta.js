@@ -23,15 +23,17 @@ export const CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS = [
     id: "phieu-xuat-kho",
     label: "Phiếu xuất kho",
     status: CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
-    mode: "by-slip",
-    subtitle: "Một phiếu xuất LTTP → Google Sheets (SS14-QN10). Chọn phiếu theo ngày.",
+    mode: "by-date",
+    subtitle:
+      "Tổng hợp LTTP theo tháng → Google Sheets (SS14-QN10). Chọn tháng, đơn vị và chế độ gộp dữ liệu.",
   },
   {
     id: "phieu-nhap-kho",
     label: "Phiếu nhập kho",
     status: CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
     mode: "by-date",
-    subtitle: "Tổng hợp nhập theo ngày từ dòng phiếu xuất LTTP trong ngày.",
+    subtitle:
+      "Tổng hợp LTTP theo tháng → Google Sheets. Căn cứ BKMH tự điền từ snapshot đã đồng bộ.",
   },
   {
     id: "giay-de-nghi-thanh-toan",

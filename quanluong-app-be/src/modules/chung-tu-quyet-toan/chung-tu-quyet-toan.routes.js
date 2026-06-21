@@ -19,32 +19,28 @@ import {
   createTemplateCatalogController,
   deleteChungTuDocumentController,
   deleteTemplateCatalogController,
-  exportBkmhExcelController,
   getChungTuDocumentController,
-  getExcelTemplateMetadataController,
   getChungTuUnitProfileController,
   getCategoryTemplateFillMappingController,
   getTemplateFillRulesController,
   importDriveFileController,
   listCategoryTemplatesController,
   listChungTuDocumentsController,
+  listBkmhSnapshotsController,
   listDriveTemplatesController,
-  listExcelExportHistoryController,
-  listExcelTemplatesController,
   listSpreadsheetNamedRangesController,
   listSpreadsheetNamedRangesSuperadminController,
   listTemplateCatalogController,
   listTemplateCatalogManageController,
+  listTemplateTreeController,
+  getTemplateTreeFileMetaController,
   patchTemplateCatalogController,
-  printChungTuDocumentPdfController,
   previewChungTuContextController,
   putCategoryTemplateFillMappingController,
   putChungTuUnitProfileController,
-  putExcelTemplateMappingController,
   putTemplateFillRulesController,
   syncChungTuDocumentController,
   templateCatalogFieldRegistryController,
-  uploadExcelTemplateController,
   uploadTemplateCatalogOfficeController,
 } from "./chung-tu-quyet-toan.controller.js";
 import {
@@ -59,11 +55,6 @@ import {
   driveFileIdParamsSchema,
   driveImportBodySchema,
   driveImportQuerySchema,
-  excelBkmhExportBodySchema,
-  excelTemplateIdParamSchema,
-  excelTemplateMappingBodySchema,
-  excelTemplateQuerySchema,
-  excelTemplateUploadBodySchema,
   putTemplateFillRulesBodySchema,
   templateCatalogCreateBodySchema,
   templateCatalogIdParamSchema,
@@ -72,6 +63,8 @@ import {
   templateCatalogQuerySchema,
   templateCatalogUploadBodySchema,
   templateFieldRegistryQuerySchema,
+  templateTreeFileParamsSchema,
+  templateTreeQuerySchema,
   unitIdQuerySchema,
 } from "./chung-tu-quyet-toan.validator.js";
 
@@ -92,26 +85,6 @@ function driveImportMulterMiddleware(req, res, next) {
       next(
         new AppError({
           message: "File tối đa 32MB.",
-          statusCode: 400,
-          code: ERROR_CODES.VALIDATION_ERROR,
-        }),
-      );
-      return;
-    }
-    next(err);
-  });
-}
-
-function excelTemplateUploadMiddleware(req, res, next) {
-  driveImportUpload.single("file")(req, res, (err) => {
-    if (!err) {
-      next();
-      return;
-    }
-    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
-      next(
-        new AppError({
-          message: "File Excel tối đa 32MB.",
           statusCode: 400,
           code: ERROR_CODES.VALIDATION_ERROR,
         }),
@@ -223,6 +196,20 @@ chungTuQuyetToanRouter.get(
   asyncHandler(listTemplateCatalogController),
 );
 
+chungTuQuyetToanRouter.get(
+  "/template-tree",
+  permissionMiddleware([routePermissions.templateTreeBrowse]),
+  validateRequest({ query: templateTreeQuerySchema }),
+  asyncHandler(listTemplateTreeController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/template-tree/files/:driveFileId",
+  permissionMiddleware([routePermissions.templateTreeFileMeta]),
+  validateRequest({ params: templateTreeFileParamsSchema }),
+  asyncHandler(getTemplateTreeFileMetaController),
+);
+
 chungTuQuyetToanRouter.post(
   "/drive-import",
   permissionMiddleware([routePermissions.driveImport]),
@@ -306,13 +293,6 @@ chungTuQuyetToanRouter.post(
   asyncHandler(syncChungTuDocumentController),
 );
 
-chungTuQuyetToanRouter.get(
-  "/documents/:documentKey/print-pdf",
-  permissionMiddleware([routePermissions.documentPrintPdf]),
-  validateRequest({ params: documentKeyParamSchema }),
-  asyncHandler(printChungTuDocumentPdfController),
-);
-
 chungTuQuyetToanRouter.delete(
   "/documents/:documentKey",
   permissionMiddleware([routePermissions.documentDelete]),
@@ -328,47 +308,10 @@ chungTuQuyetToanRouter.get(
 );
 
 chungTuQuyetToanRouter.get(
-  "/excel-templates",
-  permissionMiddleware([routePermissions.excelTemplatesList]),
-  validateRequest({ query: excelTemplateQuerySchema }),
-  asyncHandler(listExcelTemplatesController),
-);
-
-chungTuQuyetToanRouter.post(
-  "/excel-templates",
-  permissionMiddleware([routePermissions.excelTemplatesUpload]),
-  excelTemplateUploadMiddleware,
-  validateRequest({ body: excelTemplateUploadBodySchema }),
-  asyncHandler(uploadExcelTemplateController),
-);
-
-chungTuQuyetToanRouter.get(
-  "/excel-templates/:id/metadata",
-  permissionMiddleware([routePermissions.excelTemplateMetadata]),
-  validateRequest({ params: excelTemplateIdParamSchema }),
-  asyncHandler(getExcelTemplateMetadataController),
-);
-
-chungTuQuyetToanRouter.put(
-  "/excel-templates/:id/mapping",
-  permissionMiddleware([routePermissions.excelTemplateMappingPut]),
-  validateRequest({ params: excelTemplateIdParamSchema, body: excelTemplateMappingBodySchema }),
-  asyncHandler(putExcelTemplateMappingController),
-);
-
-chungTuQuyetToanRouter.post(
-  "/excel-exports/bkmh",
-  permissionMiddleware([routePermissions.excelBkmhExport]),
-  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
-  validateRequest({ body: excelBkmhExportBodySchema }),
-  asyncHandler(exportBkmhExcelController),
-);
-
-chungTuQuyetToanRouter.get(
-  "/excel-exports/history",
-  permissionMiddleware([routePermissions.excelExportHistory]),
-  validateRequest({ query: excelTemplateQuerySchema }),
-  asyncHandler(listExcelExportHistoryController),
+  "/documents/:documentKey/bkmh-snapshots",
+  permissionMiddleware([routePermissions.documentBkmhSnapshots]),
+  validateRequest({ params: documentKeyParamSchema }),
+  asyncHandler(listBkmhSnapshotsController),
 );
 
 chungTuQuyetToanRouter.post(

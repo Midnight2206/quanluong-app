@@ -17,7 +17,8 @@ function mapProfileRow(row, unitName, issueDefaults) {
     signerWriter: row?.signerWriter ?? issueDefaults?.signerWriter ?? null,
     signerApprover: row?.signerApprover ?? issueDefaults?.signerApprover ?? null,
     signerThird: row?.signerThird ?? null,
-    signerNguoiMua: row?.signerNguoiMua ?? null,
+    signerNguoiMua:
+      row?.signerNguoiMua ?? issueDefaults?.defaultBuyerUserName ?? null,
     signerPhuTrachBoPhan: row?.signerPhuTrachBoPhan ?? null,
     signerTaiChinh: row?.signerTaiChinh ?? null,
     donViSo: issueDefaults?.printLine1 ?? null,
@@ -30,7 +31,14 @@ function mapProfileRow(row, unitName, issueDefaults) {
 async function loadIssueDefaults(unitId) {
   const [unit, defaults] = await Promise.all([
     prisma.unit.findUnique({ where: { id: unitId }, select: { id: true, name: true } }),
-    prisma.lttpUnitIssueFormDefaults.findUnique({ where: { unitId } }),
+    prisma.lttpUnitIssueFormDefaults.findUnique({
+      where: { unitId },
+      include: {
+        defaultBuyerUser: {
+          select: { id: true, username: true, profile: { select: { fullName: true } } },
+        },
+      },
+    }),
   ]);
   if (!unit) {
     throw new AppError({
@@ -39,6 +47,10 @@ async function loadIssueDefaults(unitId) {
       code: ERROR_CODES.NOT_FOUND,
     });
   }
+  const buyerUser = defaults?.defaultBuyerUser;
+  const defaultBuyerUserName = buyerUser
+    ? String(buyerUser.profile?.fullName ?? "").trim() || String(buyerUser.username ?? "").trim()
+    : null;
   return {
     unitId: unit.id,
     unitName: unit.name,
@@ -48,6 +60,8 @@ async function loadIssueDefaults(unitId) {
     warehouseFrom: defaults?.warehouseFrom ?? null,
     signerWriter: defaults?.signerWriter ?? null,
     signerApprover: defaults?.signerApprover ?? null,
+    defaultBuyerUserId: defaults?.defaultBuyerUserId ?? null,
+    defaultBuyerUserName: defaultBuyerUserName || null,
   };
 }
 

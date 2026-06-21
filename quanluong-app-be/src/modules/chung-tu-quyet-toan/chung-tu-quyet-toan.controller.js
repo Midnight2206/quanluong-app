@@ -18,30 +18,25 @@ import {
   patchTemplateCatalogLink,
 } from "./chung-tu-template-catalog.service.js";
 import { getContextFieldRegistryForCategory } from "./chung-tu-context-field-registry.js";
-import { listCategoryTemplates } from "./chung-tu-drive-folders.service.js";
+import {
+  listTemplateFolderBrowse,
+  resolveTemplateSelectionMeta,
+} from "./chung-tu-template-tree.service.js";
 import {
   checkDocumentStale,
   createOrGetChungTuDocument,
-  buildChungTuDocumentPdf,
   deleteChungTuDocument,
   getChungTuDocumentByKey,
   listChungTuDocuments,
   previewChungTuContext,
   syncChungTuDocument,
+  listBkmhSnapshotsByDocumentKey,
 } from "./chung-tu-document.service.js";
 import { getChungTuUnitProfile, putChungTuUnitProfile } from "./chung-tu-unit-profile.service.js";
 import {
   getCategoryTemplateFillMapping,
   putCategoryTemplateFillMapping,
 } from "./chung-tu-template-fill-config.service.js";
-import {
-  createExcelTemplate,
-  exportBkmhExcel,
-  getExcelTemplateMetadata,
-  listExcelExportHistory,
-  listExcelTemplates,
-  updateExcelTemplateMapping,
-} from "./chung-tu-excel-template.service.js";
 
 async function chungTuQuyetToanHealthController(req, res) {
   const data = await getChungTuQuyetToanHealth({
@@ -219,6 +214,27 @@ async function deleteTemplateCatalogController(req, res) {
   });
 }
 
+async function listTemplateTreeController(req, res) {
+  const data = await listTemplateFolderBrowse({
+    folderId: req.validatedQuery.folderId,
+    categoryKey: req.validatedQuery.categoryKey,
+  });
+  return respondSuccess(res, {
+    message: "Duyệt thư mục mẫu chứng từ trên Drive.",
+    data,
+  });
+}
+
+async function getTemplateTreeFileMetaController(req, res) {
+  const data = await resolveTemplateSelectionMeta({
+    driveFileId: req.validatedParams.driveFileId,
+  });
+  return respondSuccess(res, {
+    message: "Metadata mẫu chứng từ (đường dẫn folder + tên).",
+    data,
+  });
+}
+
 async function listCategoryTemplatesController(req, res) {
   const data = await listCategoryTemplates({
     categoryKey: req.validatedParams.categoryKey,
@@ -294,7 +310,9 @@ async function createChungTuDocumentController(req, res) {
     periodMonth: body.periodMonth,
     issueSlipId: body.issueSlipId,
     unitIds: body.unitIds,
+    aggregationMode: body.aggregationMode,
     templateDriveFileId: body.templateDriveFileId,
+    templateDisplayName: body.templateDisplayName,
     settings: body.settings ?? {},
     createdById: req.user.id,
     effectiveUnitIds: req.effectiveUnitIds,
@@ -302,8 +320,23 @@ async function createChungTuDocumentController(req, res) {
   return respondSuccess(res, {
     message: result.created
       ? "Đã tạo chứng từ Google Sheets và đồng bộ dữ liệu."
-      : "Chứng từ đã tồn tại — mở bản hiện có.",
+      : body.categoryKey === "bang-ke-mua-hang"
+        ? "Bảng kê tháng này đã có — đã đồng bộ lại file hiện có."
+        : body.categoryKey === "phieu-nhap-kho"
+          ? "Phiếu nhập kho tháng này đã có — đã đồng bộ lại file hiện có."
+          : "Chứng từ đã tồn tại — đã đồng bộ lại file hiện có.",
     data: result,
+  });
+}
+
+async function listBkmhSnapshotsController(req, res) {
+  const data = await listBkmhSnapshotsByDocumentKey({
+    documentKey: req.validatedParams.documentKey,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Lịch sử snapshot bảng kê mua hàng.",
+    data,
   });
 }
 
@@ -330,16 +363,6 @@ async function checkChungTuDocumentStaleController(req, res) {
   });
 }
 
-async function printChungTuDocumentPdfController(req, res) {
-  const data = await buildChungTuDocumentPdf({
-    documentKey: req.validatedParams.documentKey,
-    effectiveUnitIds: req.effectiveUnitIds,
-  });
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `inline; filename="${data.filename}"`);
-  res.send(data.buffer);
-}
-
 async function previewChungTuContextController(req, res) {
   const body = req.validatedBody;
   const data = await previewChungTuContext({
@@ -349,87 +372,13 @@ async function previewChungTuContextController(req, res) {
     periodMonth: body.periodMonth,
     issueSlipId: body.issueSlipId,
     unitIds: body.unitIds,
+    aggregationMode: body.aggregationMode,
     settings: body.settings ?? {},
     effectiveUnitIds: req.effectiveUnitIds,
   });
   return respondSuccess(res, {
     message: "Xem trước dữ liệu nguồn từ LTTP.",
     data,
-  });
-}
-
-async function listExcelTemplatesController(req, res) {
-  const items = await listExcelTemplates({ categoryKey: req.validatedQuery.categoryKey });
-  return respondSuccess(res, {
-    message: "Danh sách template Excel local.",
-    data: { items },
-  });
-}
-
-async function uploadExcelTemplateController(req, res) {
-  if (!req.file?.buffer) {
-    throw new AppError({
-      message: "Thiếu file Excel (multipart field «file»).",
-      statusCode: 400,
-      code: ERROR_CODES.VALIDATION_ERROR,
-    });
-  }
-  const data = await createExcelTemplate({
-    categoryKey: req.validatedBody.categoryKey,
-    displayName: req.validatedBody.displayName,
-    buffer: req.file.buffer,
-    originalFilename: req.file.originalname,
-    mimetype: req.file.mimetype,
-    size: req.file.size,
-    createdById: req.user.id,
-  });
-  return respondSuccess(res, {
-    message: "Đã upload template Excel.",
-    data,
-  });
-}
-
-async function getExcelTemplateMetadataController(req, res) {
-  const data = await getExcelTemplateMetadata({ id: req.validatedParams.id });
-  return respondSuccess(res, {
-    message: "Metadata template Excel.",
-    data,
-  });
-}
-
-async function putExcelTemplateMappingController(req, res) {
-  const data = await updateExcelTemplateMapping({
-    id: req.validatedParams.id,
-    mapping: req.validatedBody.mapping,
-    isActive: req.validatedBody.isActive,
-  });
-  return respondSuccess(res, {
-    message: "Đã lưu mapping template Excel.",
-    data,
-  });
-}
-
-async function exportBkmhExcelController(req, res) {
-  const body = req.validatedBody;
-  const data = await exportBkmhExcel({
-    templateId: body.templateId,
-    unitId: body.unitId,
-    periodMonth: body.periodMonth,
-    unitIds: body.unitIds,
-    settings: body.settings ?? {},
-    createdById: req.user.id,
-    effectiveUnitIds: req.effectiveUnitIds,
-  });
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", `attachment; filename="${data.filename}"`);
-  res.send(data.buffer);
-}
-
-async function listExcelExportHistoryController(req, res) {
-  const items = await listExcelExportHistory({ categoryKey: req.validatedQuery.categoryKey });
-  return respondSuccess(res, {
-    message: "Lịch sử xuất Excel.",
-    data: { items },
   });
 }
 
@@ -464,31 +413,27 @@ export {
   deleteChungTuDocumentController,
   createTemplateCatalogController,
   deleteTemplateCatalogController,
-  exportBkmhExcelController,
   getChungTuDocumentController,
-  getExcelTemplateMetadataController,
   getCategoryTemplateFillMappingController,
   getChungTuUnitProfileController,
   getTemplateFillRulesController,
   importDriveFileController,
   listCategoryTemplatesController,
   listChungTuDocumentsController,
+  listBkmhSnapshotsController,
   listDriveTemplatesController,
-  listExcelExportHistoryController,
-  listExcelTemplatesController,
   listSpreadsheetNamedRangesController,
   listSpreadsheetNamedRangesSuperadminController,
   listTemplateCatalogController,
   listTemplateCatalogManageController,
+  listTemplateTreeController,
+  getTemplateTreeFileMetaController,
   patchTemplateCatalogController,
-  printChungTuDocumentPdfController,
   previewChungTuContextController,
   putCategoryTemplateFillMappingController,
   putChungTuUnitProfileController,
-  putExcelTemplateMappingController,
   putTemplateFillRulesController,
   syncChungTuDocumentController,
   templateCatalogFieldRegistryController,
-  uploadExcelTemplateController,
   uploadTemplateCatalogOfficeController,
 };

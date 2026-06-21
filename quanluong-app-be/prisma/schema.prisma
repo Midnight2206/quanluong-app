@@ -153,13 +153,13 @@ model User {
   chatGroupMessagesSent   ChatGroupMessage[]
   lttpIssueSlipsCreated     LttpIssueSlip[]   @relation("LttpIssueSlipCreatedBy")
   lttpIssueSlipsAsRecipient LttpIssueSlip[] @relation("LttpIssueSlipRecipientUser")
+  lttpIssueSlipsAsBuyer     LttpIssueSlip[] @relation("LttpIssueSlipBuyerUser")
   lttpFormDefaultsAsDefaultRecipientUser LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultRecipientUser")
+  lttpFormDefaultsAsDefaultBuyerUser     LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultBuyerUser")
   lttpAsDefaultForRecipientUnit          LttpRecipientUnitDefaultUser[] @relation("LttpRecipientDefaultUserUser")
   chungTuQuyetToanTemplateConfigs        ChungTuQuyetToanTemplateConfig[]
   chungTuDocumentsCreated                ChungTuDocument[] @relation("ChungTuDocumentCreatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
-  chungTuExcelTemplatesCreated           ChungTuExcelTemplate[] @relation("ChungTuExcelTemplateCreatedBy")
-  chungTuExcelExportsCreated             ChungTuExcelExportHistory[] @relation("ChungTuExcelExportCreatedBy")
 
   @@index([typeId])
   @@index([unitId])
@@ -267,53 +267,35 @@ model ChungTuDocument {
   unit                Unit           @relation(fields: [unitId], references: [id], onDelete: Cascade)
   issueSlip           LttpIssueSlip? @relation(fields: [issueSlipId], references: [id], onDelete: SetNull)
   createdBy           User           @relation("ChungTuDocumentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  bkmhSnapshots       ChungTuBkmhSnapshot[]
 
   @@index([unitId, categoryKey, periodDate])
   @@index([issueSlipId])
   @@index([unitId, categoryKey])
 }
 
-/// Template Excel local cho chứng từ quyết toán. Output sinh ra để tải về, không lưu dài hạn.
-model ChungTuExcelTemplate {
-  id               Int      @id @default(autoincrement())
-  categoryKey      String   @db.VarChar(80)
-  displayName      String   @db.VarChar(200)
-  originalFilename String   @db.VarChar(255)
-  storagePath      String   @db.VarChar(1024)
-  fileSize         Int
-  checksum         String   @db.VarChar(64)
-  metadataJson     Json
-  mappingJson      Json?
-  isActive         Boolean  @default(true)
-  createdById      Int
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  createdBy        User     @relation("ChungTuExcelTemplateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  exports          ChungTuExcelExportHistory[]
+/// Snapshot BKMH mỗi lần tạo/đồng bộ (theo ngày hoặc cả tháng).
+model ChungTuBkmhSnapshot {
+  id              Int             @id @default(autoincrement())
+  documentId      Int
+  eventType       String          @db.VarChar(16)
+  syncedAt        DateTime        @default(now())
+  periodMonth     String          @db.VarChar(7)
+  periodDate      String          @db.VarChar(10)
+  sheetName       String?         @db.VarChar(31)
+  soChungTu       String?         @db.VarChar(64)
+  quyenSo         String?         @db.VarChar(32)
+  ngay            String?         @db.VarChar(2)
+  thang           String?         @db.VarChar(2)
+  nam             String?         @db.VarChar(4)
+  tongTien        Decimal         @default(0) @db.Decimal(18, 2)
+  nguoiMua        String?         @db.VarChar(191)
+  aggregationMode String?         @db.VarChar(16)
+  sourceDataHash  String?         @db.VarChar(64)
+  document        ChungTuDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  @@index([categoryKey, isActive, updatedAt])
-  @@index([createdById])
-  @@index([checksum])
-}
-
-/// Lịch sử metadata các lần xuất Excel; không lưu file output.
-model ChungTuExcelExportHistory {
-  id            Int      @id @default(autoincrement())
-  templateId    Int
-  categoryKey   String   @db.VarChar(80)
-  periodMonth   String   @db.VarChar(7)
-  unitIdsJson   Json
-  lineCount     Int      @default(0)
-  totalAmount   Decimal  @default(0) @db.Decimal(18, 2)
-  metadataJson  Json?
-  createdById   Int
-  createdAt     DateTime @default(now())
-  template      ChungTuExcelTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  createdBy     User     @relation("ChungTuExcelExportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-
-  @@index([categoryKey, periodMonth])
-  @@index([templateId, createdAt])
-  @@index([createdById, createdAt])
+  @@index([documentId, syncedAt])
+  @@index([periodMonth, periodDate])
 }
 
 /// Tin nhắn 1–1 realtime (Socket.io); lưu DB để tải lại lịch sử.
@@ -681,10 +663,15 @@ model LttpIssueSlip {
   signerWriter  String?   @db.VarChar(191)
   signerRecipient String? @db.VarChar(191)
   signerApprover  String? @db.VarChar(191)
+  /// User người mua hàng (BKMH / chứng từ quyết toán).
+  buyerUserId Int?
+  /// Họ tên người mua (snapshot).
+  buyerDisplayName String? @db.VarChar(191)
   unit          Unit   @relation("LttpIssueSlipStorageUnit", fields: [unitId], references: [id], onDelete: Cascade)
   createdBy     User   @relation("LttpIssueSlipCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   recipientUnit Unit?  @relation("LttpIssueSlipRecipientUnit", fields: [recipientUnitId], references: [id], onDelete: SetNull)
   recipientUser User?  @relation("LttpIssueSlipRecipientUser", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  buyerUser     User?  @relation("LttpIssueSlipBuyerUser", fields: [buyerUserId], references: [id], onDelete: SetNull)
   lines         LttpIssueSlipLine[]
   chungTuDocuments ChungTuDocument[]
 
@@ -710,6 +697,8 @@ model LttpRecipientUnitDefaultUser {
   id               Int      @id @default(autoincrement())
   recipientUnitId  Int      @unique
   defaultUserId    Int?
+  /// Địa chỉ in trên chứng từ / phiếu (theo đơn vị nhận).
+  address          String?  @db.VarChar(500)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   recipientUnit    Unit     @relation("LttpRecipientDefaultRecipientUnit", fields: [recipientUnitId], references: [id], onDelete: Cascade)
@@ -736,11 +725,14 @@ model LttpUnitIssueFormDefaults {
   signerApprover         String?  @db.VarChar(191)
   defaultRecipientUnitId Int?
   defaultRecipientUserId Int?
+  /// User mặc định là người mua hàng (BKMH) theo đơn vị kho.
+  defaultBuyerUserId     Int?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
   unit                   Unit  @relation("LttpIssueFormDefaultUnit", fields: [unitId], references: [id], onDelete: Cascade)
   defaultRecipientUnit   Unit? @relation("LttpIssueFormDefaultRecipUnit", fields: [defaultRecipientUnitId], references: [id], onDelete: SetNull)
   defaultRecipientUser   User? @relation("LttpIssueFormDefaultRecipientUser", fields: [defaultRecipientUserId], references: [id], onDelete: SetNull)
+  defaultBuyerUser       User? @relation("LttpIssueFormDefaultBuyerUser", fields: [defaultBuyerUserId], references: [id], onDelete: SetNull)
 }
 
 model LttpIssueSlipLine {
