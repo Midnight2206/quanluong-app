@@ -8,10 +8,9 @@ import { createSheetsClient } from "../../shared/utils/google-sheets-fetch.api.j
 import { CHUNG_TU_DEFAULT_SHEET_PRINT } from "./chung-tu-category.constants.js";
 import {
   getOAuthClient,
-  getSystemChungTuDriveOAuthClient,
-  createSystemChungTuDriveOAuthClient,
-  resolveSystemChungTuTemplateFolder,
+  getUserChungTuDriveContext,
 } from "../auth/google-drive-link.service.js";
+import { resolveCategoryFolderId } from "./chung-tu-drive-folders.service.js";
 
 const GOOGLE_DOC_MIME = "application/vnd.google-apps.document";
 const GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
@@ -337,43 +336,21 @@ function normalizeFillRulesV2(raw, templateKind = "document") {
   };
 }
 
-async function getUserMidnightDriveContext(userId) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { googleRefreshToken: true, googleDriveFolderId: true },
+async function getUserChungTuTemplateDriveContext(userId) {
+  const ctx = await getUserChungTuDriveContext(userId);
+  const drive = createDriveClient(ctx.oauth2Client);
+  const folderMeta = await drive.files.get({
+    fileId: ctx.templateRootFolderId,
+    fields: "id, name, webViewLink",
+    supportsAllDrives: false,
   });
-  if (!user?.googleRefreshToken || !user?.googleDriveFolderId) {
-    throw new AppError({
-      message:
-        "Chưa liên kết Google Drive hoặc chưa có thư mục làm việc. Hãy liên kết từ trang chủ rồi thử lại.",
-      statusCode: 400,
-      code: ERROR_CODES.VALIDATION_ERROR,
-    });
-  }
-  const client = getOAuthClient();
-  if (!client) {
-    throw new AppError({
-      message: "Google OAuth chưa được cấu hình.",
-      statusCode: 503,
-      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
-    });
-  }
-  client.setCredentials({ refresh_token: user.googleRefreshToken });
   return {
-    oauth2Client: client,
-    midnightFolderId: user.googleDriveFolderId,
-  };
-}
-
-/** Drive tài khoản hệ thống — thư mục mẫu chứng từ (CHUNG_TU_SYSTEM_*). Không dùng Drive của user thường. */
-async function getSystemChungTuDriveContext() {
-  const oauth2Client = await createSystemChungTuDriveOAuthClient();
-  const folder = await resolveSystemChungTuTemplateFolder(oauth2Client);
-  return {
-    oauth2Client,
-    templateFolderId: folder.templateFolderId,
-    templateFolderWebViewLink: folder.templateFolderWebViewLink,
-    templateFolderName: folder.templateFolderName,
+    oauth2Client: ctx.oauth2Client,
+    templateFolderId: ctx.templateRootFolderId,
+    templateFolderWebViewLink: folderMeta.data.webViewLink ?? null,
+    templateFolderName: folderMeta.data.name ?? null,
+    midnightFolderId: ctx.midnightFolderId,
+    generatedRootFolderId: ctx.generatedRootFolderId,
   };
 }
 
@@ -444,7 +421,7 @@ async function getChungTuQuyetToanHealth({ user, unitScope, effectiveUnitIds }) 
 
 async function listDriveTemplates({ userId }) {
   const { oauth2Client, templateFolderId, templateFolderWebViewLink, templateFolderName } =
-    await getSystemChungTuDriveContext();
+    await getUserChungTuTemplateDriveContext(userId);
 
   const drive = createDriveClient(oauth2Client);
   const items = [];
@@ -510,7 +487,7 @@ async function listDriveTemplates({ userId }) {
 }
 
 async function getTemplateFillRules({ userId, driveFileId }) {
-  const { oauth2Client, templateFolderId } = await getSystemChungTuDriveContext();
+  const { oauth2Client, templateFolderId } = await getUserChungTuTemplateDriveContext(userId);
   const meta = await assertGoogleDocInTemplateFolder({
     oauth2Client,
     templateFolderId,
@@ -556,7 +533,7 @@ async function putTemplateFillRules({ userId, driveFileId, fillRules, displayNam
     }
   }
 
-  const { oauth2Client, templateFolderId } = await getSystemChungTuDriveContext();
+  const { oauth2Client, templateFolderId } = await getUserChungTuTemplateDriveContext(userId);
   const meta = await assertGoogleDocInTemplateFolder({
     oauth2Client,
     templateFolderId,
@@ -611,12 +588,33 @@ async function putTemplateFillRules({ userId, driveFileId, fillRules, displayNam
 
 /** Đọc named ranges từ Google Sheets template (API spreadsheets.get). */
 async function listSpreadsheetNamedRanges({ userId, driveFileId }) {
-  const { oauth2Client, templateFolderId } = await getSystemChungTuDriveContext();
-  const meta = await assertGoogleDocInTemplateFolder({
-    oauth2Client,
-    templateFolderId,
-    driveFileId,
-  });
+  const { oauth2Client } = await getUserChungTuTemplateDriveContext(userId);
+  const drive = createDriveClient(oauth2Client);
+  let meta;
+  try {
+    const res = await drive.files.get({
+      fileId: driveFileId,
+      fields: "id, name, parents, mimeType, trashed, webViewLink, driveId, modifiedTime",
+      supportsAllDrives: false,
+    });
+    meta = res.data;
+  } catch (error) {
+    if (error?.response?.status === 404) {
+      throw new AppError({
+        message: "Không tìm thấy file Google Drive.",
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    }
+    throw error;
+  }
+  if (meta.trashed || meta.driveId) {
+    throw new AppError({
+      message: "File không hợp lệ hoặc không nằm trong My Drive được phép.",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
 
   if (meta.mimeType !== GOOGLE_SHEET_MIME) {
     throw new AppError({
@@ -639,7 +637,7 @@ async function listSpreadsheetNamedRanges({ userId, driveFileId }) {
     if (status === 403 || reason === "PERMISSION_DENIED") {
       throw new AppError({
         message:
-          "Không đọc được Google Sheets (thiếu quyền spreadsheets.readonly trên OAuth tài khoản hệ thống template — kiểm tra GCP và refresh token CHUNG_TU_SYSTEM_DRIVE_REFRESH_TOKEN).",
+          "Không đọc được Google Sheets (thiếu quyền spreadsheets.readonly — hãy gỡ quyền ứng dụng trong Google Account rồi liên kết lại Drive từ trang chủ).",
         statusCode: 403,
         code: ERROR_CODES.VALIDATION_ERROR,
       });
@@ -691,6 +689,7 @@ async function importFileToGoogleWorkspace({
   buffer,
   originalFilename,
   targetFolder = "template",
+  categoryKey,
   documentTitle,
 }) {
   if (!buffer?.length) {
@@ -728,11 +727,15 @@ async function importFileToGoogleWorkspace({
   let oauth2Client;
   let parentId;
   if (targetFolder === "midnight") {
-    const ctx = await getUserMidnightDriveContext(userId);
+    const ctx = await getUserChungTuDriveContext(userId);
     oauth2Client = ctx.oauth2Client;
     parentId = ctx.midnightFolderId;
+  } else if (targetFolder === "category" && categoryKey) {
+    const resolved = await resolveCategoryFolderId({ userId, categoryKey });
+    oauth2Client = resolved.oauth2Client;
+    parentId = resolved.categoryFolderId;
   } else {
-    const ctx = await getSystemChungTuDriveContext();
+    const ctx = await getUserChungTuTemplateDriveContext(userId);
     oauth2Client = ctx.oauth2Client;
     parentId = ctx.templateFolderId;
   }
@@ -835,10 +838,11 @@ async function importFileToGoogleWorkspace({
 }
 
 /**
- * Tải Word/Excel (và tùy chọn PDF) lên thư mục mẫu Google Drive hệ thống, chuyển sang Docs/Sheets khi khớp.
- * Không ghi `ChungTuQuyetToanTemplateConfig` — dùng cho superadmin đăng ký danh mục template.
+ * Tải Word/Excel (và tùy chọn PDF) lên thư mục mẫu trên Drive user, chuyển sang Docs/Sheets khi khớp.
  */
-async function importOfficeBinaryToSystemTemplateFolder({
+async function importOfficeBinaryToUserTemplateFolder({
+  userId,
+  categoryKey,
   buffer,
   originalFilename,
   documentTitle,
@@ -883,7 +887,17 @@ async function importOfficeBinaryToSystemTemplateFolder({
     });
   }
 
-  const { oauth2Client, templateFolderId: parentId } = await getSystemChungTuDriveContext();
+  let oauth2Client;
+  let parentId;
+  if (categoryKey) {
+    const resolved = await resolveCategoryFolderId({ userId, categoryKey });
+    oauth2Client = resolved.oauth2Client;
+    parentId = resolved.categoryFolderId;
+  } else {
+    const ctx = await getUserChungTuTemplateDriveContext(userId);
+    oauth2Client = ctx.oauth2Client;
+    parentId = ctx.templateFolderId;
+  }
   const cfg = EXT_TO_CONVERSION[ext];
   const title = normalizeDocumentTitle(
     typeof documentTitle === "string" && documentTitle.trim()
@@ -963,7 +977,7 @@ export {
   getChungTuQuyetToanHealth,
   getTemplateFillRules,
   importFileToGoogleWorkspace,
-  importOfficeBinaryToSystemTemplateFolder,
+  importOfficeBinaryToUserTemplateFolder,
   listDriveTemplates,
   listSpreadsheetNamedRanges,
   normalizeFillRulesV2,

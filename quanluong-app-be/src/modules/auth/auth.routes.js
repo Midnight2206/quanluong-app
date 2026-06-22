@@ -17,6 +17,9 @@ import {
   googleDriveStartController,
   googleDriveStatusController,
   googleDriveUnlinkController,
+  googleLoginAuthorizeUrlController,
+  googleLoginCallbackController,
+  googleLoginStartController,
   loginController,
   logoutController,
   patchMeProfileController,
@@ -52,6 +55,9 @@ authRouter.get(
   asyncHandler(googleDriveAuthorizeUrlController),
 );
 authRouter.get("/google/drive/callback", asyncHandler(googleDriveCallbackController));
+authRouter.get("/google/login/start", asyncHandler(googleLoginStartController));
+authRouter.get("/google/login/authorize-url", asyncHandler(googleLoginAuthorizeUrlController));
+authRouter.get("/google/login/callback", asyncHandler(googleLoginCallbackController));
 authRouter.get("/google/drive/status", authMiddleware, asyncHandler(googleDriveStatusController));
 authRouter.delete("/google/drive", authMiddleware, asyncHandler(googleDriveUnlinkController));
 authRouter.get(

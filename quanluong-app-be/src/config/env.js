@@ -127,6 +127,18 @@ const env = {
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   /** Khớp tuyệt đối Google Console; bỏ khoảng trắng và slash cuối để tránh redirect_uri_mismatch. */
   googleRedirectUri: (process.env.GOOGLE_REDIRECT_URI || "").trim().replace(/\/+$/, ""),
+  /** Đăng nhập Google (scope openid/email/profile). Để trống → suy ra từ GOOGLE_REDIRECT_URI (drive → login callback). */
+  googleLoginRedirectUri: (() => {
+    const explicit = (process.env.GOOGLE_LOGIN_REDIRECT_URI || "").trim().replace(/\/+$/, "");
+    if (explicit) {
+      return explicit;
+    }
+    const driveUri = (process.env.GOOGLE_REDIRECT_URI || "").trim().replace(/\/+$/, "");
+    if (driveUri.includes("/google/drive/callback")) {
+      return driveUri.replace("/google/drive/callback", "/google/login/callback");
+    }
+    return "";
+  })(),
   /**
    * Refresh token của tài khoản Google chứa mẫu chứng từ quyết toán (thường trùng superadmin hoặc GMAIL_SENDER).
    * OAuth cần có quyền đọc/ghi vùng mẫu (vd. `drive` hoặc `drive.metadata.readonly` + khả năng tạo file) và `spreadsheets.readonly`.

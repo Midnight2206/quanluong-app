@@ -1,9 +1,8 @@
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
-  createSystemChungTuDriveOAuthClient,
-  MIDNIGHT_APP_FOLDER_NAME,
-  resolveSystemChungTuTemplateFolder,
+  ensureChildFolder,
+  getUserChungTuDriveContext,
 } from "../auth/google-drive-link.service.js";
 import { createDriveClient } from "../../shared/utils/google-drive-fetch.api.js";
 import { isDescendantOfFolder } from "./chung-tu-drive-file.util.js";
@@ -17,74 +16,27 @@ const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
 const GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 const GOOGLE_DOC_MIME = "application/vnd.google-apps.document";
 
-async function ensureChildFolder({ oauth2Client, parentId, folderName }) {
-  const drive = createDriveClient(oauth2Client);
-  const escapedName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  const list = await drive.files.list({
-    q: [
-      `name='${escapedName}'`,
-      `mimeType='${DRIVE_FOLDER_MIME}'`,
-      "trashed=false",
-      `'${parentId}' in parents`,
-    ].join(" and "),
-    fields: "files(id, name, parents, driveId, webViewLink)",
-    spaces: "drive",
-    corpora: "user",
-    pageSize: 10,
-    supportsAllDrives: false,
-    includeItemsFromAllDrives: false,
-  });
-  const existing = list.data.files?.find((file) => !file.driveId);
-  if (existing?.id) {
-    return existing.id;
-  }
-  const created = await drive.files.create({
-    requestBody: {
-      name: folderName,
-      mimeType: DRIVE_FOLDER_MIME,
-      parents: [parentId],
-    },
+async function getDriveContext({ userId }) {
+  const ctx = await getUserChungTuDriveContext(userId);
+  const drive = createDriveClient(ctx.oauth2Client);
+  const folderMeta = await drive.files.get({
+    fileId: ctx.templateRootFolderId,
     fields: "id, name, webViewLink",
     supportsAllDrives: false,
   });
-  return created.data.id;
-}
-
-async function ensureMidnightAppFolder(oauth2Client) {
-  const drive = createDriveClient(oauth2Client);
-  const escaped = MIDNIGHT_APP_FOLDER_NAME.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-  const list = await drive.files.list({
-    q: [`name='${escaped}'`, `mimeType='${DRIVE_FOLDER_MIME}'`, "trashed=false"].join(" and "),
-    fields: "files(id, driveId)",
-    spaces: "drive",
-    corpora: "user",
-    pageSize: 5,
-    supportsAllDrives: false,
-  });
-  const existing = list.data.files?.find((f) => !f.driveId);
-  if (existing?.id) return existing.id;
-  const created = await drive.files.create({
-    requestBody: { name: MIDNIGHT_APP_FOLDER_NAME, mimeType: DRIVE_FOLDER_MIME },
-    fields: "id",
-    supportsAllDrives: false,
-  });
-  return created.data.id;
-}
-
-async function getDriveContext() {
-  const oauth2Client = await createSystemChungTuDriveOAuthClient();
-  const templateRoot = await resolveSystemChungTuTemplateFolder(oauth2Client);
   return {
-    oauth2Client,
-    templateRootFolderId: templateRoot.templateFolderId,
-    templateRootFolderName: templateRoot.templateFolderName ?? CHUNG_TU_TEMPLATE_ROOT_FOLDER_NAME,
-    templateRootWebViewLink: templateRoot.templateFolderWebViewLink ?? null,
+    oauth2Client: ctx.oauth2Client,
+    templateRootFolderId: ctx.templateRootFolderId,
+    generatedRootFolderId: ctx.generatedRootFolderId,
+    midnightFolderId: ctx.midnightFolderId,
+    templateRootFolderName: folderMeta.data.name ?? CHUNG_TU_TEMPLATE_ROOT_FOLDER_NAME,
+    templateRootWebViewLink: folderMeta.data.webViewLink ?? null,
   };
 }
 
-async function resolveCategoryFolderId(categoryKey) {
+async function resolveCategoryFolderId({ userId, categoryKey }) {
   const meta = assertKnownCategoryKey(categoryKey);
-  const { oauth2Client, templateRootFolderId } = await getDriveContext();
+  const { oauth2Client, templateRootFolderId } = await getDriveContext({ userId });
   const folderId = await ensureChildFolder({
     oauth2Client,
     parentId: templateRootFolderId,
@@ -104,7 +56,7 @@ async function resolveCategoryFolderId(categoryKey) {
   };
 }
 
-async function resolveGeneratedUnitFolderId(unitId) {
+async function resolveGeneratedUnitFolderId({ userId, unitId }) {
   const uid = Number(unitId);
   if (!Number.isInteger(uid) || uid <= 0) {
     throw new AppError({
@@ -113,25 +65,19 @@ async function resolveGeneratedUnitFolderId(unitId) {
       code: ERROR_CODES.VALIDATION_ERROR,
     });
   }
-  const oauth2Client = await createSystemChungTuDriveOAuthClient();
-  const midnightId = await ensureMidnightAppFolder(oauth2Client);
-  const generatedRootId = await ensureChildFolder({
-    oauth2Client,
-    parentId: midnightId,
-    folderName: CHUNG_TU_GENERATED_ROOT_FOLDER_NAME,
-  });
+  const { oauth2Client, generatedRootFolderId } = await getDriveContext({ userId });
   const unitFolderId = await ensureChildFolder({
     oauth2Client,
-    parentId: generatedRootId,
+    parentId: generatedRootFolderId,
     folderName: `unit-${uid}`,
   });
   return { oauth2Client, unitFolderId };
 }
 
-async function listCategoryTemplates({ categoryKey }) {
+async function listCategoryTemplates({ userId, categoryKey }) {
   const meta = assertKnownCategoryKey(categoryKey);
   const { oauth2Client, categoryFolderId, categoryFolderName, categoryFolderWebViewLink } =
-    await resolveCategoryFolderId(categoryKey);
+    await resolveCategoryFolderId({ userId, categoryKey });
   const drive = createDriveClient(oauth2Client);
   const items = [];
   let pageToken;
@@ -173,8 +119,8 @@ async function listCategoryTemplates({ categoryKey }) {
   };
 }
 
-async function assertTemplateInCategoryFolder({ categoryKey, driveFileId }) {
-  const { oauth2Client, categoryFolderId } = await resolveCategoryFolderId(categoryKey);
+async function assertTemplateInCategoryFolder({ userId, categoryKey, driveFileId }) {
+  const { oauth2Client, categoryFolderId } = await resolveCategoryFolderId({ userId, categoryKey });
   const drive = createDriveClient(oauth2Client);
   let data;
   try {
@@ -202,7 +148,6 @@ async function assertTemplateInCategoryFolder({ categoryKey, driveFileId }) {
     });
   }
   if (!data.parents?.includes(categoryFolderId)) {
-    const drive = createDriveClient(oauth2Client);
     const nested = await isDescendantOfFolder(drive, driveFileId, categoryFolderId);
     if (!nested) {
       throw new AppError({
@@ -222,8 +167,8 @@ async function assertTemplateInCategoryFolder({ categoryKey, driveFileId }) {
   return { oauth2Client, categoryFolderId, meta: data };
 }
 
-async function copyTemplateToUnitFolder({ templateDriveFileId, unitId, title }) {
-  const { oauth2Client, unitFolderId } = await resolveGeneratedUnitFolderId(unitId);
+async function copyTemplateToUnitFolder({ userId, templateDriveFileId, unitId, title }) {
+  const { oauth2Client, unitFolderId } = await resolveGeneratedUnitFolderId({ userId, unitId });
   const drive = createDriveClient(oauth2Client);
   const copied = await drive.files.copy({
     fileId: templateDriveFileId,
@@ -250,4 +195,5 @@ export {
   resolveCategoryFolderId,
   resolveGeneratedUnitFolderId,
   CHUNG_TU_TEMPLATE_ROOT_FOLDER_NAME,
+  CHUNG_TU_GENERATED_ROOT_FOLDER_NAME,
 };

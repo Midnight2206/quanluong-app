@@ -3,10 +3,10 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { logger } from "../../shared/utils/logger.js";
 import { createDriveClient } from "../../shared/utils/google-drive-fetch.api.js";
-import { createSystemChungTuDriveOAuthClient } from "../auth/google-drive-link.service.js";
+import { createUserChungTuDriveOAuthClient } from "../auth/google-drive-link.service.js";
 import {
   assertJsonObject,
-  importOfficeBinaryToSystemTemplateFolder,
+  importOfficeBinaryToUserTemplateFolder,
   normalizeFillRulesV2,
 } from "./chung-tu-quyet-toan.service.js";
 
@@ -44,8 +44,8 @@ export function parseGoogleDriveFileIdFromUrl(input) {
   return null;
 }
 
-async function fetchDriveFileMetaSystem(driveFileId) {
-  const oauth2Client = await createSystemChungTuDriveOAuthClient();
+async function fetchDriveFileMetaUser({ userId, driveFileId }) {
+  const oauth2Client = await createUserChungTuDriveOAuthClient(userId);
   const drive = createDriveClient(oauth2Client);
   try {
     const res = await drive.files.get({
@@ -89,7 +89,7 @@ async function fetchDriveFileMetaSystem(driveFileId) {
     if (status === 404) {
       throw new AppError({
         message:
-          "Không đọc được file trên Drive (404). Kiểm tra link, quyền và CHUNG_TU_SYSTEM_DRIVE_REFRESH_TOKEN (cùng tài khoản sở hữu file).",
+          "Không đọc được file trên Drive (404). Kiểm tra link và quyền truy cập trên Drive đã liên kết.",
         statusCode: 400,
         code: ERROR_CODES.VALIDATION_ERROR,
       });
@@ -165,7 +165,7 @@ async function listTemplateCatalogManage({ categoryKey }) {
   return rows.map(mapManageRow);
 }
 
-async function createTemplateCatalogLink({ categoryKey, displayName, linkUrl, sortOrder }) {
+async function createTemplateCatalogLink({ userId, categoryKey, displayName, linkUrl, sortOrder }) {
   const cid = String(categoryKey ?? "").trim().slice(0, 80);
   const dname = String(displayName ?? "").trim().slice(0, 200);
   const url = String(linkUrl ?? "").trim();
@@ -184,7 +184,7 @@ async function createTemplateCatalogLink({ categoryKey, displayName, linkUrl, so
       code: ERROR_CODES.VALIDATION_ERROR,
     });
   }
-  const meta = await fetchDriveFileMetaSystem(driveFileId);
+  const meta = await fetchDriveFileMetaUser({ userId, driveFileId });
   let nextSort = sortOrder;
   if (nextSort == null || !Number.isFinite(Number(nextSort))) {
     const agg = await prisma.chungTuDriveTemplateLink.aggregate({
@@ -233,6 +233,7 @@ function buildDriveWorkspaceEditLink(driveFileId, mimeType) {
 }
 
 async function createTemplateCatalogFromUploadedOfficeFile({
+  userId,
   categoryKey,
   displayName,
   sortOrder,
@@ -249,7 +250,9 @@ async function createTemplateCatalogFromUploadedOfficeFile({
     });
   }
 
-  const uploaded = await importOfficeBinaryToSystemTemplateFolder({
+  const uploaded = await importOfficeBinaryToUserTemplateFolder({
+    userId,
+    categoryKey: cid,
     buffer,
     originalFilename,
     documentTitle: dname,
@@ -310,7 +313,7 @@ async function createTemplateCatalogFromUploadedOfficeFile({
   }
 }
 
-async function patchTemplateCatalogLink({ id, displayName, linkUrl, sortOrder, isActive, fillRules }) {
+async function patchTemplateCatalogLink({ userId, id, displayName, linkUrl, sortOrder, isActive, fillRules }) {
   const existing = await prisma.chungTuDriveTemplateLink.findUnique({
     where: { id: Number(id) },
   });
@@ -344,7 +347,7 @@ async function patchTemplateCatalogLink({ id, displayName, linkUrl, sortOrder, i
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    const meta = await fetchDriveFileMetaSystem(parsed);
+    const meta = await fetchDriveFileMetaUser({ userId, driveFileId: parsed });
     nextDriveId = meta.driveFileId;
     nextMime = meta.mimeType;
     nextWeb = meta.webViewLink ? meta.webViewLink.slice(0, 1024) : null;
@@ -410,7 +413,7 @@ export {
   createTemplateCatalogFromUploadedOfficeFile,
   createTemplateCatalogLink,
   deleteTemplateCatalogLink,
-  fetchDriveFileMetaSystem,
+  fetchDriveFileMetaUser,
   listTemplateCatalogForApp,
   listTemplateCatalogManage,
   patchTemplateCatalogLink,

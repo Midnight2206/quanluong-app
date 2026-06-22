@@ -90,13 +90,13 @@ function enrichTemplateRow({ template, folderPath, catalogByFileId }) {
   };
 }
 
-async function listTemplateFolderBrowse({ folderId, categoryKey } = {}) {
-  const { oauth2Client, templateRootFolderId } = await getDriveContext();
+async function listTemplateFolderBrowse({ userId, folderId, categoryKey } = {}) {
+  const { oauth2Client, templateRootFolderId } = await getDriveContext({ userId });
   const drive = createDriveClient(oauth2Client);
 
   let browseFolderId = String(folderId ?? "").trim();
   if (!browseFolderId && categoryKey) {
-    const resolved = await resolveCategoryFolderId(categoryKey);
+    const resolved = await resolveCategoryFolderId({ userId, categoryKey });
     browseFolderId = resolved.categoryFolderId;
   }
   if (!browseFolderId) {
@@ -152,7 +152,7 @@ async function listTemplateFolderBrowse({ folderId, categoryKey } = {}) {
   };
 }
 
-async function resolveTemplateSelectionMeta({ driveFileId }) {
+async function resolveTemplateSelectionMeta({ userId, driveFileId }) {
   const fileId = String(driveFileId ?? "").trim();
   if (!fileId) {
     throw new AppError({
@@ -161,7 +161,7 @@ async function resolveTemplateSelectionMeta({ driveFileId }) {
       code: ERROR_CODES.VALIDATION_ERROR,
     });
   }
-  const { oauth2Client, templateRootFolderId } = await getDriveContext();
+  const { oauth2Client, templateRootFolderId } = await getDriveContext({ userId });
   const drive = createDriveClient(oauth2Client);
   const fileMeta = await fetchDriveFileMeta(
     drive,

@@ -321,6 +321,55 @@ async function login({ req, identifier, password, ipAddress, userAgent }) {
   });
 }
 
+async function loginWithGoogleAccount({ req, email, ipAddress, userAgent }) {
+  const user = await findAuthUserByEmailNormalized(email);
+
+  if (!user) {
+    throw new AppError({
+      message: "Không tìm thấy tài khoản với email Google này. Vui lòng đăng ký trước.",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+
+  if (user.registrationStatus === "PENDING_APPROVAL") {
+    throw new AppError({
+      message:
+        "Tài khoản đang chờ quản trị đơn vị duyệt (chỉ quản trị từ cấp chỉ định trở lên trong cùng nhánh đơn vị).",
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+  }
+
+  if (user.registrationStatus === "REJECTED") {
+    throw new AppError({
+      message: "Đăng ký của bạn đã bị từ chối. Liên hệ quản trị đơn vị.",
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+  }
+
+  assertActiveUser(user);
+
+  let activeUser = user;
+  if (!user.emailVerifiedAt) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date() },
+    });
+    activeUser = await getUserById(user.id);
+  }
+
+  assertEmailVerifiedForLogin(activeUser);
+
+  return issueSessionForUser({
+    req,
+    user: activeUser,
+    ipAddress,
+    userAgent,
+  });
+}
+
 function assertEmailVerifiedForLogin(user) {
   if (!config.auth.requireEmailVerification) {
     return;
@@ -891,6 +940,7 @@ export {
   getRegisterUnits,
   getUserById,
   login,
+  loginWithGoogleAccount,
   logout,
   register,
   refreshSession,

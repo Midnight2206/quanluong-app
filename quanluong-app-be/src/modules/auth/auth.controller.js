@@ -1,10 +1,12 @@
 import { AUTH_COOKIE_NAMES } from "./auth.constants.js";
 import { clearAuthCookies, setAuthCookies } from "./auth.cookies.js";
+import { logger } from "../../shared/utils/logger.js";
 import { mapCurrentUser } from "./auth.mapper.js";
 import {
   getCurrentUser,
   getRegisterUnits,
   login,
+  loginWithGoogleAccount,
   logout,
   refreshSession,
   register,
@@ -35,6 +37,11 @@ import {
   verifyGoogleDriveLinkForUser,
 } from "./google-drive-link.service.js";
 import {
+  buildGoogleLoginAuthUrl,
+  exchangeGoogleLoginCode,
+  sanitizeLoginFromPath,
+} from "./google-login.service.js";
+import {
   claimEntertainmentCoinsForUser,
   flipEntertainmentCoinForUser,
   getEntertainmentCoinStateForUser,
@@ -50,6 +57,130 @@ import { respondSuccess } from "../../shared/utils/responders.js";
 function googleDriveErrorRedirect(reason) {
   const q = new URLSearchParams({ google: "error", reason });
   return `${config.publicWebUrl}/?${q.toString()}`;
+}
+
+function googleLoginErrorRedirect(reason, from = "/", message) {
+  const q = new URLSearchParams({ google: "error", reason });
+  const path = sanitizeLoginFromPath(from);
+  if (path !== "/") {
+    q.set("from", path);
+  }
+  if (typeof message === "string" && message.trim()) {
+    q.set("msg", message.trim().slice(0, 240));
+  }
+  return `${config.publicWebUrl}/login?${q.toString()}`;
+}
+
+function mapGoogleLoginErrorReason(error) {
+  if (!(error instanceof AppError)) {
+    return "unknown";
+  }
+  if (error.statusCode === 404) {
+    return "no_account";
+  }
+  if (error.statusCode === 403) {
+    if (String(error.message).includes("chờ")) {
+      return "pending";
+    }
+    if (String(error.message).includes("từ chối")) {
+      return "rejected";
+    }
+    if (String(error.message).includes("xác minh")) {
+      return "email";
+    }
+    return "forbidden";
+  }
+  if (error.statusCode === 401) {
+    return "inactive";
+  }
+  if (error.statusCode === 503) {
+    return "config";
+  }
+  if (error.statusCode === 400) {
+    if (String(error.message).includes("redirect_uri")) {
+      return "redirect_uri";
+    }
+    if (String(error.details?.error ?? "").includes("invalid_grant")) {
+      return "token";
+    }
+    return "token";
+  }
+  if (error.statusCode === 502) {
+    return "profile";
+  }
+  return "unknown";
+}
+
+async function prepareGoogleLoginOAuthSession(req) {
+  const from = sanitizeLoginFromPath(
+    typeof req.query.from === "string" ? req.query.from : "/",
+  );
+  const state = crypto.randomBytes(24).toString("hex");
+  req.session.googleOAuthLogin = { state, from };
+  await saveSessionAsync(req);
+  return buildGoogleLoginAuthUrl(state);
+}
+
+async function googleLoginStartController(req, res) {
+  const url = await prepareGoogleLoginOAuthSession(req);
+  return res.redirect(302, url);
+}
+
+async function googleLoginAuthorizeUrlController(req, res) {
+  const url = await prepareGoogleLoginOAuthSession(req);
+  return respondSuccess(res, {
+    message: "Sẵn sàng chuyển tới Google để đăng nhập.",
+    data: { url },
+  });
+}
+
+async function googleLoginCallbackController(req, res) {
+  const { code, state, error: oauthError } = req.query;
+
+  const fromFallback =
+    typeof req.session?.googleOAuthLogin?.from === "string"
+      ? req.session.googleOAuthLogin.from
+      : "/";
+
+  if (oauthError) {
+    return res.redirect(302, googleLoginErrorRedirect("denied", fromFallback));
+  }
+  if (!code || !state) {
+    return res.redirect(302, googleLoginErrorRedirect("missing", fromFallback));
+  }
+
+  const sess = req.session.googleOAuthLogin;
+  if (!sess || sess.state !== state) {
+    return res.redirect(302, googleLoginErrorRedirect("state", fromFallback));
+  }
+
+  const from = sanitizeLoginFromPath(sess.from);
+  delete req.session.googleOAuthLogin;
+  await saveSessionAsync(req);
+
+  try {
+    const profile = await exchangeGoogleLoginCode(String(code));
+    const session = await loginWithGoogleAccount({
+      req,
+      email: profile.email,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+    setAuthCookies(res, session);
+    return res.redirect(302, `${config.publicWebUrl}${from}`);
+  } catch (error) {
+    const reason = mapGoogleLoginErrorReason(error);
+    const message = error instanceof AppError ? error.message : "Đăng nhập Google thất bại.";
+    logger.warn(
+      {
+        reason,
+        err: error instanceof AppError ? { statusCode: error.statusCode, code: error.code, details: error.details } : { message: error?.message },
+      },
+      "Google login callback failed",
+    );
+    clearAuthCookies(res);
+    return res.redirect(302, googleLoginErrorRedirect(reason, from, message));
+  }
 }
 
 async function mapAuthUserResponse(user) {
@@ -495,6 +626,9 @@ export {
   googleDriveStartController,
   googleDriveStatusController,
   googleDriveUnlinkController,
+  googleLoginAuthorizeUrlController,
+  googleLoginCallbackController,
+  googleLoginStartController,
   entertainmentCoinFlipController,
   entertainmentCoinClaimController,
   entertainmentCoinStateController,

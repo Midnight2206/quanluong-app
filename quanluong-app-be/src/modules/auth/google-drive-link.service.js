@@ -1,10 +1,11 @@
 /**
  * Liên kết Drive của user — Google Drive API v3 (scope drive.file) + Sheets chỉ đọc trên file được phép.
- * Mẫu chứng từ quyết toán lấy từ Drive của tài khoản hệ thống (CHUNG_TU_SYSTEM_DRIVE_REFRESH_TOKEN), không tạo thư mục mẫu trên Drive user.
+ * Mẫu và chứng từ quyết toán nằm trong `midnight-app/chung-tu-quyet-toan-template` và `midnight-app/chung-tu-quyet-toan-generated`.
  * Gmail gửi thư hệ thống dùng Gmail API riêng (MAIL_TRANSPORT=gmail_api + GMAIL_SENDER_*).
  */
 import { google } from "googleapis";
 import { config } from "../../config/config.js";
+import { CHUNG_TU_GENERATED_ROOT_FOLDER_NAME } from "../chung-tu-quyet-toan/chung-tu-category.constants.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
@@ -69,7 +70,7 @@ async function refreshAccessTokenViaFetch(clientId, clientSecret, refreshToken) 
         const errCode = String(data.error ?? "");
         if (errCode === "invalid_grant") {
           throw googleOAuthConfigError(
-            "Refresh token Google Drive hết hạn hoặc không khớp GOOGLE_CLIENT_ID/SECRET. Liên kết lại Google Drive (superadmin) và cập nhật CHUNG_TU_SYSTEM_DRIVE_REFRESH_TOKEN.",
+            "Refresh token Google Drive hết hạn hoặc không khớp GOOGLE_CLIENT_ID/SECRET. Hãy liên kết lại Google Drive từ trang chủ.",
             { details: { error: data.error, error_description: data.error_description } },
           );
         }
@@ -104,7 +105,7 @@ async function refreshAccessTokenViaFetch(clientId, clientSecret, refreshToken) 
   throw googleOAuthConfigError("Không làm mới được access token Google.", { cause: lastError });
 }
 
-async function prepareSystemChungTuDriveOAuthClient(oauth2Client) {
+async function prepareDriveOAuthClient(oauth2Client) {
   const { clientId, clientSecret } = config.google;
   const refreshToken = String(oauth2Client.credentials?.refresh_token ?? "").trim();
   if (!clientId || !clientSecret || !refreshToken) {
@@ -201,6 +202,64 @@ async function ensureMidnightAppFolder(oauth2Client) {
   }
 
   return created.data.id;
+}
+
+async function ensureUserChungTuWorkspaceFolders(oauth2Client, midnightFolderId) {
+  const templateRootFolderId = await ensureChildFolder({
+    oauth2Client,
+    parentId: midnightFolderId,
+    folderName: CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME,
+  });
+  const generatedRootFolderId = await ensureChildFolder({
+    oauth2Client,
+    parentId: midnightFolderId,
+    folderName: CHUNG_TU_GENERATED_ROOT_FOLDER_NAME,
+  });
+  return { templateRootFolderId, generatedRootFolderId };
+}
+
+async function getUserChungTuDriveContext(userId) {
+  const uid = Number(userId);
+  if (!Number.isInteger(uid) || uid <= 0) {
+    throw new AppError({
+      message: "userId không hợp lệ.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: uid },
+    select: { googleRefreshToken: true, googleDriveFolderId: true },
+  });
+  if (!user?.googleRefreshToken || !user?.googleDriveFolderId) {
+    throw new AppError({
+      message:
+        "Chưa liên kết Google Drive hoặc chưa có thư mục làm việc. Hãy liên kết từ trang chủ rồi thử lại.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  const client = getOAuthClient();
+  if (!client) {
+    throw new AppError({
+      message: "Google OAuth chưa được cấu hình.",
+      statusCode: 503,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+  client.setCredentials({ refresh_token: user.googleRefreshToken });
+  const oauth2Client = await prepareDriveOAuthClient(client);
+  const folders = await ensureUserChungTuWorkspaceFolders(oauth2Client, user.googleDriveFolderId);
+  return {
+    oauth2Client,
+    midnightFolderId: user.googleDriveFolderId,
+    ...folders,
+  };
+}
+
+async function createUserChungTuDriveOAuthClient(userId) {
+  const { oauth2Client } = await getUserChungTuDriveContext(userId);
+  return oauth2Client;
 }
 
 async function ensureChildFolder({ oauth2Client, parentId, folderName }) {
@@ -364,6 +423,7 @@ async function exchangeCodeAndLinkDrive({ code, userId }) {
   let folderId;
   try {
     folderId = await ensureMidnightAppFolder(client);
+    await ensureUserChungTuWorkspaceFolders(client, folderId);
   } catch (error) {
     logger.error(
       {
@@ -497,7 +557,11 @@ function getSystemChungTuDriveOAuthClient() {
 /** OAuth client hệ thống đã làm mới access token (fetch trực tiếp, tránh lỗi gaxios Premature close). */
 async function createSystemChungTuDriveOAuthClient() {
   const client = getSystemChungTuDriveOAuthClient();
-  return prepareSystemChungTuDriveOAuthClient(client);
+  return prepareDriveOAuthClient(client);
+}
+
+async function prepareSystemChungTuDriveOAuthClient(oauth2Client) {
+  return prepareDriveOAuthClient(oauth2Client);
 }
 
 /**
@@ -551,9 +615,12 @@ export {
   buildGoogleAuthUrl,
   CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME,
   createSystemChungTuDriveOAuthClient,
+  createUserChungTuDriveOAuthClient,
+  ensureChildFolder,
   exchangeCodeAndLinkDrive,
   getOAuthClient,
   getSystemChungTuDriveOAuthClient,
+  getUserChungTuDriveContext,
   MIDNIGHT_APP_FOLDER_NAME,
   resolveSystemChungTuTemplateFolder,
   unlinkGoogleDriveForUser,

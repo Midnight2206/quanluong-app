@@ -22,8 +22,8 @@ import { resolveChungTuContext } from "./chung-tu-data-resolver.service.js";
 import { syncSpreadsheetFromContext } from "./chung-tu-sheet-sync.service.js";
 import { normalizeMonthUnitIds, normalizePeriodMonth, lastDayOfMonth } from "./chung-tu-monthly-sheets.js";
 import {
-  getSystemDriveFileAvailability,
-  trashSystemDriveFileIfExists,
+  getUserDriveFileAvailability,
+  trashUserDriveFileIfExists,
 } from "./chung-tu-drive-file-state.js";
 import { resolveTemplateSelectionMeta } from "./chung-tu-template-tree.service.js";
 
@@ -137,7 +137,18 @@ async function deleteDocumentRow(row) {
 }
 
 async function assertDocumentOutputAvailable(row, { deleteIfMissing = false } = {}) {
-  const availability = await getSystemDriveFileAvailability(row.outputDriveFileId);
+  const driveUserId = row.createdById;
+  if (!driveUserId) {
+    throw new AppError({
+      message: "Chứng từ thiếu thông tin người tạo — không thể truy cập Google Drive.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  const availability = await getUserDriveFileAvailability({
+    userId: driveUserId,
+    fileId: row.outputDriveFileId,
+  });
   if (!availability.exists) {
     if (deleteIfMissing) {
       await deleteDocumentRow(row);
@@ -488,13 +499,17 @@ async function createOrGetChungTuDocument({
   }
 
   const { oauth2Client, meta: templateMeta } = await assertTemplateInCategoryFolder({
+    userId: createdById,
     categoryKey,
     driveFileId: templateDriveFileId,
   });
 
   let templateSelectionMeta = null;
   try {
-    templateSelectionMeta = await resolveTemplateSelectionMeta({ driveFileId: templateDriveFileId });
+    templateSelectionMeta = await resolveTemplateSelectionMeta({
+      userId: createdById,
+      driveFileId: templateDriveFileId,
+    });
   } catch {
     templateSelectionMeta = null;
   }
@@ -518,6 +533,7 @@ async function createOrGetChungTuDocument({
   });
 
   const copied = await copyTemplateToUnitFolder({
+    userId: createdById,
     templateDriveFileId,
     unitId,
     title,
@@ -586,7 +602,7 @@ async function deleteChungTuDocument({ documentKey, effectiveUnitIds }) {
       code: ERROR_CODES.VALIDATION_ERROR,
     });
   }
-  await trashSystemDriveFileIfExists(row.outputDriveFileId);
+  await trashUserDriveFileIfExists({ userId: row.createdById, fileId: row.outputDriveFileId });
   await deleteDocumentRow(row);
   return { documentKey, deleted: true };
 }
@@ -717,8 +733,10 @@ async function syncChungTuDocument({
   const { context, sourceDataHash } = await resolveDocumentContextForRow(row, effectiveUnitIds);
 
   let oauth2Client = externalClient;
+  const driveUserId = row.createdById;
   if (!oauth2Client) {
     const asserted = await assertTemplateInCategoryFolder({
+      userId: driveUserId,
       categoryKey: row.categoryKey,
       driveFileId: row.templateDriveFileId,
     });

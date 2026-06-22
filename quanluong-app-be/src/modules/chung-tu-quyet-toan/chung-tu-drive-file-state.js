@@ -1,5 +1,5 @@
 import { createDriveClient } from "../../shared/utils/google-drive-fetch.api.js";
-import { createSystemChungTuDriveOAuthClient } from "../auth/google-drive-link.service.js";
+import { createUserChungTuDriveOAuthClient } from "../auth/google-drive-link.service.js";
 
 export function isDriveFileMissingError(error) {
   const status = error?.response?.status;
@@ -33,16 +33,16 @@ export async function getDriveFileAvailability({ oauth2Client, fileId }) {
   }
 }
 
-export async function getSystemDriveFileAvailability(fileId) {
-  const oauth2Client = await createSystemChungTuDriveOAuthClient();
+export async function getUserDriveFileAvailability({ userId, fileId }) {
+  const oauth2Client = await createUserChungTuDriveOAuthClient(userId);
   return getDriveFileAvailability({ oauth2Client, fileId });
 }
 
-export async function trashSystemDriveFileIfExists(fileId) {
+export async function trashUserDriveFileIfExists({ userId, fileId }) {
   const id = String(fileId ?? "").trim();
   if (!id) return { trashed: false, reason: "missing-id" };
 
-  const oauth2Client = await createSystemChungTuDriveOAuthClient();
+  const oauth2Client = await createUserChungTuDriveOAuthClient(userId);
   const drive = createDriveClient(oauth2Client);
   try {
     await drive.files.update({

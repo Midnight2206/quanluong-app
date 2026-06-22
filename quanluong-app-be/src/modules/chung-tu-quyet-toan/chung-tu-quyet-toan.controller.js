@@ -100,7 +100,7 @@ async function listSpreadsheetNamedRangesSuperadminController(req, res) {
     driveFileId: req.validatedParams.driveFileId,
   });
   return respondSuccess(res, {
-    message: "Danh sách Named ranges (template hệ thống).",
+    message: "Danh sách Named ranges (template trên Drive đã liên kết).",
     data,
   });
 }
@@ -131,7 +131,7 @@ async function listTemplateCatalogController(req, res) {
   const { categoryKey } = req.validatedQuery;
   const items = await listTemplateCatalogForApp({ categoryKey });
   return respondSuccess(res, {
-    message: "Danh sách mẫu chứng từ (Drive hệ thống — đăng ký bởi superadmin).",
+    message: "Danh sách mẫu chứng từ (Drive đã liên kết).",
     data: { items },
   });
 }
@@ -159,6 +159,7 @@ async function templateCatalogFieldRegistryController(req, res) {
 
 async function createTemplateCatalogController(req, res) {
   const data = await createTemplateCatalogLink({
+    userId: req.user.id,
     categoryKey: req.validatedBody.categoryKey,
     displayName: req.validatedBody.displayName,
     linkUrl: req.validatedBody.linkUrl,
@@ -179,6 +180,7 @@ async function uploadTemplateCatalogOfficeController(req, res) {
     });
   }
   const data = await createTemplateCatalogFromUploadedOfficeFile({
+    userId: req.user.id,
     categoryKey: req.validatedBody.categoryKey,
     displayName: req.validatedBody.displayName,
     sortOrder: req.validatedBody.sortOrder,
@@ -186,13 +188,14 @@ async function uploadTemplateCatalogOfficeController(req, res) {
     originalFilename: req.file.originalname,
   });
   return respondSuccess(res, {
-    message: "Đã tải Word/Excel lên Google Drive hệ thống và thêm vào danh mục.",
+    message: "Đã tải Word/Excel lên Google Drive và thêm vào danh mục.",
     data,
   });
 }
 
 async function patchTemplateCatalogController(req, res) {
   const data = await patchTemplateCatalogLink({
+    userId: req.user.id,
     id: req.validatedParams.id,
     displayName: req.validatedBody.displayName,
     linkUrl: req.validatedBody.linkUrl,
@@ -216,6 +219,7 @@ async function deleteTemplateCatalogController(req, res) {
 
 async function listTemplateTreeController(req, res) {
   const data = await listTemplateFolderBrowse({
+    userId: req.user.id,
     folderId: req.validatedQuery.folderId,
     categoryKey: req.validatedQuery.categoryKey,
   });
@@ -227,6 +231,7 @@ async function listTemplateTreeController(req, res) {
 
 async function getTemplateTreeFileMetaController(req, res) {
   const data = await resolveTemplateSelectionMeta({
+    userId: req.user.id,
     driveFileId: req.validatedParams.driveFileId,
   });
   return respondSuccess(res, {
@@ -237,6 +242,7 @@ async function getTemplateTreeFileMetaController(req, res) {
 
 async function listCategoryTemplatesController(req, res) {
   const data = await listCategoryTemplates({
+    userId: req.user.id,
     categoryKey: req.validatedParams.categoryKey,
   });
   return respondSuccess(res, {
@@ -384,6 +390,7 @@ async function previewChungTuContextController(req, res) {
 
 async function getCategoryTemplateFillMappingController(req, res) {
   const data = await getCategoryTemplateFillMapping({
+    userId: req.user.id,
     categoryKey: req.validatedParams.categoryKey,
     driveFileId: req.validatedParams.driveFileId,
   });
@@ -395,6 +402,7 @@ async function getCategoryTemplateFillMappingController(req, res) {
 
 async function putCategoryTemplateFillMappingController(req, res) {
   const data = await putCategoryTemplateFillMapping({
+    userId: req.user.id,
     categoryKey: req.validatedParams.categoryKey,
     driveFileId: req.validatedParams.driveFileId,
     fillRules: req.validatedBody.fillRules,

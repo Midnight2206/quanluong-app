@@ -236,7 +236,7 @@ async function fetchSpreadsheetNamedRanges(oauth2Client, driveFileId, fileName) 
     if (status === 403 || reason === "PERMISSION_DENIED") {
       throw new AppError({
         message:
-          "Không đọc được Google Sheets (kiểm tra OAuth hệ thống CHUNG_TU_SYSTEM_DRIVE_REFRESH_TOKEN).",
+          "Không đọc được Google Sheets (kiểm tra liên kết Google Drive và quyền spreadsheets.readonly).",
         statusCode: 403,
         code: ERROR_CODES.VALIDATION_ERROR,
       });
@@ -666,7 +666,7 @@ export function enrichFillRulesWithSpreadsheetMeta(fillRules, spreadsheetMeta, c
 export async function loadFillRulesForCategoryTemplate(
   templateDriveFileId,
   categoryKey,
-  { skipTemplateNamedRangeFetch = false, requireSavedDetailTable = false } = {},
+  { userId, skipTemplateNamedRangeFetch = false, requireSavedDetailTable = false } = {},
 ) {
   const registry = getContextFieldRegistryForCategory(categoryKey);
   const fieldKeys = buildKnownFieldKeys(registry, categoryKey);
@@ -677,6 +677,7 @@ export async function loadFillRulesForCategoryTemplate(
     }
     if (namedRangesPayload) return namedRangesPayload;
     const { oauth2Client, meta } = await assertTemplateInCategoryFolder({
+      userId,
       categoryKey,
       driveFileId: templateDriveFileId,
     });
@@ -709,6 +710,7 @@ export async function loadFillRulesForCategoryTemplate(
     merged = applyDefaultDetailTableOptions(merged, categoryKey);
     if (!skipTemplateNamedRangeFetch) {
       const { oauth2Client } = await assertTemplateInCategoryFolder({
+        userId,
         categoryKey,
         driveFileId: templateDriveFileId,
       });
@@ -736,6 +738,7 @@ export async function loadFillRulesForCategoryTemplate(
       merged = applyDefaultDetailTableOptions(merged, categoryKey);
       if (!skipTemplateNamedRangeFetch) {
         const { oauth2Client } = await assertTemplateInCategoryFolder({
+          userId,
           categoryKey,
           driveFileId: templateDriveFileId,
         });
@@ -768,6 +771,7 @@ export async function loadFillRulesForCategoryTemplate(
   const payload = await fetchTemplateNamedRangesForMerge();
   fillRules.sheets.namedRanges = suggestNamedRangeMappings(payload.items, fieldKeys);
   const { oauth2Client } = await assertTemplateInCategoryFolder({
+    userId,
     categoryKey,
     driveFileId: templateDriveFileId,
   });
@@ -784,8 +788,9 @@ export async function loadFillRulesForCategoryTemplate(
   return applyDefaultDetailTableOptions(fillRules, categoryKey);
 }
 
-export async function getCategoryTemplateFillMapping({ categoryKey, driveFileId }) {
+export async function getCategoryTemplateFillMapping({ userId, categoryKey, driveFileId }) {
   const { oauth2Client, meta } = await assertTemplateInCategoryFolder({
+    userId,
     categoryKey,
     driveFileId,
   });
@@ -871,12 +876,13 @@ export async function getCategoryTemplateFillMapping({ categoryKey, driveFileId 
 }
 
 export async function putCategoryTemplateFillMapping({
+  userId,
   categoryKey,
   driveFileId,
   fillRules,
   updatedById,
 }) {
-  const { meta } = await assertTemplateInCategoryFolder({ categoryKey, driveFileId });
+  const { meta } = await assertTemplateInCategoryFolder({ userId, categoryKey, driveFileId });
   if (meta.mimeType !== GOOGLE_SHEET_MIME) {
     throw new AppError({
       message: "Chỉ lưu map cho mẫu Google Sheets.",
@@ -916,8 +922,9 @@ export async function putCategoryTemplateFillMapping({
   };
 }
 
-export async function listCategoryTemplateNamedRanges({ categoryKey, driveFileId }) {
+export async function listCategoryTemplateNamedRanges({ userId, categoryKey, driveFileId }) {
   const { oauth2Client, meta } = await assertTemplateInCategoryFolder({
+    userId,
     categoryKey,
     driveFileId,
   });

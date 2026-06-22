@@ -27,6 +27,12 @@ async function bootstrapServer() {
       "Google OAuth redirect URI (GOOGLE_REDIRECT_URI) — copy into GCP Authorized redirect URIs byte-for-byte; Error 400 redirect_uri_mismatch if mismatch",
     );
   }
+  if (config.google.clientId && config.google.loginRedirectUri) {
+    logger.info(
+      { googleLoginRedirectUri: config.google.loginRedirectUri },
+      "Google login redirect URI (GOOGLE_LOGIN_REDIRECT_URI) — add to GCP Authorized redirect URIs for sign-in",
+    );
+  }
 
   const app = createApp({ sessionStore: sessionStore ?? undefined });
   const apiServer = http.createServer(app);
