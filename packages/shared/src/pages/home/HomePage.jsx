@@ -32,7 +32,7 @@ const GOOGLE_DRIVE_ERROR_MESSAGES = {
     "Google không cấp refresh token. Vào Tài khoản Google → Bảo mật → Quyền truy cập của bên thứ ba, gỡ ứng dụng này rồi liên kết lại.",
   config: "Google OAuth chưa được cấu hình đúng trên máy chủ (CLIENT_ID / SECRET / REDIRECT_URI).",
   folder: "Không tạo hoặc tìm được thư mục «midnight-app» trên Drive. Thử lại sau vài phút.",
-  scope: "Google chưa cấp quyền tạo thư mục Drive. Hãy gỡ quyền ứng dụng trong Google Account rồi liên kết lại.",
+  scope: "Google chưa cấp đủ quyền Drive/Sheets. Gỡ quyền ứng dụng trong Tài khoản Google rồi liên kết lại.",
   token: "Google không trả về access token hợp lệ. Thử liên kết lại.",
   unknown: "Liên kết Google Drive thất bại. Thử lại hoặc kiểm tra cấu hình OAuth.",
 };
@@ -89,6 +89,7 @@ export function HomePage() {
   const pathname = usePathname();
   const googleParam = searchParams.get("google");
   const googleReasonParam = searchParams.get("reason");
+  const googleMsgParam = searchParams.get("msg");
   const [refetchUser] = useLazyGetCurrentUserQuery();
   const [unlinkDrive, { isLoading: unlinkingDrive }] = useUnlinkGoogleDriveMutation();
   const [checkDriveLink] = useCheckGoogleDriveLinkMutation();
@@ -101,7 +102,7 @@ export function HomePage() {
   useEffect(() => {
     const g = googleParam;
     const reason = googleReasonParam;
-    const resultKey = `${g || ""}:${reason || ""}`;
+    const resultKey = `${g || ""}:${reason || ""}:${googleMsgParam || ""}`;
     if ((g === "linked" || g === "error") && handledGoogleResultRef.current === resultKey) {
       return;
     }
@@ -112,21 +113,25 @@ export function HomePage() {
       const next = new URLSearchParams(searchParams.toString());
       next.delete("google");
       next.delete("reason");
+      next.delete("msg");
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     } else if (g === "error") {
       handledGoogleResultRef.current = resultKey;
       const msg =
-        (reason && GOOGLE_DRIVE_ERROR_MESSAGES[reason]) || GOOGLE_DRIVE_ERROR_MESSAGES.unknown;
+        (googleMsgParam && googleMsgParam.trim()) ||
+        (reason && GOOGLE_DRIVE_ERROR_MESSAGES[reason]) ||
+        GOOGLE_DRIVE_ERROR_MESSAGES.unknown;
       notifyError(msg);
       const next = new URLSearchParams(searchParams.toString());
       next.delete("google");
       next.delete("reason");
+      next.delete("msg");
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- searchParams thay đổi mỗi render; chỉ cần scalar google* + pathname + router.
-  }, [googleParam, googleReasonParam, pathname, refetchUser, router]);
+  }, [googleParam, googleReasonParam, googleMsgParam, pathname, refetchUser, router]);
 
   useEffect(() => {
     const folderId = user?.googleDriveFolderId;

@@ -54,9 +54,56 @@ import crypto from "node:crypto";
 import { getUnitBreadcrumbChain } from "../../shared/units/unit-scope.service.js";
 import { respondSuccess } from "../../shared/utils/responders.js";
 
-function googleDriveErrorRedirect(reason) {
+function pickReturnWebOrigin(req) {
+  const originHeader = typeof req.get("origin") === "string" ? req.get("origin").trim() : "";
+  if (originHeader && config.security.corsOrigins.includes(originHeader)) {
+    return originHeader.replace(/\/+$/, "");
+  }
+  const referer = typeof req.get("referer") === "string" ? req.get("referer").trim() : "";
+  if (referer) {
+    try {
+      const parsed = new URL(referer);
+      const origin = `${parsed.protocol}//${parsed.host}`;
+      if (config.security.corsOrigins.includes(origin)) {
+        return origin;
+      }
+    } catch {
+      // ignore malformed referer
+    }
+  }
+  return config.publicWebUrl;
+}
+
+function googleDriveErrorRedirect(returnOrigin, reason, message) {
   const q = new URLSearchParams({ google: "error", reason });
-  return `${config.publicWebUrl}/?${q.toString()}`;
+  if (typeof message === "string" && message.trim()) {
+    q.set("msg", message.trim().slice(0, 240));
+  }
+  const base = String(returnOrigin || config.publicWebUrl).replace(/\/+$/, "");
+  return `${base}/?${q.toString()}`;
+}
+
+function mapGoogleDriveLinkErrorReason(error) {
+  if (!(error instanceof AppError)) {
+    return { reason: "unknown" };
+  }
+  const message = String(error.message || "");
+  if (error.statusCode === 503) {
+    return { reason: "config", message };
+  }
+  if (message.includes("refresh token")) {
+    return { reason: "no_refresh", message };
+  }
+  if (message.includes("Không tạo được thư mục") || message.includes("thư mục con")) {
+    return { reason: "folder", message };
+  }
+  if (message.includes("quyền") && (message.includes("Drive") || message.includes("Sheets"))) {
+    return { reason: "scope", message };
+  }
+  if (message.includes("access token")) {
+    return { reason: "token", message };
+  }
+  return { reason: "unknown", message };
 }
 
 function googleLoginErrorRedirect(reason, from = "/", message) {
@@ -348,6 +395,7 @@ async function prepareGoogleDriveOAuthSession(req) {
   req.session.googleOAuthLink = {
     state,
     userId: user.id,
+    returnOrigin: pickReturnWebOrigin(req),
   };
   await saveSessionAsync(req);
 
@@ -370,17 +418,19 @@ async function googleDriveAuthorizeUrlController(req, res) {
 
 async function googleDriveCallbackController(req, res) {
   const { code, state, error: oauthError } = req.query;
+  const fallbackOrigin = pickReturnWebOrigin(req);
 
   if (oauthError) {
-    return res.redirect(302, googleDriveErrorRedirect("denied"));
+    return res.redirect(302, googleDriveErrorRedirect(fallbackOrigin, "denied"));
   }
   if (!code || !state) {
-    return res.redirect(302, googleDriveErrorRedirect("missing"));
+    return res.redirect(302, googleDriveErrorRedirect(fallbackOrigin, "missing"));
   }
 
   const sess = req.session.googleOAuthLink;
+  const returnOrigin = sess?.returnOrigin || fallbackOrigin;
   if (!sess || sess.state !== state) {
-    return res.redirect(302, googleDriveErrorRedirect("state"));
+    return res.redirect(302, googleDriveErrorRedirect(returnOrigin, "state"));
   }
 
   delete req.session.googleOAuthLink;
@@ -392,24 +442,20 @@ async function googleDriveCallbackController(req, res) {
       userId: sess.userId,
     });
   } catch (e) {
-    let reason = "unknown";
-    if (e instanceof AppError) {
-      if (e.statusCode === 503) {
-        reason = "config";
-      } else if (String(e.message).includes("refresh token")) {
-        reason = "no_refresh";
-      } else if (String(e.message).includes("Không tạo được thư mục")) {
-        reason = "folder";
-      } else if (String(e.message).includes("quyền tạo thư mục Drive")) {
-        reason = "scope";
-      } else if (String(e.message).includes("access token")) {
-        reason = "token";
-      }
-    }
-    return res.redirect(302, googleDriveErrorRedirect(reason));
+    const { reason, message } = mapGoogleDriveLinkErrorReason(e);
+    logger.warn(
+      {
+        userId: sess.userId,
+        reason,
+        statusCode: e instanceof AppError ? e.statusCode : undefined,
+        message: e instanceof AppError ? e.message : e?.message,
+      },
+      "Liên kết Google Drive thất bại sau OAuth callback",
+    );
+    return res.redirect(302, googleDriveErrorRedirect(returnOrigin, reason, message));
   }
 
-  return res.redirect(302, `${config.publicWebUrl}/?google=linked`);
+  return res.redirect(302, `${returnOrigin}/?google=linked`);
 }
 
 async function googleDriveUnlinkController(req, res) {

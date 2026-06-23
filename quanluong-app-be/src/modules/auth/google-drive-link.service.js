@@ -19,8 +19,11 @@ import {
 const MIDNIGHT_APP_FOLDER_NAME = "midnight-app";
 const CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME = "chung-tu-quyet-toan-template";
 const DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
-/** Đọc/ghi file trong My Drive user — cần để liệt kê mẫu user tự đặt và copy tạo chứng từ. */
+/** Đọc/ghi toàn bộ My Drive — ưu tiên khi Google cấp (restricted scope). */
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+/** Fallback khi app chưa được duyệt scope `drive`: đọc mẫu user đặt + ghi file trong folder app tạo. */
+const DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 /** Đọc metadata/lưới (namedRanges) của Google Sheets mà Drive API đã được phép truy cập. */
 const SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const DRIVE_FOLDER_HEALTH_ATTEMPTS = 3;
@@ -147,6 +150,8 @@ function buildGoogleAuthUrl(state) {
       "openid",
       "https://www.googleapis.com/auth/userinfo.email",
       DRIVE_SCOPE,
+      DRIVE_READONLY_SCOPE,
+      DRIVE_FILE_SCOPE,
       SHEETS_READONLY_SCOPE,
     ],
     state,
@@ -315,14 +320,24 @@ async function ensureChildFolder({ oauth2Client, parentId, folderName }) {
   return created.data.id;
 }
 
+function hasUsableDriveScopes(grantedScopes) {
+  if (grantedScopes.includes(DRIVE_SCOPE)) {
+    return true;
+  }
+  return (
+    grantedScopes.includes(DRIVE_READONLY_SCOPE) && grantedScopes.includes(DRIVE_FILE_SCOPE)
+  );
+}
+
 function assertGoogleDriveLinkScopesGranted(tokens) {
   const grantedScopes = String(tokens.scope || "")
     .split(/\s+/)
     .filter(Boolean);
-  if (!grantedScopes.includes(DRIVE_SCOPE)) {
-    logger.warn({ grantedScopes }, "Liên kết Google: OAuth token thiếu scope drive");
+  if (!hasUsableDriveScopes(grantedScopes)) {
+    logger.warn({ grantedScopes }, "Liên kết Google: OAuth token thiếu scope Drive hợp lệ");
     throw new AppError({
-      message: "Google không cấp quyền truy cập Google Drive. Hãy chấp nhận đủ quyền rồi liên kết lại.",
+      message:
+        "Google chưa cấp đủ quyền Drive (cần «Xem và quản lý» hoặc «Xem» + «Tạo file ứng dụng»). Gỡ quyền ứng dụng trong Tài khoản Google rồi liên kết lại.",
       statusCode: 400,
       code: ERROR_CODES.VALIDATION_ERROR,
     });
@@ -395,7 +410,29 @@ async function exchangeCodeAndLinkDrive({ code, userId }) {
     });
   }
 
-  const { tokens } = await client.getToken(code);
+  let tokens;
+  try {
+    ({ tokens } = await client.getToken(code));
+  } catch (error) {
+    const oauthError = error?.response?.data?.error;
+    logger.warn(
+      {
+        userId,
+        oauthError,
+        message: error?.response?.data?.error_description || error?.message,
+      },
+      "Liên kết Google: đổi authorization code thất bại",
+    );
+    throw new AppError({
+      message:
+        error?.response?.data?.error_description ||
+        (oauthError === "invalid_grant"
+          ? "Mã xác nhận Google đã hết hạn hoặc đã dùng. Hãy bắt đầu liên kết lại từ trang chủ."
+          : "Google từ chối mã xác nhận OAuth. Thử liên kết lại."),
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
   if (!tokens.access_token) {
     throw new AppError({
       message: "Google không trả về access token.",
@@ -496,8 +533,8 @@ async function verifyGoogleDriveLinkForUser(userId) {
     });
   }
   client.setCredentials({ refresh_token: user.googleRefreshToken });
-  attachResilientGoogleTransport(client);
-  const drive = createDriveClient(client);
+  const oauth2Client = await prepareDriveOAuthClient(client);
+  const drive = createDriveClient(oauth2Client);
 
   try {
     const status = await verifyDriveFolderOrClearLink({
