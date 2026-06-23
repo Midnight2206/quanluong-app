@@ -270,11 +270,14 @@ export function HomePage() {
                     <div className="min-w-0 space-y-2">
                       <p className="text-sm font-medium text-foreground">Google Drive — sổ sách</p>
                       <p className="text-xs leading-relaxed text-muted-foreground">
-                        Liên kết một lần để hệ thống dùng quyền{" "}
-                        <span className="font-medium text-foreground">drive.file</span> (chỉ file/thư mục ứng dụng tạo),
-                        tạo hoặc dùng thư mục <span className="font-mono text-[11px]">midnight-app</span> trên Drive của
-                        bạn. Nên đặt Sheets/Docs sổ sách trong thư mục đó.                         Luồng OAuth: bấm liên kết → đăng nhập Google → chấp nhận quyền → trình duyệt quay về
-                        trang chủ. Dùng cùng địa chỉ trang (vd. luôn localhost:8080, không trộn với 127.0.0.1).
+                        Liên kết một lần để tạo thư mục{" "}
+                        <span className="font-mono text-[11px]">midnight-app</span> trên Drive của bạn, kèm{" "}
+                        <span className="font-mono text-[11px]">chung-tu-quyet-toan-template</span> (mẫu) và{" "}
+                        <span className="font-mono text-[11px]">chung-tu-quyet-toan-generated</span> (chứng từ đã tạo).
+                        Đặt Google Sheets/Docs mẫu vào các thư mục con theo loại chứng từ (vd.{" "}
+                        <span className="font-mono text-[11px]">bang-ke-mua-hang</span>). Luồng OAuth: bấm liên kết →
+                        đăng nhập Google → chấp nhận quyền → trình duyệt quay về trang chủ. Dùng cùng địa chỉ trang (vd.
+                        luôn localhost:8080, không trộn với 127.0.0.1).
                       </p>
                       {user?.googleDriveFolderId ? (
                         <p className="text-[11px] leading-relaxed text-muted-foreground">

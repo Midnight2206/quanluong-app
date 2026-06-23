@@ -1,11 +1,11 @@
 /**
- * Liên kết Drive của user — Google Drive API v3 (scope drive.file) + Sheets chỉ đọc trên file được phép.
- * Mẫu và chứng từ quyết toán nằm trong `midnight-app/chung-tu-quyet-toan-template` và `midnight-app/chung-tu-quyet-toan-generated`.
+ * Liên kết Drive của user — scope `drive` (đọc mẫu user đặt trong workspace + tạo chứng từ trên Drive user).
+ * Workspace: `midnight-app/chung-tu-quyet-toan-template` và `chung-tu-quyet-toan-generated`.
  * Gmail gửi thư hệ thống dùng Gmail API riêng (MAIL_TRANSPORT=gmail_api + GMAIL_SENDER_*).
  */
 import { google } from "googleapis";
 import { config } from "../../config/config.js";
-import { CHUNG_TU_GENERATED_ROOT_FOLDER_NAME } from "../chung-tu-quyet-toan/chung-tu-category.constants.js";
+import { CHUNG_TU_CATEGORY_LIST, CHUNG_TU_GENERATED_ROOT_FOLDER_NAME } from "../chung-tu-quyet-toan/chung-tu-category.constants.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
@@ -19,7 +19,8 @@ import {
 const MIDNIGHT_APP_FOLDER_NAME = "midnight-app";
 const CHUNG_TU_QUYET_TOAN_TEMPLATE_FOLDER_NAME = "chung-tu-quyet-toan-template";
 const DRIVE_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
-const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+/** Đọc/ghi file trong My Drive user — cần để liệt kê mẫu user tự đặt và copy tạo chứng từ. */
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 /** Đọc metadata/lưới (namedRanges) của Google Sheets mà Drive API đã được phép truy cập. */
 const SHEETS_READONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const DRIVE_FOLDER_HEALTH_ATTEMPTS = 3;
@@ -109,7 +110,7 @@ async function prepareDriveOAuthClient(oauth2Client) {
   const { clientId, clientSecret } = config.google;
   const refreshToken = String(oauth2Client.credentials?.refresh_token ?? "").trim();
   if (!clientId || !clientSecret || !refreshToken) {
-    throw googleOAuthConfigError("Thiếu cấu hình Google OAuth hoặc refresh token hệ thống.");
+    throw googleOAuthConfigError("Thiếu cấu hình Google OAuth hoặc refresh token.");
   }
   const tokens = await refreshAccessTokenViaFetch(clientId, clientSecret, refreshToken);
   oauth2Client.setCredentials({
@@ -145,7 +146,7 @@ function buildGoogleAuthUrl(state) {
     scope: [
       "openid",
       "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/drive.file",
+      DRIVE_SCOPE,
       SHEETS_READONLY_SCOPE,
     ],
     state,
@@ -215,6 +216,13 @@ async function ensureUserChungTuWorkspaceFolders(oauth2Client, midnightFolderId)
     parentId: midnightFolderId,
     folderName: CHUNG_TU_GENERATED_ROOT_FOLDER_NAME,
   });
+  for (const category of CHUNG_TU_CATEGORY_LIST) {
+    await ensureChildFolder({
+      oauth2Client,
+      parentId: templateRootFolderId,
+      folderName: category.folderName,
+    });
+  }
   return { templateRootFolderId, generatedRootFolderId };
 }
 
@@ -311,10 +319,10 @@ function assertGoogleDriveLinkScopesGranted(tokens) {
   const grantedScopes = String(tokens.scope || "")
     .split(/\s+/)
     .filter(Boolean);
-  if (!grantedScopes.includes(DRIVE_FILE_SCOPE)) {
-    logger.warn({ grantedScopes }, "Liên kết Google: OAuth token thiếu scope drive.file");
+  if (!grantedScopes.includes(DRIVE_SCOPE)) {
+    logger.warn({ grantedScopes }, "Liên kết Google: OAuth token thiếu scope drive");
     throw new AppError({
-      message: "Google không cấp quyền tạo thư mục Drive cho ứng dụng.",
+      message: "Google không cấp quyền truy cập Google Drive. Hãy chấp nhận đủ quyền rồi liên kết lại.",
       statusCode: 400,
       code: ERROR_CODES.VALIDATION_ERROR,
     });
