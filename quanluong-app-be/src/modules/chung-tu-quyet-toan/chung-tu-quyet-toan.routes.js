@@ -15,6 +15,7 @@ import { CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS } from "./chung-tu-quyet-toan.rou
 import {
   chungTuQuyetToanHealthController,
   checkChungTuDocumentStaleController,
+  seedTemplatesFromSystemController,
   createChungTuDocumentController,
   createTemplateCatalogController,
   deleteChungTuDocumentController,
@@ -320,6 +321,12 @@ chungTuQuyetToanRouter.post(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["periodDate"] }),
   validateRequest({ body: chungTuContextPreviewBodySchema }),
   asyncHandler(previewChungTuContextController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/templates/seed-from-system",
+  permissionMiddleware([routePermissions.templatesSeedFromSystem]),
+  asyncHandler(seedTemplatesFromSystemController),
 );
 
 export { chungTuQuyetToanRouter };

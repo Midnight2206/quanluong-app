@@ -18,6 +18,7 @@ import {
   patchTemplateCatalogLink,
 } from "./chung-tu-template-catalog.service.js";
 import { getContextFieldRegistryForCategory } from "./chung-tu-context-field-registry.js";
+import { seedUserTemplatesFromSystem } from "./chung-tu-template-seed.service.js";
 import {
   listTemplateFolderBrowse,
   resolveTemplateSelectionMeta,
@@ -414,9 +415,20 @@ async function putCategoryTemplateFillMappingController(req, res) {
   });
 }
 
+async function seedTemplatesFromSystemController(req, res) {
+  const data = await seedUserTemplatesFromSystem({ userId: req.user.id });
+  const { totals } = data;
+  const message =
+    totals.available === 0
+      ? "Drive hệ thống chưa có mẫu nào để sao chép."
+      : `Đã sao chép ${totals.copied} mẫu, bỏ qua ${totals.skipped} mẫu đã có.`;
+  return respondSuccess(res, { message, data });
+}
+
 export {
   chungTuQuyetToanHealthController,
   checkChungTuDocumentStaleController,
+  seedTemplatesFromSystemController,
   createChungTuDocumentController,
   deleteChungTuDocumentController,
   createTemplateCatalogController,

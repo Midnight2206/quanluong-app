@@ -267,6 +267,18 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
       description: "Xem trước dữ liệu nguồn trước khi tạo/đồng bộ chứng từ.",
     },
   },
+  {
+    key: "templatesSeedFromSystem",
+    method: "POST",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/templates/seed-from-system",
+    pathRoute: "/api/chungtuquyettoan/templates/seed-from-system",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      name: "Chứng từ quyết toán",
+      description: "Sao chép mẫu chứng từ từ Drive hệ thống sang Drive của user.",
+    },
+  },
 ];
 
 export { CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS };

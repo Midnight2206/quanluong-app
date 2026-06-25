@@ -568,6 +568,21 @@ async function exchangeCodeAndLinkDrive({ code, userId }) {
     },
   });
 
+  // Best-effort: nạp sẵn mẫu chứng từ từ Drive hệ thống — lỗi không làm hỏng việc liên kết.
+  // Import động để tránh phụ thuộc vòng với module chung-tu.
+  try {
+    const { seedUserTemplatesFromSystem } = await import(
+      "../chung-tu-quyet-toan/chung-tu-template-seed.service.js"
+    );
+    const result = await seedUserTemplatesFromSystem({ userId });
+    logger.info({ userId, totals: result.totals }, "Liên kết Google: đã nạp sẵn mẫu chứng từ từ hệ thống");
+  } catch (error) {
+    logger.warn(
+      { userId, message: error?.message },
+      "Liên kết Google: không nạp được mẫu chứng từ từ hệ thống (bỏ qua)",
+    );
+  }
+
   return { folderId };
 }
 

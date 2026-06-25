@@ -1,12 +1,14 @@
 "use client";
 
-import { ExternalLink, Loader2 } from "lucide-react";
+import { Copy, ExternalLink, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
+import { notifyError, notifySuccess } from "@/services/notify";
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { useGetLttpIssueSlipsQuery } from "@/features/lttp/api/lttpApi";
+import { useSeedChungTuTemplatesMutation } from "@/features/chung-tu-quyet-toan/api/chungTuTemplateSeedApi";
 import {
   CHUNG_TU_AGGREGATION_MODE_OPTIONS,
   CHUNG_TU_AGGREGATION_MODES,
@@ -87,6 +89,21 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind, subtitle }) {
 
   const [createDoc, { isLoading: creating }] = useCreateChungTuDocumentMutation();
   const [previewCtx, { isLoading: previewing }] = useChungTuContextPreviewMutation();
+  const [seedTemplates, { isLoading: seeding }] = useSeedChungTuTemplatesMutation();
+
+  const handleSeedTemplates = async () => {
+    try {
+      const result = await seedTemplates();
+      const totals = result?.totals ?? { available: 0, copied: 0, skipped: 0 };
+      if (totals.available === 0) {
+        notifySuccess("Drive hệ thống chưa có mẫu nào để sao chép.");
+      } else {
+        notifySuccess(`Đã sao chép ${totals.copied} mẫu, bỏ qua ${totals.skipped} mẫu đã có.`);
+      }
+    } catch (e) {
+      notifyError(e?.data?.message || e?.message || "Không sao chép được mẫu từ hệ thống.");
+    }
+  };
 
   const buildPayloadBase = useCallback(() => {
     const base = {
@@ -362,9 +379,28 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind, subtitle }) {
       </div>
 
       <div className="space-y-2 rounded-xl border border-border/80 bg-card/40 p-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
-          Mẫu chứng từ (thư mục Drive hệ thống)
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
+            Mẫu chứng từ (Drive của bạn)
+          </h3>
+          {canWrite ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={seeding}
+              onClick={handleSeedTemplates}
+              title="Sao chép mẫu có sẵn từ Drive hệ thống vào Drive của bạn"
+            >
+              {seeding ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Copy className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Sao chép mẫu từ hệ thống
+            </Button>
+          ) : null}
+        </div>
         <ChungTuTemplateTreePicker
           categoryKey={categoryKey}
           selectedDriveFileId={selectedTemplate?.driveFileId ?? ""}

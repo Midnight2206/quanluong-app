@@ -3,6 +3,7 @@ import { ERROR_CODES } from "../../errors/error-codes.js";
 import { withGoogleApiRetry } from "./google-api-transport.util.js";
 
 const DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files";
+const DRIVE_ABOUT_URL = "https://www.googleapis.com/drive/v3/about";
 
 function requireAccessToken(oauth2Client) {
   const token = String(oauth2Client?.credentials?.access_token ?? "").trim();
@@ -131,6 +132,29 @@ export function createDriveClient(oauth2Client) {
             body: requestBody ?? {},
           },
         );
+        return { data };
+      },
+    },
+    permissions: {
+      async create(params = {}) {
+        const { fileId, requestBody, ...rest } = params;
+        const query = serializeQueryParams(rest);
+        const data = await driveFetchJson(
+          oauth2Client,
+          `${DRIVE_FILES_URL}/${encodeURIComponent(String(fileId))}/permissions`,
+          {
+            method: "POST",
+            query,
+            body: requestBody ?? {},
+          },
+        );
+        return { data };
+      },
+    },
+    about: {
+      async get(params = {}) {
+        const query = serializeQueryParams(params);
+        const data = await driveFetchJson(oauth2Client, DRIVE_ABOUT_URL, { query });
         return { data };
       },
     },
