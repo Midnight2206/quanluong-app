@@ -109,6 +109,97 @@ async function refreshAccessTokenViaFetch(clientId, clientSecret, refreshToken) 
   throw googleOAuthConfigError("Không làm mới được access token Google.", { cause: lastError });
 }
 
+/**
+ * Đổi authorization code lấy token qua fetch trực tiếp.
+ * googleapis (gaxios) hay lỗi "Premature close" trong Docker khi gọi oauth2.googleapis.com/token.
+ */
+async function exchangeAuthCodeViaFetch(clientId, clientSecret, redirectUri, code) {
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+    grant_type: "authorization_code",
+    code,
+  });
+
+  let lastError;
+  for (let attempt = 1; attempt <= OAUTH_TOKEN_REFRESH_ATTEMPTS; attempt += 1) {
+    try {
+      const res = await fetch(OAUTH_TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new AppError({
+          message: "Google OAuth trả về phản hồi không hợp lệ khi đổi mã xác nhận.",
+          statusCode: 502,
+          code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+          details: { status: res.status },
+        });
+      }
+
+      if (!res.ok || !data.access_token) {
+        const errCode = String(data.error ?? "");
+        if (errCode === "invalid_grant") {
+          throw new AppError({
+            message:
+              "Mã xác nhận Google đã hết hạn hoặc đã dùng. Hãy bắt đầu liên kết lại từ trang chủ.",
+            statusCode: 400,
+            code: ERROR_CODES.VALIDATION_ERROR,
+            details: { error: data.error, error_description: data.error_description },
+          });
+        }
+        throw new AppError({
+          message:
+            data.error_description ||
+            `Google OAuth từ chối mã xác nhận (${errCode || res.status}).`,
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+          details: data,
+        });
+      }
+
+      return {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        scope: data.scope,
+        token_type: data.token_type,
+        id_token: data.id_token,
+        expiry_date: data.expires_in
+          ? Date.now() + Number(data.expires_in) * 1000
+          : undefined,
+      };
+    } catch (error) {
+      lastError = error;
+      if (error instanceof AppError) {
+        throw error;
+      }
+      if (attempt < OAUTH_TOKEN_REFRESH_ATTEMPTS && isTransientGoogleTransportError(error)) {
+        await sleep(OAUTH_TOKEN_REFRESH_DELAY_MS * attempt);
+        continue;
+      }
+      throw new AppError({
+        message: "Không kết nối được Google OAuth (lỗi mạng). Thử liên kết lại sau.",
+        statusCode: 502,
+        code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+        details: { cause: error?.message },
+      });
+    }
+  }
+
+  throw new AppError({
+    message: "Không đổi được mã xác nhận Google.",
+    statusCode: 502,
+    code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    details: { cause: lastError?.message },
+  });
+}
+
 async function prepareDriveOAuthClient(oauth2Client) {
   const { clientId, clientSecret } = config.google;
   const refreshToken = String(oauth2Client.credentials?.refresh_token ?? "").trim();
@@ -410,29 +501,8 @@ async function exchangeCodeAndLinkDrive({ code, userId }) {
     });
   }
 
-  let tokens;
-  try {
-    ({ tokens } = await client.getToken(code));
-  } catch (error) {
-    const oauthError = error?.response?.data?.error;
-    logger.warn(
-      {
-        userId,
-        oauthError,
-        message: error?.response?.data?.error_description || error?.message,
-      },
-      "Liên kết Google: đổi authorization code thất bại",
-    );
-    throw new AppError({
-      message:
-        error?.response?.data?.error_description ||
-        (oauthError === "invalid_grant"
-          ? "Mã xác nhận Google đã hết hạn hoặc đã dùng. Hãy bắt đầu liên kết lại từ trang chủ."
-          : "Google từ chối mã xác nhận OAuth. Thử liên kết lại."),
-      statusCode: 400,
-      code: ERROR_CODES.VALIDATION_ERROR,
-    });
-  }
+  const { clientId, clientSecret, redirectUri } = config.google;
+  const tokens = await exchangeAuthCodeViaFetch(clientId, clientSecret, redirectUri, code);
   if (!tokens.access_token) {
     throw new AppError({
       message: "Google không trả về access token.",
