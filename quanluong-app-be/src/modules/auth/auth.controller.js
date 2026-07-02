@@ -41,11 +41,6 @@ import {
   exchangeGoogleLoginCode,
   sanitizeLoginFromPath,
 } from "./google-login.service.js";
-import {
-  claimEntertainmentCoinsForUser,
-  flipEntertainmentCoinForUser,
-  getEntertainmentCoinStateForUser,
-} from "./entertainment-coin.service.js";
 import { avatarPixelCropSchema } from "./auth.validator.js";
 import { config } from "../../config/config.js";
 import { AppError } from "../../errors/app-error.js";
@@ -482,30 +477,6 @@ async function googleDriveStatusController(req, res) {
   });
 }
 
-async function entertainmentCoinStateController(req, res) {
-  const state = await getEntertainmentCoinStateForUser(req.user.id);
-  return respondSuccess(res, {
-    message: "Đã lấy số xu giải trí.",
-    data: state,
-  });
-}
-
-async function entertainmentCoinFlipController(req, res) {
-  const result = await flipEntertainmentCoinForUser(req.user.id);
-  return respondSuccess(res, {
-    message: "Đã tung đồng xu.",
-    data: result,
-  });
-}
-
-async function entertainmentCoinClaimController(req, res) {
-  const result = await claimEntertainmentCoinsForUser(req.user.id);
-  return respondSuccess(res, {
-    message: "Đã nhận 1000 xu.",
-    data: result,
-  });
-}
-
 async function logoutController(req, res) {
   await logout({
     req,
@@ -675,9 +646,6 @@ export {
   googleLoginAuthorizeUrlController,
   googleLoginCallbackController,
   googleLoginStartController,
-  entertainmentCoinFlipController,
-  entertainmentCoinClaimController,
-  entertainmentCoinStateController,
   loginController,
   logoutController,
   patchMeProfileController,
