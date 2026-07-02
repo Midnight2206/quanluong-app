@@ -329,6 +329,127 @@ function readGridCellText(gridData, mergeLookup, rowIndex, colIndex) {
   return gridCellFormattedText(cell).slice(0, 120);
 }
 
+function normalizeTotalLabelMatch(text) {
+  return String(text ?? "")
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[\s._-]+/g, "")
+    .toLowerCase();
+}
+
+/** Nhãn dòng tổng khớp chính xác sau chuẩn hóa (không dấu, bỏ khoảng trắng). */
+const TOTAL_ROW_LABEL_EXACT = new Set([
+  "tong",
+  "cong",
+  "tongcong",
+  "tongso",
+  "tongtien",
+  "tongthanhtien",
+  "congtien",
+  "tonggiatri",
+  "tongcongtien",
+  "conglai",
+  "tonghop",
+  "congtatca",
+  "tongtatca",
+  "tongcongtatca",
+]);
+
+/** Tiền tố nhãn dòng tổng — khớp cả «Tổng cộng:», «Cộng (đồng)», v.v. */
+const TOTAL_ROW_LABEL_PREFIXES = [
+  "tongcong",
+  "tongcongtatca",
+  "tongtatca",
+  "tongso",
+  "tongtien",
+  "tongthanhtien",
+  "congtien",
+  "tonggiatri",
+  "tongcongtien",
+  "conglai",
+  "congtatca",
+  "tonghop",
+  "tong",
+  "cong",
+];
+
+/** Chuỗi dài / footer — không phải dòng tổng bảng chi tiết. */
+const TOTAL_ROW_LABEL_EXCLUDE_FRAGMENTS = [
+  "vietbangchu",
+  "bangchu",
+  "chubangchu",
+  "sotientvietbang",
+  "thanhtienbangchu",
+];
+
+const MAX_TOTAL_ROW_LABEL_LEN = 28;
+
+function stripTotalLabelDecorators(normalized) {
+  return String(normalized ?? "")
+    .replace(/^[([]+/, "")
+    .replace(/[:：,.;]+$/g, "")
+    .replace(/[([]+$/g, "");
+}
+
+export function cellLooksLikeTotalLabel(
+  text,
+  totalLabel = CHUNG_TU_DEFAULT_SHEET_PRINT.totalLabel,
+) {
+  const normalized = normalizeTotalLabelMatch(text);
+  if (!normalized || normalized.length > MAX_TOTAL_ROW_LABEL_LEN) return false;
+
+  for (const fragment of TOTAL_ROW_LABEL_EXCLUDE_FRAGMENTS) {
+    if (normalized.includes(fragment)) return false;
+  }
+
+  const core = stripTotalLabelDecorators(normalized);
+  if (!core) return false;
+
+  const target = stripTotalLabelDecorators(normalizeTotalLabelMatch(totalLabel));
+  if (target && (core === target || core.startsWith(target) || target.startsWith(core))) {
+    return true;
+  }
+
+  if (TOTAL_ROW_LABEL_EXACT.has(core)) return true;
+
+  for (const prefix of TOTAL_ROW_LABEL_PREFIXES) {
+    if (core === prefix || core.startsWith(prefix)) {
+      if (prefix === "tong" && core.length > 14) continue;
+      if (prefix === "cong" && core.length > 10) continue;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Quét mẫu để tìm dòng «Tổng cộng» (0-based). */
+export function detectTotalTemplateRowFromGridData(
+  gridData,
+  mergeLookup,
+  { startRow, totalLabel = CHUNG_TU_DEFAULT_SHEET_PRINT.totalLabel, searchRowCount = 30 } = {},
+) {
+  if (!gridData?.rowData?.length) return null;
+  const baseRow = gridData.startRow ?? 0;
+  const minRow = Number.isFinite(Number(startRow)) ? Number(startRow) : baseRow;
+  const maxRow = minRow + Math.max(Number(searchRowCount) || 30, 1);
+  const rowCount = gridData.rowData.length;
+
+  for (let relRow = 0; relRow < rowCount; relRow += 1) {
+    const rowIndex = baseRow + relRow;
+    if (rowIndex < minRow) continue;
+    if (rowIndex > maxRow) break;
+    for (let colIndex = 0; colIndex <= 5; colIndex += 1) {
+      const text = readGridCellText(gridData, mergeLookup, rowIndex, colIndex);
+      if (cellLooksLikeTotalLabel(text, totalLabel)) {
+        return rowIndex;
+      }
+    }
+  }
+  return null;
+}
+
 async function fetchSpreadsheetHeaderRows(oauth2Client, spreadsheetId, { sheetTitle = null } = {}) {
   const sheetsApi = createSheetsClient(oauth2Client);
   const metaRes = await sheetsApi.spreadsheets.get({
@@ -395,6 +516,8 @@ async function fetchSpreadsheetHeaderRows(oauth2Client, spreadsheetId, { sheetTi
   return {
     sheetTitle: title,
     headerRows: headerRows.slice(0, 12),
+    gridData,
+    mergeLookup,
   };
 }
 
@@ -434,12 +557,25 @@ function inferDetailTableRowsFromHeader(headerPayload, categoryKey, def) {
       String(categoryKey ?? "").trim() === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO ? 3 : 1;
     startRow = headerRow + offset;
   }
-  const totalTemplateRow = Number(def?.totalTemplateRow ?? startRow + 1);
+  const detectedTotal = detectTotalTemplateRowFromGridData(
+    headerPayload?.gridData,
+    headerPayload?.mergeLookup,
+    {
+      startRow,
+      totalLabel: def?.totalLabel ?? CHUNG_TU_DEFAULT_SHEET_PRINT.totalLabel,
+    },
+  );
+  const totalTemplateRow =
+    Number.isFinite(Number(detectedTotal)) && Number(detectedTotal) > startRow
+      ? Number(detectedTotal)
+      : Number(def?.totalTemplateRow ?? startRow + 1);
   return {
     headerRow,
     startRow,
     templateRow: startRow,
     totalTemplateRow,
+    totalTemplateRowDetected:
+      Number.isFinite(Number(detectedTotal)) && Number(detectedTotal) > startRow,
   };
 }
 
@@ -465,6 +601,7 @@ function suggestDetailTableFromHeaderRows(headerPayload, categoryKey) {
       startCol: Math.min(...slots.map((s) => s.col)),
       templateRow: rowLayout.templateRow,
       totalTemplateRow: rowLayout.totalTemplateRow,
+      totalTemplateRowDetected: rowLayout.totalTemplateRowDetected,
       columnMappings,
       columns: columnMappings.map((item) => item.fieldKey).filter(Boolean),
       amountFieldKey: CHUNG_TU_DEFAULT_SHEET_PRINT.amountFieldKey,
@@ -515,6 +652,15 @@ function suggestDetailTableFromHeaderRows(headerPayload, categoryKey) {
   };
 }
 
+function resolveMergedTotalTemplateRow(current, suggested) {
+  if (suggested?.totalTemplateRowDetected) {
+    return Number(suggested.totalTemplateRow);
+  }
+  const currentTotal = Number(current?.totalTemplateRow);
+  if (Number.isFinite(currentTotal)) return currentTotal;
+  return Number(suggested?.totalTemplateRow);
+}
+
 function mergeSuggestedDetailTable(fillRules, suggested, categoryKey) {
   if (!suggested) return fillRules;
   const slots = getSuggestedColumnSlotsForCategory(categoryKey);
@@ -549,6 +695,7 @@ function mergeSuggestedDetailTable(fillRules, suggested, categoryKey) {
           ...suggested,
           ...current,
           ...rowFromSuggested,
+          totalTemplateRow: resolveMergedTotalTemplateRow(current, suggested),
           columnMappings: mergedMappings,
           columns: mergedMappings.map((item) => item.fieldKey).filter(Boolean),
         },
@@ -564,6 +711,7 @@ function mergeSuggestedDetailTable(fillRules, suggested, categoryKey) {
         detailTable: {
           ...suggested,
           ...current,
+          totalTemplateRow: resolveMergedTotalTemplateRow(current, suggested),
           columnMappings: hasMappings
             ? current.columnMappings
             : resolveDetailColumnMappings(current ?? suggested, suggested.startCol),
@@ -631,6 +779,51 @@ export function buildDerivedNamedRangeMappings(spreadsheetMeta, categoryKey) {
   return suggestNamedRangeMappings(namedRangeItems, derivedFieldKeys).filter(
     (item) => item.fieldKey && derivedSet.has(item.fieldKey),
   );
+}
+
+/** Đọc lại startRow / totalTemplateRow từ mẫu gốc trước khi fill (tránh ghi nhầm dòng tổng). */
+export async function enrichDetailTableLayoutFromTemplate(
+  oauth2Client,
+  templateSpreadsheetId,
+  fillRules,
+  categoryKey,
+) {
+  const detailTable = fillRules?.sheets?.detailTable;
+  if (!detailTable || !templateSpreadsheetId) return fillRules;
+
+  const def = defaultDetailTableForCategory(categoryKey);
+  const sheetTitle = String(detailTable.sheetName ?? def?.sheetName ?? "").trim() || null;
+  const headerPayload = await fetchSpreadsheetHeaderRows(oauth2Client, templateSpreadsheetId, {
+    sheetTitle,
+  });
+  const rowLayout = inferDetailTableRowsFromHeader(headerPayload, categoryKey, def);
+  const nextStart = Number.isFinite(Number(rowLayout.startRow)) ? Number(rowLayout.startRow) : null;
+  const nextTotal = Number.isFinite(Number(rowLayout.totalTemplateRow))
+    ? Number(rowLayout.totalTemplateRow)
+    : null;
+
+  if (nextStart == null && nextTotal == null) return fillRules;
+
+  return {
+    ...fillRules,
+    sheets: {
+      ...fillRules.sheets,
+      detailTable: {
+        ...detailTable,
+        ...(nextStart != null
+          ? {
+              startRow: nextStart,
+              templateRow: Number.isFinite(Number(detailTable.templateRow))
+                ? Number(detailTable.templateRow)
+                : nextStart,
+            }
+          : {}),
+        ...(nextTotal != null && nextTotal > (nextStart ?? detailTable.startRow ?? 0)
+          ? { totalTemplateRow: nextTotal }
+          : {}),
+      },
+    },
+  };
 }
 
 /** Bổ sung map named range từ metadata sheet output — chỉ field tự động, không dùng map cũ. */

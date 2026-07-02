@@ -96,6 +96,25 @@ test("buildTotalRowAmountCellA1 targets mapped amount column", () => {
   assert.equal(range, "'01'!G11");
 });
 
+test("buildDetailTableFillPlan keeps total on template row when data fits slots", () => {
+  const plan = buildDetailTableFillPlan({
+    detailRows: [
+      { stt: 1, tenHang: "A", thanhTien: "1" },
+      { stt: 2, tenHang: "B", thanhTien: "2" },
+      { stt: 3, tenHang: "C", thanhTien: "3" },
+      { stt: 4, tenHang: "D", thanhTien: "4" },
+      { stt: 5, tenHang: "E", thanhTien: "5" },
+    ],
+    columns: ["stt", "tenHang", "thanhTien"],
+    tableCfg: { startRow: 8, totalTemplateRow: 13 },
+    context: { tongTien: "15" },
+    columnMeta: {},
+  });
+  assert.equal(plan.dataRowCount, 5);
+  assert.equal(plan.totalRow0, 13);
+  assert.equal(plan.dataSlotsInTemplate, 5);
+});
+
 test("buildInsertDataRowsRequestFromPlan inserts before shifted total row", () => {
   const plan = buildDetailTableFillPlan({
     detailRows: [

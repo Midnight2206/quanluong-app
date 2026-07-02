@@ -5,6 +5,7 @@ import { createSheetsClient } from "../../shared/utils/google-sheets-fetch.api.j
 import { CHUNG_TU_DEFAULT_SHEET_TABLE, excelColumnLetter } from "./chung-tu-category.constants.js";
 import { detailColumnFieldKeys } from "./chung-tu-detail-field-catalog.js";
 import {
+  enrichDetailTableLayoutFromTemplate,
   enrichFillRulesWithSpreadsheetMeta,
   formatDerivedNamedRangeValue,
   loadFillRulesForCategoryTemplate,
@@ -13,14 +14,17 @@ import { getDerivedNamedRangeSetForCategory } from "./chung-tu-category.constant
 import { resolveTemplateSheetTitle } from "./chung-tu-monthly-sheets.js";
 import {
   buildApplyDataRowFormatsRequest,
+  buildApplyTotalRowFormatRequest,
   buildCopyTemplateRowFormatRequest,
   buildDeleteExtraDataRowsRequest,
   buildDetailTableFillPlan,
   buildInsertDataRowsRequestFromPlan,
   buildPerRowHeightUpdateRequests,
+  buildTableCellA1,
   buildTotalRowAmountCellA1,
   fetchSheetTemplateColumnMeta,
   fetchTemplateRowCellFormats,
+  fetchTemplateTotalRowCellFormats,
   resolveNamedRangeTargetCell,
   resolveOverflowFormatTarget,
 } from "./chung-tu-sheet-print-pagination.js";
@@ -368,6 +372,20 @@ function pushContextDetailTableUpdate({
     values: [[String(plan.totalAmount ?? "")]],
   });
 
+  const labelMapping = (plan.columnMappings ?? []).find(
+    (item) => item.fieldKey === plan.labelFieldKey,
+  );
+  if (labelMapping && plan.totalLabel) {
+    data.push({
+      range: buildTableCellA1({
+        sheetName: sheetTitle,
+        row0: plan.totalRow0,
+        col0: Number(labelMapping.col),
+      }),
+      values: [[plan.totalLabel]],
+    });
+  }
+
   data.push({
     range: null,
     values: [],
@@ -422,11 +440,14 @@ async function applyDetailTableLayout({
   spreadsheetId,
   layoutJobs,
   spreadsheetMeta,
+  templateSpreadsheetId = null,
+  formatTemplateSheetTitle = "",
 }) {
   if (!layoutJobs?.length) return spreadsheetMeta;
 
   const requests = [];
   let metaForSheets = spreadsheetMeta;
+  const formatSourceSpreadsheetId = templateSpreadsheetId || spreadsheetId;
 
   for (const job of layoutJobs) {
     const { sheetTitle, plan, columns, previousDataRowCount } = job;
@@ -438,6 +459,28 @@ async function applyDetailTableLayout({
       sheetId = resolveSheetIdByTitle(sheetTitle, metaForSheets);
     }
     if (sheetId == null) continue;
+
+    const writeStartCol = plan.writeStartCol ?? plan.startCol;
+    const writeColCount = plan.writeColCount ?? columns.length;
+    const totalRowShifts = Number(plan.totalRow0) !== Number(plan.totalTemplateRow);
+    let totalRowFormats = null;
+    if (totalRowShifts) {
+      const formatSourceSheet = formatTemplateSheetTitle || sheetTitle;
+      try {
+        totalRowFormats = await fetchTemplateTotalRowCellFormats(
+          sheetsApi,
+          formatSourceSpreadsheetId,
+          {
+            sheetTitle: formatSourceSheet,
+            totalTemplateRow0: plan.totalTemplateRow,
+            startCol0: writeStartCol,
+            colCount: writeColCount,
+          },
+        );
+      } catch {
+        totalRowFormats = null;
+      }
+    }
 
     const insertReq = buildInsertDataRowsRequestFromPlan({
       sheetId,
@@ -452,8 +495,6 @@ async function applyDetailTableLayout({
     if (deleteReq) requests.push(deleteReq);
     if (insertReq) requests.push(insertReq);
 
-    const writeStartCol = plan.writeStartCol ?? plan.startCol;
-    const writeColCount = plan.writeColCount ?? columns.length;
     const { overflowCount, destStartRow } = resolveOverflowFormatTarget(plan);
 
     if (overflowCount > 0) {
@@ -493,6 +534,16 @@ async function applyDetailTableLayout({
         });
         if (copyDataFormatReq) requests.push(copyDataFormatReq);
       }
+    }
+
+    if (totalRowShifts && totalRowFormats?.length) {
+      const applyTotalReq = buildApplyTotalRowFormatRequest({
+        sheetId,
+        totalRow0: plan.totalRow0,
+        startCol0: writeStartCol,
+        cellFormats: totalRowFormats,
+      });
+      if (applyTotalReq) requests.push(applyTotalReq);
     }
   }
 
@@ -568,13 +619,19 @@ export async function syncSpreadsheetFromContext({
 
   const fillRulesBase = await loadFillRulesForTemplate(templateDriveFileId, categoryKey);
   assertTemplateDetailTableConfigured(fillRulesBase, { templateDriveFileId, categoryKey });
+  const fillRulesFromTemplate = await enrichDetailTableLayoutFromTemplate(
+    oauth2Client,
+    templateDriveFileId,
+    fillRulesBase,
+    categoryKey,
+  );
   const sheetsApi = createSheetsClient(oauth2Client);
   const sheetContexts = Array.isArray(context.sheetContexts) ? context.sheetContexts : [];
   if (sheetContexts.length > 0) {
     const sheetNames = sheetContexts.map((ctx) => ctx.sheetName).filter(Boolean);
     let spreadsheetMeta = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
     const fillRules = enrichFillRulesWithSpreadsheetMeta(
-      fillRulesBase,
+      fillRulesFromTemplate,
       spreadsheetMeta,
       categoryKey,
     );
@@ -660,7 +717,7 @@ export async function syncSpreadsheetFromContext({
 
   const spreadsheetMeta = await fetchSpreadsheetMeta(sheetsApi, spreadsheetId);
   const fillRules = enrichFillRulesWithSpreadsheetMeta(
-    fillRulesBase,
+    fillRulesFromTemplate,
     spreadsheetMeta,
     categoryKey,
   );

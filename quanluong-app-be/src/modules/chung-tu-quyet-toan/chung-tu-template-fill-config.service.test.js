@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   buildDerivedNamedRangeMappings,
+  cellLooksLikeTotalLabel,
+  detectTotalTemplateRowFromGridData,
   enrichFillRulesWithSpreadsheetMeta,
 } from "./chung-tu-template-fill-config.service.js";
 
@@ -111,4 +113,94 @@ test("enrichFillRulesWithSpreadsheetMeta replaces saved signer mappings", () => 
   );
   assert.equal(fillRules.sheets.namedRanges[0].fieldKey, "soChungTu");
   assert.equal(fillRules.sheets.namedRanges[0].rule, "field");
+});
+
+test("detectTotalTemplateRowFromGridData finds Tổng cộng row after data start", () => {
+  const mergeLookup = new Map();
+  const gridData = {
+    startRow: 0,
+    startColumn: 0,
+    rowData: Array.from({ length: 20 }, (_unused, relRow) => ({
+      values: Array.from({ length: 8 }, (_c, col) => {
+        if (relRow === 12 && col === 1) {
+          return { formattedValue: "Tổng cộng" };
+        }
+        return {};
+      }),
+    })),
+  };
+
+  assert.equal(
+    detectTotalTemplateRowFromGridData(gridData, mergeLookup, { startRow: 8 }),
+    12,
+  );
+});
+
+test("cellLooksLikeTotalLabel accepts common Vietnamese total row variants", () => {
+  const positives = [
+    "Tổng cộng",
+    "TONG CONG",
+    "Tổng Cộng:",
+    "Tổng",
+    "TONG",
+    "Cộng",
+    "CONG",
+    "Cộng:",
+    "Tổng số",
+    "Tổng tiền",
+    "Tổng thành tiền",
+    "Cộng tiền",
+    "Tổng giá trị",
+    "Cộng lại",
+    "Tổng hợp",
+    "(Tổng cộng)",
+    "Tổng cộng tất cả",
+    "Cộng tất cả",
+  ];
+  for (const label of positives) {
+    assert.equal(cellLooksLikeTotalLabel(label), true, `expected match: ${label}`);
+  }
+});
+
+test("cellLooksLikeTotalLabel rejects footer amount-in-words lines", () => {
+  const negatives = [
+    "Tổng số tiền (Viết bằng chữ): Sáu mươi nghìn đồng",
+    "Thành tiền",
+    "STT",
+    "Gạo tẻ",
+  ];
+  for (const label of negatives) {
+    assert.equal(cellLooksLikeTotalLabel(label), false, `expected no match: ${label}`);
+  }
+});
+
+test("detectTotalTemplateRowFromGridData finds Cộng and Tổng rows", () => {
+  const mergeLookup = new Map();
+  function gridWithLabel(rowIndex, label) {
+    return {
+      startRow: 0,
+      startColumn: 0,
+      rowData: Array.from({ length: 20 }, (_unused, relRow) => ({
+        values: Array.from({ length: 8 }, (_c, col) => {
+          if (relRow === rowIndex && col === 0) {
+            return { formattedValue: label };
+          }
+          return {};
+        }),
+      })),
+    };
+  }
+
+  assert.equal(
+    detectTotalTemplateRowFromGridData(gridWithLabel(11, "Cộng"), mergeLookup, { startRow: 8 }),
+    11,
+  );
+  assert.equal(
+    detectTotalTemplateRowFromGridData(gridWithLabel(10, "Tổng"), mergeLookup, { startRow: 8 }),
+    10,
+  );
+  assert.equal(
+    detectTotalTemplateRowFromGridData(gridWithLabel(13, "TONG TIEN"), mergeLookup, { startRow: 8 }),
+    13,
+  );
 });
