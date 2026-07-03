@@ -61,6 +61,17 @@ function formatMoney(value) {
   return n.toLocaleString("vi-VN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function resolvePdfLineUnitPrice(line) {
+  if (line?.appliedUnitPrice != null && Number.isFinite(Number(line.appliedUnitPrice))) {
+    return Number(line.appliedUnitPrice);
+  }
+  const kind = String(line?.priceKind ?? "market").trim().toLowerCase();
+  if (kind === "tgsx" && line?.tgsxPrice != null && Number.isFinite(Number(line.tgsxPrice))) {
+    return Number(line.tgsxPrice);
+  }
+  return Number(line?.unitPrice ?? 0);
+}
+
 /** Thu nhỏ cỡ chữ số để vừa ô — tránh xuống dòng / ellipsis trên Giá, Thành tiền. */
 function fitNumericFontSize(doc, text, maxWidth, baseSize, minSize = 6.5) {
   const content = String(text ?? "");
@@ -394,7 +405,7 @@ function drawTableHeader(doc, x, y, widths, fontScale = 1) {
 function drawDataRow(doc, line, rowNo, x, y, widths, rowHeight, fontScale = 1) {
   const baseSize = 9 * fontScale;
   const unitSize = 8 * fontScale;
-  const priceText = formatMoney(line?.unitPrice ?? 0);
+  const priceText = formatMoney(resolvePdfLineUnitPrice(line));
   const amountText = formatMoney(line?.amount ?? 0);
   const priceSize = fitNumericFontSize(doc, priceText, widths.price, baseSize);
   const amountSize = fitNumericFontSize(doc, amountText, widths.amount, baseSize);

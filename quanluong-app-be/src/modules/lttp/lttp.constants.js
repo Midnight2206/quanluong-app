@@ -15,4 +15,10 @@ const LTTP_PERMISSIONS = {
 
 const LTTP_OTHER_GROUP_CODE = "other";
 
-export { LTTP_MODULE_NAME, LTTP_OTHER_GROUP_CODE, LTTP_PERMISSIONS };
+/** Nguồn giá dòng phiếu xuất LTTP. */
+const LTTP_ISSUE_SLIP_PRICE_KIND = Object.freeze({
+  MARKET: "market",
+  TGSX: "tgsx",
+});
+
+export { LTTP_ISSUE_SLIP_PRICE_KIND, LTTP_MODULE_NAME, LTTP_OTHER_GROUP_CODE, LTTP_PERMISSIONS };

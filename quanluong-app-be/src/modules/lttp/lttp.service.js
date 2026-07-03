@@ -16,7 +16,7 @@ import {
   markChungTuDocumentsStaleForLttpIssueSlipChange,
   markChungTuDocumentsStaleForStorageUnit,
 } from "../chung-tu-quyet-toan/chung-tu-document.service.js";
-import { LTTP_OTHER_GROUP_CODE } from "./lttp.constants.js";
+import { LTTP_ISSUE_SLIP_PRICE_KIND, LTTP_OTHER_GROUP_CODE } from "./lttp.constants.js";
 
 const commodityInclude = {
   group: true,
@@ -769,6 +769,67 @@ function roundMoney2(n) {
   return Math.round(x * 100) / 100;
 }
 
+function normalizeIssueSlipPriceKind(value) {
+  return String(value ?? "").trim().toLowerCase() === LTTP_ISSUE_SLIP_PRICE_KIND.TGSX
+    ? LTTP_ISSUE_SLIP_PRICE_KIND.TGSX
+    : LTTP_ISSUE_SLIP_PRICE_KIND.MARKET;
+}
+
+function resolveIssueSlipLinePriceSnapshot(hit, priceKind, commodityIdForMessage) {
+  const kind = normalizeIssueSlipPriceKind(priceKind);
+  const marketPrice =
+    hit?.unitPrice != null && Number.isFinite(Number(hit.unitPrice)) ? Number(hit.unitPrice) : null;
+  const tgsxPrice =
+    hit?.tgsxPrice != null && Number.isFinite(Number(hit.tgsxPrice)) ? Number(hit.tgsxPrice) : null;
+  const cid = commodityIdForMessage ?? hit?.commodity?.id ?? "?";
+
+  if (kind === LTTP_ISSUE_SLIP_PRICE_KIND.TGSX) {
+    if (tgsxPrice == null) {
+      return {
+        ok: false,
+        message: `Chưa có giá TGSX tại ngày cho mặt hàng (id: ${cid})`,
+      };
+    }
+    return {
+      ok: true,
+      priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.TGSX,
+      unitPrice: marketPrice ?? tgsxPrice,
+      tgsxPrice,
+      appliedPrice: tgsxPrice,
+    };
+  }
+
+  if (marketPrice == null) {
+    return {
+      ok: false,
+      message: `Chưa có đơn giá tại ngày cho mặt hàng (id: ${cid})`,
+    };
+  }
+  return {
+    ok: true,
+    priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET,
+    unitPrice: marketPrice,
+    tgsxPrice,
+    appliedPrice: marketPrice,
+  };
+}
+
+function mapIssueSlipLinePriceFields(r) {
+  const priceKind = normalizeIssueSlipPriceKind(r.priceKind);
+  const unitPrice = Number(r.unitPrice);
+  const tgsxPrice = r.tgsxPrice != null ? Number(r.tgsxPrice) : null;
+  const appliedUnitPrice =
+    priceKind === LTTP_ISSUE_SLIP_PRICE_KIND.TGSX && tgsxPrice != null
+      ? tgsxPrice
+      : unitPrice;
+  return {
+    priceKind,
+    unitPrice,
+    tgsxPrice,
+    appliedUnitPrice,
+  };
+}
+
 /**
  * Gợi ý một dòng phiếu từ mã mặt hàng: tra mặt hàng trên kho + giá theo `date` (bảng hiệu lực),
  * cùng logic `getEffectivePrices`.
@@ -889,7 +950,9 @@ function mapIssueSlip(slip) {
           fullName: slip.createdBy.profile?.fullName ?? null,
         }
       : null,
-    lines: slip.lines.map((r) => ({
+    lines: slip.lines.map((r) => {
+      const prices = mapIssueSlipLinePriceFields(r);
+      return {
       id: r.id,
       commodityId: r.commodityId,
       commodity: mapCommodity(r.commodity),
@@ -903,11 +966,14 @@ function mapIssueSlip(slip) {
         : null,
       requiredQuantity: r.requiredQuantity != null ? Number(r.requiredQuantity) : null,
       quantity: Number(r.quantity),
-      unitPrice: Number(r.unitPrice),
-      tgsxPrice: r.tgsxPrice != null ? Number(r.tgsxPrice) : null,
+      priceKind: prices.priceKind,
+      unitPrice: prices.unitPrice,
+      tgsxPrice: prices.tgsxPrice,
+      appliedUnitPrice: prices.appliedUnitPrice,
       amount: Number(r.amount),
       lineNote: r.lineNote != null && String(r.lineNote).trim() !== "" ? String(r.lineNote).trim() : null,
-    })),
+    };
+    }),
   };
 }
 
@@ -1001,16 +1067,15 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
       });
     }
     const hit = priceByCid.get(cid);
-    if (!hit || hit.unitPrice == null) {
+    const priceSnap = resolveIssueSlipLinePriceSnapshot(hit, raw.priceKind, cid);
+    if (!priceSnap.ok) {
       throw new AppError({
-        message: `Chưa có đơn giá tại ngày cho mặt hàng (id: ${cid})`,
+        message: priceSnap.message,
         statusCode: 400,
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    const unitPrice = Number(hit.unitPrice);
-    const tgsx = hit.tgsxPrice != null ? Number(hit.tgsxPrice) : null;
-    const amount = roundMoney2(qty * unitPrice);
+    const amount = roundMoney2(qty * priceSnap.appliedPrice);
     const reqQ = raw.requiredQuantity;
     const reqQNum =
       reqQ != null && reqQ !== "" && Number.isFinite(Number(reqQ)) ? Number(reqQ) : null;
@@ -1051,8 +1116,9 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
       requiredQuantity:
         reqQNum != null && Number.isFinite(reqQNum) && reqQNum >= 0 ? String(reqQNum) : null,
       quantity: String(qty),
-      unitPrice: String(unitPrice),
-      tgsxPrice: tgsx != null ? String(tgsx) : null,
+      unitPrice: String(priceSnap.unitPrice),
+      tgsxPrice: priceSnap.tgsxPrice != null ? String(priceSnap.tgsxPrice) : null,
+      priceKind: priceSnap.priceKind,
       amount: String(amount),
       lineNote: lineNoteTrim,
     });
@@ -1161,6 +1227,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
           quantity: d.quantity,
           unitPrice: d.unitPrice,
           tgsxPrice: d.tgsxPrice,
+          priceKind: d.priceKind,
           amount: d.amount,
           lineNote: d.lineNote,
         })),
@@ -1242,16 +1309,15 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
       });
     }
     const hit = priceByCid.get(cid);
-    if (!hit || hit.unitPrice == null) {
+    const priceSnap = resolveIssueSlipLinePriceSnapshot(hit, raw.priceKind, cid);
+    if (!priceSnap.ok) {
       throw new AppError({
-        message: `Chưa có đơn giá tại ngày cho mặt hàng (id: ${cid})`,
+        message: priceSnap.message,
         statusCode: 400,
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    const unitPrice = Number(hit.unitPrice);
-    const tgsx = hit.tgsxPrice != null ? Number(hit.tgsxPrice) : null;
-    const amount = roundMoney2(qty * unitPrice);
+    const amount = roundMoney2(qty * priceSnap.appliedPrice);
     const reqQ = raw.requiredQuantity;
     const reqQNum =
       reqQ != null && reqQ !== "" && Number.isFinite(Number(reqQ)) ? Number(reqQ) : null;
@@ -1291,8 +1357,9 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
       requiredQuantity:
         reqQNum != null && Number.isFinite(reqQNum) && reqQNum >= 0 ? String(reqQNum) : null,
       quantity: String(qty),
-      unitPrice: String(unitPrice),
-      tgsxPrice: tgsx != null ? String(tgsx) : null,
+      unitPrice: String(priceSnap.unitPrice),
+      tgsxPrice: priceSnap.tgsxPrice != null ? String(priceSnap.tgsxPrice) : null,
+      priceKind: priceSnap.priceKind,
       amount: String(amount),
       lineNote: lineNoteTrim,
     });
@@ -1387,6 +1454,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
           quantity: d.quantity,
           unitPrice: d.unitPrice,
           tgsxPrice: d.tgsxPrice,
+          priceKind: d.priceKind,
           amount: d.amount,
           lineNote: d.lineNote,
         })),
@@ -1451,22 +1519,22 @@ async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveU
   await prisma.$transaction(async (tx) => {
     for (const line of existing.lines) {
       const hit = priceByCid.get(line.commodityId);
-      if (!hit || hit.unitPrice == null) {
+      const priceSnap = resolveIssueSlipLinePriceSnapshot(hit, line.priceKind, line.commodityId);
+      if (!priceSnap.ok) {
         throw new AppError({
-          message: `Chưa có đơn giá tại ngày phiếu cho mặt hàng (id: ${line.commodityId})`,
+          message: priceSnap.message,
           statusCode: 400,
           code: ERROR_CODES.VALIDATION_ERROR,
         });
       }
-      const unitPrice = Number(hit.unitPrice);
-      const tgsx = hit.tgsxPrice != null ? Number(hit.tgsxPrice) : null;
       const qty = Number(line.quantity);
-      const amount = roundMoney2(qty * unitPrice);
+      const amount = roundMoney2(qty * priceSnap.appliedPrice);
       await tx.lttpIssueSlipLine.update({
         where: { id: line.id },
         data: {
-          unitPrice: String(unitPrice),
-          tgsxPrice: tgsx != null ? String(tgsx) : null,
+          unitPrice: String(priceSnap.unitPrice),
+          tgsxPrice: priceSnap.tgsxPrice != null ? String(priceSnap.tgsxPrice) : null,
+          priceKind: priceSnap.priceKind,
           amount: String(amount),
         },
       });

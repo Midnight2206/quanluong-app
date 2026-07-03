@@ -732,6 +732,11 @@ model LttpUnitIssueFormDefaults {
   defaultBuyerUser       User? @relation("LttpIssueFormDefaultBuyerUser", fields: [defaultBuyerUserId], references: [id], onDelete: SetNull)
 }
 
+enum LttpIssueSlipPriceKind {
+  market
+  tgsx
+}
+
 model LttpIssueSlipLine {
   id          Int            @id @default(autoincrement())
   slipId     Int
@@ -739,8 +744,11 @@ model LttpIssueSlipLine {
   /// Số lượng yêu cầu / theo nhu cầu (có thể khác thực xuất).
   requiredQuantity Decimal?  @db.Decimal(18, 4)
   quantity   Decimal        @db.Decimal(18, 4)
+  /// Giá mua thị trường (snapshot từ bảng giá).
   unitPrice  Decimal        @db.Decimal(18, 2)
   tgsxPrice        Decimal?       @db.Decimal(18, 2)
+  /// Nguồn giá áp dụng cho thành tiền: market | tgsx.
+  priceKind        LttpIssueSlipPriceKind @default(market)
   /// Thành tiền = quantity × unitPrice (lưu snapshot)
   amount           Decimal        @db.Decimal(18, 2)
   /// Ghi chú dòng phiếu (hiển thị Đặt hàng, không in mặc định).

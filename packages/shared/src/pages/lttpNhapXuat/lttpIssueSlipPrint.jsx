@@ -5,6 +5,7 @@ import {
   coercePrintFontSizePt,
   resolveLttpPrintFont,
 } from "./lttpIssueSlipPrint.shared";
+import { resolveIssueSlipAppliedUnitPrice } from "./lttpIssueSlipPriceKind";
 
 export {
   FORM_FIELD_DEFAULTS,
@@ -168,7 +169,7 @@ export function mapFormRowsToPrintLines(rows, comById, parseQty) {
         ? parseQty(reqRaw)
         : null;
     const quantity = parseQty(r.quantity);
-    const unitPrice = r.unitPrice;
+    const unitPrice = resolveIssueSlipAppliedUnitPrice(r);
     return {
       id: r.key,
       amount: computeLinePrintAmount(quantity, unitPrice),
@@ -185,7 +186,10 @@ export function mapFormRowsToPrintLines(rows, comById, parseQty) {
 export function mapApiLinesToPrintLines(lines) {
   return (lines ?? []).map((line) => {
     const quantity = line.quantity;
-    const unitPrice = line.unitPrice;
+    const unitPrice =
+      line.appliedUnitPrice != null && Number.isFinite(Number(line.appliedUnitPrice))
+        ? Number(line.appliedUnitPrice)
+        : resolveIssueSlipAppliedUnitPrice(line);
     return {
       id: line.id,
       amount: computeLinePrintAmount(quantity, unitPrice),

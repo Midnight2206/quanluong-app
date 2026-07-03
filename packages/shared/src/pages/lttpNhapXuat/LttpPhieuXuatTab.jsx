@@ -41,6 +41,11 @@ import {
   readIssueSlipDraft,
   writeIssueSlipDraft,
 } from "./lttpNhapXuatSessionPersist";
+import {
+  LTTP_ISSUE_SLIP_PRICE_KIND,
+  normalizeIssueSlipPriceKind,
+  resolveIssueSlipAppliedUnitPrice,
+} from "./lttpIssueSlipPriceKind";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -80,6 +85,7 @@ function newEmptyRow() {
     quantity: "1",
     unitPrice: null,
     tgsxPrice: null,
+    priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET,
     lineNote: "",
   };
 }
@@ -136,6 +142,7 @@ function normalizeStoredDraftRows(raw) {
           : Number.isFinite(Number(r.tgsxPrice))
             ? Number(r.tgsxPrice)
             : null,
+    priceKind: normalizeIssueSlipPriceKind(r?.priceKind),
     lineNote: typeof r?.lineNote === "string" ? r.lineNote : "",
   }));
   return out.length ? out : [newEmptyRow()];
@@ -158,12 +165,16 @@ function rowFromSlipLine(line) {
     quantity: line.quantity != null ? String(line.quantity) : "",
     unitPrice: line.unitPrice ?? null,
     tgsxPrice: line.tgsxPrice ?? null,
+    priceKind: normalizeIssueSlipPriceKind(line.priceKind),
     lineNote: typeof line?.lineNote === "string" ? line.lineNote : "",
   };
 }
 
 function isRowCompleteForSubmit(r) {
-  if (!r.commodityId || r.unitPrice == null) {
+  if (!r.commodityId) {
+    return false;
+  }
+  if (resolveIssueSlipAppliedUnitPrice(r) == null) {
     return false;
   }
   if (r.lttpSupplierId === "" || r.lttpSupplierId == null) {
@@ -1022,6 +1033,7 @@ export function LttpPhieuXuatTab({
           quantity: r.quantity,
           unitPrice: r.unitPrice,
           tgsxPrice: r.tgsxPrice,
+          priceKind: r.priceKind,
           lineNote: r.lineNote ?? "",
         })),
       });
@@ -1124,6 +1136,9 @@ export function LttpPhieuXuatTab({
               : "",
           unitPrice: hit?.unitPrice ?? null,
           tgsxPrice: hit?.tgsxPrice ?? null,
+          ...(hit?.tgsxPrice == null
+            ? { priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET }
+            : {}),
         });
       });
       focusRowQuantity(key);
@@ -1163,6 +1178,9 @@ export function LttpPhieuXuatTab({
                 : "",
             unitPrice: d.unitPrice,
             tgsxPrice: d.tgsxPrice,
+            ...(d.tgsxPrice == null
+              ? { priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET }
+              : {}),
           });
         });
         if (focusQuantity) {
@@ -1191,15 +1209,15 @@ export function LttpPhieuXuatTab({
   );
 
   const lineTotal = useCallback((r) => {
-    if (r.unitPrice == null) {
+    const applied = resolveIssueSlipAppliedUnitPrice(r);
+    if (applied == null) {
       return 0;
     }
     const q = parsePositiveDecimalField(r.quantity);
-    const p = Number(r.unitPrice);
-    if (!Number.isFinite(q) || !Number.isFinite(p)) {
+    if (!Number.isFinite(q)) {
       return 0;
     }
-    return Math.round(q * p * 100) / 100;
+    return Math.round(q * applied * 100) / 100;
   }, []);
 
   /** Trùng mặt hàng trong phiếu (cùng commodityId ≥ 2 dòng) — khớp lỗi BE «Trùng mặt hàng trong phiếu». */
@@ -1270,7 +1288,7 @@ export function LttpPhieuXuatTab({
     const toSave = rows.filter(isRowCompleteForSubmit);
     if (!toSave.length) {
       notifyError(
-        "Cần ít nhất một dòng hợp lệ (mặt hàng, đối tác, đơn giá, số lượng thực xuất > 0).",
+        "Cần ít nhất một dòng hợp lệ (mặt hàng, đối tác, giá theo loại đã chọn, số lượng thực xuất > 0).",
       );
       return;
     }
@@ -1293,6 +1311,7 @@ export function LttpPhieuXuatTab({
             ? reqNum
             : null,
         lttpSupplierId: Number(r.lttpSupplierId),
+        priceKind: normalizeIssueSlipPriceKind(r.priceKind),
         lineNote: noteTrim,
       });
     }
@@ -1824,11 +1843,11 @@ export function LttpPhieuXuatTab({
                 <th className="w-32 px-1 py-1 text-center" colSpan={2}>
                   Số lượng
                 </th>
+                <th className="min-w-[4.5rem] px-1 py-1.5 text-center" rowSpan={2}>
+                  Loại giá
+                </th>
                 <th className="w-24 px-1 py-1.5 text-right" rowSpan={2}>
                   Đơn giá
-                </th>
-                <th className="w-20 px-1 py-1.5 text-right" rowSpan={2}>
-                  TGSX
                 </th>
                 <th className="w-28 px-1 py-1.5 text-right" rowSpan={2}>
                   Thành tiền
@@ -2013,21 +2032,74 @@ export function LttpPhieuXuatTab({
                         }}
                       />
                     </td>
+                    <td className="px-1 py-1 align-middle">
+                      {(() => {
+                        const kind = normalizeIssueSlipPriceKind(r.priceKind);
+                        const isMarket = kind === LTTP_ISSUE_SLIP_PRICE_KIND.MARKET;
+                        const isTgsx = kind === LTTP_ISSUE_SLIP_PRICE_KIND.TGSX;
+                        const rowDisabled = !canWrite || r.commodityId === "" || !r.commodityId;
+                        const tgsxDisabled = rowDisabled || r.tgsxPrice == null;
+                        const boxClass = cn(
+                          "size-3 shrink-0 rounded border-border accent-primary",
+                          dupRow && "border-red-500/90",
+                        );
+                        const labelClass = cn(
+                          "inline-flex cursor-pointer select-none items-center gap-0.5 leading-none",
+                          rowDisabled && "cursor-not-allowed opacity-60",
+                        );
+                        return (
+                          <div className="flex flex-col items-start gap-1 text-[9px]">
+                            <label className={labelClass}>
+                              <input
+                                type="checkbox"
+                                className={boxClass}
+                                checked={isMarket}
+                                disabled={rowDisabled}
+                                onChange={() =>
+                                  applyRowPatch(r.key, {
+                                    priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET,
+                                  })
+                                }
+                              />
+                              <span>Mua TT</span>
+                            </label>
+                            <label
+                              className={cn(labelClass, tgsxDisabled && "cursor-not-allowed opacity-60")}
+                            >
+                              <input
+                                type="checkbox"
+                                className={boxClass}
+                                checked={isTgsx}
+                                disabled={tgsxDisabled}
+                                onChange={(e) =>
+                                  applyRowPatch(r.key, {
+                                    priceKind: e.target.checked
+                                      ? LTTP_ISSUE_SLIP_PRICE_KIND.TGSX
+                                      : LTTP_ISSUE_SLIP_PRICE_KIND.MARKET,
+                                  })
+                                }
+                              />
+                              <span>TGSX</span>
+                            </label>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td
                       className={cn(
                         "whitespace-nowrap px-1 py-1 text-right tabular-nums text-[10px]",
                         dupRow && "text-red-950 dark:text-red-50/95",
                       )}
+                      title={
+                        r.unitPrice != null || r.tgsxPrice != null
+                          ? `TT: ${r.unitPrice != null ? formatVnd(r.unitPrice) : "—"} · TGSX: ${r.tgsxPrice != null ? formatVnd(r.tgsxPrice) : "—"}`
+                          : undefined
+                      }
                     >
-                      {r.unitPrice != null ? formatVnd(r.unitPrice) : "—"}
-                    </td>
-                    <td
-                      className={cn(
-                        "whitespace-nowrap px-1 py-1 text-right tabular-nums text-[9px] text-muted-foreground",
-                        dupRow && "text-red-900/90 dark:text-red-200/85",
-                      )}
-                    >
-                      {r.tgsxPrice != null ? formatVnd(r.tgsxPrice) : "—"}
+                      {(() => {
+                        const applied = resolveIssueSlipAppliedUnitPrice(r);
+                        return applied != null ? formatVnd(applied) : "—";
+                      })()}
                     </td>
                     <td
                       className={cn(
