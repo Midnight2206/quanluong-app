@@ -5,7 +5,10 @@ import {
   coercePrintFontSizePt,
   resolveLttpPrintFont,
 } from "./lttpIssueSlipPrint.shared";
-import { resolveIssueSlipAppliedUnitPrice } from "./lttpIssueSlipPriceKind";
+import {
+  resolveIssueSlipAppliedUnitPrice,
+  resolveIssueSlipDisplayQuantities,
+} from "./lttpIssueSlipPriceKind";
 
 export {
   FORM_FIELD_DEFAULTS,
@@ -163,20 +166,20 @@ export function resolveRecipientNameForPrint(apiSlip) {
 export function mapFormRowsToPrintLines(rows, comById, parseQty) {
   return rows.map((r) => {
     const c = r.commodityId ? comById.get(r.commodityId) : null;
-    const reqRaw = r.requiredQuantity;
-    const reqNum =
-      reqRaw !== "" && reqRaw != null && String(reqRaw).trim() !== ""
-        ? parseQty(reqRaw)
-        : null;
     const quantity = parseQty(r.quantity);
     const unitPrice = resolveIssueSlipAppliedUnitPrice(r);
+    const { quantityMarket, quantityTgsx } = resolveIssueSlipDisplayQuantities({
+      priceKind: r.priceKind,
+      quantity,
+    });
     return {
       id: r.key,
       amount: computeLinePrintAmount(quantity, unitPrice),
       quantity,
+      quantityMarket,
+      quantityTgsx,
       unitPrice,
-      requiredQuantity:
-        reqNum != null && Number.isFinite(reqNum) && reqNum >= 0 ? reqNum : null,
+      priceKind: r.priceKind,
       commodity: c,
       lineNote: (r.lineNote ?? "").trim(),
     };
@@ -190,12 +193,18 @@ export function mapApiLinesToPrintLines(lines) {
       line.appliedUnitPrice != null && Number.isFinite(Number(line.appliedUnitPrice))
         ? Number(line.appliedUnitPrice)
         : resolveIssueSlipAppliedUnitPrice(line);
+    const { quantityMarket, quantityTgsx } = resolveIssueSlipDisplayQuantities({
+      priceKind: line.priceKind,
+      quantity,
+    });
     return {
       id: line.id,
       amount: computeLinePrintAmount(quantity, unitPrice),
       quantity,
+      quantityMarket,
+      quantityTgsx,
       unitPrice,
-      requiredQuantity: line.requiredQuantity,
+      priceKind: line.priceKind,
       commodity: line.commodity,
       lineNote: (line.lineNote ?? "").trim(),
     };

@@ -72,6 +72,16 @@ function resolvePdfLineUnitPrice(line) {
   return Number(line?.unitPrice ?? 0);
 }
 
+function resolvePdfDisplayQuantities(line) {
+  const kind = String(line?.priceKind ?? "market").trim().toLowerCase();
+  const q = line?.quantity;
+  const hasQ = q != null && Number.isFinite(Number(q));
+  if (kind === "tgsx") {
+    return { market: "—", tgsx: hasQ ? formatQty(q) : "—" };
+  }
+  return { market: hasQ ? formatQty(q) : "—", tgsx: "—" };
+}
+
 /** Thu nhỏ cỡ chữ số để vừa ô — tránh xuống dòng / ellipsis trên Giá, Thành tiền. */
 function fitNumericFontSize(doc, text, maxWidth, baseSize, minSize = 6.5) {
   const content = String(text ?? "");
@@ -390,11 +400,11 @@ function drawTableHeader(doc, x, y, widths, fontScale = 1) {
   doc
     .font(FONT_BOLD)
     .fontSize(7.2 * fontScale)
-    .text("Yêu cầu", qtyX + 2, y + h1 + h2 / 2 - 3.2 * fontScale, { width: widths.req - 4, align: "center", lineBreak: false, ellipsis: true });
+    .text("Mua TT", qtyX + 2, y + h1 + h2 / 2 - 3.2 * fontScale, { width: widths.req - 4, align: "center", lineBreak: false, ellipsis: true });
   doc
     .font(FONT_BOLD)
     .fontSize(7.2 * fontScale)
-    .text("Thực xuất", qtyX + widths.req + 2, y + h1 + h2 / 2 - 3.2 * fontScale, {
+    .text("TGSX", qtyX + widths.req + 2, y + h1 + h2 / 2 - 3.2 * fontScale, {
       width: widths.qty - 4,
       align: "center",
       lineBreak: false,
@@ -410,13 +420,15 @@ function drawDataRow(doc, line, rowNo, x, y, widths, rowHeight, fontScale = 1) {
   const priceSize = fitNumericFontSize(doc, priceText, widths.price, baseSize);
   const amountSize = fitNumericFontSize(doc, amountText, widths.amount, baseSize);
 
+  const qtyDisplay = resolvePdfDisplayQuantities(line);
+
   const cols = [
     { text: String(rowNo), width: widths.stt, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: false },
     { text: oneLine(line?.commodity?.name ?? "—"), width: widths.name, align: "left", fontSize: baseSize, lineBreak: true, ellipsis: false },
     { text: oneLine(line?.commodity?.code ?? "—"), width: widths.code, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: true },
     { text: String(line?.commodity?.measureUnit ?? "—"), width: widths.unit, align: "center", fontSize: unitSize, lineBreak: true, ellipsis: false },
-    { text: line?.requiredQuantity != null ? formatQty(line.requiredQuantity) : "—", width: widths.req, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: false },
-    { text: formatQty(line?.quantity ?? 0), width: widths.qty, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: false },
+    { text: qtyDisplay.market, width: widths.req, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: false },
+    { text: qtyDisplay.tgsx, width: widths.qty, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: false },
     { text: priceText, width: widths.price, align: "right", fontSize: priceSize, lineBreak: false, ellipsis: false },
     { text: amountText, width: widths.amount, align: "right", fontSize: amountSize, lineBreak: false, ellipsis: false },
     { text: oneLine(line?.lineNote ?? ""), width: widths.note, align: "center", fontSize: baseSize, lineBreak: true, ellipsis: false },

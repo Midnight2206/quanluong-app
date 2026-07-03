@@ -204,10 +204,10 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
           </tr>
           <tr>
             <th className="box-border border border-black p-[0.1em] text-center text-[0.7em] font-bold [border-width:0.4pt]">
-              Yêu cầu
+              Mua TT
             </th>
             <th className="box-border border border-black p-[0.1em] text-center text-[0.7em] font-bold [border-width:0.4pt]">
-              Thực xuất
+              TGSX
             </th>
           </tr>
         </thead>
@@ -215,8 +215,16 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
           {dataRows.map((r, sttIdx) => {
             const c = r.commodity;
             const stt = sttIdx + 1;
-            const reqRaw = r.requiredQuantity;
-            const hasReq = reqRaw !== null && reqRaw !== undefined && String(reqRaw).trim() !== "";
+            const marketRaw = r.quantityMarket;
+            const tgsxRaw = r.quantityTgsx;
+            const hasMarket =
+              marketRaw !== null &&
+              marketRaw !== undefined &&
+              String(marketRaw).trim() !== "";
+            const hasTgsx =
+              tgsxRaw !== null &&
+              tgsxRaw !== undefined &&
+              String(tgsxRaw).trim() !== "";
             return (
               <tr key={r.id ?? stt}>
                 <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.12em] text-center text-[0.9em] [border-width:0.4pt]">
@@ -232,10 +240,10 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
                   {c?.measureUnit ?? "—"}
                 </td>
                 <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.1em] text-center text-[0.8em] [border-width:0.4pt]">
-                  {hasReq ? formatVnQtyComma(reqRaw, 3) : "—"}
+                  {hasMarket ? formatVnQtyComma(marketRaw, 3) : "—"}
                 </td>
                 <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.1em] text-center text-[0.8em] [border-width:0.4pt]">
-                  {formatVnQtyComma(r.quantity, 3)}
+                  {hasTgsx ? formatVnQtyComma(tgsxRaw, 3) : "—"}
                 </td>
                 <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.1em] text-right text-[0.84em] [border-width:0.4pt]">
                   {r.unitPrice != null ? formatVnIntDot(r.unitPrice) : "—"}

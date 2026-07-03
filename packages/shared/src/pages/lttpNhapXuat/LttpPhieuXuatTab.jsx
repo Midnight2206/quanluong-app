@@ -43,12 +43,20 @@ import {
 } from "./lttpNhapXuatSessionPersist";
 import {
   LTTP_ISSUE_SLIP_PRICE_KIND,
+  issueSlipQuantityDisplayCell,
   normalizeIssueSlipPriceKind,
   resolveIssueSlipAppliedUnitPrice,
 } from "./lttpIssueSlipPriceKind";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+
+/** Ô nhập trong bảng phiếu xuất — gọn để không kéo cao / rộng dòng. */
+const tableInputClass =
+  "w-full min-w-0 rounded-md border border-border bg-background px-1 py-1 text-[11px] outline-none focus:border-primary";
+
+const tableQtyDisplayClass =
+  "flex h-7 items-center justify-center rounded-md border border-border bg-muted/35 px-0.5 text-center text-[10px] tabular-nums text-muted-foreground";
 
 function localYmd(d = new Date()) {
   const y = d.getFullYear();
@@ -339,7 +347,7 @@ function IssueSlipCommoditySearch({
                   setOpen(false);
                 }}
               >
-                <span className="min-w-0 flex-1 font-medium text-foreground">
+                <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                   {c.name}
                 </span>
                 <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
@@ -354,15 +362,17 @@ function IssueSlipCommoditySearch({
     );
 
   return (
-    <div ref={wrapRef} className="relative min-w-0 max-w-[14rem]">
+    <div ref={wrapRef} className="relative min-w-0 w-full">
       <input
         type="search"
         enterKeyHint="search"
         disabled={disabled}
         className={cn(
           inputClass,
+          "truncate",
           dupRow && "border-red-500/90 dark:border-red-400/80",
         )}
+        title={(query || selectedLabel || "").trim() || undefined}
         value={query}
         onChange={(e) => {
           const v = e.target.value;
@@ -411,7 +421,7 @@ const FONT_CHOICES = [
 ];
 
 /**
- * Tab Phiếu xuất LTTP: bảng nhập (dòng mới khi hoàn tất dòng hiện tại + Enter ở Thực xuất), giá theo blur mã, in theo cùng mẫu lịch sử, tổng bằng chữ.
+ * Tab Phiếu xuất LTTP: bảng nhập (dòng mới khi hoàn tất dòng hiện tại + Enter ở ô SL), giá theo blur mã, in theo cùng mẫu lịch sử, tổng bằng chữ.
  *
  * Khi `editingSlip` được truyền, form chuyển sang chế độ sửa: khoá ngày phiếu (giữ ngày + quyển/số gốc),
  * prefill toàn bộ trường, đổi nút lưu thành «Cập nhật phiếu» và hiển thị nút «Hủy».
@@ -1288,17 +1298,12 @@ export function LttpPhieuXuatTab({
     const toSave = rows.filter(isRowCompleteForSubmit);
     if (!toSave.length) {
       notifyError(
-        "Cần ít nhất một dòng hợp lệ (mặt hàng, đối tác, giá theo loại đã chọn, số lượng thực xuất > 0).",
+        "Cần ít nhất một dòng hợp lệ (mặt hàng, đối tác, giá theo loại đã chọn, số lượng > 0).",
       );
       return;
     }
     const lines = [];
     for (const r of toSave) {
-      const reqRaw = r.requiredQuantity;
-      const reqNum =
-        reqRaw !== "" && reqRaw != null && String(reqRaw).trim() !== ""
-          ? parsePositiveDecimalField(reqRaw)
-          : null;
       const noteTrim =
         r.lineNote != null && String(r.lineNote).trim() !== ""
           ? String(r.lineNote).trim().slice(0, 500)
@@ -1306,10 +1311,7 @@ export function LttpPhieuXuatTab({
       lines.push({
         commodityId: Number(r.commodityId),
         quantity: parsePositiveDecimalField(r.quantity),
-        requiredQuantity:
-          reqNum != null && Number.isFinite(reqNum) && reqNum >= 0
-            ? reqNum
-            : null,
+        requiredQuantity: null,
         lttpSupplierId: Number(r.lttpSupplierId),
         priceKind: normalizeIssueSlipPriceKind(r.priceKind),
         lineNote: noteTrim,
@@ -1719,7 +1721,7 @@ export function LttpPhieuXuatTab({
 
       <form
         id={formId}
-        className="print:hidden space-y-3"
+        className="print:hidden min-w-0 space-y-3"
         onSubmit={(e) => e.preventDefault()}
       >
         <div className="flex flex-wrap items-end gap-2">
@@ -1821,51 +1823,59 @@ export function LttpPhieuXuatTab({
           </p>
         ) : null}
 
-        <div className="overflow-x-auto rounded-lg border border-border/60">
-          <table className="w-full min-w-[64rem] border-collapse text-left text-[11px]">
+        <div className="min-w-0 rounded-lg border border-border/60">
+          <table className="w-full table-fixed border-collapse text-left text-[11px]">
+            <colgroup>
+              <col className="w-[3%]" />
+              <col className="w-[24%]" />
+              <col className="w-[11%]" />
+              <col className="w-[9%]" />
+              <col className="w-[5.5%]" />
+              <col className="w-[5.5%]" />
+              <col className="w-[15%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+              <col className="w-[3%]" />
+            </colgroup>
             <thead className="bg-secondary/90">
               <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
-                <th className="w-8 px-1 py-1.5" rowSpan={2}>
+                <th className="px-0.5 py-1" rowSpan={2}>
                   STT
                 </th>
-                <th className="min-w-[9rem] px-1 py-1.5" rowSpan={2}>
-                  Tên, quy cách (mặt hàng)
+                <th className="px-1 py-1" rowSpan={2}>
+                  Mặt hàng
                 </th>
-                <th className="min-w-[7rem] px-1 py-1.5" rowSpan={2}>
+                <th className="px-1 py-1" rowSpan={2}>
                   Đối tác
                 </th>
-                <th className="w-20 px-1 py-1.5" rowSpan={2}>
-                  Mã
+                <th className="px-1 py-1" rowSpan={2}>
+                  Mã / ĐVT
                 </th>
-                <th className="w-12 px-1 py-1.5" rowSpan={2}>
-                  ĐVT
-                </th>
-                <th className="w-32 px-1 py-1 text-center" colSpan={2}>
+                <th className="px-0.5 py-1 text-center" colSpan={3}>
                   Số lượng
                 </th>
-                <th className="min-w-[4.5rem] px-1 py-1.5 text-center" rowSpan={2}>
-                  Loại giá
-                </th>
-                <th className="w-24 px-1 py-1.5 text-right" rowSpan={2}>
+                <th className="px-1 py-1 text-right" rowSpan={2}>
                   Đơn giá
                 </th>
-                <th className="w-28 px-1 py-1.5 text-right" rowSpan={2}>
+                <th className="px-1 py-1 text-right" rowSpan={2}>
                   Thành tiền
                 </th>
-                <th className="min-w-[5rem] px-1 py-1.5" rowSpan={2}>
+                <th className="px-1 py-1" rowSpan={2}>
                   Ghi chú
                 </th>
-                <th className="w-12 px-1 py-1.5" rowSpan={2} />
+                <th className="px-0.5 py-1" rowSpan={2} />
               </tr>
               <tr className="border-b border-border text-[8px] uppercase text-muted-foreground">
-                <th className="w-16 px-1 py-1.5">Yêu cầu</th>
-                <th className="w-16 px-1 py-1.5">Thực xuất</th>
+                <th className="px-0.5 py-1 text-center">Mua TT</th>
+                <th className="px-0.5 py-1 text-center">TGSX</th>
+                <th className="px-0.5 py-1 text-center">SL</th>
               </tr>
             </thead>
             <tbody>
               {cLoad ? (
                 <tr>
-                  <td colSpan={12} className="px-2 py-3 text-muted-foreground">
+                  <td colSpan={11} className="px-2 py-3 text-muted-foreground">
                     Đang tải danh mục mặt hàng…
                   </td>
                 </tr>
@@ -1873,6 +1883,9 @@ export function LttpPhieuXuatTab({
               {rows.map((r, i) => {
                 const c = r.commodityId ? comById.get(r.commodityId) : null;
                 const commoditySelectedLabel = c ? `${c.name} (${c.code})` : "";
+                const supplierForRow = suppliers.find(
+                  (s) => String(s.id) === String(r.lttpSupplierId),
+                );
                 const dupRow = isDuplicateCommodityRow(r);
                 return (
                   <tr
@@ -1896,24 +1909,26 @@ export function LttpPhieuXuatTab({
                     >
                       {i + 1}
                     </td>
-                    <td className="px-1 py-1.5 align-top">
+                    <td className="max-w-0 px-1 py-1 align-top">
                       <IssueSlipCommoditySearch
                         rowKey={r.key}
                         commodityId={r.commodityId}
                         selectedLabel={commoditySelectedLabel}
                         commodities={commodities}
                         dupRow={dupRow}
-                        inputClass={inputClass}
+                        inputClass={tableInputClass}
                         disabled={!canWrite}
                         onPickCommodity={onPickCommodity}
                       />
                     </td>
-                    <td className="px-1 py-1.5">
+                    <td className="max-w-0 px-1 py-1">
                       <select
                         className={cn(
-                          inputClass,
+                          tableInputClass,
+                          "max-w-full truncate",
                           dupRow && "border-red-500/90 dark:border-red-400/80",
                         )}
+                        title={supplierForRow?.name ?? undefined}
                         value={
                           r.lttpSupplierId === "" || r.lttpSupplierId == null
                             ? ""
@@ -1933,123 +1948,143 @@ export function LttpPhieuXuatTab({
                         ))}
                       </select>
                     </td>
-                    <td className="px-1 py-1.5">
-                      <input
-                        ref={(el) => {
-                          rowCodeRefs.current[r.key] = el;
-                        }}
+                    <td className="px-1 py-1">
+                      <div className="flex min-w-0 items-center gap-0.5">
+                        <input
+                          ref={(el) => {
+                            rowCodeRefs.current[r.key] = el;
+                          }}
+                          className={cn(
+                            tableInputClass,
+                            "min-w-0 flex-1 font-mono text-[10px]",
+                            dupRow && "border-red-500/90 dark:border-red-400/80",
+                          )}
+                          value={r.codeDraft}
+                          onChange={(e) =>
+                            applyRowPatch(r.key, { codeDraft: e.target.value })
+                          }
+                          onBlur={() =>
+                            resolveByCode(r.key, r.codeDraft, { silent: true })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void resolveByCode(r.key, r.codeDraft, {
+                                silent: true,
+                                focusQuantity: true,
+                              });
+                            }
+                          }}
+                          placeholder="Mã"
+                        />
+                        <span
+                          className={cn(
+                            "w-7 shrink-0 truncate text-center text-[9px] text-muted-foreground",
+                            dupRow && "text-red-900/90 dark:text-red-100/90",
+                          )}
+                          title={c?.measureUnit ?? undefined}
+                        >
+                          {c?.measureUnit ?? "—"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-0.5 py-1">
+                      <div
                         className={cn(
-                          inputClass,
-                          "font-mono text-[10px]",
+                          tableQtyDisplayClass,
                           dupRow && "border-red-500/90 dark:border-red-400/80",
                         )}
-                        value={r.codeDraft}
-                        onChange={(e) =>
-                          applyRowPatch(r.key, { codeDraft: e.target.value })
-                        }
-                        onBlur={() =>
-                          resolveByCode(r.key, r.codeDraft, { silent: true })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void resolveByCode(r.key, r.codeDraft, {
-                              silent: true,
-                              focusQuantity: true,
-                            });
-                          }
-                        }}
-                        placeholder="Mã, Enter"
-                      />
+                        aria-readonly
+                      >
+                        {issueSlipQuantityDisplayCell({
+                          priceKind: r.priceKind,
+                          quantity: r.quantity,
+                          targetKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET,
+                        })}
+                      </div>
                     </td>
-                    <td
-                      className={cn(
-                        "px-1 py-1 text-[10px] text-muted-foreground",
-                        dupRow && "text-red-900/90 dark:text-red-100/90",
-                      )}
-                    >
-                      {c?.measureUnit ?? "—"}
-                    </td>
-                    <td className="px-1 py-1.5">
-                      <input
-                        type="text"
-                        inputMode="decimal"
+                    <td className="px-0.5 py-1">
+                      <div
                         className={cn(
-                          inputClass,
+                          tableQtyDisplayClass,
                           dupRow && "border-red-500/90 dark:border-red-400/80",
                         )}
-                        value={r.requiredQuantity}
-                        onChange={(e) =>
-                          applyRowPatch(r.key, {
-                            requiredQuantity: e.target.value,
-                          })
-                        }
-                        placeholder="—"
-                      />
+                        aria-readonly
+                      >
+                        {issueSlipQuantityDisplayCell({
+                          priceKind: r.priceKind,
+                          quantity: r.quantity,
+                          targetKind: LTTP_ISSUE_SLIP_PRICE_KIND.TGSX,
+                        })}
+                      </div>
                     </td>
-                    <td className="px-1 py-1.5">
-                      <input
-                        ref={(el) => {
-                          rowQtyRefs.current[r.key] = el;
-                        }}
-                        type="text"
-                        inputMode="decimal"
-                        className={cn(
-                          inputClass,
-                          dupRow && "border-red-500/90 dark:border-red-400/80",
-                        )}
-                        value={quantityInputDisplay(r.quantity)}
-                        onChange={(e) => {
-                          const cleaned = e.target.value.replace(
-                            /[^\d.,]/g,
-                            "",
-                          );
-                          applyRowPatch(r.key, { quantity: cleaned });
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key !== "Enter") {
-                            return;
-                          }
-                          e.preventDefault();
-                          const idx = rows.findIndex((x) => x.key === r.key);
-                          if (idx < 0) {
-                            return;
-                          }
-                          if (idx < rows.length - 1) {
-                            const nextKey = rows[idx + 1].key;
-                            queueMicrotask(() =>
-                              rowCodeRefs.current[nextKey]?.focus(),
-                            );
-                            return;
-                          }
-                          const nr = newEmptyRow();
-                          flushSync(() => {
-                            setRows((prev) => [...prev, nr]);
-                          });
-                          queueMicrotask(() =>
-                            rowCodeRefs.current[nr.key]?.focus(),
-                          );
-                        }}
-                      />
-                    </td>
-                    <td className="px-1 py-1 align-middle">
+                    <td className="px-0.5 py-1">
                       {(() => {
                         const kind = normalizeIssueSlipPriceKind(r.priceKind);
                         const isMarket = kind === LTTP_ISSUE_SLIP_PRICE_KIND.MARKET;
                         const isTgsx = kind === LTTP_ISSUE_SLIP_PRICE_KIND.TGSX;
-                        const rowDisabled = !canWrite || r.commodityId === "" || !r.commodityId;
+                        const rowDisabled =
+                          !canWrite || r.commodityId === "" || !r.commodityId;
                         const tgsxDisabled = rowDisabled || r.tgsxPrice == null;
                         const boxClass = cn(
-                          "size-3 shrink-0 rounded border-border accent-primary",
+                          "size-2.5 shrink-0 rounded border-border accent-primary",
                           dupRow && "border-red-500/90",
                         );
                         const labelClass = cn(
-                          "inline-flex cursor-pointer select-none items-center gap-0.5 leading-none",
+                          "inline-flex shrink-0 cursor-pointer select-none items-center gap-px leading-none",
                           rowDisabled && "cursor-not-allowed opacity-60",
                         );
                         return (
-                          <div className="flex flex-col items-start gap-1 text-[9px]">
-                            <label className={labelClass}>
+                          <div className="flex h-7 min-w-0 items-center gap-0.5">
+                            <input
+                              ref={(el) => {
+                                rowQtyRefs.current[r.key] = el;
+                              }}
+                              type="text"
+                              inputMode="decimal"
+                              disabled={rowDisabled}
+                              className={cn(
+                                tableInputClass,
+                                "min-w-[2rem] max-w-[3.25rem] shrink-0 text-center tabular-nums",
+                                dupRow &&
+                                  "border-red-500/90 dark:border-red-400/80",
+                              )}
+                              value={quantityInputDisplay(r.quantity)}
+                              onChange={(e) => {
+                                const cleaned = e.target.value.replace(
+                                  /[^\d.,]/g,
+                                  "",
+                                );
+                                applyRowPatch(r.key, { quantity: cleaned });
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key !== "Enter") {
+                                  return;
+                                }
+                                e.preventDefault();
+                                const idx = rows.findIndex(
+                                  (x) => x.key === r.key,
+                                );
+                                if (idx < 0) {
+                                  return;
+                                }
+                                if (idx < rows.length - 1) {
+                                  const nextKey = rows[idx + 1].key;
+                                  queueMicrotask(() =>
+                                    rowCodeRefs.current[nextKey]?.focus(),
+                                  );
+                                  return;
+                                }
+                                const nr = newEmptyRow();
+                                flushSync(() => {
+                                  setRows((prev) => [...prev, nr]);
+                                });
+                                queueMicrotask(() =>
+                                  rowCodeRefs.current[nr.key]?.focus(),
+                                );
+                              }}
+                            />
+                            <label className={labelClass} title="Mua thị trường">
                               <input
                                 type="checkbox"
                                 className={boxClass}
@@ -2057,14 +2092,19 @@ export function LttpPhieuXuatTab({
                                 disabled={rowDisabled}
                                 onChange={() =>
                                   applyRowPatch(r.key, {
-                                    priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET,
+                                    priceKind:
+                                      LTTP_ISSUE_SLIP_PRICE_KIND.MARKET,
                                   })
                                 }
                               />
-                              <span>Mua TT</span>
+                              <span className="text-[8px]">TT</span>
                             </label>
                             <label
-                              className={cn(labelClass, tgsxDisabled && "cursor-not-allowed opacity-60")}
+                              className={cn(
+                                labelClass,
+                                tgsxDisabled && "cursor-not-allowed opacity-60",
+                              )}
+                              title="TGSX"
                             >
                               <input
                                 type="checkbox"
@@ -2079,7 +2119,7 @@ export function LttpPhieuXuatTab({
                                   })
                                 }
                               />
-                              <span>TGSX</span>
+                              <span className="text-[8px]">TGSX</span>
                             </label>
                           </div>
                         );
@@ -2087,7 +2127,7 @@ export function LttpPhieuXuatTab({
                     </td>
                     <td
                       className={cn(
-                        "whitespace-nowrap px-1 py-1 text-right tabular-nums text-[10px]",
+                        "max-w-0 truncate px-1 py-1 text-right tabular-nums text-[10px]",
                         dupRow && "text-red-950 dark:text-red-50/95",
                       )}
                       title={
@@ -2103,16 +2143,17 @@ export function LttpPhieuXuatTab({
                     </td>
                     <td
                       className={cn(
-                        "whitespace-nowrap px-1 py-1 text-right tabular-nums text-[10px]",
+                        "max-w-0 truncate px-1 py-1 text-right tabular-nums text-[10px]",
                         dupRow && "text-red-950 dark:text-red-50/95",
                       )}
+                      title={formatVnd(lineTotal(r))}
                     >
                       {formatVnd(lineTotal(r))}
                     </td>
                     <td className="px-1 py-1">
                       <input
                         className={cn(
-                          inputClass,
+                          tableInputClass,
                           "text-[10px]",
                           dupRow && "border-red-500/90 dark:border-red-400/80",
                         )}
@@ -2124,13 +2165,13 @@ export function LttpPhieuXuatTab({
                       />
                     </td>
                     <td className="px-0 py-1 text-right">
-                      <div className="flex justify-end gap-0.5">
+                      <div className="flex justify-end">
                         <IconButton
                           type="button"
                           label="Xóa dòng"
                           variant="ghost"
                           onClick={() => removeRow(r.key)}
-                          className="h-7"
+                          className="h-6 w-6"
                         >
                           <Trash2 className="size-3.5" />
                         </IconButton>
@@ -2143,21 +2184,21 @@ export function LttpPhieuXuatTab({
             <tfoot>
               <tr className="border-t-2 border-border bg-muted/20">
                 <td
-                  colSpan={9}
-                  className="px-2 py-2 text-right text-[10px] font-bold"
+                  colSpan={8}
+                  className="px-2 py-1.5 text-right text-[10px] font-bold"
                 >
                   TỔNG CỘNG
                 </td>
-                <td className="whitespace-nowrap px-2 py-2 text-right text-xs font-semibold tabular-nums">
+                <td className="truncate px-2 py-1.5 text-right text-xs font-semibold tabular-nums">
                   {formatVnd(formTotal)}
                 </td>
-                <td className="px-2" />
+                <td className="px-1" />
                 <td />
               </tr>
               <tr>
                 <td
-                  colSpan={12}
-                  className="px-2 py-2 text-[10px] italic leading-relaxed text-foreground/90"
+                  colSpan={11}
+                  className="px-2 py-1.5 text-[10px] italic leading-relaxed text-foreground/90"
                 >
                   Tổng số tiền (Viết bằng chữ): {totalInWords || "—"}
                 </td>
