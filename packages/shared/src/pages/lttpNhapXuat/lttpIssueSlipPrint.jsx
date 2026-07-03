@@ -423,6 +423,14 @@ export function buildPrintPageCss(layout) {
               table-layout: fixed !important;
               width: 100% !important;
             }
+            .lttp-isd-print .lttp-isd-nowrap {
+              white-space: nowrap !important;
+            }
+            .lttp-isd-print .lttp-isd-unit {
+              overflow-wrap: anywhere !important;
+              word-break: break-word !important;
+              line-height: 1.2 !important;
+            }
           }
         `;
 }

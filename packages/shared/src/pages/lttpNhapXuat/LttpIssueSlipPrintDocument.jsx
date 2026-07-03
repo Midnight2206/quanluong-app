@@ -61,6 +61,13 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
           __html: `
         .lttp-isd-print table { border-collapse: collapse; }
         .lttp-isd-print .lttp-isd-nums { font-variant-numeric: tabular-nums; }
+        .lttp-isd-print .lttp-isd-nowrap { white-space: nowrap; }
+        .lttp-isd-print .lttp-isd-unit {
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          line-height: 1.2;
+          hyphens: auto;
+        }
       `,
         }}
       />
@@ -130,19 +137,19 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
         style={{ border: "0.4pt solid #000" }}
       >
         {/*
-          Tỷ lệ cột = 100%: 4+30+7+4+5.5+5.5+10+16+18 (STT rộng hơn cho đủ chữ «STT»)
-          Tên mặt hàng trái; Giá, Thành tiền phải; STT, Mã, ĐV, số lượng, ghi chú giữa.
+          Tỷ lệ cột = 100%: 4+28+7+7+5.5+5.5+10+16+17
+          Tên mặt hàng trái; Giá, Thành tiền phải (nowrap); ĐV rộng hơn, cho phép xuống dòng.
         */}
         <colgroup>
           <col style={{ width: "4%" }} />
-          <col style={{ width: "30%" }} />
+          <col style={{ width: "28%" }} />
           <col style={{ width: "7%" }} />
-          <col style={{ width: "4%" }} />
+          <col style={{ width: "7%" }} />
           <col style={{ width: "5.5%" }} />
           <col style={{ width: "5.5%" }} />
           <col style={{ width: "10%" }} />
           <col style={{ width: "16%" }} />
-          <col style={{ width: "18%" }} />
+          <col style={{ width: "17%" }} />
         </colgroup>
         <thead>
           <tr>
@@ -212,28 +219,28 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
             const hasReq = reqRaw !== null && reqRaw !== undefined && String(reqRaw).trim() !== "";
             return (
               <tr key={r.id ?? stt}>
-                <td className="lttp-isd-nums box-border border border-black p-[0.12em] text-center text-[0.9em] [border-width:0.4pt]">
+                <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.12em] text-center text-[0.9em] [border-width:0.4pt]">
                   {stt}
                 </td>
                 <td className="box-border border border-black p-[0.12em] text-left align-top text-[0.9em] [border-width:0.4pt]">
                   {c?.name ?? "—"}
                 </td>
-                <td className="box-border border border-black p-[0.1em] text-center text-[0.9em] [border-width:0.4pt]">
+                <td className="lttp-isd-nowrap box-border border border-black p-[0.1em] text-center text-[0.86em] [border-width:0.4pt]">
                   {c?.code ?? "—"}
                 </td>
-                <td className="box-border border border-black p-[0.1em] text-center text-[0.86em] [border-width:0.4pt]">
+                <td className="lttp-isd-unit box-border border border-black p-[0.1em] text-center align-middle text-[0.82em] [border-width:0.4pt]">
                   {c?.measureUnit ?? "—"}
                 </td>
-                <td className="lttp-isd-nums box-border border border-black p-[0.1em] text-center text-[0.8em] [border-width:0.4pt]">
+                <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.1em] text-center text-[0.8em] [border-width:0.4pt]">
                   {hasReq ? formatVnQtyComma(reqRaw, 3) : "—"}
                 </td>
-                <td className="lttp-isd-nums box-border border border-black p-[0.1em] text-center text-[0.8em] [border-width:0.4pt]">
+                <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.1em] text-center text-[0.8em] [border-width:0.4pt]">
                   {formatVnQtyComma(r.quantity, 3)}
                 </td>
-                <td className="lttp-isd-nums box-border border border-black p-[0.1em] text-right text-[0.88em] [border-width:0.4pt]">
+                <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.1em] text-right text-[0.84em] [border-width:0.4pt]">
                   {r.unitPrice != null ? formatVnIntDot(r.unitPrice) : "—"}
                 </td>
-                <td className="lttp-isd-nums box-border border border-black p-[0.1em] text-right text-[0.88em] [border-width:0.4pt]">
+                <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.1em] text-right text-[0.84em] [border-width:0.4pt]">
                   {formatVnIntDot(Math.round(lineAmount(r)))}
                 </td>
                 <td className="box-border border border-black p-[0.1em] text-center text-[0.8em] [border-width:0.4pt]">
@@ -249,7 +256,7 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
             >
               TỔNG CỘNG
             </td>
-            <td className="lttp-isd-nums box-border border border-black p-[0.2em] text-right text-[0.9em] font-bold [border-width:0.4pt]">
+            <td className="lttp-isd-nums lttp-isd-nowrap box-border border border-black p-[0.2em] text-right text-[0.9em] font-bold [border-width:0.4pt]">
               {formatVnIntDot(Math.round(formTotal))}
             </td>
             <td className="box-border border border-black p-[0.1em] [border-width:0.4pt]" />

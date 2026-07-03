@@ -61,6 +61,19 @@ function formatMoney(value) {
   return n.toLocaleString("vi-VN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+/** Thu nhỏ cỡ chữ số để vừa ô — tránh xuống dòng / ellipsis trên Giá, Thành tiền. */
+function fitNumericFontSize(doc, text, maxWidth, baseSize, minSize = 6.5) {
+  const content = String(text ?? "");
+  let size = baseSize;
+  doc.font(FONT_REGULAR).fontSize(size);
+  const limit = Math.max(maxWidth - 6, 8);
+  while (size > minSize && doc.widthOfString(content) > limit) {
+    size -= 0.5;
+    doc.fontSize(size);
+  }
+  return size;
+}
+
 function formatDate(ymd) {
   if (!ymd) return "";
   const [y, m, d] = String(ymd).split("-").map(Number);
@@ -208,12 +221,19 @@ function buildRowText(line) {
 
 function estimateDataRowHeight(doc, line, widths, fontScale = 1) {
   doc.font(FONT_REGULAR).fontSize(9 * fontScale);
-  const text = oneLine(buildRowText(line));
-  const textHeight = doc.heightOfString(text, {
+  const nameText = oneLine(buildRowText(line));
+  const nameHeight = doc.heightOfString(nameText, {
     width: widths.name - 8,
     align: "left",
   });
-  return Math.max(BASE_ROW_HEIGHT * fontScale, Math.ceil(textHeight + 8 * fontScale));
+  const unitText = String(line?.commodity?.measureUnit ?? "—");
+  doc.fontSize(8 * fontScale);
+  const unitHeight = doc.heightOfString(unitText, {
+    width: widths.unit - 6,
+    align: "center",
+  });
+  const contentHeight = Math.max(nameHeight, unitHeight);
+  return Math.max(BASE_ROW_HEIGHT * fontScale, Math.ceil(contentHeight + 8 * fontScale));
 }
 
 function paginateLines(doc, lines, firstBodyHeight, nextBodyHeight, widths, fontScale = 1) {
@@ -372,28 +392,36 @@ function drawTableHeader(doc, x, y, widths, fontScale = 1) {
 }
 
 function drawDataRow(doc, line, rowNo, x, y, widths, rowHeight, fontScale = 1) {
-  const cols = [];
-  cols.push({ text: String(rowNo), width: widths.stt, align: "center" });
-  cols.push({ text: oneLine(line?.commodity?.name ?? "—"), width: widths.name, align: "left" });
-  cols.push({ text: oneLine(line?.commodity?.code ?? "—"), width: widths.code, align: "center" });
-  cols.push({ text: line?.commodity?.measureUnit ?? "—", width: widths.unit, align: "center" });
-  cols.push({ text: line?.requiredQuantity != null ? formatQty(line.requiredQuantity) : "—", width: widths.req, align: "center" });
-  cols.push({ text: formatQty(line?.quantity ?? 0), width: widths.qty, align: "center" });
-  cols.push({ text: formatMoney(line?.unitPrice ?? 0), width: widths.price, align: "right" });
-  cols.push({ text: formatMoney(line?.amount ?? 0), width: widths.amount, align: "right" });
-  cols.push({ text: oneLine(line?.lineNote ?? ""), width: widths.note, align: "center" });
+  const baseSize = 9 * fontScale;
+  const unitSize = 8 * fontScale;
+  const priceText = formatMoney(line?.unitPrice ?? 0);
+  const amountText = formatMoney(line?.amount ?? 0);
+  const priceSize = fitNumericFontSize(doc, priceText, widths.price, baseSize);
+  const amountSize = fitNumericFontSize(doc, amountText, widths.amount, baseSize);
+
+  const cols = [
+    { text: String(rowNo), width: widths.stt, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: false },
+    { text: oneLine(line?.commodity?.name ?? "—"), width: widths.name, align: "left", fontSize: baseSize, lineBreak: true, ellipsis: false },
+    { text: oneLine(line?.commodity?.code ?? "—"), width: widths.code, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: true },
+    { text: String(line?.commodity?.measureUnit ?? "—"), width: widths.unit, align: "center", fontSize: unitSize, lineBreak: true, ellipsis: false },
+    { text: line?.requiredQuantity != null ? formatQty(line.requiredQuantity) : "—", width: widths.req, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: false },
+    { text: formatQty(line?.quantity ?? 0), width: widths.qty, align: "center", fontSize: baseSize, lineBreak: false, ellipsis: false },
+    { text: priceText, width: widths.price, align: "right", fontSize: priceSize, lineBreak: false, ellipsis: false },
+    { text: amountText, width: widths.amount, align: "right", fontSize: amountSize, lineBreak: false, ellipsis: false },
+    { text: oneLine(line?.lineNote ?? ""), width: widths.note, align: "center", fontSize: baseSize, lineBreak: true, ellipsis: false },
+  ];
   let cx = x;
   for (const c of cols) {
     doc.rect(cx, y, c.width, rowHeight).stroke();
     doc
       .font(FONT_REGULAR)
-      .fontSize(9 * fontScale)
+      .fontSize(c.fontSize)
       .text(String(c.text ?? ""), cx + 3, y + 5 * fontScale, {
         width: c.width - 6,
         align: c.align,
         height: rowHeight - 6,
-        lineBreak: false,
-        ellipsis: true,
+        lineBreak: c.lineBreak,
+        ellipsis: c.ellipsis,
       });
     cx += c.width;
   }
@@ -411,11 +439,13 @@ function drawCarryRow(doc, x, y, widths, label, value, fontScale = 1) {
     lineBreak: false,
     ellipsis: true,
   });
-  doc.font(FONT_BOLD).fontSize(9 * fontScale).text(formatMoney(value), x + labelWidth + 4, y + 5 * fontScale, {
+  const carryAmountText = formatMoney(value);
+  const carryAmountSize = fitNumericFontSize(doc, carryAmountText, widths.amount, 9 * fontScale);
+  doc.font(FONT_BOLD).fontSize(carryAmountSize).text(carryAmountText, x + labelWidth + 4, y + 5 * fontScale, {
     width: widths.amount - 8,
     align: "right",
     lineBreak: false,
-    ellipsis: true,
+    ellipsis: false,
   });
 }
 
@@ -516,14 +546,14 @@ async function buildIssueSlipPdfBuffer(slip) {
   doc.registerFont("vi-bold", FONT_BOLD);
   const widths = {
     stt: Math.round(pageWidth * 0.04),
-    name: Math.round(pageWidth * 0.30),
+    name: Math.round(pageWidth * 0.28),
     code: Math.round(pageWidth * 0.07),
-    unit: Math.round(pageWidth * 0.04),
+    unit: Math.round(pageWidth * 0.07),
     req: Math.round(pageWidth * 0.055),
     qty: Math.round(pageWidth * 0.055),
-    price: Math.round(pageWidth * 0.10),
-    amount: Math.round(pageWidth * 0.10),
-    note: Math.round(pageWidth * 0.24),
+    price: Math.round(pageWidth * 0.16),
+    amount: Math.round(pageWidth * 0.17),
+    note: Math.round(pageWidth * 0.17),
   };
   widths.total = Object.values(widths).reduce((sum, v) => (Number.isFinite(v) ? sum + v : sum), 0);
   widths.note += pageWidth - widths.total;
