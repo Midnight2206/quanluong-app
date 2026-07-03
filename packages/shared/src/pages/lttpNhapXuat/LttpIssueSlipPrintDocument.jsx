@@ -130,7 +130,7 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
         style={{ border: "0.4pt solid #000" }}
       >
         {/*
-          Tỷ lệ cột = 100%: 4+30+7+4+5.5+5.5+10+10+24 (STT rộng hơn cho đủ chữ «STT»)
+          Tỷ lệ cột = 100%: 4+30+7+4+5.5+5.5+10+16+18 (STT rộng hơn cho đủ chữ «STT»)
           Tên mặt hàng trái; Giá, Thành tiền phải; STT, Mã, ĐV, số lượng, ghi chú giữa.
         */}
         <colgroup>
@@ -141,8 +141,8 @@ export function LttpIssueSlipPrintDocument({ slip, breakAfter = false, fontFamil
           <col style={{ width: "5.5%" }} />
           <col style={{ width: "5.5%" }} />
           <col style={{ width: "10%" }} />
-          <col style={{ width: "10%" }} />
-          <col style={{ width: "24%" }} />
+          <col style={{ width: "16%" }} />
+          <col style={{ width: "18%" }} />
         </colgroup>
         <thead>
           <tr>
