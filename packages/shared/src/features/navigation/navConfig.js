@@ -1,4 +1,4 @@
-import { FileText, Home, LayoutDashboard, Soup, Users, Warehouse } from "lucide-react";
+import { BookOpen, FileText, Home, LayoutDashboard, Soup, Users, Warehouse } from "lucide-react";
 import { getMainAppOrigin, getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 /**
@@ -38,6 +38,12 @@ export const mainNavItems = [
     icon: Soup,
     routeAccessKey: "nav-meal-roster",
   },
+  {
+    to: "/so-sach-bep-an",
+    label: "Sổ sách bếp ăn",
+    icon: BookOpen,
+    routeAccessKey: "nav-kitchen-books",
+  },
 ];
 
 /**
@@ -70,6 +76,12 @@ export const superadminNavItems = [
     icon: Soup,
     routeAccessKey: "nav-meal-roster",
   },
+  {
+    to: "/so-sach-bep-an",
+    label: "Sổ sách bếp ăn",
+    icon: BookOpen,
+    routeAccessKey: "nav-kitchen-books",
+  },
 ];
 
 /**
@@ -100,5 +112,11 @@ export const superadminPortalNavItems = [
     label: "Chấm cơm",
     icon: Soup,
     routeAccessKey: "nav-meal-roster",
+  },
+  {
+    to: "/so-sach-bep-an",
+    label: "Sổ sách bếp ăn",
+    icon: BookOpen,
+    routeAccessKey: "nav-kitchen-books",
   },
 ];

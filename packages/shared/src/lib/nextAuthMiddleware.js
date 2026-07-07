@@ -19,6 +19,7 @@ export function isProtectedAppPath(pathname) {
   if (
     pathname === "/users" ||
     pathname === "/meal-roster" ||
+    pathname === "/so-sach-bep-an" ||
     pathname === "/profile" ||
     pathname === "/settings"
   ) {

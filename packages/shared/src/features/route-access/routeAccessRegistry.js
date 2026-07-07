@@ -103,6 +103,10 @@ export const ROUTE_ACCESS_RULES = {
     description: "Trang Chấm cơm / danh sách bảo đảm quân lương",
     requiredPermissions: [PERMISSIONS.MEAL_ROSTER_ACCESS],
   },
+  "nav-kitchen-books": {
+    description: "Trang Sổ sách bếp ăn — danh mục món và thực đơn ngày",
+    requiredPermissions: [PERMISSIONS.KITCHEN_BOOKS_ACCESS],
+  },
 };
 
 export const ROUTE_ACCESS_KEYS = Object.freeze(Object.keys(ROUTE_ACCESS_RULES));

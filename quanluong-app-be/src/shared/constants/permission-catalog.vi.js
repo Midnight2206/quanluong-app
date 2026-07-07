@@ -189,6 +189,11 @@ const PERMISSION_CATALOG_VI = {
     description:
       "Danh sách bảo đảm theo tháng; cấu hình mức tiền ăn áp dụng (ăn tiêu chuẩn / ăn thêm); sổ chấm cơm theo ngày; tải mẫu và nhập Excel; sao chép tháng. Dữ liệu private theo đơn vị.",
   },
+  "kitchenBooks.access": {
+    name: "Sổ sách bếp ăn",
+    description:
+      "Danh mục món và thực đơn ngày theo buổi; tính số lượng LTTP từ quân số chấm cơm; dữ liệu theo kho LTTP của đơn vị.",
+  },
 };
 
 function getPermissionVi(code) {

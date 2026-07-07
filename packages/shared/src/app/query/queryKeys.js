@@ -65,6 +65,18 @@ export const qk = {
     catalog: () => ["mealRoster", "catalog"],
     dayMarks: (unitId, yearMonth) => ["mealRoster", "dayMarks", String(unitId), String(yearMonth)],
   },
+  kitchenBooks: {
+    root: ["kitchenBooks"],
+    catalog: (unitId, q) => ["kitchenBooks", "catalog", String(unitId), q ?? ""],
+    catalogDetail: (unitId, id) => ["kitchenBooks", "catalogDetail", String(unitId), String(id)],
+    menu: (unitId, date) => ["kitchenBooks", "menu", String(unitId), String(date)],
+    monthMarkers: (unitId, yearMonth) => [
+      "kitchenBooks",
+      "monthMarkers",
+      String(unitId),
+      String(yearMonth),
+    ],
+  },
   chungTuQuyetToan: {
     root: ["chungTuQuyetToan"],
     templateCatalog: (categoryKey) => [
@@ -112,6 +124,7 @@ export const RTK_TAG_INVALIDATION_MAP = {
   UnitPrivateShare: qk.units.root,
   MealAllowanceRate: qk.mealAllowanceRates.root,
   MealRoster: qk.mealRoster.root,
+  KitchenBooks: qk.kitchenBooks.root,
   Auth: qk.auth.root,
 };
 

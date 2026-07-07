@@ -454,6 +454,8 @@ model Unit {
   unitMealPeriodSplits      UnitMealPeriodSplit[]
   chungTuUnitProfile        ChungTuUnitProfile?
   chungTuDocuments          ChungTuDocument[]
+  kitchenDishCatalogs       KitchenDishCatalog[]
+  kitchenMenuDays           KitchenMenuDay[]
 
   @@index([parentId])
   @@index([path])
@@ -591,6 +593,8 @@ model LttpCommodity {
   priceRows                      LttpPriceRow[]
   lttpPartnerPriceRows            LttpPartnerPriceRow[]
   issueSlipLines                 LttpIssueSlipLine[]
+  kitchenDishCatalogLines        KitchenDishCatalogLine[]
+  kitchenMenuDishLines           KitchenMenuDishLine[]
   lttpCommodityDefaultSupplier  LttpCommodityDefaultSupplier?
 
   @@unique([unitId, code])
@@ -759,6 +763,110 @@ model LttpIssueSlipLine {
   lttpSupplier     LttpSupplier?  @relation(fields: [lttpSupplierId], references: [id], onDelete: SetNull)
 
   @@index([slipId])
+  @@index([commodityId])
+}
+
+// --- Sổ sách bếp ăn (thực đơn) — unitId = storageUnitId (cùng scope LTTP_COMMODITY) ---
+
+enum KitchenMenuMealPeriod {
+  sang
+  trua
+  chieu
+}
+
+enum KitchenMenuCalcMode {
+  per_person
+  per_unit_shared
+}
+
+enum KitchenMenuPerPersonUnit {
+  g
+  ml
+}
+
+model KitchenDishCatalog {
+  id        Int      @id @default(autoincrement())
+  unitId    Int
+  name      String   @db.VarChar(300)
+  note      String?  @db.VarChar(500)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  lines     KitchenDishCatalogLine[]
+  menuDishes KitchenMenuDish[] @relation("MenuDishSourceCatalog")
+
+  @@unique([unitId, name])
+  @@index([unitId])
+}
+
+model KitchenDishCatalogLine {
+  id              Int                      @id @default(autoincrement())
+  catalogId       Int
+  commodityId     Int
+  calcMode        KitchenMenuCalcMode
+  perPersonAmount Decimal?                 @db.Decimal(18, 4)
+  perPersonUnit   KitchenMenuPerPersonUnit?
+  peoplePerUnit   Decimal?                 @db.Decimal(18, 4)
+  sortOrder       Int                      @default(0)
+  catalog         KitchenDishCatalog       @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  commodity       LttpCommodity            @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+
+  @@index([catalogId])
+  @@index([commodityId])
+}
+
+model KitchenMenuDay {
+  id        Int      @id @default(autoincrement())
+  unitId    Int
+  menuDate  DateTime @db.Date
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  periods   KitchenMenuPeriod[]
+
+  @@unique([unitId, menuDate])
+  @@index([unitId, menuDate])
+}
+
+model KitchenMenuPeriod {
+  id         Int                   @id @default(autoincrement())
+  dayId      Int
+  mealPeriod KitchenMenuMealPeriod
+  note       String?               @db.VarChar(500)
+  day        KitchenMenuDay        @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  dishes     KitchenMenuDish[]
+
+  @@unique([dayId, mealPeriod])
+}
+
+model KitchenMenuDish {
+  id              Int                 @id @default(autoincrement())
+  periodId        Int
+  name            String              @db.VarChar(300)
+  sortOrder       Int                 @default(0)
+  sourceCatalogId Int?
+  period          KitchenMenuPeriod   @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  sourceCatalog   KitchenDishCatalog? @relation("MenuDishSourceCatalog", fields: [sourceCatalogId], references: [id], onDelete: SetNull)
+  lines           KitchenMenuDishLine[]
+
+  @@index([periodId])
+  @@index([sourceCatalogId])
+}
+
+model KitchenMenuDishLine {
+  id              Int                      @id @default(autoincrement())
+  dishId          Int
+  commodityId     Int
+  calcMode        KitchenMenuCalcMode
+  perPersonAmount Decimal?                 @db.Decimal(18, 4)
+  perPersonUnit   KitchenMenuPerPersonUnit?
+  peoplePerUnit   Decimal?                 @db.Decimal(18, 4)
+  sortOrder       Int                      @default(0)
+  dish            KitchenMenuDish          @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  commodity       LttpCommodity            @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+
+  @@index([dishId])
   @@index([commodityId])
 }
 

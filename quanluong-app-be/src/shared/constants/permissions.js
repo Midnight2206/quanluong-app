@@ -40,6 +40,8 @@ const PERMISSIONS = {
   MEAL_ALLOWANCE_RATES_MANAGE: "mealAllowanceRates.manage",
   /** Danh sách chấm cơm / bảo đảm quân lương theo tháng (dữ liệu private đơn vị). */
   MEAL_ROSTER_ACCESS: "mealRoster.access",
+  /** Sổ sách bếp ăn — danh mục món và thực đơn ngày. */
+  KITCHEN_BOOKS_ACCESS: "kitchenBooks.access",
 };
 
 export { PERMISSIONS };

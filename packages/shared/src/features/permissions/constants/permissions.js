@@ -38,4 +38,5 @@ export const PERMISSIONS = {
   LTTP_ISSUE_SLIPS_WRITE: "lttp.issue-slips.write",
   MEAL_ALLOWANCE_RATES_MANAGE: "mealAllowanceRates.manage",
   MEAL_ROSTER_ACCESS: "mealRoster.access",
+  KITCHEN_BOOKS_ACCESS: "kitchenBooks.access",
 };
