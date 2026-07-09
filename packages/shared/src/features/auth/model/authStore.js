@@ -32,7 +32,7 @@ export const useAuthStore = create((set, get) => ({
   status: "checking",
   initialized: false,
   /** @type {Record<string, 'allowed' | 'forbidden'>} */
-  routeAccessByKey: {},
+  routeAccessByKey: buildRouteAccessByKey(null, []),
 
   setAuthChecking: () => set({ status: "checking" }),
 
@@ -55,7 +55,7 @@ export const useAuthStore = create((set, get) => ({
       permissions: [],
       status: "anonymous",
       initialized: true,
-      routeAccessByKey: {},
+      routeAccessByKey: buildRouteAccessByKey(null, []),
     }),
 
   setAuthInitialized: () => {

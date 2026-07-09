@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowDownToLine } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
 import { useApplyJobTitleToUnitMutation, useGetJobTitlesQuery } from "@/features/job-titles/api/jobTitlesApi";
 import {
@@ -362,15 +363,8 @@ export function AdminUnitDataSharePanel() {
       <CardContent className="flex flex-col gap-3 !p-3 sm:!p-4">
         <div className="space-y-1">
           <p className="text-xs font-medium sm:text-sm">Đồng bộ dữ liệu xuống đơn vị con</p>
-          <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-            Chọn <span className="font-medium text-foreground">đơn vị cha</span> qua thanh «Đơn vị đang xem», sau đó chọn
-            nhiều <span className="font-medium text-foreground">đơn vị cấp dưới</span>. Tab{" "}
-            <span className="font-medium text-foreground">Đồng bộ fork</span> tạo bản nhanh trên con và liên kết cập nhật;
-            tab <span className="font-medium text-foreground">Chia sẻ quyền đọc private</span> chỉ gán quyền đọc dữ liệu lưu
-            tại đơn vị bạn (phù hợp đơn vị kế thừa kho cha theo middleware).
-          </p>
-          <p className="text-[11px] text-muted-foreground">
-            Đơn vị nguồn:{" "}
+          <p className="text-xs text-muted-foreground">
+            Nguồn:{" "}
             {sourceUnitLabel ? (
               <span className="font-medium text-foreground">{sourceUnitLabel}</span>
             ) : (
@@ -637,8 +631,8 @@ export function AdminUnitDataSharePanel() {
                   <p className="text-[10px] font-medium text-muted-foreground">
                     Gán hiện có {grantsLoading ? "(đang tải…)" : `(${grants.length})`}
                   </p>
-                  <div className="max-h-[16rem] overflow-auto rounded-lg border border-border/60">
-                    <table className="w-full text-left text-[11px] sm:text-xs">
+                  <ResponsiveTableWrap className="max-h-[16rem] border-border/60">
+                    <table className="w-full min-w-[480px] text-left text-[11px] sm:text-xs">
                       <thead className="sticky top-0 bg-muted/50">
                         <tr>
                           <th className="p-2 font-medium">Đơn vị nhận</th>
@@ -695,7 +689,7 @@ export function AdminUnitDataSharePanel() {
                         )}
                       </tbody>
                     </table>
-                  </div>
+                  </ResponsiveTableWrap>
                 </div>
               </div>
             ) : null}

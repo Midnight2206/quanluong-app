@@ -3,6 +3,9 @@ import { Loader2, Power, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { DashboardUserRowCard } from "@/pages/dashboard/components/DashboardUserRowCard";
 import { useGetTypesQuery } from "@/features/types/api/typesApi";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import {
@@ -21,6 +24,7 @@ function sortUnitsByPath(units) {
 }
 
 export function SuperadminUsersPanel() {
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const { data: users = [], isLoading, isError } = useGetUsersQuery();
   const { data: types = [] } = useGetTypesQuery();
   const { data: units = [] } = useGetUnitsQuery();
@@ -211,56 +215,72 @@ export function SuperadminUsersPanel() {
         ) : null}
 
         {!isLoading && !isError ? (
-          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain rounded-lg border border-border/70">
-            <table className="w-full min-w-[560px] border-collapse text-left text-xs sm:text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="px-2 py-1.5 font-medium">Người dùng</th>
-                  <th className="px-2 py-1.5 font-medium">Vai trò</th>
-                  <th className="px-2 py-1.5 font-medium">Đơn vị</th>
-                  <th className="px-2 py-1.5 font-medium">HT</th>
-                  <th className="px-2 py-1.5 font-medium text-right">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr
-                    key={u.id}
-                    className="border-b border-border/60 hover:bg-secondary/20"
-                  >
-                    <td className="px-2 py-1.5">
-                      <div className="font-medium">
-                        {u.profile?.fullName || u.username}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {u.email}
-                      </div>
-                    </td>
-                    <td className="px-2 py-1.5 capitalize text-muted-foreground">
-                      {u.type?.name ?? "—"}
-                    </td>
-                    <td className="max-w-[10rem] truncate px-2 py-1.5 text-muted-foreground">
-                      {u.unit?.name ?? "—"}
-                    </td>
-                    <td className="px-2 py-1.5">{u.isActive ? "✓" : "—"}</td>
-                    <td className="px-2 py-1.5 text-right">
-                      <IconButton
-                        label={u.isActive ? "Vô hiệu" : "Kích hoạt"}
-                        variant={u.isActive ? "danger" : "primary"}
-                        disabled={isPatching || togglingUserId != null}
-                        loading={togglingUserId === u.id}
-                        onClick={() => toggleActive(u)}
+          isDesktop ? (
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+              <ResponsiveTableWrap className="border-border/70">
+                <table className="w-full min-w-[560px] border-collapse text-left text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <th className="px-2 py-1.5 font-medium">Người dùng</th>
+                      <th className="px-2 py-1.5 font-medium">Vai trò</th>
+                      <th className="px-2 py-1.5 font-medium">Đơn vị</th>
+                      <th className="px-2 py-1.5 font-medium">HT</th>
+                      <th className="px-2 py-1.5 font-medium text-right">
+                        Thao tác
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((u) => (
+                      <tr
+                        key={u.id}
+                        className="border-b border-border/60 hover:bg-secondary/20"
                       >
-                        <Power aria-hidden />
-                      </IconButton>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        <td className="px-2 py-1.5">
+                          <div className="font-medium">
+                            {u.profile?.fullName || u.username}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {u.email}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1.5 capitalize text-muted-foreground">
+                          {u.type?.name ?? "—"}
+                        </td>
+                        <td className="max-w-[10rem] truncate px-2 py-1.5 text-muted-foreground">
+                          {u.unit?.name ?? "—"}
+                        </td>
+                        <td className="px-2 py-1.5">{u.isActive ? "✓" : "—"}</td>
+                        <td className="px-2 py-1.5 text-right">
+                          <IconButton
+                            label={u.isActive ? "Vô hiệu" : "Kích hoạt"}
+                            variant={u.isActive ? "danger" : "primary"}
+                            disabled={isPatching || togglingUserId != null}
+                            loading={togglingUserId === u.id}
+                            onClick={() => toggleActive(u)}
+                          >
+                            <Power aria-hidden />
+                          </IconButton>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ResponsiveTableWrap>
+            </div>
+          ) : (
+            <div className="min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-y-contain px-3 sm:space-y-2 sm:px-0">
+              {users.map((u) => (
+                <DashboardUserRowCard
+                  key={u.id}
+                  user={u}
+                  isPatching={isPatching}
+                  togglingUserId={togglingUserId}
+                  onToggleActive={toggleActive}
+                />
+              ))}
+            </div>
+          )
         ) : null}
       </CardContent>
     </Card>

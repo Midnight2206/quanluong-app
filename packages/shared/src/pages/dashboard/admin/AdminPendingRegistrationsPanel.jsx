@@ -84,8 +84,8 @@ export function AdminPendingRegistrationsPanel() {
 
   return (
     <Card className="shadow-soft flex min-h-0 flex-1 flex-col overflow-hidden">
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !p-3 sm:!p-4">
-        <div>
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !px-0 !py-3 sm:!p-4">
+        <div className="px-3 sm:px-0">
           <p className="text-xs font-medium sm:text-sm">Đăng ký chờ duyệt</p>
           <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
             Chỉ hiển thị tài khoản người dùng đã đăng ký vào đơn vị trong phạm vi bạn quản lý. Sau khi duyệt, tài khoản
@@ -94,22 +94,22 @@ export function AdminPendingRegistrationsPanel() {
         </div>
 
         {isError ? (
-          <p className="text-xs text-destructive">Không tải được danh sách (kiểm tra quyền hoặc mạng).</p>
+          <p className="px-3 text-xs text-destructive sm:px-0">Không tải được danh sách (kiểm tra quyền hoặc mạng).</p>
         ) : null}
 
-        {isLoading ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
+        {isLoading ? <p className="px-3 text-xs text-muted-foreground sm:px-0">Đang tải…</p> : null}
 
         {!isLoading && !isError && pending.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-xs text-muted-foreground">
+          <p className="mx-3 rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-xs text-muted-foreground sm:mx-0">
             Hiện không có đăng ký nào chờ duyệt trong phạm vi của bạn.
           </p>
         ) : null}
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain">
+        <div className="min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-y-contain px-3 sm:space-y-3 sm:px-0">
           {pending.map((u) => (
             <div
               key={u.id}
-              className="rounded-xl border border-border/70 bg-card px-3 py-3 shadow-soft sm:px-4"
+              className="-mx-3 rounded-none border-x-0 border-y border-border/70 bg-card px-3 py-3 shadow-soft first:border-t sm:mx-0 sm:rounded-xl sm:border sm:border-border/70 sm:px-4"
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">

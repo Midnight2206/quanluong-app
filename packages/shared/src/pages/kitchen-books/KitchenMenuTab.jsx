@@ -129,6 +129,20 @@ export function KitchenMenuTab({
     loadPeriodDraft(p);
   }
 
+  function changeMenuDate(nextDate) {
+    if (nextDate === menuDate) {
+      return;
+    }
+    if (dirty) {
+      const ok = window.confirm("Bạn có thay đổi chưa lưu. Đổi ngày sẽ bỏ thay đổi?");
+      if (!ok) {
+        return;
+      }
+    }
+    setDirty(false);
+    setMenuDate(nextDate);
+  }
+
   function updateDish(idx, patch) {
     setDirty(true);
     setDraftDishes((prev) => prev.map((d, i) => (i === idx ? { ...d, ...patch } : d)));
@@ -238,16 +252,16 @@ export function KitchenMenuTab({
           user={user}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="icon" onClick={() => setMenuDate(shiftDate(menuDate, -1))}>
+          <Button type="button" variant="outline" size="icon" onClick={() => changeMenuDate(shiftDate(menuDate, -1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <input
             type="date"
             className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
             value={menuDate}
-            onChange={(e) => setMenuDate(e.target.value)}
+            onChange={(e) => changeMenuDate(e.target.value)}
           />
-          <Button type="button" variant="outline" size="icon" onClick={() => setMenuDate(shiftDate(menuDate, 1))}>
+          <Button type="button" variant="outline" size="icon" onClick={() => changeMenuDate(shiftDate(menuDate, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           {daysWithMenu.has(dayNum) ? (
@@ -276,6 +290,15 @@ export function KitchenMenuTab({
           </button>
         ))}
       </div>
+
+      {dirty ? (
+        <div
+          role="status"
+          className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+        >
+          Bạn có thay đổi chưa lưu. Bấm «Lưu buổi» để áp dụng.
+        </div>
+      ) : null}
 
       <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
         Quân số buổi {MEAL_PERIOD_LABELS[mealPeriod]}:{" "}

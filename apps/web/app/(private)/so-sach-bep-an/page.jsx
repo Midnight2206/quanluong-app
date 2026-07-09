@@ -4,7 +4,8 @@ import { quanLuongPageMeta } from "@/lib/quanLuongPageMeta";
 
 export const metadata = quanLuongPageMeta({
   title: "Sổ sách bếp ăn",
-  description: "Danh mục món và thực đơn ngày theo buổi; tính số lượng LTTP từ quân số chấm cơm.",
+  description:
+    "Chấm cơm, danh sách bảo đảm quân lương và danh mục món bếp ăn theo phạm vi đơn vị.",
 });
 
 export default function KitchenBooksRoutePage() {

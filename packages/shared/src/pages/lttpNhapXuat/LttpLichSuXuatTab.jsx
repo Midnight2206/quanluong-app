@@ -2,7 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Loader2, Pencil, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
 import { cn } from "@/utils/cn";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import httpClient from "@/services/httpClient";
 import {
   useDeleteLttpIssueSlipMutation,
@@ -12,6 +14,7 @@ import { useConfirm } from "@/contexts/ConfirmProvider";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { readLichSuFilters, writeLichSuFilters } from "./lttpNhapXuatSessionPersist";
+import { LttpLichSuXuatSlipCard } from "./LttpLichSuXuatSlipCard";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -64,6 +67,7 @@ export function LttpLichSuXuatTab({
   onRequestEdit,
 }) {
   const { confirm } = useConfirm();
+  const isLgUp = useMediaQuery("(min-width: 1024px)");
   const [listFrom, setListFrom] = useState(() => firstDayOfCurrentMonthYmd());
   const [listTo, setListTo] = useState(() => lastDayOfCurrentMonthYmd());
   const [filterRecipientId, setFilterRecipientId] = useState("");
@@ -229,14 +233,13 @@ export function LttpLichSuXuatTab({
   }
 
   return (
-    <div className="border-y-[16px] border-white text-xs">
+    <div className="space-y-3 text-xs">
       <p className="text-[11px] text-muted-foreground">
-        Kho cấp: <span className="font-medium text-foreground">{storageUnitName || `#${storageUnitId}`}</span> — lọc
-        phiếu xuất đã lưu.
+        Kho cấp: <span className="font-medium text-foreground">{storageUnitName || `#${storageUnitId}`}</span>
       </p>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-card/30 p-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <label className="min-w-[9rem] space-y-0.5 text-[10px] text-muted-foreground">
+      <div className="grid gap-2 rounded-lg border border-border/70 bg-card/30 p-3 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto] lg:items-end">
+        <label className="min-w-0 space-y-0.5 text-[10px] text-muted-foreground">
           Từ ngày
           <input
             type="date"
@@ -245,7 +248,7 @@ export function LttpLichSuXuatTab({
             onChange={(e) => setListFrom(e.target.value)}
           />
         </label>
-        <label className="min-w-[9rem] space-y-0.5 text-[10px] text-muted-foreground">
+        <label className="min-w-0 space-y-0.5 text-[10px] text-muted-foreground">
           Đến ngày
           <input
             type="date"
@@ -254,7 +257,7 @@ export function LttpLichSuXuatTab({
             onChange={(e) => setListTo(e.target.value)}
           />
         </label>
-        <label className="min-w-[12rem] flex-1 space-y-0.5 text-[10px] text-muted-foreground">
+        <label className="min-w-0 space-y-0.5 text-[10px] text-muted-foreground sm:col-span-2 lg:col-span-1">
           Đơn vị nhận
           <select
             className={cn(inputClass, "mt-0.5 block")}
@@ -269,102 +272,134 @@ export function LttpLichSuXuatTab({
             ))}
           </select>
         </label>
-        <Button type="button" variant="secondary" className="h-8 text-xs" onClick={() => refetch()}>
+        <Button
+          type="button"
+          variant="secondary"
+          className="h-9 w-full text-xs sm:col-span-2 lg:col-span-1 lg:w-auto"
+          onClick={() => refetch()}
+        >
           Tải lại
         </Button>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p className="text-[10px] text-muted-foreground">
-          {total} phiếu / {pageCount} trang
+          {total} phiếu · trang {page}/{pageCount}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
-            className="h-8 gap-1 text-xs"
+            className="h-9 flex-1 gap-1.5 text-xs sm:flex-none"
             disabled={isLoading || !slips.length || batchPrintBusy}
             onClick={() => printCurrentPagePdfs()}
             title="Gộp PDF các phiếu trên trang hiện tại"
           >
             {batchPrintBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Printer className="size-3.5" />}
-            In trang (PDF)
+            In trang
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            className="h-8 min-w-[5rem] text-xs"
-            disabled={page <= 1 || isLoading}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Trang trước
-          </Button>
-          <span className="text-[10px] text-muted-foreground">
-            {page} / {pageCount}
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            className="h-8 min-w-[5rem] text-xs"
-            disabled={page >= pageCount || isLoading}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Trang sau
-          </Button>
+          <div className="flex w-full items-center gap-1 sm:w-auto">
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-9 flex-1 text-xs sm:min-w-[5rem] sm:flex-none"
+              disabled={page <= 1 || isLoading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Trước
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-9 flex-1 text-xs sm:min-w-[5rem] sm:flex-none"
+              disabled={page >= pageCount || isLoading}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Sau
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto overflow-y-visible rounded-lg border border-border/60 pb-px">
-        <table className="mb-px w-full min-w-[52rem] border-collapse text-left text-[11px]">
+      {isLoading ? (
+        <p className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          Đang tải…
+        </p>
+      ) : null}
+
+      {!isLoading && !slips.length ? (
+        <p className="rounded-lg border border-dashed border-border/70 px-3 py-6 text-center text-sm text-muted-foreground">
+          Không có phiếu phù hợp bộ lọc.
+        </p>
+      ) : null}
+
+      {!isLoading && slips.length > 0 && !isLgUp ? (
+        <div className="space-y-2">
+          {slips.map((s) => {
+            const slipTotal =
+              s.lines?.reduce((a, l) => a + (Number(l.amount) || 0), 0) ?? 0;
+            return (
+              <LttpLichSuXuatSlipCard
+                key={s.id}
+                slip={s}
+                total={slipTotal}
+                canWrite={canWrite}
+                printing={printingId === s.id}
+                actionsDisabled={delBusy || batchPrintBusy}
+                onPrint={() => openIssueSlipPdf(s.id)}
+                onEdit={() => onRequestEdit?.(s)}
+                onRecall={() => onRecall(s)}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+
+      {!isLoading && slips.length > 0 && isLgUp ? (
+      <ResponsiveTableWrap className="border-border/60">
+        <table className="mb-px w-full min-w-[44rem] border-collapse text-left text-[11px]">
           <thead className="bg-secondary/90">
             <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
-              <th className="px-2 py-2">Ngày xuất</th>
+              <th className="whitespace-nowrap px-2 py-2">Ngày</th>
               <th className="px-2 py-2">Đơn vị nhận</th>
-              <th className="min-w-[10rem] px-2 py-2">Chú thích phiếu</th>
-              <th className="px-2 py-2">Số phiếu</th>
-              <th className="px-2 py-2 text-right">Thành tiền</th>
-              <th className="min-w-[15rem] whitespace-nowrap px-2 py-2 text-right">Thao tác</th>
+              <th className="min-w-[8rem] px-2 py-2">Chú thích</th>
+              <th className="whitespace-nowrap px-2 py-2">Số phiếu</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right">Thành tiền</th>
+              <th className="whitespace-nowrap px-2 py-2 text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={6} className="px-2 py-4 text-muted-foreground">
-                  <Loader2 className="mr-1 inline size-3.5 animate-spin" />
-                  Đang tải…
-                </td>
-              </tr>
-            ) : null}
-            {!isLoading && !slips.length ? (
-              <tr>
-                <td colSpan={6} className="px-2 py-4 text-muted-foreground">
-                  Không có phiếu phù hợp bộ lọc.
-                </td>
-              </tr>
-            ) : null}
             {slips.map((s) => {
-              const total = s.lines?.reduce((a, l) => a + (Number(l.amount) || 0), 0) ?? 0;
-              const soPhieu = `Quyển ${s.bookMmyy} — Số ${String(s.slipNo).padStart(4, "0")}`;
+              const slipTotal =
+                s.lines?.reduce((a, l) => a + (Number(l.amount) || 0), 0) ?? 0;
+              const soPhieu = `Q.${s.bookMmyy} — ${String(s.slipNo).padStart(4, "0")}`;
               return (
                 <tr key={s.id} className="border-b border-border/50">
-                  <td className="px-2 py-1.5 font-medium tabular-nums">{s.issueDate}</td>
-                  <td className="max-w-[12rem] truncate px-2 py-1.5" title={s.recipientUnit?.name ?? "—"}>
+                  <td className="whitespace-nowrap px-2 py-1.5 font-medium tabular-nums">
+                    {s.issueDate}
+                  </td>
+                  <td className="max-w-[10rem] truncate px-2 py-1.5" title={s.recipientUnit?.name ?? "—"}>
                     {s.recipientUnit?.name ?? "—"}
                   </td>
                   <td
-                    className="max-w-[14rem] px-2 py-1.5 align-top text-[11px] leading-snug text-muted-foreground"
+                    className="max-w-[12rem] px-2 py-1.5 align-top text-[11px] leading-snug text-muted-foreground"
                     title={s.note != null && String(s.note).trim() !== "" ? String(s.note) : undefined}
                   >
                     {s.note != null && String(s.note).trim() !== "" ? (
-                      <span className="line-clamp-3 text-foreground">{String(s.note).trim()}</span>
+                      <span className="line-clamp-2 text-foreground">{String(s.note).trim()}</span>
                     ) : (
                       <span className="italic opacity-60">—</span>
                     )}
                   </td>
-                  <td className="px-2 py-1.5 font-mono text-[10px] text-muted-foreground">{soPhieu}</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{formatVnd(total)}</td>
-                  <td className="min-w-[15rem] whitespace-nowrap px-2 py-1.5 text-right align-middle">
-                    <div className="flex flex-nowrap items-center justify-end gap-1">
+                  <td className="whitespace-nowrap px-2 py-1.5 font-mono text-[10px] text-muted-foreground">
+                    {soPhieu}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right tabular-nums">
+                    {formatVnd(slipTotal)}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-1.5 text-right align-middle">
+                    <div className="flex flex-nowrap items-center justify-end gap-0.5">
                       <IconButton
                         label="In phiếu PDF"
                         variant="ghost"
@@ -407,7 +442,8 @@ export function LttpLichSuXuatTab({
             })}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTableWrap>
+      ) : null}
     </div>
   );
 }

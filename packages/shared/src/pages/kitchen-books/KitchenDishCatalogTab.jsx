@@ -13,8 +13,10 @@ import {
 } from "@/features/kitchen-books/api/kitchenBooksApi";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
 import { classifyCommodityCalcMode } from "./kitchenMenuQuantity.js";
 import { KitchenCommodityPicker } from "./KitchenCommodityPicker.jsx";
+import { KitchenBooksUnitPicker } from "./KitchenBooksUnitPicker.jsx";
 
 const inputClass =
   "w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary";
@@ -31,37 +33,8 @@ function emptyLine() {
   };
 }
 
-function UnitPicker({
-  canPickUnits,
-  sortedUnits,
-  selectedUnitId,
-  manualUnitId,
-  setManualUnitId,
-  user,
-}) {
-  if (!canPickUnits) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Đơn vị: <span className="font-medium text-foreground">{user?.unit?.name ?? "—"}</span>
-      </p>
-    );
-  }
-  return (
-    <label className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Đơn vị</span>
-      <select
-        className="min-w-[12rem] rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-        value={selectedUnitId ?? ""}
-        onChange={(e) => setManualUnitId(Number(e.target.value))}
-      >
-        {sortedUnits.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
+function UnitPicker(props) {
+  return <KitchenBooksUnitPicker {...props} />;
 }
 
 function CatalogEditor({ unitId, item, commodities, onClose, onSaved }) {
@@ -83,6 +56,7 @@ function CatalogEditor({ unitId, item, commodities, onClose, onSaved }) {
   const [createCatalog, { isLoading: creating }] = useCreateKitchenCatalogMutation();
   const [updateCatalog, { isLoading: updating }] = useUpdateKitchenCatalogMutation();
   const busy = creating || updating;
+  const [fieldErrors, setFieldErrors] = useState({ name: "", lines: "" });
 
   function updateLine(idx, patch) {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -98,15 +72,15 @@ function CatalogEditor({ unitId, item, commodities, onClose, onSaved }) {
 
   async function handleSave() {
     const trimmedName = name.trim();
+    const nextErrors = { name: "", lines: "" };
     if (!trimmedName) {
-      notifyError("Nhập tên món");
-      return;
+      nextErrors.name = "Nhập tên món";
     }
     const payloadLines = [];
     for (const l of lines) {
       if (!l.commodityId) {
-        notifyError("Chọn mặt hàng LTTP cho mỗi dòng");
-        return;
+        nextErrors.lines = "Chọn mặt hàng LTTP cho mỗi dòng";
+        break;
       }
       payloadLines.push({
         commodityId: l.commodityId,
@@ -115,6 +89,10 @@ function CatalogEditor({ unitId, item, commodities, onClose, onSaved }) {
         perPersonUnit: l.calcMode === "per_person" ? l.perPersonUnit : null,
         peoplePerUnit: l.calcMode === "per_unit_shared" ? Number(l.peoplePerUnit) : null,
       });
+    }
+    setFieldErrors(nextErrors);
+    if (nextErrors.name || nextErrors.lines) {
+      return;
     }
     try {
       if (isEdit) {
@@ -148,7 +126,23 @@ function CatalogEditor({ unitId, item, commodities, onClose, onSaved }) {
       <div className="mb-3 grid gap-2 sm:grid-cols-2">
         <label className="grid gap-1 text-sm">
           <span>Tên món</span>
-          <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            className={cn(inputClass, fieldErrors.name && "border-destructive")}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (fieldErrors.name) {
+                setFieldErrors((prev) => ({ ...prev, name: "" }));
+              }
+            }}
+            aria-invalid={fieldErrors.name ? "true" : undefined}
+            aria-describedby={fieldErrors.name ? "catalog-name-error" : undefined}
+          />
+          {fieldErrors.name ? (
+            <p id="catalog-name-error" role="alert" className="text-xs text-destructive">
+              {fieldErrors.name}
+            </p>
+          ) : null}
         </label>
         <label className="grid gap-1 text-sm">
           <span>Ghi chú</span>
@@ -219,6 +213,11 @@ function CatalogEditor({ unitId, item, commodities, onClose, onSaved }) {
           </div>
         ))}
       </div>
+      {fieldErrors.lines ? (
+        <p role="alert" className="mt-2 text-xs text-destructive">
+          {fieldErrors.lines}
+        </p>
+      ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="sm" onClick={addLine}>
           <Plus className="mr-1 h-4 w-4" />
@@ -331,7 +330,7 @@ export function KitchenDishCatalogTab({
           Đang tải…
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <ResponsiveTableWrap>
           <table className="w-full min-w-[32rem] text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
@@ -385,7 +384,7 @@ export function KitchenDishCatalogTab({
               )}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableWrap>
       )}
     </div>
   );

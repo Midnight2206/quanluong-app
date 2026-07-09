@@ -3,8 +3,10 @@
 import { ChevronRight, FileSpreadsheet, Folder, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/utils/cn";
+import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { useChungTuTemplateTreeQuery } from "@/features/chung-tu-quyet-toan/api/chungTuTemplateTreeApi";
 import { getChungTuCategoryConfig } from "./chungTuCategoryConfig";
+import { ChungTuDriveLinkNotice } from "./ChungTuDriveLinkNotice";
 
 /**
  * @typedef {{
@@ -23,9 +25,16 @@ import { getChungTuCategoryConfig } from "./chungTuCategoryConfig";
  *   categoryKey: string,
  *   selectedDriveFileId?: string,
  *   onSelect: (template: ChungTuTemplateTreeSelection | null) => void,
+ *   listMaxHeightClass?: string,
  * }} props
  */
-export function ChungTuTemplateTreePicker({ categoryKey, selectedDriveFileId = "", onSelect }) {
+export function ChungTuTemplateTreePicker({
+  categoryKey,
+  selectedDriveFileId = "",
+  onSelect,
+  listMaxHeightClass = "max-h-64",
+}) {
+  const user = useCurrentUser();
   const config = getChungTuCategoryConfig(categoryKey);
   const rootLabel = config?.label ?? "Mẫu chứng từ";
 
@@ -73,7 +82,7 @@ export function ChungTuTemplateTreePicker({ categoryKey, selectedDriveFileId = "
             <button
               type="button"
               className={cn(
-                "rounded px-1 py-0.5 hover:bg-muted hover:text-foreground",
+                "min-h-9 rounded px-1.5 py-1 text-xs hover:bg-muted hover:text-foreground",
                 index === breadcrumb.length - 1 && "font-medium text-foreground",
               )}
               onClick={() => goToCrumb(index)}
@@ -90,11 +99,14 @@ export function ChungTuTemplateTreePicker({ categoryKey, selectedDriveFileId = "
           Đang tải thư mục…
         </p>
       ) : isError ? (
-        <p className="px-3 py-4 text-xs text-destructive">
-          {error?.data?.message || error?.message || "Không tải được thư mục mẫu."}
-        </p>
+        <div className="space-y-2 px-3 py-4">
+          <p className="text-xs text-destructive" role="alert">
+            {error?.data?.message || error?.message || "Không tải được thư mục mẫu."}
+          </p>
+          {!user?.googleDriveFolderId ? <ChungTuDriveLinkNotice /> : null}
+        </div>
       ) : (
-        <ul className="max-h-64 divide-y divide-border/60 overflow-auto">
+        <ul className={cn("divide-y divide-border/60 overflow-auto", listMaxHeightClass)}>
           {folders.map((folder) => (
             <li key={folder.id}>
               <button

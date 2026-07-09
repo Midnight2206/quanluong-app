@@ -10,6 +10,7 @@ import {
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { cn } from "@/utils/cn";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { formatPermissionModuleLabel } from "@/features/permissions/constants/permissionModuleLabels.vi";
 
 function sortUnitsByPath(units) {
   return [...units].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
@@ -27,7 +28,7 @@ function isUnitRowVisible(unit, byId, expandedIds) {
 }
 
 const treeRowBtn =
-  "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const EMPTY_DEPTHS = [];
 const EMPTY_PERMISSIONS = [];
@@ -232,33 +233,29 @@ export function SuperadminPermissionMatrixPanel() {
 
   return (
     <Card className="shadow-soft flex min-h-0 flex-1 flex-col overflow-hidden">
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !p-3 sm:!p-4">
-        <div className="shrink-0 space-y-1">
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !px-0 !py-3 sm:!p-4">
+        <div className="shrink-0 px-3 sm:px-0">
           <p className="text-xs font-medium sm:text-sm">Ma trận quyền theo depth đơn vị</p>
-          <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-            Chọn đơn vị trong cây bên trái để chỉnh trần quyền ở cùng <span className="font-medium">depth</span> với
-            đơn vị đó (mọi đơn vị cùng depth dùng chung một ma trận). Nhóm quyền có thể đóng/mở như thư mục.
-          </p>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden lg:flex-row lg:gap-4">
-          {/* Cây đơn vị */}
-          <div className="flex max-h-[40vh] shrink-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-muted/15 lg:max-h-none lg:w-[min(100%,280px)] lg:shrink-0">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3 lg:flex-row lg:gap-4 lg:px-0">
+          {/* Cây đơn vị — desktop/tablet; mobile chỉ dùng select depth */}
+          <div className="hidden max-h-[min(36vh,20rem)] shrink-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-muted/15 md:flex lg:max-h-none lg:w-[min(100%,280px)] lg:shrink-0">
             <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border/60 px-2 py-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Đơn vị
               </span>
               <div className="ml-auto flex gap-1">
                 <button
                   type="button"
-                  className="text-[10px] font-medium text-primary hover:underline"
+                  className="min-h-9 rounded px-2 text-xs font-medium text-primary hover:underline"
                   onClick={expandAllUnitBranches}
                 >
                   Mở hết
                 </button>
                 <button
                   type="button"
-                  className="text-[10px] text-muted-foreground hover:underline"
+                  className="min-h-9 rounded px-2 text-xs text-muted-foreground hover:underline"
                   onClick={collapseAllUnitBranches}
                 >
                   Thu hết
@@ -327,17 +324,20 @@ export function SuperadminPermissionMatrixPanel() {
           {/* Khối quyền */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="shrink-0 flex flex-col gap-2 border-b border-border/50 pb-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-              <div className="space-y-1">
-                <p className="text-[11px] font-medium text-muted-foreground">Đang chỉnh: depth {selectedDepth ?? "—"}</p>
-                {depthHint ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    Gợi ý từ đơn vị: <span className="font-medium text-foreground">{depthHint}</span>
-                  </p>
-                ) : null}
-                <label className="flex max-w-xs flex-col gap-0.5">
-                  <span className="text-[10px] font-medium text-muted-foreground">Hoặc chọn depth trực tiếp</span>
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Depth {selectedDepth ?? "—"}
+                  {depthHint ? (
+                    <span className="font-normal">
+                      {" "}
+                      · <span className="text-foreground">{depthHint}</span>
+                    </span>
+                  ) : null}
+                </p>
+                <label className="flex w-full max-w-xs flex-col gap-0.5 sm:max-w-sm">
+                  <span className="sr-only">Chọn depth</span>
                   <select
-                    className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm"
+                    className="min-h-9 rounded-lg border border-border bg-background px-2 py-2 text-xs outline-none focus:border-primary sm:text-sm"
                     value={selectedDepth ?? ""}
                     onChange={(e) => {
                       setSelectedUnitId(null);
@@ -382,7 +382,7 @@ export function SuperadminPermissionMatrixPanel() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-y-contain rounded-lg border border-border/70 bg-muted/10 p-2 sm:p-3">
+            <div className="-mx-3 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-y-contain rounded-none border border-y border-border/70 border-x-0 bg-muted/10 p-2 sm:mx-0 sm:rounded-lg sm:border-x sm:p-3">
               {moduleKeys.map((mod) => {
                 const isModuleOpen = expandedModules.has(mod);
                 return (
@@ -400,20 +400,20 @@ export function SuperadminPermissionMatrixPanel() {
                           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                         )}
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {mod}
+                          {formatPermissionModuleLabel(mod)}
                         </span>
                       </button>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          className="text-[11px] font-medium text-primary hover:underline"
+                          className="min-h-9 rounded px-2 text-xs font-medium text-primary hover:underline"
                           onClick={() => selectAllInModule(mod)}
                         >
                           Chọn cả nhóm
                         </button>
                         <button
                           type="button"
-                          className="text-[11px] font-medium text-muted-foreground hover:underline"
+                          className="min-h-9 rounded px-2 text-xs font-medium text-muted-foreground hover:underline"
                           onClick={() => clearModule(mod)}
                         >
                           Bỏ cả nhóm

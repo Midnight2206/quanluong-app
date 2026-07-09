@@ -1,4 +1,4 @@
-import { BookOpen, FileText, Home, LayoutDashboard, Soup, Users, Warehouse } from "lucide-react";
+import { BookOpen, FileText, Home, LayoutDashboard, Users, Warehouse } from "lucide-react";
 import { getMainAppOrigin, getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 /**
@@ -11,6 +11,7 @@ export const mainNavItems = [
     to: "/dashboard/units",
     label: "Bảng điều khiển",
     icon: LayoutDashboard,
+    requiresAuth: true,
     /** Mọi route `/dashboard/...` vẫn tính là đang ở mục này (sáng tab sidebar). */
     activePathPrefix: "/dashboard",
   },
@@ -18,30 +19,28 @@ export const mainNavItems = [
     to: "/lttp-nhap-xuat",
     label: "Nhập xuất LTTP",
     icon: Warehouse,
+    requiresAuth: true,
     routeAccessKey: "nav-lttp-nhap-xuat",
   },
   {
     to: "/chungtuquyettoan",
     label: "Chứng từ quyết toán",
     icon: FileText,
+    requiresAuth: true,
     routeAccessKey: "nav-chungtuquyettoan",
   },
   {
     to: "/users",
     label: "Người dùng",
     icon: Users,
+    requiresAuth: true,
     routeAccessKey: "nav-users",
-  },
-  {
-    to: "/meal-roster",
-    label: "Chấm cơm",
-    icon: Soup,
-    routeAccessKey: "nav-meal-roster",
   },
   {
     to: "/so-sach-bep-an",
     label: "Sổ sách bếp ăn",
     icon: BookOpen,
+    requiresAuth: true,
     routeAccessKey: "nav-kitchen-books",
   },
 ];
@@ -62,24 +61,21 @@ export const superadminNavItems = [
     to: "/lttp-nhap-xuat",
     label: "Nhập xuất LTTP",
     icon: Warehouse,
+    requiresAuth: true,
     routeAccessKey: "nav-lttp-nhap-xuat",
   },
   {
     to: "/users",
     label: "Người dùng",
     icon: Users,
+    requiresAuth: true,
     routeAccessKey: "nav-users",
-  },
-  {
-    to: "/meal-roster",
-    label: "Chấm cơm",
-    icon: Soup,
-    routeAccessKey: "nav-meal-roster",
   },
   {
     to: "/so-sach-bep-an",
     label: "Sổ sách bếp ăn",
     icon: BookOpen,
+    requiresAuth: true,
     routeAccessKey: "nav-kitchen-books",
   },
 ];
@@ -99,24 +95,21 @@ export const superadminPortalNavItems = [
     to: "/lttp-nhap-xuat",
     label: "Nhập xuất LTTP",
     icon: Warehouse,
+    requiresAuth: true,
     routeAccessKey: "nav-lttp-nhap-xuat",
   },
   {
     to: "/users",
     label: "Người dùng",
     icon: Users,
+    requiresAuth: true,
     routeAccessKey: "nav-users",
-  },
-  {
-    to: "/meal-roster",
-    label: "Chấm cơm",
-    icon: Soup,
-    routeAccessKey: "nav-meal-roster",
   },
   {
     to: "/so-sach-bep-an",
     label: "Sổ sách bếp ăn",
     icon: BookOpen,
+    requiresAuth: true,
     routeAccessKey: "nav-kitchen-books",
   },
 ];

@@ -7,6 +7,7 @@ import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { useRouteAccessByKey } from "@/features/route-access/routeAccessHooks";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
 import { GuardedNavLink } from "@/hocs/GuardedNavLink";
+import { ScrollableHorizontalStrip } from "@/components/common/ScrollableHorizontalStrip";
 import { writePersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { DASHBOARD_SUPERADMIN_TAB_META } from "@/pages/dashboard/superadminDashboardTabMeta";
 import { cn } from "@/utils/cn";
@@ -60,11 +61,11 @@ export function SuperadminDashboardLayout({ children }) {
         </div>
       </header>
 
-      <div
+      <ScrollableHorizontalStrip
         role="tablist"
         aria-label="Mục quản lý hệ thống"
-        aria-orientation="horizontal"
-        className="flex shrink-0 flex-wrap gap-0.5 border-b border-border bg-background/80 pb-px backdrop-blur-sm"
+        className="shrink-0 border-b border-border bg-background/80 pb-px backdrop-blur-sm"
+        innerClassName="flex flex-nowrap gap-0.5"
       >
         {visibleTabs.map((tab) => {
           const href = tab.nestedUnder === "lttp" ? "/dashboard/lttp" : `/dashboard/${tab.path}`;
@@ -75,9 +76,10 @@ export function SuperadminDashboardLayout({ children }) {
               routeAccessKey={tab.routeAccessKey}
               href={href}
               end={useEnd}
+              role="tab"
               className={({ isActive }) =>
                 cn(
-                  "relative rounded-t-md px-2.5 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm sm:px-3 sm:py-1.5",
+                  "relative shrink-0 whitespace-nowrap rounded-t-md px-2.5 py-2.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-9 sm:text-sm sm:px-3",
                   isActive
                     ? "text-foreground after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary"
                     : "text-muted-foreground hover:text-foreground",
@@ -88,11 +90,11 @@ export function SuperadminDashboardLayout({ children }) {
             </GuardedNavLink>
           );
         })}
-      </div>
+      </ScrollableHorizontalStrip>
 
       <div
         role="tabpanel"
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto overscroll-y-contain pr-0.5"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain pr-0.5"
       >
         {children}
       </div>

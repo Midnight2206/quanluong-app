@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
 import {
   useCreateJobTitleMutation,
   useDeleteJobTitleMutation,
@@ -441,18 +442,8 @@ export function AdminJobTitlesPanel() {
     <div className="flex flex-col gap-4 pb-2">
       <Card className="shadow-soft">
         <CardContent className="flex flex-col gap-3 !p-3 sm:!p-4">
-          <div className="shrink-0 space-y-1">
-            <p className="text-xs font-medium sm:text-sm">Chức danh &amp; phân quyền gói quyền</p>
-            <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-              <span className="font-medium text-foreground">Bước 1 —</span> tạo chức danh theo đơn vị.{" "}
-              <span className="font-medium text-foreground">Bước 2 —</span> bấm biểu tượng{" "}
-              <span className="font-medium text-foreground">khiên</span> (Phân quyền) để mở cửa sổ gán từng quyền hệ
-              thống (chỉ những quyền bạn đang có, sau ma trận &amp; vai trò).{" "}
-              <span className="font-medium text-foreground">Bước 3 —</span> ở bảng bên dưới, gán chức danh cho từng
-              nhân sự để họ nhận đúng gói quyền.{" "}
-              <span className="font-medium text-foreground">Đồng bộ xuống nhiều đơn vị con</span> (dùng chung dữ liệu với đơn
-              vị cha) — mở tab <span className="font-medium text-foreground">Đồng bộ đơn vị con</span> trên bảng điều khiển.
-            </p>
+          <div className="shrink-0">
+            <p className="text-xs font-medium sm:text-sm">Chức danh &amp; phân quyền</p>
           </div>
 
           {canJtCreate ? (
@@ -501,7 +492,7 @@ export function AdminJobTitlesPanel() {
             <p className="text-xs text-destructive">Không tải được danh sách chức danh.</p>
           ) : null}
 
-          <div className="rounded-lg border border-border/60">
+          <ResponsiveTableWrap className="border-border/60">
             {jtLoading ? (
               <p className="p-3 text-xs text-muted-foreground">Đang tải…</p>
             ) : (
@@ -587,14 +578,7 @@ export function AdminJobTitlesPanel() {
                 </tbody>
               </table>
             )}
-          </div>
-
-          {canJtPatch ? (
-            <p className="shrink-0 rounded-md border border-dashed border-border/80 bg-muted/20 px-2 py-2 text-[11px] text-muted-foreground">
-              Bấm biểu tượng <span className="font-medium text-foreground">khiên</span> trên một chức danh đang hoạt động
-              để mở cửa sổ phân quyền toàn màn hình (thích hợp điện thoại).
-            </p>
-          ) : null}
+          </ResponsiveTableWrap>
 
           {canJtPatch ? (
             <JobTitlePermissionsModal
@@ -641,7 +625,7 @@ export function AdminJobTitlesPanel() {
           <CardContent className="flex flex-col gap-2 !p-3 sm:!p-4">
             <p className="shrink-0 text-xs font-medium sm:text-sm">Gán chức danh cho nhân sự (nhận gói phân quyền)</p>
             
-            <div className="rounded-lg border border-border/60">
+            <ResponsiveTableWrap className="border-border/60">
               {usLoading ? (
                 <p className="p-3 text-xs text-muted-foreground">Đang tải người dùng…</p>
               ) : (
@@ -738,7 +722,7 @@ export function AdminJobTitlesPanel() {
                   </tbody>
                 </table>
               )}
-            </div>
+            </ResponsiveTableWrap>
           </CardContent>
         </Card>
       ) : (

@@ -47,6 +47,13 @@ import {
   normalizeIssueSlipPriceKind,
   resolveIssueSlipAppliedUnitPrice,
 } from "./lttpIssueSlipPriceKind";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import {
+  LttpIssueSlipWizardFooter,
+  LttpIssueSlipWizardStepper,
+  LTTP_ISSUE_SLIP_WIZARD_STEPS,
+} from "./LttpIssueSlipWizard";
+import { LttpIssueSlipMobileLineCard } from "./LttpIssueSlipMobileLineCard";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -438,6 +445,9 @@ export function LttpPhieuXuatTab({
 }) {
   const isEditMode = !!editingSlip;
   const formId = useId();
+  const isLgUp = useMediaQuery("(min-width: 1024px)");
+  const useWizardLayout = !isLgUp;
+  const [wizardStep, setWizardStep] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [issueDate, setIssueDate] = useState(() => localYmd());
 
@@ -477,6 +487,10 @@ export function LttpPhieuXuatTab({
   const draftPersistAllowedRef = useRef(false);
 
   const defLoadedKey = useRef(null);
+
+  useEffect(() => {
+    setWizardStep(0);
+  }, [selectedUnitId, editingSlip?.id, isEditMode]);
 
   useLayoutEffect(() => {
     if (isEditMode) {
@@ -1280,6 +1294,54 @@ export function LttpPhieuXuatTab({
     [formTotal],
   );
 
+  const wizardShowInfo = !useWizardLayout || wizardStep === 0;
+  const wizardShowLines = !useWizardLayout || wizardStep === 1;
+  const wizardShowReview = useWizardLayout && wizardStep === 2;
+  const wizardShowDesktopActions = !useWizardLayout;
+
+  const validateWizardInfoStep = useCallback(() => {
+    if (!issueDate || !/^\d{4}-\d{2}-\d{2}/.test(issueDate)) {
+      notifyError("Chọn ngày phiếu hợp lệ.");
+      return false;
+    }
+    if (recipientUnitId == null) {
+      notifyError("Chọn đơn vị nhận LTTP.");
+      return false;
+    }
+    return true;
+  }, [issueDate, recipientUnitId]);
+
+  const validateWizardLinesStep = useCallback(() => {
+    if (hasDuplicateCommodityInForm) {
+      notifyError(
+        "Trùng mặt hàng trong phiếu — mỗi mặt hàng chỉ một dòng trước khi tiếp tục.",
+      );
+      return false;
+    }
+    if (!dataRows.length) {
+      notifyWarning(
+        "Chưa có dòng mặt hàng hợp lệ — bạn vẫn có thể xem lại, nhưng cần ít nhất một dòng trước khi lưu.",
+      );
+    }
+    return true;
+  }, [dataRows.length, hasDuplicateCommodityInForm]);
+
+  const goWizardNext = useCallback(() => {
+    if (wizardStep === 0 && !validateWizardInfoStep()) {
+      return;
+    }
+    if (wizardStep === 1 && !validateWizardLinesStep()) {
+      return;
+    }
+    setWizardStep((s) =>
+      Math.min(s + 1, LTTP_ISSUE_SLIP_WIZARD_STEPS.length - 1),
+    );
+  }, [validateWizardInfoStep, validateWizardLinesStep, wizardStep]);
+
+  const goWizardBack = useCallback(() => {
+    setWizardStep((s) => Math.max(0, s - 1));
+  }, []);
+
   const removeRow = useCallback((key) => {
     setRows((prev) => {
       if (prev.length <= 1) {
@@ -1721,11 +1783,20 @@ export function LttpPhieuXuatTab({
 
       <form
         id={formId}
-        className="print:hidden min-w-0 space-y-3"
+        className={cn(
+          "print:hidden min-w-0 space-y-3",
+          useWizardLayout && "pb-14",
+        )}
         onSubmit={(e) => e.preventDefault()}
       >
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="min-w-[10rem] space-y-0.5 text-xs">
+        {useWizardLayout ? (
+          <LttpIssueSlipWizardStepper stepIndex={wizardStep} className="mb-1" />
+        ) : null}
+
+        {wizardShowInfo ? (
+        <div className="space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+          <label className="min-w-0 space-y-0.5 text-xs sm:min-w-[10rem]">
             Ngày phiếu{isEditMode ? " (không đổi)" : ""}
             <input
               type="date"
@@ -1742,7 +1813,7 @@ export function LttpPhieuXuatTab({
             />
           </label>
           {canPickUnits && units.length > 0 ? (
-            <label className="min-w-[16rem] flex-1 space-y-0.5 text-xs">
+            <label className="min-w-0 flex-1 space-y-0.5 text-xs">
               Đơn vị nhận LTTP
               <select
                 className={cn(inputClass, "mt-0.5 block")}
@@ -1769,7 +1840,7 @@ export function LttpPhieuXuatTab({
               </span>
             </div>
           )}
-          <label className="min-w-[16rem] flex-1 space-y-0.5 text-xs">
+          <label className="min-w-0 flex-1 space-y-0.5 text-xs">
             Người mua hàng
             <select
               className={cn(inputClass, "mt-0.5 block")}
@@ -1799,6 +1870,26 @@ export function LttpPhieuXuatTab({
             disabled={!canWrite}
           />
         </label>
+        {useWizardLayout ? (
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+            <p>
+              Quyển số:{" "}
+              <span className="font-mono font-medium text-foreground">
+                {bookMmyyDisplay}
+              </span>
+              {" · "}
+              Số phiếu kế tiếp:{" "}
+              <span className="font-mono font-medium text-foreground">
+                {nextSlipNoDisplay}
+              </span>
+            </p>
+          </div>
+        ) : null}
+        </div>
+        ) : null}
+
+        {wizardShowLines ? (
+        <div className="space-y-3">
         <p className="text-[10px] text-muted-foreground">
           Bảng giá theo đơn vị cấp, tham chiếu ngày:{" "}
           {eff?.appliedEffectiveDate ?? "—"}{" "}
@@ -1823,6 +1914,116 @@ export function LttpPhieuXuatTab({
           </p>
         ) : null}
 
+        {useWizardLayout ? (
+          <div className="space-y-3">
+            {cLoad ? (
+              <p className="text-xs text-muted-foreground">
+                Đang tải danh mục mặt hàng…
+              </p>
+            ) : null}
+            {rows.map((r, i) => {
+              const c = r.commodityId ? comById.get(r.commodityId) : null;
+              const commoditySelectedLabel = c ? `${c.name} (${c.code})` : "";
+              const dupRow = isDuplicateCommodityRow(r);
+              return (
+                <LttpIssueSlipMobileLineCard
+                  key={r.key}
+                  index={i}
+                  row={r}
+                  suppliers={suppliers}
+                  dupRow={dupRow}
+                  canWrite={canWrite}
+                  quantityDisplay={quantityInputDisplay(r.quantity)}
+                  lineTotal={lineTotal(r)}
+                  commoditySearch={
+                    <IssueSlipCommoditySearch
+                      rowKey={r.key}
+                      commodityId={r.commodityId}
+                      selectedLabel={commoditySelectedLabel}
+                      commodities={commodities}
+                      dupRow={dupRow}
+                      inputClass={inputClass}
+                      disabled={!canWrite}
+                      onPickCommodity={onPickCommodity}
+                    />
+                  }
+                  onSupplierChange={(e) =>
+                    applyRowPatch(r.key, {
+                      lttpSupplierId: e.target.value,
+                    })
+                  }
+                  onCodeChange={(e) =>
+                    applyRowPatch(r.key, { codeDraft: e.target.value })
+                  }
+                  onCodeBlur={() =>
+                    resolveByCode(r.key, r.codeDraft, { silent: true })
+                  }
+                  onCodeKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void resolveByCode(r.key, r.codeDraft, {
+                        silent: true,
+                        focusQuantity: true,
+                      });
+                    }
+                  }}
+                  onQuantityChange={(e) => {
+                    const cleaned = e.target.value.replace(/[^\d.,]/g, "");
+                    applyRowPatch(r.key, { quantity: cleaned });
+                  }}
+                  onQuantityKeyDown={(e) => {
+                    if (e.key !== "Enter") {
+                      return;
+                    }
+                    e.preventDefault();
+                    const idx = rows.findIndex((x) => x.key === r.key);
+                    if (idx < 0) {
+                      return;
+                    }
+                    if (idx < rows.length - 1) {
+                      const nextKey = rows[idx + 1].key;
+                      queueMicrotask(() =>
+                        rowCodeRefs.current[nextKey]?.focus(),
+                      );
+                      return;
+                    }
+                    const nr = newEmptyRow();
+                    flushSync(() => {
+                      setRows((prev) => [...prev, nr]);
+                    });
+                    queueMicrotask(() =>
+                      rowQtyRefs.current[nr.key]?.focus(),
+                    );
+                  }}
+                  onPriceKindChange={(kind) =>
+                    applyRowPatch(r.key, { priceKind: kind })
+                  }
+                  onLineNoteChange={(e) =>
+                    applyRowPatch(r.key, { lineNote: e.target.value })
+                  }
+                  onRemove={() => removeRow(r.key)}
+                  qtyInputRef={(el) => {
+                    rowQtyRefs.current[r.key] = el;
+                  }}
+                  codeInputRef={(el) => {
+                    rowCodeRefs.current[r.key] = el;
+                  }}
+                />
+              );
+            })}
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">Tổng cộng</span>
+                <span className="text-base font-semibold tabular-nums">
+                  {formatVnd(formTotal)}
+                </span>
+              </div>
+              <p className="mt-1 text-[10px] italic leading-relaxed text-muted-foreground">
+                {totalInWords || "—"}
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="min-w-0 rounded-lg border border-border/60">
           <table className="w-full table-fixed border-collapse text-left text-[11px]">
             <colgroup>
@@ -2206,7 +2407,96 @@ export function LttpPhieuXuatTab({
             </tfoot>
           </table>
         </div>
-        {canWrite ? (
+        )}
+        </div>
+        ) : null}
+
+        {wizardShowReview ? (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-border/70 bg-card/40 p-3 text-xs shadow-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Thông tin phiếu
+              </p>
+              <dl className="mt-2 space-y-1.5">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Ngày phiếu</dt>
+                  <dd className="font-mono font-medium">{issueDate}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Đơn vị nhận</dt>
+                  <dd className="text-right font-medium">
+                    {recipientUnitLabel || "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Người mua</dt>
+                  <dd className="text-right font-medium">
+                    {buyerDisplayName || "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Quyển / Số</dt>
+                  <dd className="font-mono font-medium">
+                    {bookMmyyDisplay} · {nextSlipNoDisplay}
+                  </dd>
+                </div>
+                {slipNote?.trim() ? (
+                  <div>
+                    <dt className="text-muted-foreground">Chú thích</dt>
+                    <dd className="mt-0.5 text-foreground">{slipNote.trim()}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+
+            <div className="rounded-xl border border-border/70 bg-card/40 p-3 text-xs shadow-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Mặt hàng ({dataRows.length} dòng)
+              </p>
+              {dataRows.length === 0 ? (
+                <p className="mt-2 text-destructive">
+                  Chưa có dòng hợp lệ — quay lại bước Mặt hàng để nhập.
+                </p>
+              ) : (
+                <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto">
+                  {dataRows.map((r, i) => {
+                    const c = comById.get(r.commodityId);
+                    const supplier = suppliers.find(
+                      (s) => String(s.id) === String(r.lttpSupplierId),
+                    );
+                    return (
+                      <li
+                        key={r.key}
+                        className="rounded-lg border border-border/60 bg-background/60 px-2 py-1.5"
+                      >
+                        <p className="font-medium">
+                          {i + 1}. {c?.name ?? "—"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {supplier?.name ?? "—"} · SL {r.quantity} ·{" "}
+                          {formatVnd(lineTotal(r))}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <div className="mt-3 border-t border-border/60 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold">Tổng cộng</span>
+                  <span className="text-base font-bold tabular-nums">
+                    {formatVnd(formTotal)}
+                  </span>
+                </div>
+                <p className="mt-1 text-[10px] italic text-muted-foreground">
+                  {totalInWords || "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {wizardShowDesktopActions && canWrite ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
@@ -2234,11 +2524,39 @@ export function LttpPhieuXuatTab({
               </Button>
             ) : null}
           </div>
-        ) : (
+        ) : wizardShowDesktopActions ? (
           <p className="text-[11px] text-muted-foreground">
             Bạn không có quyền lập/sửa/xóa phiếu (cần lttp.issue-slips.write).
           </p>
-        )}
+        ) : null}
+
+        {wizardShowReview && !canWrite ? (
+          <p className="text-[11px] text-muted-foreground">
+            Bạn không có quyền lập/sửa/xóa phiếu (cần lttp.issue-slips.write).
+          </p>
+        ) : null}
+
+        {useWizardLayout ? (
+          <LttpIssueSlipWizardFooter
+            stepIndex={wizardStep}
+            onBack={goWizardBack}
+            onNext={goWizardNext}
+            showSubmit={canWrite}
+            submitLabel={
+              isEditMode ? "Cập nhật phiếu" : "Lưu phiếu xuất"
+            }
+            submitBusy={createBusy || updateBusy}
+            submitDisabled={
+              createBusy ||
+              updateBusy ||
+              resyncBusy ||
+              !selectedUnitId ||
+              !dataRows.length ||
+              hasDuplicateCommodityInForm
+            }
+            onSubmit={() => void onSubmit()}
+          />
+        ) : null}
       </form>
     </div>
   );

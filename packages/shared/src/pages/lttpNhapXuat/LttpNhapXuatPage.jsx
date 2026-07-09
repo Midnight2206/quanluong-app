@@ -194,12 +194,8 @@ export function LttpNhapXuatPage() {
 
   return (
     <section className="min-w-0 pb-6 print:hidden">
-      <div className="mb-2 space-y-0.5">
+      <div className="mb-3">
         <h1 className="text-base font-semibold tracking-tight sm:text-lg">Nhập xuất LTTP</h1>
-        <p className="text-[11px] text-muted-foreground">
-          Chọn kho cấp phát — tab Phiếu xuất, Lịch sử xuất kho, hoặc Đặt hàng (tổng hợp phiếu trong ngày; có đường dẫn riêng{" "}
-          <span className="font-mono text-[10px]">…/ordering-lttp</span> để chia sẻ và in).
-        </p>
       </div>
 
       {canPickUnits && unitsForKhoDropdown.length > 0 && effectiveUnitId != null ? (

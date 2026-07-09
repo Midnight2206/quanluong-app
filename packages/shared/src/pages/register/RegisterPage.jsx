@@ -21,8 +21,12 @@ import { notifyError, notifySuccess } from "@/services/notify";
 export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
   const router = useRouter();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const hydrateFromServer = initialUnits !== undefined;
-  const rtk = useGetRegisterUnitsQuery(undefined, { skip: hydrateFromServer });
+  const [forceClientUnits, setForceClientUnits] = useState(false);
+  const hydrateFromServer = initialUnits !== undefined && !initialUnitsError && !forceClientUnits;
+  const rtk = useGetRegisterUnitsQuery(undefined, {
+    skip: hydrateFromServer,
+    retry: 1,
+  });
   const units = hydrateFromServer
     ? Array.isArray(initialUnits)
       ? initialUnits
@@ -97,13 +101,17 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
           <input
             type="text"
             autoComplete="username"
-            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary"
+            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
             placeholder="nguyenvana"
             {...register("username")}
             id="ql-register-username"
+            aria-invalid={errors.username ? "true" : undefined}
+            aria-describedby={errors.username ? "ql-register-username-error" : undefined}
           />
           {errors.username ? (
-            <p className="text-sm text-destructive">{errors.username.message}</p>
+            <p id="ql-register-username-error" role="alert" className="text-sm text-destructive">
+              {errors.username.message}
+            </p>
           ) : null}
         </label>
 
@@ -112,13 +120,17 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
           <input
             type="email"
             autoComplete="email"
-            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary"
+            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
             placeholder="ban@domain.com"
             {...register("email")}
             id="ql-register-email"
+            aria-invalid={errors.email ? "true" : undefined}
+            aria-describedby={errors.email ? "ql-register-email-error" : undefined}
           />
           {errors.email ? (
-            <p className="text-sm text-destructive">{errors.email.message}</p>
+            <p id="ql-register-email-error" role="alert" className="text-sm text-destructive">
+              {errors.email.message}
+            </p>
           ) : null}
         </label>
 
@@ -128,10 +140,12 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
             <input
               type={isPasswordVisible ? "text" : "password"}
               autoComplete="new-password"
-              className="w-full rounded-2xl border bg-background px-4 py-3 pr-12 text-sm outline-none transition focus:border-primary"
+              className="w-full rounded-2xl border bg-background px-4 py-3 pr-12 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
               placeholder="Nhập mật khẩu"
               {...register("password")}
               id="ql-register-password"
+              aria-invalid={errors.password ? "true" : undefined}
+              aria-describedby={errors.password ? "ql-register-password-error" : undefined}
             />
             <button
               type="button"
@@ -143,17 +157,27 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
             </button>
           </div>
           {errors.password ? (
-            <p className="text-sm text-destructive">{errors.password.message}</p>
+            <p id="ql-register-password-error" role="alert" className="text-sm text-destructive">
+              {errors.password.message}
+            </p>
           ) : null}
         </label>
 
         <label className="block space-y-2" htmlFor="ql-register-unitId">
           <span className="text-sm font-medium">Đơn vị</span>
           <select
-            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary"
+            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
             disabled={isLoadingUnits || !units.length}
             {...register("unitId")}
             id="ql-register-unitId"
+            aria-invalid={errors.unitId ? "true" : undefined}
+            aria-describedby={
+              errors.unitId
+                ? "ql-register-unitId-error"
+                : !isLoadingUnits && !units.length
+                  ? "ql-register-unitId-hint"
+                  : undefined
+            }
           >
             <option value="">
               {isLoadingUnits ? "Đang tải đơn vị..." : "Chọn đơn vị"}
@@ -165,14 +189,32 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
             ))}
           </select>
           {errors.unitId ? (
-            <p className="text-sm text-destructive">{errors.unitId.message}</p>
+            <p id="ql-register-unitId-error" role="alert" className="text-sm text-destructive">
+              {errors.unitId.message}
+            </p>
           ) : null}
           {!isLoadingUnits && !units.length ? (
-            <p className="text-xs text-muted-foreground">
-              {unitsFetchFailed
-                ? "Không tải được danh sách đơn vị. Thử tải lại trang hoặc liên hệ quản trị."
-                : "Hiện chưa có đơn vị khả dụng để đăng ký."}
-            </p>
+            <div id="ql-register-unitId-hint" className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                {unitsFetchFailed
+                  ? "Không tải được danh sách đơn vị. Thử tải lại hoặc liên hệ quản trị."
+                  : "Hiện chưa có đơn vị khả dụng để đăng ký."}
+              </p>
+              {unitsFetchFailed ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={isLoadingUnits}
+                  onClick={() => {
+                    setForceClientUnits(true);
+                    void rtk.refetch();
+                  }}
+                >
+                  {isLoadingUnits ? "Đang tải…" : "Tải lại danh sách đơn vị"}
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </label>
 

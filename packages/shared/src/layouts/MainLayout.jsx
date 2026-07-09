@@ -73,11 +73,11 @@ export function MainLayout({ children, navItems: navItemsProp }) {
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain [-webkit-overflow-scrolling:touch] touch-pan-y print:h-auto print:min-h-0 print:overflow-visible">
                   {children}
                 </div>
-                <EmailVerificationDock />
               </main>
             </div>
           </TargetUnitScopeProvider>
         </div>
+        <EmailVerificationDock />
         <MessengerChatDock />
       </div>
     </ChatDockProvider>

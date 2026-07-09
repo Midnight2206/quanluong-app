@@ -3,6 +3,8 @@
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   useChungTuTemplateFillMappingQuery,
   usePutChungTuTemplateFillMappingMutation,
@@ -12,6 +14,7 @@ import {
   detailFieldLabel,
 } from "@/pages/chungTuQuyetToan/chungTuDetailFieldCatalog";
 import { excelColumnLetter, mergeColumnMappingsWithSuggestedSlots } from "@/pages/chungTuQuyetToan/chungTuFormat";
+import { ChungTuColumnMappingCard } from "./ChungTuColumnMappingCard";
 
 const DEFAULT_SHEET_PRINT = {
   rowHeightPt: 18,
@@ -105,6 +108,7 @@ function resolveColumnMappings(detailTable, sheetHeaders, suggestedColumnSlots) 
  * @param {{ categoryKey: string, driveFileId: string, canWrite?: boolean }} props
  */
 export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite = false }) {
+  const isLgUp = useMediaQuery("(min-width: 1024px)");
   const { data, isLoading, isError, error, refetch } = useChungTuTemplateFillMappingQuery(
     { categoryKey, driveFileId },
     { skip: !driveFileId },
@@ -352,9 +356,22 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
           <p className="text-[10px] text-muted-foreground">
             Không đọc được tiêu đề cột từ mẫu — kiểm tra dòng header trên Google Sheets.
           </p>
+        ) : !isLgUp ? (
+          <div className="space-y-2">
+            {columnMappings.map((mapping, index) => (
+              <ChungTuColumnMappingCard
+                key={`${mapping.col}-${mapping.label}`}
+                mapping={mapping}
+                index={index}
+                detailFieldOptions={detailFieldOptions}
+                canWrite={canWrite}
+                onFieldKeyChange={(i, fieldKey) => updateColumnMapping(i, { fieldKey })}
+              />
+            ))}
+          </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border/80">
-            <table className="w-full min-w-[520px] text-left text-xs">
+          <ResponsiveTableWrap className="border-border/80">
+            <table className="w-full min-w-[28rem] text-left text-xs">
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-[10px] uppercase text-muted-foreground">
                   <th className="px-2 py-1.5 font-semibold">Cột / tiêu đề</th>
@@ -394,7 +411,7 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableWrap>
         )}
       </div>
 

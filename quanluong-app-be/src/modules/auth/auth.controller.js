@@ -316,6 +316,13 @@ async function refreshTokenController(req, res) {
 }
 
 async function currentUserController(req, res) {
+  if (!req.user?.id) {
+    return respondSuccess(res, {
+      message: "Không có phiên đăng nhập",
+      data: null,
+    });
+  }
+
   const user = await getCurrentUser(req.user);
 
   return respondSuccess(res, {

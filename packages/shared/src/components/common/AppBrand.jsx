@@ -5,7 +5,7 @@ export function AppBrand() {
         QL
       </div>
       <div>
-        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+        <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">
           Quân lương
         </p>
         <p className="mt-1 text-sm font-semibold">

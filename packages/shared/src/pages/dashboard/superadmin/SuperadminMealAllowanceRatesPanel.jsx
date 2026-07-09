@@ -3,6 +3,9 @@ import { Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { DashboardMealRateCard } from "@/pages/dashboard/components/DashboardMealRateCard";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import {
@@ -34,6 +37,7 @@ const emptyDraft = () => ({
 });
 
 export function SuperadminMealAllowanceRatesPanel() {
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const { confirm } = useConfirm();
   const user = useCurrentUser();
   const isSuperadmin = user?.type?.name === "superadmin";
@@ -161,12 +165,8 @@ export function SuperadminMealAllowanceRatesPanel() {
   return (
     <Card className="shadow-soft w-full min-w-0">
       <CardContent className="flex flex-col gap-3 !p-3 sm:!p-4">
-        <div className="space-y-1 shrink-0">
+        <div className="shrink-0">
           <p className="text-xs font-medium sm:text-sm">Danh mục mức tiền ăn</p>
-          <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-            Dữ liệu công khai (đồng/người/ngày). Mọi tài khoản đã đăng nhập có thể đọc qua API; chỉ{" "}
-            <span className="font-medium text-foreground">superadmin</span> được thêm, sửa, xóa trên giao diện này.
-          </p>
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -181,7 +181,7 @@ export function SuperadminMealAllowanceRatesPanel() {
                 type="button"
                 onClick={() => setFilterType(t.id)}
                 className={cn(
-                  "rounded-md px-2.5 py-1 text-[11px] font-medium transition sm:text-xs",
+                  "min-h-9 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition sm:text-xs",
                   filterType === t.id
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted/80",
@@ -203,57 +203,79 @@ export function SuperadminMealAllowanceRatesPanel() {
         {isError ? <p className="text-xs text-destructive">Không tải được danh mục.</p> : null}
 
         {!isLoading && !isError ? (
-          <div className="rounded-lg border border-border/60">
-            <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
-              <thead className="sticky top-0 z-[1] bg-secondary/95">
-                <tr className="border-b border-border text-[10px] uppercase text-muted-foreground">
-                  <th className="px-2 py-2 font-medium">Loại</th>
-                  <th className="min-w-[12rem] px-2 py-2 font-medium">Đối tượng</th>
-                  <th className="whitespace-nowrap px-2 py-2 font-medium">Mức (đ/ngày)</th>
-                  {isSuperadmin ? <th className="px-2 py-2 text-right font-medium">Thao tác</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={isSuperadmin ? 4 : 3}
-                      className="px-3 py-6 text-center text-muted-foreground"
-                    >
-                      Chưa có dữ liệu. Chạy seed backend hoặc thêm mục mới.
-                    </td>
+          isDesktop ? (
+            <ResponsiveTableWrap className="border-border/60">
+              <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
+                <thead className="sticky top-0 z-[1] bg-secondary/95">
+                  <tr className="border-b border-border text-[10px] uppercase text-muted-foreground">
+                    <th className="px-2 py-2 font-medium">Loại</th>
+                    <th className="min-w-[12rem] px-2 py-2 font-medium">Đối tượng</th>
+                    <th className="whitespace-nowrap px-2 py-2 font-medium">Mức (đ/ngày)</th>
+                    {isSuperadmin ? <th className="px-2 py-2 text-right font-medium">Thao tác</th> : null}
                   </tr>
-                ) : (
-                  filtered.map((row) => (
-                    <tr key={row.id} className="border-b border-border/50 align-top hover:bg-muted/20">
-                      <td className="px-2 py-2 text-[11px] text-muted-foreground">{typeLabel(row.type)}</td>
-                      <td className="px-2 py-2">
-                        <span className="whitespace-pre-wrap leading-snug">{row.doiTuong}</span>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={isSuperadmin ? 4 : 3}
+                        className="px-3 py-6 text-center text-muted-foreground"
+                      >
+                        Chưa có dữ liệu. Chạy seed backend hoặc thêm mục mới.
                       </td>
-                      <td className="px-2 py-2 tabular-nums">{formatVnd(row.mucTienAn)}</td>
-                      {isSuperadmin ? (
-                        <td className="px-2 py-2 text-right">
-                          <div className="flex justify-end gap-1">
-                            <IconButton label="Sửa" variant="surface" onClick={() => startEdit(row)}>
-                              <Pencil aria-hidden />
-                            </IconButton>
-                            <IconButton
-                              label="Xóa"
-                              variant="danger"
-                              disabled={deleting}
-                              onClick={() => onDelete(row.id)}
-                            >
-                              <Trash2 aria-hidden />
-                            </IconButton>
-                          </div>
-                        </td>
-                      ) : null}
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    filtered.map((row) => (
+                      <tr key={row.id} className="border-b border-border/50 align-top hover:bg-muted/20">
+                        <td className="px-2 py-2 text-[11px] text-muted-foreground">{typeLabel(row.type)}</td>
+                        <td className="px-2 py-2">
+                          <span className="whitespace-pre-wrap leading-snug">{row.doiTuong}</span>
+                        </td>
+                        <td className="px-2 py-2 tabular-nums">{formatVnd(row.mucTienAn)}</td>
+                        {isSuperadmin ? (
+                          <td className="px-2 py-2 text-right">
+                            <div className="flex justify-end gap-1">
+                              <IconButton label="Sửa" variant="surface" onClick={() => startEdit(row)}>
+                                <Pencil aria-hidden />
+                              </IconButton>
+                              <IconButton
+                                label="Xóa"
+                                variant="danger"
+                                disabled={deleting}
+                                onClick={() => onDelete(row.id)}
+                              >
+                                <Trash2 aria-hidden />
+                              </IconButton>
+                            </div>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </ResponsiveTableWrap>
+          ) : (
+            <div className="space-y-0 px-3 sm:space-y-2 sm:px-0">
+              {filtered.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-6 text-center text-xs text-muted-foreground">
+                  Chưa có dữ liệu. Chạy seed backend hoặc thêm mục mới.
+                </p>
+              ) : (
+                filtered.map((row) => (
+                  <DashboardMealRateCard
+                    key={row.id}
+                    row={row}
+                    typeLabel={typeLabel}
+                    isSuperadmin={isSuperadmin}
+                    deleting={deleting}
+                    onEdit={startEdit}
+                    onDelete={onDelete}
+                  />
+                ))
+              )}
+            </div>
+          )
         ) : null}
       </CardContent>
 

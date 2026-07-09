@@ -37,6 +37,7 @@ httpClient.interceptors.response.use(
     const isAuthRequest =
       requestUrl.includes("/auth/login") ||
       requestUrl.includes("/auth/register") ||
+      requestUrl.includes("/auth/current-user") ||
       requestUrl.includes("/auth/refresh-token") ||
       requestUrl.includes("/auth/verify-email") ||
       requestUrl.includes("/auth/forgot-password") ||

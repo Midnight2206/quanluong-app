@@ -23,6 +23,7 @@ import {
   usePatchUnitMutation,
 } from "@/features/units/api/unitsApi";
 import { cn } from "@/utils/cn";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
 import { notifyError, notifySuccess, notifySuccessWithUndo } from "@/services/notify";
 
 const inputClass =
@@ -360,7 +361,7 @@ export function SuperadminUnitsPanel() {
                 <ListX aria-hidden />
               </IconButton>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border/70">
+            <ResponsiveTableWrap className="min-h-0 flex-1">
               <table className="w-full min-w-[640px] border-collapse text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-border bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -477,7 +478,7 @@ export function SuperadminUnitsPanel() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTableWrap>
           </div>
         ) : null}
 

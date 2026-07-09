@@ -70,7 +70,7 @@ export function AppHeader() {
               QL
             </div>
             <div className="hidden sm:block">
-              <p className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
                 Quân lương
               </p>
               <p className="text-xs font-semibold">Workspace</p>

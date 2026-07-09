@@ -48,8 +48,8 @@ export function ChungTuQuyetToanPage() {
           <TabPanel
             persistId="chungtu-doc-type-tabs-v1"
             defaultTabId={DEFAULT_CHUNG_TU_CATEGORY_KEY}
-            equalWidthTabs={false}
             scrollablePanel={false}
+            scrollableTabList
             stickyTabList
             fullBleedInCard
             stickyTabListTopClassName="top-0"

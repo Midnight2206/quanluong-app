@@ -7,6 +7,7 @@ import {
   usePatchPermissionDescriptionMutation,
 } from "@/features/permissions/api/permissionsApi";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { formatPermissionModuleLabel } from "@/features/permissions/constants/permissionModuleLabels.vi";
 import { cn } from "@/utils/cn";
 
 const textareaClass =
@@ -67,12 +68,6 @@ export function SuperadminPermissionDescriptionsPanel() {
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !p-3 sm:!p-4">
         <div>
           <p className="text-xs font-medium sm:text-sm">Mô tả quyền (dùng chung toàn hệ thống)</p>
-          <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-            Mỗi quyền chỉ có <span className="font-medium text-foreground">một mô tả dùng chung</span> trong cơ sở dữ liệu — hiển thị
-            giống nhau cho superadmin và admin (modal chức danh / API người dùng hiện tại). Đồng bộ khi khởi động backend điền tên và mô tả
-            tiếng Việt từ catalog nếu ô đang trống; <span className="font-medium text-foreground">nội dung bạn đã lưu tại đây không bị ghi đè</span> khi deploy.
-            Viết tiếng Việt nghiệp vụ, tránh thuật ngữ lập trình. Mã quyền và HTTP chỉ để tham chiếu nội bộ.
-          </p>
         </div>
 
         {isError ? (
@@ -83,7 +78,9 @@ export function SuperadminPermissionDescriptionsPanel() {
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain pr-1">
           {moduleKeys.map((mod) => (
             <div key={mod}>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{mod}</p>
+              <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                {formatPermissionModuleLabel(mod)}
+              </p>
               <div className="space-y-3">
                 {(byModule.get(mod) || []).map((row) => (
                   <div

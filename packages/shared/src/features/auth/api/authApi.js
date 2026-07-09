@@ -7,15 +7,14 @@ import { mapPermissionsFromUser, useAuthStore } from "@/features/auth/model/auth
 import { clearTargetUnitId } from "@/services/targetUnitScope";
 
 async function fetchCurrentUser() {
-  try {
-    const data = await apiRequest({ url: "/auth/current-user", method: "get" });
-    useAuthStore.getState().setAuthState({ user: data, permissions: mapPermissionsFromUser(data) });
-    return data;
-  } catch {
+  const data = await apiRequest({ url: "/auth/current-user", method: "get" });
+  if (data == null) {
     clearTargetUnitId();
     useAuthStore.getState().clearAuthState();
-    throw new Error("unauthenticated");
+    return null;
   }
+  useAuthStore.getState().setAuthState({ user: data, permissions: mapPermissionsFromUser(data) });
+  return data;
 }
 
 export function useGetCurrentUserQuery(options = {}) {

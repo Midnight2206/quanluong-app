@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { ListChecks, ListX, Save, X } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
+import { formatPermissionModuleLabel } from "@/features/permissions/constants/permissionModuleLabels.vi";
 
 export function JobTitlePermissionsModal({
   open,
@@ -69,9 +70,8 @@ export function JobTitlePermissionsModal({
           </p>
           <p className="text-sm font-medium text-foreground">
             {editingRow.name}{" "}
-            <span className="font-normal text-muted-foreground">— đơn vị: {unitLabel}</span>
+            <span className="font-normal text-muted-foreground">— {unitLabel}</span>
           </p>
-          
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5">
@@ -84,7 +84,9 @@ export function JobTitlePermissionsModal({
             <div className="space-y-3">
               {moduleKeys.map((mod) => (
                 <div key={mod}>
-                  <p className="mb-1.5 text-[10px] font-semibold uppercase text-muted-foreground">{mod}</p>
+                  <p className="mb-1.5 text-xs font-semibold uppercase text-muted-foreground">
+                    {formatPermissionModuleLabel(mod)}
+                  </p>
                   <ul className="grid gap-2 sm:grid-cols-2">
                     {(assignableByModule.get(mod) || []).map((p) => {
                       const catalogDesc = descriptionByPermissionId?.get(p.id);
@@ -110,8 +112,8 @@ export function JobTitlePermissionsModal({
                                   {desc}
                                 </span>
                               ) : (
-                                <span className="mt-0.5 block text-[10px] italic text-muted-foreground/80">
-                                  Chưa có mô tả chung — superadmin có thể bổ sung ở tab «Mô tả quyền (dùng chung)».
+                                <span className="mt-0.5 block text-xs italic text-muted-foreground/80">
+                                  Chưa có mô tả
                                 </span>
                               )}
                             </span>

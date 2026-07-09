@@ -3,7 +3,9 @@
 import { ExternalLink, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
 import { cn } from "@/utils/cn";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import {
@@ -15,6 +17,11 @@ import {
 import { CHUNG_TU_EXPORT_KIND } from "@/pages/chungTuQuyetToan/chungTuCategoryConfig";
 import { chungTuStatusBadge, formatPeriodLabel } from "@/pages/chungTuQuyetToan/chungTuFormat";
 import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScope";
+import { ChungTuHistoryDocumentCard } from "./ChungTuHistoryDocumentCard";
+import { ChungTuExportWizardCard } from "./ChungTuExportWizard";
+
+const fieldClass =
+  "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
 
 function StatusBadge({ status }) {
   const badge = chungTuStatusBadge(status);
@@ -29,6 +36,7 @@ function StatusBadge({ status }) {
  */
 export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
+  const isLgUp = useMediaQuery("(min-width: 1024px)");
   const { canPickUnits, unitsForDropdown, effectiveUnitId, persistManualUnitId } = useChungTuUnitScope();
   const [actionError, setActionError] = useState(null);
 
@@ -89,48 +97,102 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   const showAggregation = exportKind === CHUNG_TU_EXPORT_KIND.MONTHLY;
   const periodHeader =
     exportKind === CHUNG_TU_EXPORT_KIND.MONTHLY ? "Tháng/Năm" : "Ngày / Phiếu";
+  const expandedLayout = !isLgUp;
 
   return (
-    <div className="space-y-4 p-3 sm:p-4">
+    <div
+      className={cn(
+        "space-y-3",
+        expandedLayout ? "px-0 py-3 sm:p-4" : "p-3 sm:p-4",
+      )}
+    >
       {canPickUnits && unitsForDropdown.length > 0 && effectiveUnitId != null ? (
-        <label className="block min-w-0 space-y-1" htmlFor={`ct-history-unit-${categoryKey}`}>
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-            Đơn vị kho LTTP
-          </span>
-          <select
-            id={`ct-history-unit-${categoryKey}`}
-            className="w-full max-w-md rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-            value={String(effectiveUnitId ?? "")}
-            onChange={(e) => {
-              const v = e.target.value;
-              persistManualUnitId(v === "" ? null : Number(v));
-            }}
-          >
-            {unitsForDropdown.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name ?? `Đơn vị #${u.id}`}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ChungTuExportWizardCard
+          title="Bộ lọc"
+          description="Chọn kho LTTP để xem chứng từ đã lưu."
+          expanded={expandedLayout}
+        >
+          <label className="block min-w-0 space-y-1" htmlFor={`ct-history-unit-${categoryKey}`}>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+              Đơn vị kho LTTP
+            </span>
+            <select
+              id={`ct-history-unit-${categoryKey}`}
+              className={fieldClass}
+              value={String(effectiveUnitId ?? "")}
+              onChange={(e) => {
+                const v = e.target.value;
+                persistManualUnitId(v === "" ? null : Number(v));
+              }}
+            >
+              {unitsForDropdown.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name ?? `Đơn vị #${u.id}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        </ChungTuExportWizardCard>
       ) : null}
 
       {actionError ? (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p
+          className={cn(
+            "rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive",
+            expandedLayout && "mx-0 rounded-none border-x-0 sm:mx-0 sm:rounded-lg sm:border-x",
+          )}
+        >
           {actionError}
         </p>
       ) : null}
 
       {docsLoading ? (
-        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Đang tải lịch sử…
-        </p>
+        <ChungTuExportWizardCard
+          title="Danh sách chứng từ"
+          expanded={expandedLayout}
+          bodyClassName="py-6"
+        >
+          <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Đang tải lịch sử…
+          </p>
+        </ChungTuExportWizardCard>
       ) : documents.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Chưa có chứng từ nào cho đơn vị này.</p>
+        <ChungTuExportWizardCard
+          title="Danh sách chứng từ"
+          expanded={expandedLayout}
+          bodyClassName="py-6"
+        >
+          <p className="text-center text-sm text-muted-foreground">
+            Chưa có chứng từ nào cho đơn vị này.
+          </p>
+        </ChungTuExportWizardCard>
+      ) : !isLgUp ? (
+        <ChungTuExportWizardCard
+          title={`Danh sách (${documents.length})`}
+          description="Chạm Mở / Đồng bộ / Xóa trên từng chứng từ."
+          expanded={expandedLayout}
+          bodyClassName="divide-y divide-border/60 space-y-0 p-0"
+        >
+          {documents.map((doc) => (
+            <ChungTuHistoryDocumentCard
+              key={doc.documentKey}
+              doc={doc}
+              exportKind={exportKind}
+              canWrite={canWrite}
+              syncing={syncing}
+              openingDoc={openingDoc}
+              deletingDoc={deletingDoc}
+              inset
+              onOpen={() => handleOpenDocument(doc)}
+              onSync={() => handleSync(doc)}
+              onDelete={() => handleDeleteDocument(doc)}
+            />
+          ))}
+        </ChungTuExportWizardCard>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border/80">
-          <table className="w-full min-w-[640px] text-left text-sm">
+        <ResponsiveTableWrap className="border-border/80">
+          <table className="w-full min-w-[36rem] text-left text-sm">
             <thead>
               <tr className="border-b border-border/80 bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground">
                 <th className="px-3 py-2 font-semibold">Tên chứng từ</th>
@@ -211,7 +273,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
               })}
             </tbody>
           </table>
-        </div>
+        </ResponsiveTableWrap>
       )}
     </div>
   );

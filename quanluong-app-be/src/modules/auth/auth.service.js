@@ -151,7 +151,7 @@ async function findAuthUserByEmailNormalized(email) {
 
 function createAuthError() {
   return new AppError({
-    message: "Authentication failed",
+    message: "Tên đăng nhập hoặc mật khẩu không đúng",
     statusCode: 401,
     code: ERROR_CODES.UNAUTHORIZED,
   });
@@ -885,25 +885,26 @@ async function bootstrapAuthSystem(routeDefinitions = []) {
   await rebuildAllUnitPaths();
   await ensureUnitLevelMetadata();
 
-  if (config.auth.permissionSyncOnBoot) {
-    await syncPermissionsFromRoutes(routeDefinitions);
+  // Luôn đồng bộ catalog quyền từ route (upsert an toàn) — kể cả khi PERMISSION_SYNC_ON_BOOT=false.
+  await syncPermissionsFromRoutes(routeDefinitions);
 
-    const allPermissions = await prisma.permission.findMany({
-      select: {
-        code: true,
-      },
-    });
+  const allPermissions = await prisma.permission.findMany({
+    select: {
+      code: true,
+    },
+  });
 
-    await assignPermissionsToType({
-      typeId: superadminType.id,
-      permissionCodes: allPermissions.map((permission) => permission.code),
-    });
+  // Superadmin luôn nhận mọi quyền mới (upsert, không xóa quyền tùy chỉnh).
+  await assignPermissionsToType({
+    typeId: superadminType.id,
+    permissionCodes: allPermissions.map((permission) => permission.code),
+  });
 
-    await assignPermissionsToType({
-      typeId: adminType.id,
-      permissionCodes: DEFAULT_ADMIN_PERMISSION_CODES,
-    });
-  }
+  // Bổ sung quyền mặc định cho type admin (upsert — không gỡ quyền đã cấp thêm).
+  await assignPermissionsToType({
+    typeId: adminType.id,
+    permissionCodes: DEFAULT_ADMIN_PERMISSION_CODES,
+  });
 
   await ensureUnitLevelPermissionCapsSeed();
 

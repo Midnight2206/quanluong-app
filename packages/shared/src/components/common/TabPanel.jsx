@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { usePersistedNavTabSelection } from "@/hooks/usePersistedNavTab";
 import { cn } from "@/utils/cn";
 
@@ -12,6 +12,7 @@ import { cn } from "@/utils/cn";
  * @param {boolean} [fullBleedInCard] — dùng khi `CardContent` có `p-0`: thanh tab kéo sát mép card; panel có padding ngang/dưới.
  * @param {boolean} [equalWidthTabs] — các nút tab chia đều chiều ngang (`flex-1`).
  * @param {string} [stickyTabListTopClassName] — với `stickyTabList`, class `top-*` (mặc định `top-0`; tab lồng dùng vd. `top-14`).
+ * @param {boolean} [scrollableTabList] — thanh tab cuộn ngang (nhiều tab trên mobile).
  * @param {string} [forcedActiveTabId] — nếu thuộc `tabs`, ép tab hiển thị (vd. đồng bộ segment URL); khi `undefined` dùng state nội bộ.
  * @param {(id: string) => void} [onTabSelect] — gọi sau khi đổi tab (điều hướng / side-effect ngoài).
  */
@@ -25,10 +26,13 @@ export function TabPanel({
   stickyTabListTopClassName,
   fullBleedInCard = false,
   equalWidthTabs = false,
+  scrollableTabList = false,
   forcedActiveTabId,
   onTabSelect,
 }) {
   const baseId = useId();
+  const tabListRef = useRef(null);
+  const [tabFade, setTabFade] = useState({ left: false, right: false });
   const firstId = tabs[0]?.id;
   const validIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
 
@@ -55,6 +59,29 @@ export function TabPanel({
     onTabSelect?.(id);
   }
 
+  useEffect(() => {
+    if (!scrollableTabList) {
+      return undefined;
+    }
+    const el = tabListRef.current;
+    if (!el) {
+      return undefined;
+    }
+    const updateFade = () => {
+      setTabFade({
+        left: el.scrollLeft > 4,
+        right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+      });
+    };
+    updateFade();
+    el.addEventListener("scroll", updateFade, { passive: true });
+    window.addEventListener("resize", updateFade);
+    return () => {
+      el.removeEventListener("scroll", updateFade);
+      window.removeEventListener("resize", updateFade);
+    };
+  }, [scrollableTabList, tabs]);
+
   return (
     <div
       className={cn(
@@ -64,24 +91,41 @@ export function TabPanel({
         className,
       )}
     >
-      <div
-        role="tablist"
-        aria-orientation="horizontal"
-        className={cn(
-          "flex shrink-0 gap-0.5 border-b border-border pb-px",
-          equalWidthTabs ? "w-full flex-nowrap sm:flex-wrap" : "flex-wrap items-center",
-          equalWidthTabs ? "items-stretch" : "items-center",
-          stickyTabList &&
-            cn(
-              "sticky z-20 bg-muted/90 shadow-[inset_0_-1px_0_0_hsl(var(--border))] backdrop-blur-sm supports-[backdrop-filter]:bg-muted/85",
-              stickyTabListTopClassName ?? "top-0",
-            ),
-          !stickyTabList && fullBleedInCard ? "rounded-t-xl px-4 pt-4 sm:px-5 sm:pt-5" : null,
-          !stickyTabList && !fullBleedInCard ? "bg-background/80 backdrop-blur-sm" : null,
-          stickyTabList && fullBleedInCard ? "rounded-t-xl px-4 pt-3 sm:px-5 sm:pt-4" : null,
-          stickyTabList && !fullBleedInCard ? "px-0 pt-0" : null,
-        )}
-      >
+      <div className={cn("relative shrink-0", scrollableTabList && "min-w-0")}>
+        {scrollableTabList && tabFade.left ? (
+          <div
+            className="pointer-events-none absolute inset-y-0 left-0 z-30 w-6 bg-gradient-to-r from-background to-transparent"
+            aria-hidden
+          />
+        ) : null}
+        {scrollableTabList && tabFade.right ? (
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 z-30 w-8 bg-gradient-to-l from-background to-transparent"
+            aria-hidden
+          />
+        ) : null}
+        <div
+          ref={tabListRef}
+          role="tablist"
+          aria-orientation="horizontal"
+          className={cn(
+            "flex shrink-0 gap-0.5 border-b border-border pb-px",
+            scrollableTabList
+              ? "overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]"
+              : null,
+            scrollableTabList ? "flex-nowrap items-stretch" : equalWidthTabs ? "w-full flex-nowrap sm:flex-wrap" : "flex-wrap items-center",
+            !scrollableTabList && equalWidthTabs ? "items-stretch" : null,
+            stickyTabList &&
+              cn(
+                "sticky z-20 bg-muted/90 shadow-[inset_0_-1px_0_0_hsl(var(--border))] backdrop-blur-sm supports-[backdrop-filter]:bg-muted/85",
+                stickyTabListTopClassName ?? "top-0",
+              ),
+            !stickyTabList && fullBleedInCard ? "rounded-t-xl px-4 pt-4 sm:px-5 sm:pt-5" : null,
+            !stickyTabList && !fullBleedInCard ? "bg-background/80 backdrop-blur-sm" : null,
+            stickyTabList && fullBleedInCard ? "rounded-t-xl px-4 pt-3 sm:px-5 sm:pt-4" : null,
+            stickyTabList && !fullBleedInCard ? "px-0 pt-0" : null,
+          )}
+        >
         {tabs.map((tab) => {
           const isActive = tab.id === safeActive;
           const tabId = `${baseId}-tab-${tab.id}`;
@@ -97,10 +141,13 @@ export function TabPanel({
               tabIndex={isActive ? 0 : -1}
               onClick={() => handleSelectTab(tab.id)}
               className={cn(
-                "relative gap-1.5 rounded-t-md px-2.5 py-2 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm sm:gap-2 sm:px-3 sm:py-2",
-                equalWidthTabs
+                "relative gap-1.5 rounded-t-md px-2.5 py-2.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm sm:gap-2 sm:px-3 sm:py-2.5",
+                scrollableTabList ? "shrink-0 whitespace-nowrap" : null,
+                equalWidthTabs && !scrollableTabList
                   ? "flex min-h-[2.75rem] min-w-0 flex-1 basis-0 flex-col items-center justify-center sm:min-h-0 sm:flex-row sm:flex-wrap sm:justify-center"
-                  : "inline-flex max-w-full flex-wrap items-center",
+                  : scrollableTabList
+                    ? "inline-flex min-h-[2.75rem] items-center px-3"
+                    : "inline-flex max-w-full flex-wrap items-center",
                 isActive
                   ? "bg-background text-foreground shadow-sm ring-1 ring-border/70 after:absolute after:inset-x-1 after:-bottom-px after:z-10 after:h-0.5 after:rounded-full after:bg-primary"
                   : "text-foreground/75 hover:bg-muted/70 hover:text-foreground",
@@ -113,6 +160,7 @@ export function TabPanel({
             </button>
           );
         })}
+        </div>
       </div>
       <div
         role="tabpanel"

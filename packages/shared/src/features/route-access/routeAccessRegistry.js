@@ -104,8 +104,8 @@ export const ROUTE_ACCESS_RULES = {
     requiredPermissions: [PERMISSIONS.MEAL_ROSTER_ACCESS],
   },
   "nav-kitchen-books": {
-    description: "Trang Sổ sách bếp ăn — danh mục món và thực đơn ngày",
-    requiredPermissions: [PERMISSIONS.KITCHEN_BOOKS_ACCESS],
+    description: "Sổ sách bếp ăn — chấm cơm, sổ LTTP bếp, danh mục món",
+    requiredPermissions: [PERMISSIONS.KITCHEN_BOOKS_ACCESS, PERMISSIONS.MEAL_ROSTER_ACCESS],
   },
 };
 

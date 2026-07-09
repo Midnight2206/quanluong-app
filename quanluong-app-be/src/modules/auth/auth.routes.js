@@ -2,6 +2,7 @@ import express from "express";
 import { sensitiveAuthEndpointRateLimit } from "../../middlewares/auth-rate-limit.middleware.js";
 import { asyncHandler } from "../../shared/utils/async-handler.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
+import { optionalAuthMiddleware } from "../../middlewares/optional-auth.middleware.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
 import {
   changePasswordController,
@@ -82,7 +83,7 @@ authRouter.post(
   asyncHandler(resetPasswordController),
 );
 authRouter.post("/refresh-token", asyncHandler(refreshTokenController));
-authRouter.get("/current-user", authMiddleware, asyncHandler(currentUserController));
+authRouter.get("/current-user", optionalAuthMiddleware, asyncHandler(currentUserController));
 authRouter.patch(
   "/me/profile",
   authMiddleware,

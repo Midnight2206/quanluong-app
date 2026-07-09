@@ -40,6 +40,7 @@ import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { resolveDefaultLttpStorageUnitId, LTTP_STORAGE_UNIT_NAME } from "@/pages/lttpNhapXuat/lttpStorageUnitDefault";
 import { DASHBOARD_LTTP_SUB_ACCESS_KEY } from "@/features/route-access/routeAccessRegistry";
 import { GuardedNavLink } from "@/hocs/GuardedNavLink";
+import { ResponsiveTableWrap, ScrollableHorizontalStrip } from "@/components/common/ScrollableHorizontalStrip";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
 import httpClient from "@/services/httpClient";
@@ -805,15 +806,15 @@ export function AdminLttpPanel({
         ) : (
           <>
             {subTabs.length > 1 ? (
-              <div
+              <ScrollableHorizontalStrip
                 role="tablist"
                 aria-label="Mục bảng giá LTTP"
-                aria-orientation="horizontal"
-                className="flex shrink-0 flex-wrap gap-0.5 border-b border-border/70 bg-background/80 pb-px"
+                className="shrink-0 border-b border-border/70 bg-background/80 pb-px"
+                innerClassName="flex flex-nowrap gap-0.5"
               >
                 {subTabs.map((t) => {
                   const tabBase =
-                    "relative rounded-t-md px-2.5 py-1.5 text-left text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm sm:px-3 sm:py-1.5";
+                    "relative shrink-0 whitespace-nowrap rounded-t-md px-2.5 py-2.5 text-left text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-9 sm:text-sm sm:px-3";
                   const tabOn =
                     "text-foreground after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary";
                   const tabOff = "text-muted-foreground hover:text-foreground";
@@ -847,7 +848,7 @@ export function AdminLttpPanel({
                     </button>
                   );
                 })}
-              </div>
+              </ScrollableHorizontalStrip>
             ) : null}
 
             <div className="pr-1">
@@ -888,7 +889,7 @@ export function AdminLttpPanel({
                     </Button>
                   </form>
                   {fgCatLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
-                  <div className="rounded-lg border border-border/60">
+                  <ResponsiveTableWrap className="border-border/60">
                     <table className="w-full min-w-[520px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="border-b border-border bg-secondary/40 text-[10px] uppercase text-muted-foreground">
@@ -926,7 +927,7 @@ export function AdminLttpPanel({
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </ResponsiveTableWrap>
                 </div>
               ) : null}
 
@@ -988,7 +989,7 @@ export function AdminLttpPanel({
                     </form>
                   ) : null}
                   {cLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
-                  <div className="rounded-lg border border-border/60">
+                  <ResponsiveTableWrap className="border-border/60">
                     <table className="w-full min-w-[880px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="border-b border-border bg-secondary/40 text-[10px] uppercase text-muted-foreground">
@@ -1063,7 +1064,7 @@ export function AdminLttpPanel({
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </ResponsiveTableWrap>
                 </div>
               ) : null}
 
@@ -1127,7 +1128,7 @@ export function AdminLttpPanel({
                     </form>
                   ) : null}
                   {supLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
-                  <div className="rounded-lg border border-border/60">
+                  <ResponsiveTableWrap className="border-border/60">
                     <table className="w-full min-w-[640px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="border-b border-border bg-secondary/40 text-[10px] uppercase text-muted-foreground">
@@ -1165,7 +1166,7 @@ export function AdminLttpPanel({
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </ResponsiveTableWrap>
                   {!suppliers.length && !supLoad ? (
                     <p className="text-xs text-muted-foreground">Chưa có đối tác nào.</p>
                   ) : null}
@@ -1225,7 +1226,7 @@ export function AdminLttpPanel({
                     <span className="font-medium text-foreground">{effectiveData?.appliedEffectiveDate ?? "—"}</span>
                     {effectiveData?.note ? ` — ${effectiveData.note}` : ""}
                   </p>
-                  <div className="rounded-lg border border-border/60">
+                  <ResponsiveTableWrap className="border-border/60">
                     <table className="w-full min-w-[36rem] table-fixed border-collapse text-xs">
                       <colgroup>
                         <col className="w-[9%]" />
@@ -1273,7 +1274,7 @@ export function AdminLttpPanel({
                         )}
                       </tbody>
                     </table>
-                  </div>
+                  </ResponsiveTableWrap>
                 </div>
               ) : null}
 
@@ -1312,7 +1313,7 @@ export function AdminLttpPanel({
                       <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
                     ) : null}
                   </div>
-                  <div className="rounded-lg border border-border/60">
+                  <ResponsiveTableWrap className="border-border/60">
                     <table className="w-full min-w-[56rem] border-collapse text-left text-[11px]">
                       <thead className="sticky top-0 bg-secondary/90">
                         <tr className="border-b border-border text-[10px] uppercase text-muted-foreground">
@@ -1376,7 +1377,7 @@ export function AdminLttpPanel({
                         })}
                       </tbody>
                     </table>
-                  </div>
+                  </ResponsiveTableWrap>
                   <Button type="submit" className="gap-1.5 text-xs">
                     <Save className="size-3.5" aria-hidden />
                     Lưu bảng giá

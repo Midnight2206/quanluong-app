@@ -22,7 +22,6 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
           <ChungTuExportWorkspace
             categoryKey={categoryKey}
             exportKind={config?.exportKind}
-            subtitle={config?.subtitle}
           />
         ),
       },
@@ -32,14 +31,15 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
         panel: <ChungTuHistoryWorkspace categoryKey={categoryKey} exportKind={config?.exportKind} />,
       },
     ],
-    [categoryKey, config?.exportKind, config?.subtitle],
+    [categoryKey, config?.exportKind],
   );
 
   return (
     <TabPanel
       persistId={`chungtu-${categoryKey}-subtabs`}
       defaultTabId="export"
-      equalWidthTabs={false}
+      equalWidthTabs
+      scrollableTabList
       scrollablePanel={false}
       stickyTabList
       fullBleedInCard
