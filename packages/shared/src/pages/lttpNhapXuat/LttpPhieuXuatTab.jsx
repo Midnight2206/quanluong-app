@@ -43,9 +43,16 @@ import {
 } from "./lttpNhapXuatSessionPersist";
 import {
   LTTP_ISSUE_SLIP_PRICE_KIND,
+  collectIssueSlipFormLineIssues,
+  hasIssueSlipFormLineIssues,
+  isIssueSlipLineInvalid,
   issueSlipQuantityDisplayCell,
+  LTTP_ISSUE_SLIP_DUPLICATE_LINE_MESSAGE,
+  LTTP_ISSUE_SLIP_LINE_ISSUES_BANNER,
+  LTTP_ISSUE_SLIP_TRIPLE_COMMODITY_MESSAGE,
   normalizeIssueSlipPriceKind,
   resolveIssueSlipAppliedUnitPrice,
+  suggestPriceKindForDuplicateCommodity,
 } from "./lttpIssueSlipPriceKind";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
@@ -1150,24 +1157,41 @@ export function LttpPhieuXuatTab({
       }
       const hit = priceByCommodityId.get(id);
       const c = comById.get(id);
+      const tgsxAvailable = hit?.tgsxPrice != null;
       flushSync(() => {
-        applyRowPatch(key, {
-          commodityId: id,
-          codeDraft: c?.code ?? "",
-          lttpSupplierId:
-            c?.defaultLttpSupplier?.id != null
-              ? String(c.defaultLttpSupplier.id)
-              : "",
-          unitPrice: hit?.unitPrice ?? null,
-          tgsxPrice: hit?.tgsxPrice ?? null,
-          ...(hit?.tgsxPrice == null
-            ? { priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET }
-            : {}),
+        setRows((prev) => {
+          const idx = prev.findIndex((r) => r.key === key);
+          if (idx < 0) {
+            return prev;
+          }
+          const priceKind = suggestPriceKindForDuplicateCommodity(
+            prev,
+            key,
+            id,
+            { tgsxAvailable },
+          );
+          const merged = {
+            ...prev[idx],
+            commodityId: id,
+            codeDraft: c?.code ?? "",
+            lttpSupplierId:
+              c?.defaultLttpSupplier?.id != null
+                ? String(c.defaultLttpSupplier.id)
+                : "",
+            unitPrice: hit?.unitPrice ?? null,
+            tgsxPrice: hit?.tgsxPrice ?? null,
+            priceKind,
+          };
+          const next = prev.map((r, j) => (j === idx ? merged : r));
+          if (idx === next.length - 1 && isRowCompleteForSubmit(merged)) {
+            return [...next, newEmptyRow()];
+          }
+          return next;
         });
       });
       focusRowQuantity(key);
     },
-    [applyRowPatch, comById, focusRowQuantity, priceByCommodityId],
+    [comById, focusRowQuantity, priceByCommodityId],
   );
 
   const resolveByCode = useCallback(
@@ -1193,18 +1217,35 @@ export function LttpPhieuXuatTab({
           throw new Error("Phản hồi không hợp lệ");
         }
         flushSync(() => {
-          applyRowPatch(key, {
-            commodityId: c.id,
-            codeDraft: c.code,
-            lttpSupplierId:
-              d?.commodity?.defaultLttpSupplier?.id != null
-                ? String(d.commodity.defaultLttpSupplier.id)
-                : "",
-            unitPrice: d.unitPrice,
-            tgsxPrice: d.tgsxPrice,
-            ...(d.tgsxPrice == null
-              ? { priceKind: LTTP_ISSUE_SLIP_PRICE_KIND.MARKET }
-              : {}),
+          setRows((prev) => {
+            const idx = prev.findIndex((r) => r.key === key);
+            if (idx < 0) {
+              return prev;
+            }
+            const tgsxAvailable = d.tgsxPrice != null;
+            const priceKind = suggestPriceKindForDuplicateCommodity(
+              prev,
+              key,
+              c.id,
+              { tgsxAvailable },
+            );
+            const merged = {
+              ...prev[idx],
+              commodityId: c.id,
+              codeDraft: c.code,
+              lttpSupplierId:
+                d?.commodity?.defaultLttpSupplier?.id != null
+                  ? String(d.commodity.defaultLttpSupplier.id)
+                  : "",
+              unitPrice: d.unitPrice,
+              tgsxPrice: d.tgsxPrice,
+              priceKind,
+            };
+            const next = prev.map((r, j) => (j === idx ? merged : r));
+            if (idx === next.length - 1 && isRowCompleteForSubmit(merged)) {
+              return [...next, newEmptyRow()];
+            }
+            return next;
           });
         });
         if (focusQuantity) {
@@ -1229,7 +1270,7 @@ export function LttpPhieuXuatTab({
         }
       }
     },
-    [applyRowPatch, focusRowQuantity, issueDate, selectedUnitId],
+    [focusRowQuantity, issueDate, selectedUnitId],
   );
 
   const lineTotal = useCallback((r) => {
@@ -1244,43 +1285,17 @@ export function LttpPhieuXuatTab({
     return Math.round(q * applied * 100) / 100;
   }, []);
 
-  /** Trùng mặt hàng trong phiếu (cùng commodityId ≥ 2 dòng) — khớp lỗi BE «Trùng mặt hàng trong phiếu». */
-  const commodityIdsDuplicatedInForm = useMemo(() => {
-    const counts = new Map();
-    for (const r of rows) {
-      if (r.commodityId === "" || r.commodityId == null) {
-        continue;
-      }
-      const cid = Number(r.commodityId);
-      if (!Number.isInteger(cid) || cid <= 0) {
-        continue;
-      }
-      counts.set(cid, (counts.get(cid) ?? 0) + 1);
-    }
-    const dup = new Set();
-    for (const [cid, n] of counts) {
-      if (n > 1) {
-        dup.add(cid);
-      }
-    }
-    return dup;
-  }, [rows]);
-
-  const isDuplicateCommodityRow = useCallback(
-    (r) => {
-      if (r.commodityId === "" || r.commodityId == null) {
-        return false;
-      }
-      const cid = Number(r.commodityId);
-      if (!Number.isInteger(cid) || cid <= 0) {
-        return false;
-      }
-      return commodityIdsDuplicatedInForm.has(cid);
-    },
-    [commodityIdsDuplicatedInForm],
+  const lineIssuesInForm = useMemo(
+    () => collectIssueSlipFormLineIssues(rows),
+    [rows],
   );
 
-  const hasDuplicateCommodityInForm = commodityIdsDuplicatedInForm.size > 0;
+  const isDuplicateCommodityRow = useCallback(
+    (r) => isIssueSlipLineInvalid(r, lineIssuesInForm),
+    [lineIssuesInForm],
+  );
+
+  const hasDuplicateCommodityInForm = hasIssueSlipFormLineIssues(lineIssuesInForm);
 
   const dataRows = useMemo(() => rows.filter(isRowCompleteForSubmit), [rows]);
 
@@ -1313,9 +1328,10 @@ export function LttpPhieuXuatTab({
 
   const validateWizardLinesStep = useCallback(() => {
     if (hasDuplicateCommodityInForm) {
-      notifyError(
-        "Trùng mặt hàng trong phiếu — mỗi mặt hàng chỉ một dòng trước khi tiếp tục.",
-      );
+      const msg = lineIssuesInForm.tripleCommodityIds.size
+        ? LTTP_ISSUE_SLIP_TRIPLE_COMMODITY_MESSAGE
+        : LTTP_ISSUE_SLIP_DUPLICATE_LINE_MESSAGE;
+      notifyError(`${msg} — chỉnh các dòng tô đỏ trước khi tiếp tục.`);
       return false;
     }
     if (!dataRows.length) {
@@ -1324,7 +1340,7 @@ export function LttpPhieuXuatTab({
       );
     }
     return true;
-  }, [dataRows.length, hasDuplicateCommodityInForm]);
+  }, [dataRows.length, hasDuplicateCommodityInForm, lineIssuesInForm.tripleCommodityIds.size]);
 
   const goWizardNext = useCallback(() => {
     if (wizardStep === 0 && !validateWizardInfoStep()) {
@@ -1379,9 +1395,17 @@ export function LttpPhieuXuatTab({
         lineNote: noteTrim,
       });
     }
-    const uniqueCids = new Set(lines.map((ln) => ln.commodityId));
-    if (uniqueCids.size !== lines.length) {
-      notifyError("Trùng mặt hàng trong phiếu — mỗi mặt hàng chỉ một dòng.");
+    const issues = collectIssueSlipFormLineIssues(
+      toSave.map((r) => ({
+        ...r,
+        key: r.key,
+      })),
+    );
+    if (hasIssueSlipFormLineIssues(issues)) {
+      const msg = issues.tripleCommodityIds.size
+        ? LTTP_ISSUE_SLIP_TRIPLE_COMMODITY_MESSAGE
+        : LTTP_ISSUE_SLIP_DUPLICATE_LINE_MESSAGE;
+      notifyError(`${msg} — chỉnh các dòng trước khi lưu.`);
       return;
     }
     const noteTrim =
@@ -1909,8 +1933,7 @@ export function LttpPhieuXuatTab({
         </p>
         {hasDuplicateCommodityInForm ? (
           <p className="rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1.5 text-[11px] font-medium leading-snug text-destructive dark:bg-destructive/20">
-            Trùng mặt hàng trong phiếu — các dòng tô đỏ có cùng một mặt hàng;
-            chỉ giữ một dòng cho mỗi mặt hàng hoặc đổi mặt hàng trước khi lưu.
+            {LTTP_ISSUE_SLIP_LINE_ISSUES_BANNER}
           </p>
         ) : null}
 
@@ -2098,7 +2121,7 @@ export function LttpPhieuXuatTab({
                     )}
                     title={
                       dupRow
-                        ? "Trùng mặt hàng trong phiếu — mỗi mặt hàng chỉ một dòng."
+                        ? LTTP_ISSUE_SLIP_LINE_ISSUES_BANNER
                         : undefined
                     }
                   >

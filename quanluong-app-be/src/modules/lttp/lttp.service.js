@@ -775,6 +775,14 @@ function normalizeIssueSlipPriceKind(value) {
     : LTTP_ISSUE_SLIP_PRICE_KIND.MARKET;
 }
 
+function issueSlipLineDedupeKey(commodityId, priceKind) {
+  const cid = Number(commodityId);
+  if (!Number.isInteger(cid) || cid <= 0) {
+    return null;
+  }
+  return `${cid}:${normalizeIssueSlipPriceKind(priceKind)}`;
+}
+
 function resolveIssueSlipLinePriceSnapshot(hit, priceKind, commodityIdForMessage) {
   const kind = normalizeIssueSlipPriceKind(priceKind);
   const marketPrice =
@@ -1040,6 +1048,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
   const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
   const storageUnitId = dataScope.storageUnitId;
   const seen = new Set();
+  const commodityCounts = new Map();
   const lineData = [];
   for (const raw of lines) {
     const cid = Number(raw.commodityId);
@@ -1051,14 +1060,26 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    if (seen.has(cid)) {
+    const commodityN = commodityCounts.get(cid) ?? 0;
+    if (commodityN >= 2) {
       throw new AppError({
-        message: "Trùng mặt hàng trong phiếu",
+        message: "Mỗi mặt hàng chỉ tối đa hai dòng (Mua TT và TGSX) trong phiếu",
         statusCode: 400,
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    seen.add(cid);
+    commodityCounts.set(cid, commodityN + 1);
+    const dedupeKey = issueSlipLineDedupeKey(cid, raw.priceKind);
+    if (dedupeKey && seen.has(dedupeKey)) {
+      throw new AppError({
+        message: "Trùng mặt hàng và loại giá (Mua TT/TGSX) trong phiếu",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    if (dedupeKey) {
+      seen.add(dedupeKey);
+    }
     if (!Number.isFinite(qty) || qty <= 0) {
       throw new AppError({
         message: "Số lượng phải lớn hơn 0",
@@ -1246,6 +1267,18 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
     issueDate: issueD,
     issueSlipId: slip.id,
   });
+  try {
+    const { syncKitchenReceiptOnGuaranteeFromIssueSlips } = await import(
+      "../kitchen-books/kitchen-books-receipt-sync.service.js"
+    );
+    await syncKitchenReceiptOnGuaranteeFromIssueSlips({
+      recipientUnitId,
+      dateYmd: issueD.toISOString().slice(0, 10),
+      actorUserId: userId,
+    });
+  } catch (err) {
+    console.error("[kitchen-receipt-sync] after createIssueSlip", err);
+  }
   return mapIssueSlip(slip);
 }
 
@@ -1282,6 +1315,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
   const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
 
   const seen = new Set();
+  const commodityCounts = new Map();
   const lineData = [];
   for (const raw of lines) {
     const cid = Number(raw.commodityId);
@@ -1293,14 +1327,26 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    if (seen.has(cid)) {
+    const commodityN = commodityCounts.get(cid) ?? 0;
+    if (commodityN >= 2) {
       throw new AppError({
-        message: "Trùng mặt hàng trong phiếu",
+        message: "Mỗi mặt hàng chỉ tối đa hai dòng (Mua TT và TGSX) trong phiếu",
         statusCode: 400,
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    seen.add(cid);
+    commodityCounts.set(cid, commodityN + 1);
+    const dedupeKey = issueSlipLineDedupeKey(cid, raw.priceKind);
+    if (dedupeKey && seen.has(dedupeKey)) {
+      throw new AppError({
+        message: "Trùng mặt hàng và loại giá (Mua TT/TGSX) trong phiếu",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    if (dedupeKey) {
+      seen.add(dedupeKey);
+    }
     if (!Number.isFinite(qty) || qty <= 0) {
       throw new AppError({
         message: "Số lượng phải lớn hơn 0",
@@ -1481,6 +1527,27 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
       issueSlipId: existing.id,
     });
   }
+  try {
+    const { syncKitchenReceiptOnGuaranteeFromIssueSlips } = await import(
+      "../kitchen-books/kitchen-books-receipt-sync.service.js"
+    );
+    const dateYmd = existing.issueDate.toISOString().slice(0, 10);
+    const actorUserId = existing.createdById;
+    await syncKitchenReceiptOnGuaranteeFromIssueSlips({
+      recipientUnitId,
+      dateYmd,
+      actorUserId,
+    });
+    if (Number(existing.recipientUnitId) !== Number(recipientUnitId)) {
+      await syncKitchenReceiptOnGuaranteeFromIssueSlips({
+        recipientUnitId: existing.recipientUnitId,
+        dateYmd,
+        actorUserId,
+      });
+    }
+  } catch (err) {
+    console.error("[kitchen-receipt-sync] after updateIssueSlip", err);
+  }
   return mapIssueSlip(slip);
 }
 
@@ -1548,6 +1615,18 @@ async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveU
     issueDate: existing.issueDate,
     issueSlipId: existing.id,
   });
+  try {
+    const { syncKitchenReceiptOnGuaranteeFromIssueSlips } = await import(
+      "../kitchen-books/kitchen-books-receipt-sync.service.js"
+    );
+    await syncKitchenReceiptOnGuaranteeFromIssueSlips({
+      recipientUnitId: existing.recipientUnitId,
+      dateYmd: existing.issueDate.toISOString().slice(0, 10),
+      actorUserId: existing.createdById,
+    });
+  } catch (err) {
+    console.error("[kitchen-receipt-sync] after resyncIssueSlipLinePrices", err);
+  }
   const slip = await prisma.lttpIssueSlip.findUnique({
     where: { id: existing.id },
     include: issueSlipInclude,
@@ -1876,6 +1955,9 @@ async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope) {
   assertCommodityRowStorage(slip.unitId, dataScope);
   assertUnitIdInScope(dataScope.logicalUnitId, scope);
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
+  const recipientUnitId = slip.recipientUnitId;
+  const dateYmd = slip.issueDate.toISOString().slice(0, 10);
+  const actorUserId = slip.createdById;
   await prisma.lttpIssueSlip.delete({ where: { id: slip.id } });
   await recalculateLttpPartnerDebtsForUnit(slip.unitId);
   await markChungTuDocumentsStaleForLttpIssueSlipChange({
@@ -1884,6 +1966,18 @@ async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope) {
     issueDate: slip.issueDate,
     issueSlipId: slip.id,
   });
+  try {
+    const { syncKitchenReceiptOnGuaranteeFromIssueSlips } = await import(
+      "../kitchen-books/kitchen-books-receipt-sync.service.js"
+    );
+    await syncKitchenReceiptOnGuaranteeFromIssueSlips({
+      recipientUnitId,
+      dateYmd,
+      actorUserId,
+    });
+  } catch (err) {
+    console.error("[kitchen-receipt-sync] after deleteIssueSlip", err);
+  }
   return { ok: true };
 }
 

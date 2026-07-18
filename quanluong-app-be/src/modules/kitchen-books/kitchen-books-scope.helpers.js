@@ -30,6 +30,17 @@ function assertKitchenRowStorage(rowUnitId, dataScope) {
   }
 }
 
+/** Phiếu nhập kho gắn logicalUnitId (đơn vị làm việc / đơn vị nhận), không phải kho LTTP chung. */
+function assertKitchenRowLogical(rowUnitId, dataScope) {
+  if (Number(rowUnitId) !== Number(dataScope.logicalUnitId)) {
+    throw new AppError({
+      message: "Không tìm thấy dữ liệu",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+}
+
 function assertKitchenWriteUnit(unitId, scope, effectiveUnitIds) {
   assertUnitIdInScope(unitId, scope);
   if (
@@ -82,6 +93,7 @@ function menuDateToYearMonthDay(menuDate) {
 export {
   assertKitchenLogicalMatchesDataScope,
   assertKitchenRowStorage,
+  assertKitchenRowLogical,
   assertKitchenWriteUnit,
   parseDateOnly,
   menuDateToYearMonthDay,

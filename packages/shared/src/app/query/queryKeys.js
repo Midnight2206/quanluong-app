@@ -76,6 +76,31 @@ export const qk = {
       String(unitId),
       String(yearMonth),
     ],
+    receiptSlips: (unitId, date) => [
+      "kitchenBooks",
+      "receiptSlips",
+      String(unitId),
+      date ?? "",
+    ],
+    receiptSlipByDay: (unitId, date) => [
+      "kitchenBooks",
+      "receiptSlipByDay",
+      String(unitId),
+      String(date),
+    ],
+    receiptSlip: (id) => ["kitchenBooks", "receiptSlip", String(id)],
+    receiptSlipSerial: (unitId, date) => [
+      "kitchenBooks",
+      "receiptSlipSerial",
+      String(unitId),
+      String(date),
+    ],
+    receiptGuaranteeFromIssue: (unitId, date) => [
+      "kitchenBooks",
+      "receiptGuaranteeFromIssue",
+      String(unitId),
+      String(date),
+    ],
   },
   chungTuQuyetToan: {
     root: ["chungTuQuyetToan"],

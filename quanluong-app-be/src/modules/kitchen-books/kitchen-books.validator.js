@@ -103,6 +103,63 @@ const deleteDishQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
 });
 
+const receiptSlipPriceKindSchema = z.enum(["market", "tgsx"]);
+
+const receiptSlipLineSchema = z.object({
+  commodityId: z.coerce.number().int().positive(),
+  quantity: z.coerce.number().positive(),
+  priceKind: receiptSlipPriceKindSchema.optional(),
+  lineNote: z.string().trim().max(500).optional().nullable(),
+});
+
+const receiptSlipListQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+const receiptSlipIdParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const receiptSlipSerialQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema,
+});
+
+const resolveReceiptLineQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema,
+  code: z.string().trim().min(1).max(64),
+});
+
+const receiptSlipByDayQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema,
+});
+
+const upsertReceiptSlipUnitSelfBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  receiptDate: dateSchema,
+  note: z.string().trim().max(500).optional().nullable(),
+  priceKind: receiptSlipPriceKindSchema,
+  lines: z.array(receiptSlipLineSchema),
+});
+
+const createReceiptSlipBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  receiptDate: dateSchema,
+  note: z.string().trim().max(500).optional().nullable(),
+  priceKind: receiptSlipPriceKindSchema.optional(),
+  lines: z.array(receiptSlipLineSchema),
+});
+
+const updateReceiptSlipBodySchema = z.object({
+  note: z.string().trim().max(500).optional().nullable(),
+  priceKind: receiptSlipPriceKindSchema.optional(),
+  lines: z.array(receiptSlipLineSchema),
+});
+
 export {
   catalogListQuerySchema,
   catalogIdParamsSchema,
@@ -116,4 +173,12 @@ export {
   dishIdParamsSchema,
   deleteDishQuerySchema,
   unitIdQuerySchema,
+  receiptSlipListQuerySchema,
+  receiptSlipIdParamsSchema,
+  receiptSlipSerialQuerySchema,
+  receiptSlipByDayQuerySchema,
+  resolveReceiptLineQuerySchema,
+  createReceiptSlipBodySchema,
+  updateReceiptSlipBodySchema,
+  upsertReceiptSlipUnitSelfBodySchema,
 };

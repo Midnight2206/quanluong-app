@@ -64,7 +64,7 @@ export function LttpIssueSlipMobileLineCard({
           )}
         >
           Dòng {index + 1}
-          {dupRow ? " · Trùng mặt hàng" : ""}
+          {dupRow ? " · Trùng mặt hàng + giá" : ""}
         </p>
         <IconButton
           type="button"

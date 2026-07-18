@@ -31,3 +31,7 @@ fi
 
 log "prisma migrate deploy"
 npm run prisma:migrate:deploy
+
+# Idempotent: mỗi (recipientUnitId, issueDate) → đồng bộ lại dòng on_guarantee phiếu nhập kho.
+log "backfill kitchen receipt slips from LTTP issue slips"
+npm run db:backfill-kitchen-receipt-from-issue

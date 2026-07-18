@@ -9,7 +9,10 @@ import { resolvePrivateStorageUnitId } from "../shared/data-scope/unit-data-poli
  */
 function parseAsOf(req, extraQueryKeys = []) {
   for (const key of extraQueryKeys) {
-    const v = req.query?.[key];
+    const v =
+      req.query?.[key] ??
+      req.validatedBody?.[key] ??
+      req.body?.[key];
     if (v != null && String(v).trim() !== "") {
       const d = new Date(String(v));
       if (!Number.isNaN(d.getTime())) {

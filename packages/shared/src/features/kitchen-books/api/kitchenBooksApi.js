@@ -141,3 +141,129 @@ export function useDeleteKitchenMenuDishMutation() {
       }),
   });
 }
+
+function invalidateReceiptSlips(qc, unitId, date) {
+  qc.invalidateQueries({ queryKey: qk.kitchenBooks.root });
+  if (unitId != null) {
+    qc.invalidateQueries({ queryKey: qk.kitchenBooks.receiptSlips(unitId, date) });
+    qc.invalidateQueries({ queryKey: qk.kitchenBooks.receiptSlipByDay(unitId, date) });
+    qc.invalidateQueries({ queryKey: qk.kitchenBooks.receiptSlipSerial(unitId, date) });
+    qc.invalidateQueries({ queryKey: qk.kitchenBooks.receiptGuaranteeFromIssue(unitId, date) });
+  }
+}
+
+export function useGetKitchenReceiptSlipsQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.receiptSlips(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/kitchen-books/receipt-slips",
+        method: "get",
+        params: { unitId, date: date || undefined },
+      }),
+    enabled: skip !== true && unitId != null,
+    ...rest,
+  });
+}
+
+export function useGetKitchenReceiptSlipByDayQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.receiptSlipByDay(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/kitchen-books/receipt-slips/by-day",
+        method: "get",
+        params: { unitId, date },
+      }),
+    enabled: skip !== true && unitId != null && date != null && date !== "",
+    ...rest,
+  });
+}
+
+export function useUpsertKitchenReceiptUnitSelfMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({
+        url: "/kitchen-books/receipt-slips/by-day",
+        method: "put",
+        data: body,
+      }),
+    onSuccess: (_d, vars) => {
+      invalidateReceiptSlips(qc, vars?.unitId, vars?.receiptDate);
+    },
+  });
+}
+
+export function useGetKitchenReceiptSlipSerialQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.receiptSlipSerial(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/kitchen-books/receipt-slips/next-serial",
+        method: "get",
+        params: { unitId, date },
+      }),
+    enabled: skip !== true && unitId != null && date != null && date !== "",
+    ...rest,
+  });
+}
+
+export function useGetKitchenReceiptGuaranteeFromIssueQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.receiptGuaranteeFromIssue(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/kitchen-books/receipt-slips/guarantee-from-issue",
+        method: "get",
+        params: { unitId, date },
+      }),
+    enabled: skip !== true && unitId != null && date != null && date !== "",
+    ...rest,
+  });
+}
+
+export function useCreateKitchenReceiptSlipMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/receipt-slips", method: "post", data: body }),
+    onSuccess: (_d, vars) => {
+      invalidateReceiptSlips(qc, vars?.unitId, vars?.receiptDate);
+    },
+  });
+}
+
+export function useUpdateKitchenReceiptSlipMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) =>
+      apiRequest({ url: `/kitchen-books/receipt-slips/${id}`, method: "patch", data: body }),
+    onSuccess: (data) => {
+      const slip = data?.data ?? data;
+      invalidateReceiptSlips(qc, slip?.unitId, slip?.receiptDate);
+      if (slip?.id != null) {
+        qc.invalidateQueries({ queryKey: qk.kitchenBooks.receiptSlip(slip.id) });
+      }
+    },
+  });
+}
+
+export function useDeleteKitchenReceiptSlipMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (id) =>
+      apiRequest({ url: `/kitchen-books/receipt-slips/${id}`, method: "delete" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.kitchenBooks.root });
+    },
+  });
+}

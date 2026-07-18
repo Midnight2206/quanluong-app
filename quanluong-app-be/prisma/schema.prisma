@@ -157,6 +157,7 @@ model User {
   chungTuQuyetToanTemplateConfigs        ChungTuQuyetToanTemplateConfig[]
   chungTuDocumentsCreated                ChungTuDocument[] @relation("ChungTuDocumentCreatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
+  kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
 
   @@index([typeId])
   @@index([unitId])
@@ -456,6 +457,8 @@ model Unit {
   chungTuDocuments          ChungTuDocument[]
   kitchenDishCatalogs       KitchenDishCatalog[]
   kitchenMenuDays           KitchenMenuDay[]
+  kitchenReceiptSlips       KitchenReceiptSlip[]
+  kitchenReceiptSlipSerials KitchenReceiptSlipSerial[]
 
   @@index([parentId])
   @@index([path])
@@ -595,6 +598,7 @@ model LttpCommodity {
   issueSlipLines                 LttpIssueSlipLine[]
   kitchenDishCatalogLines        KitchenDishCatalogLine[]
   kitchenMenuDishLines           KitchenMenuDishLine[]
+  kitchenReceiptSlipLines        KitchenReceiptSlipLine[]
   lttpCommodityDefaultSupplier  LttpCommodityDefaultSupplier?
 
   @@unique([unitId, code])
@@ -868,6 +872,61 @@ model KitchenMenuDishLine {
 
   @@index([dishId])
   @@index([commodityId])
+}
+
+/// Nguồn dòng phiếu nhập kho: trên cấp (phiếu xuất LTTP) hoặc đơn vị tự bảo đảm.
+enum KitchenReceiptLineSource {
+  on_guarantee
+  unit_self
+}
+
+/// Phiếu nhập kho bếp ăn — tối đa 1 phiếu / đơn vị kho / ngày.
+model KitchenReceiptSlip {
+  id            Int      @id @default(autoincrement())
+  unitId        Int
+  receiptDate   DateTime @db.Date
+  note          String?  @db.VarChar(500)
+  createdById   Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  bookMmyy      String   @db.Char(4)
+  slipNo        Int
+  unit          Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy     User     @relation("KitchenReceiptSlipCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  lines         KitchenReceiptSlipLine[]
+
+  @@unique([unitId, receiptDate])
+  @@index([unitId, bookMmyy, slipNo])
+  @@index([createdById])
+}
+
+model KitchenReceiptSlipSerial {
+  unitId     Int
+  bookMmyy   String   @db.Char(4)
+  lastSlipNo Int      @default(0)
+  updatedAt  DateTime @updatedAt
+  unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@id([unitId, bookMmyy])
+}
+
+model KitchenReceiptSlipLine {
+  id          Int                      @id @default(autoincrement())
+  slipId      Int
+  commodityId Int
+  quantity    Decimal                  @db.Decimal(18, 4)
+  unitPrice   Decimal                  @db.Decimal(18, 2)
+  tgsxPrice   Decimal?                 @db.Decimal(18, 2)
+  priceKind   LttpIssueSlipPriceKind   @default(market)
+  lineSource  KitchenReceiptLineSource @default(unit_self)
+  amount      Decimal                  @db.Decimal(18, 2)
+  lineNote    String?                  @db.VarChar(500)
+  slip        KitchenReceiptSlip       @relation(fields: [slipId], references: [id], onDelete: Cascade)
+  commodity   LttpCommodity            @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+
+  @@index([slipId])
+  @@index([commodityId])
+  @@index([slipId, lineSource, priceKind])
 }
 
 /// Phiên bản bảng giá LTTP — một bản ghi / đơn vị / ngày áp dụng.

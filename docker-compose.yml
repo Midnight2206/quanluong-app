@@ -59,7 +59,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Tự xử lý drift tên migration meal_roster (20100 vs 30000) rồi deploy — pull + rebuild là đủ.
+    # Drift meal_roster → migrate deploy → backfill phiếu nhập kho từ phiếu xuất LTTP.
+    # Pull + rebuild là đủ (service one-shot, idempotent).
     command: ["npm", "run", "prisma:migrate:deploy:recover"]
     restart: "no"
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { TabPanel } from "@/components/common/TabPanel";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
@@ -16,6 +16,14 @@ import { KitchenSoNhapXuatLttpTab } from "./KitchenSoNhapXuatLttpTab.jsx";
 import { KitchenSoTheoDoiLttpTab } from "./KitchenSoTheoDoiLttpTab.jsx";
 import { KitchenSoThucDonTab } from "./KitchenSoThucDonTab.jsx";
 import { KITCHEN_BOOKS_MAIN_TAB_IDS } from "./kitchenBooksTabIds.js";
+import {
+  readStoredKitchenManualUnitId,
+  readStoredKitchenMenuDate,
+  readStoredKitchenYearMonth,
+  writeStoredKitchenManualUnitId,
+  writeStoredKitchenMenuDate,
+  writeStoredKitchenYearMonth,
+} from "./kitchenBooksSessionPersist.js";
 
 function localDateStr(d = new Date()) {
   const y = d.getFullYear();
@@ -61,14 +69,65 @@ export function KitchenBooksPage() {
     return defaultUnitId;
   }, [canPickUnits, workingUnitId, sortedUnits, defaultUnitId]);
 
-  const [manualUnitId, setManualUnitId] = useState(null);
+  const [manualUnitId, setManualUnitIdState] = useState(null);
+  const didRestoreManualUnitRef = useRef(false);
+
   useEffect(() => {
-    setManualUnitId(null);
+    didRestoreManualUnitRef.current = false;
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!canPickUnits || !sortedUnits.length || didRestoreManualUnitRef.current) {
+      return;
+    }
+    didRestoreManualUnitRef.current = true;
+    const allowedIds = new Set(sortedUnits.map((u) => Number(u.id)));
+    const stored = readStoredKitchenManualUnitId();
+    if (stored != null && allowedIds.has(Number(stored))) {
+      setManualUnitIdState(stored);
+    }
+  }, [canPickUnits, sortedUnits]);
+
+  const prevWorkingUnitIdRef = useRef(undefined);
+  useEffect(() => {
+    const prev = prevWorkingUnitIdRef.current;
+    prevWorkingUnitIdRef.current = workingUnitId;
+    // Mount / hydrate null→id: giữ đơn vị đã chọn trong session.
+    if (prev === undefined || prev === workingUnitId) {
+      return;
+    }
+    if (prev == null && workingUnitId != null) {
+      return;
+    }
+    setManualUnitIdState(null);
+    writeStoredKitchenManualUnitId(null);
+    didRestoreManualUnitRef.current = false;
   }, [workingUnitId]);
 
+  const persistManualUnitId = useCallback((next) => {
+    const id = next == null || next === "" ? null : Number(next);
+    const safe = Number.isInteger(id) && id > 0 ? id : null;
+    setManualUnitIdState(safe);
+    writeStoredKitchenManualUnitId(safe);
+  }, []);
+
   const selectedUnitId = manualUnitId ?? scopeUnitId;
-  const [yearMonth, setYearMonth] = useState(() => localYearMonth());
-  const [menuDate, setMenuDate] = useState(() => localDateStr());
+  const [yearMonth, setYearMonthState] = useState(
+    () => readStoredKitchenYearMonth() ?? localYearMonth(),
+  );
+  const [menuDate, setMenuDateState] = useState(
+    () => readStoredKitchenMenuDate() ?? localDateStr(),
+  );
+
+  const setYearMonth = useCallback((next) => {
+    setYearMonthState(next);
+    writeStoredKitchenYearMonth(next);
+  }, []);
+
+  const setMenuDate = useCallback((next) => {
+    setMenuDateState(next);
+    writeStoredKitchenMenuDate(next);
+  }, []);
 
   const unitShellProps = {
     selectedUnitId,
@@ -76,7 +135,7 @@ export function KitchenBooksPage() {
     workingUnitId,
     sortedUnits,
     manualUnitId,
-    setManualUnitId,
+    setManualUnitId: persistManualUnitId,
     user,
   };
 
@@ -125,7 +184,9 @@ export function KitchenBooksPage() {
       {
         id: "phieu-nhap-kho",
         label: "Phiếu nhập kho",
-        panel: <KitchenPhieuNhapKhoTab />,
+        panel: (
+          <KitchenPhieuNhapKhoTab {...catalogTabProps} />
+        ),
       },
       {
         id: "phieu-xuat-kho",
