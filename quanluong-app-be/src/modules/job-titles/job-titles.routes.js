@@ -3,10 +3,11 @@ import { asyncHandler } from "../../shared/utils/async-handler.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { effectiveUnitScopeMiddleware } from "../../middlewares/effective-unit-scope.middleware.js";
 import { unitScopeMiddleware } from "../../middlewares/unit-scope.middleware.js";
+import { unitDataScopeMiddleware } from "../../middlewares/unit-data-scope.middleware.js";
 import { permissionMiddleware } from "../../middlewares/permission.middleware.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
+import { DATA_SCOPE_KINDS } from "../../shared/data-scope/data-scope.registry.js";
 import {
-  applyJobTitleToUnitController,
   createJobTitleController,
   deleteJobTitleController,
   getJobTitleController,
@@ -16,7 +17,6 @@ import {
 } from "./job-titles.controller.js";
 import { JOB_TITLES_ROUTE_DEFINITIONS } from "./job-titles.route-definitions.js";
 import {
-  applyJobTitleToUnitBodySchema,
   createJobTitleBodySchema,
   jobTitleParamsSchema,
   patchJobTitleBodySchema,
@@ -29,9 +29,14 @@ const routePermissions = Object.fromEntries(
   JOB_TITLES_ROUTE_DEFINITIONS.map((d) => [d.key, d.permission.code]),
 );
 
+const jobTitleDataScopeMw = unitDataScopeMiddleware({
+  dataKind: DATA_SCOPE_KINDS.JOB_TITLE.code,
+});
+
 jobTitlesRouter.use(authMiddleware);
 jobTitlesRouter.use(unitScopeMiddleware);
 jobTitlesRouter.use(effectiveUnitScopeMiddleware);
+jobTitlesRouter.use(jobTitleDataScopeMw);
 
 jobTitlesRouter.get(
   "/",
@@ -68,16 +73,6 @@ jobTitlesRouter.put(
   }),
   permissionMiddleware([routePermissions.setJobTitlePermissions]),
   asyncHandler(setJobTitlePermissionsController),
-);
-
-jobTitlesRouter.post(
-  "/:id/apply-to-unit",
-  validateRequest({
-    params: jobTitleParamsSchema,
-    body: applyJobTitleToUnitBodySchema,
-  }),
-  permissionMiddleware([routePermissions.applyJobTitleToUnit]),
-  asyncHandler(applyJobTitleToUnitController),
 );
 
 jobTitlesRouter.delete(

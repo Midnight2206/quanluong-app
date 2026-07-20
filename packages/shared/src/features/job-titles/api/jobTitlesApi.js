@@ -55,16 +55,3 @@ export function useDeleteJobTitleMutation() {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.jobTitles.root }),
   });
 }
-
-export function useApplyJobTitleToUnitMutation() {
-  const qc = useQueryClient();
-  return useWrappedMutation({
-    mutationFn: ({ id, targetUnitId, targetUnitIds }) =>
-      apiRequest({
-        url: `/job-titles/${id}/apply-to-unit`,
-        method: "post",
-        data: targetUnitIds?.length ? { targetUnitIds } : { targetUnitId },
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.jobTitles.root }),
-  });
-}

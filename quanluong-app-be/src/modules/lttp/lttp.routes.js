@@ -10,8 +10,6 @@ import { validateRequest } from "../../middlewares/validate-request.middleware.j
 import { unitDataScopeMiddleware } from "../../middlewares/unit-data-scope.middleware.js";
 import { DATA_SCOPE_KINDS } from "../../shared/data-scope/data-scope.registry.js";
 import {
-  applyLttpCommodityToUnitController,
-  applyLttpPriceTableToUnitController,
   createCommodityController,
   createFoodGroupController,
   createIssueSlipController,
@@ -58,8 +56,6 @@ import {
 } from "./lttp.controller.js";
 import { LTTP_ROUTE_DEFINITIONS } from "./lttp.route-definitions.js";
 import {
-  applyLttpPriceTableToUnitBodySchema,
-  applyLttpToUnitBodySchema,
   commodityParamsSchema,
   commodityQuerySchema,
   createCommodityBodySchema,
@@ -325,17 +321,6 @@ lttpRouter.get(
   asyncHandler(listCommoditiesController),
 );
 
-lttpRouter.post(
-  "/commodities/:id/apply-to-unit",
-  validateRequest({
-    params: commodityParamsSchema,
-    body: applyLttpToUnitBodySchema,
-  }),
-  unitDataScopeMiddleware({ dataKind: LTTP_COMM, recordIdParam: "id" }),
-  permissionMiddleware([routePermissions.applyLttpCommodityToUnit]),
-  asyncHandler(applyLttpCommodityToUnitController),
-);
-
 lttpRouter.get(
   "/commodities/:id",
   validateRequest({ params: commodityParamsSchema }),
@@ -474,17 +459,6 @@ lttpRouter.delete(
   unitDataScopeMiddleware({ dataKind: LTTP_PRICE, recordIdParam: "id" }),
   permissionMiddleware([routePermissions.deletePriceTable]),
   asyncHandler(deletePriceTableController),
-);
-
-lttpRouter.post(
-  "/price-tables/:id/apply-to-unit",
-  validateRequest({
-    params: priceTableParamsSchema,
-    body: applyLttpPriceTableToUnitBodySchema,
-  }),
-  unitDataScopeMiddleware({ dataKind: LTTP_PRICE, recordIdParam: "id" }),
-  permissionMiddleware([routePermissions.applyLttpPriceTableToUnit]),
-  asyncHandler(applyLttpPriceTableToUnitController),
 );
 
 export { lttpRouter };

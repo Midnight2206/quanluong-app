@@ -98,11 +98,6 @@ const PERMISSION_CATALOG_VI = {
     description:
       "Ngưng sử dụng một chức danh khi không còn người dùng nào đang được gán chức danh đó.",
   },
-  "jobTitles.applyDown": {
-    name: "Áp chức danh xuống một đơn vị con",
-    description:
-      "Sao chép nguyên vẹn một chức danh (tên, mô tả, trạng thái, bộ quyền) xuống **một** đơn vị cấp dưới trên cùng nhánh; lần gọi sau chỉ đồng bộ lại cùng bản ghi đích — không tạo bản sao trùng. Chỉ gán được quyền mà bạn cũng đang có.",
-  },
   "unitLevel.read": {
     name: "Xem mô tả cấp đơn vị",
     description:
@@ -141,11 +136,6 @@ const PERMISSION_CATALOG_VI = {
     name: "Quản lý mặt hàng LTTP",
     description: "Thêm, sửa, xóa (hoặc ngưng) mặt hàng lương thực thực phẩm trong đơn vị.",
   },
-  "lttp.commodities.applyDown": {
-    name: "Áp mặt hàng LTTP xuống đơn vị con",
-    description:
-      "Sao/đồng bộ một mặt hàng từ đơn vị hiện tại xuống **một** đơn vị cấp dưới; không tạo bản trùng khi đã liên kết fork.",
-  },
   "lttp.prices.read": {
     name: "Xem bảng giá LTTP",
     description:
@@ -155,11 +145,6 @@ const PERMISSION_CATALOG_VI = {
     name: "Cập nhật & nhập bảng giá LTTP",
     description:
       "Tạo hoặc sửa phiên bản bảng giá có ngày áp dụng, xóa phiên bản, nhập từ Excel.",
-  },
-  "lttp.prices.applyDown": {
-    name: "Áp bảng giá LTTP xuống đơn vị con",
-    description:
-      "Đẩy nguyên một phiên bản bảng giá xuống **một** đơn vị con: tự đồng bộ mặt hàng từng dòng, tạo hoặc cập nhật bảng giá đích theo fork (không nhân đôi khi áp lại).",
   },
   "lttp.groups.read": {
     name: "Xem nhóm mặt hàng LTTP",

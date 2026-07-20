@@ -29,6 +29,16 @@ export function SuperadminUsersPanel() {
   const { data: types = [] } = useGetTypesQuery();
   const { data: units = [] } = useGetUnitsQuery();
   const sortedUnits = useMemo(() => sortUnitsByPath(units), [units]);
+  const selectedUnitDepth = useMemo(() => {
+    if (!unitId) return null;
+    return sortedUnits.find((u) => String(u.id) === String(unitId))?.depth ?? null;
+  }, [unitId, sortedUnits]);
+  const typesForCreate = useMemo(() => {
+    if (selectedUnitDepth != null && selectedUnitDepth !== 0) {
+      return types.filter((t) => t.name !== "admin");
+    }
+    return types;
+  }, [types, selectedUnitDepth]);
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [patchUser, { isLoading: isPatching }] = usePatchUserMutation();
@@ -162,7 +172,7 @@ export function SuperadminUsersPanel() {
               onChange={(e) => setTypeId(e.target.value)}
             >
               <option value="">— Chọn —</option>
-              {types.map((t) => (
+              {typesForCreate.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
@@ -178,7 +188,17 @@ export function SuperadminUsersPanel() {
               name="unitId"
               className={cn(inputClass, "py-1.5")}
               value={unitId}
-              onChange={(e) => setUnitId(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setUnitId(next);
+                const depth = sortedUnits.find((u) => String(u.id) === String(next))?.depth;
+                if (depth != null && depth !== 0) {
+                  const adminType = types.find((t) => t.name === "admin");
+                  if (adminType && String(typeId) === String(adminType.id)) {
+                    setTypeId("");
+                  }
+                }
+              }}
             >
               <option value="">— Không gán —</option>
               {sortedUnits.map((unit) => (

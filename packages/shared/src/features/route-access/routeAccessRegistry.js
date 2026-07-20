@@ -35,10 +35,6 @@ export const ROUTE_ACCESS_RULES = {
     description: "Chức danh",
     requiredPermissions: [PERMISSIONS.JOB_TITLES_READ],
   },
-  "dashboard-unit-downstream-sync": {
-    description: "Đồng bộ đơn vị con",
-    requiredPermissions: [],
-  },
   "dashboard-lttp": {
     description: "LTTP — nhóm route",
     requiredPermissions: [PERMISSIONS.LTTP_GROUPS_READ],

@@ -208,19 +208,6 @@ export function usePutLttpCommodityDefaultSupplierMutation() {
   });
 }
 
-export function useApplyLttpCommodityToUnitMutation() {
-  const qc = useQueryClient();
-  return useWrappedMutation({
-    mutationFn: ({ id, targetUnitId, targetUnitIds, sourceUnitId }) =>
-      apiRequest({
-        url: `/lttp/commodities/${id}/apply-to-unit`,
-        method: "post",
-        data: targetUnitIds?.length ? { targetUnitIds } : { targetUnitId },
-      }),
-    onSuccess: () => invalidateLttpData(qc),
-  });
-}
-
 export function useCreateLttpPriceTableMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
@@ -243,25 +230,6 @@ export function useDeleteLttpPriceTableMutation() {
   return useWrappedMutation({
     mutationFn: ({ id, unitId }) =>
       apiRequest({ url: `/lttp/price-tables/${id}`, method: "delete" }),
-    onSuccess: () => invalidateLttpData(qc),
-  });
-}
-
-export function useApplyLttpPriceTableToUnitMutation() {
-  const qc = useQueryClient();
-  return useWrappedMutation({
-    mutationFn: ({ id, targetUnitId, targetUnitIds, targetEffectiveDate, sourceUnitId }) => {
-      const base = targetUnitIds?.length ? { targetUnitIds } : { targetUnitId };
-      const data =
-        targetEffectiveDate != null && String(targetEffectiveDate).trim() !== ""
-          ? { ...base, targetEffectiveDate: String(targetEffectiveDate).trim().slice(0, 10) }
-          : base;
-      return apiRequest({
-        url: `/lttp/price-tables/${id}/apply-to-unit`,
-        method: "post",
-        data,
-      });
-    },
     onSuccess: () => invalidateLttpData(qc),
   });
 }

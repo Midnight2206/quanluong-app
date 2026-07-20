@@ -17,24 +17,7 @@ const setJobTitlePermissionsBodySchema = z.object({
   permissionIds: z.array(z.number().int().positive()),
 });
 
-const applyJobTitleToUnitBodySchema = z
-  .object({
-    targetUnitId: z.number().int().positive().optional(),
-    targetUnitIds: z.array(z.number().int().positive()).min(1).max(100).optional(),
-  })
-  .superRefine((val, ctx) => {
-    const one = val.targetUnitId != null;
-    const many = val.targetUnitIds != null && val.targetUnitIds.length > 0;
-    if (one === many) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Cần đúng một trong hai: targetUnitId hoặc targetUnitIds (mảng id đơn vị con).",
-      });
-    }
-  });
-
 export {
-  applyJobTitleToUnitBodySchema,
   createJobTitleBodySchema,
   jobTitleParamsSchema,
   patchJobTitleBodySchema,

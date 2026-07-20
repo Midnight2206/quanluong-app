@@ -182,18 +182,6 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
-    key: "applyLttpCommodityToUnit",
-    method: "POST",
-    module: LTTP_MODULE_NAME,
-    path: "/commodities/:id/apply-to-unit",
-    pathRoute: "/api/lttp/commodities/:id/apply-to-unit",
-    permission: {
-      code: LTTP_PERMISSIONS.COMMODITIES_APPLY_DOWN,
-      name: "Apply LTTP commodity to child unit",
-      description: "Clone or sync one commodity to a strict child unit via UnitEntityFork.",
-    },
-  },
-  {
     key: "listPriceTables",
     method: "GET",
     module: LTTP_MODULE_NAME,
@@ -263,18 +251,6 @@ const LTTP_ROUTE_DEFINITIONS = [
       code: LTTP_PERMISSIONS.PRICES_WRITE,
       name: "Delete LTTP price table",
       description: "Delete a price table version.",
-    },
-  },
-  {
-    key: "applyLttpPriceTableToUnit",
-    method: "POST",
-    module: LTTP_MODULE_NAME,
-    path: "/price-tables/:id/apply-to-unit",
-    pathRoute: "/api/lttp/price-tables/:id/apply-to-unit",
-    permission: {
-      code: LTTP_PERMISSIONS.PRICES_APPLY_DOWN,
-      name: "Apply LTTP price table to child unit",
-      description: "Clone/sync commodities for rows then upsert forked price table at child unit.",
     },
   },
   {

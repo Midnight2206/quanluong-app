@@ -97,43 +97,6 @@ const patchFoodGroupBodySchema = z
     message: "Cần ít nhất một trường cập nhật",
   });
 
-const applyLttpToUnitBodySchema = z
-  .object({
-    targetUnitId: z.coerce.number().int().positive().optional(),
-    targetUnitIds: z.array(z.coerce.number().int().positive()).min(1).max(100).optional(),
-  })
-  .superRefine((val, ctx) => {
-    const one = val.targetUnitId != null;
-    const many = val.targetUnitIds != null && val.targetUnitIds.length > 0;
-    if (one === many) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Cần đúng một trong hai: targetUnitId hoặc targetUnitIds.",
-      });
-    }
-  });
-
-/** Giống `applyLttpToUnitBodySchema` + ngày hiệu lực bản ghi đích (đơn vị con), optional — mặc định theo bảng nguồn. */
-const applyLttpPriceTableToUnitBodySchema = z
-  .object({
-    targetUnitId: z.coerce.number().int().positive().optional(),
-    targetUnitIds: z.array(z.coerce.number().int().positive()).min(1).max(100).optional(),
-    targetEffectiveDate: z.preprocess(
-      (v) => (v === "" || v === undefined || v === null ? undefined : v),
-      z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
-    ),
-  })
-  .superRefine((val, ctx) => {
-    const one = val.targetUnitId != null;
-    const many = val.targetUnitIds != null && val.targetUnitIds.length > 0;
-    if (one === many) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Cần đúng một trong hai: targetUnitId hoặc targetUnitIds.",
-      });
-    }
-  });
-
 const issueSlipLineInputSchema = z.object({
   commodityId: z.coerce.number().int().positive(),
   requiredQuantity: z.coerce.number().finite().nonnegative().nullable().optional(),
@@ -323,8 +286,6 @@ const patchLttpSupplierBodySchema = z.object({
 });
 
 export {
-  applyLttpPriceTableToUnitBodySchema,
-  applyLttpToUnitBodySchema,
   commodityParamsSchema,
   commodityQuerySchema,
   createCommodityBodySchema,

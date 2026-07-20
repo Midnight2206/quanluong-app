@@ -24,6 +24,7 @@
     "db:backfill-drive-template": "node scripts/backfill-google-drive-template-folders.js",
     "db:backfill-lttp-slip-buyer": "node scripts/backfill-lttp-slip-buyer.js",
     "db:backfill-kitchen-receipt-from-issue": "node scripts/backfill-kitchen-receipt-from-issue.js",
+    "db:cleanup-level2-shared": "node scripts/cleanup-level2-shared-kinds.js",
     "db:migrate": "docker compose --env-file .env.docker run --rm migrate",
     "docker:up": "docker compose --env-file .env.docker up --build",
     "docker:redis": "docker compose --env-file .env.docker up -d redis",

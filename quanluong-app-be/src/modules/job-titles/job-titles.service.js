@@ -1,11 +1,9 @@
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
-import { UNIT_ENTITY_FORK_KIND } from "../../shared/unit-data-fork/unit-entity-fork.kinds.js";
+import { assertLogicalUnitIsLevel1ForWrite } from "../../shared/units/unit-level.helpers.js";
 import {
-  assertTargetUnitIsStrictDescendantOf,
   assertUnitIdInScope,
-  entityUnitIdWhere,
   UNIT_SCOPE_MODES,
 } from "../../shared/units/unit-scope.service.js";
 
@@ -28,22 +26,61 @@ function assertActorMayAssignPermissions(actor, permissionRecords) {
   }
 }
 
-async function listJobTitles(scope, effectiveUnitIds) {
+function assertUnitInEffectiveBranch(unitId, effectiveUnitIds) {
+  if (
+    effectiveUnitIds != null &&
+    effectiveUnitIds.length > 0 &&
+    unitId != null &&
+    !effectiveUnitIds.includes(unitId)
+  ) {
+    throw new AppError({
+      message: "Đơn vị ngoài nhánh đang chọn (kiểm tra X-Target-Unit-Id).",
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+  }
+}
+
+function assertJobTitleRowStorage(rowUnitId, dataScope) {
+  if (rowUnitId !== dataScope.storageUnitId) {
+    throw new AppError({
+      message: "Job title was not found",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+}
+
+function assertLogicalMatchesDataScope(unitId, dataScope) {
+  if (!dataScope || dataScope.storageUnitId == null) {
+    throw new AppError({
+      message: "Thiếu phạm vi dữ liệu chức danh",
+      statusCode: 500,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+  if (unitId != null && Number(unitId) !== Number(dataScope.logicalUnitId)) {
+    throw new AppError({
+      message: "unitId không khớp ngữ cảnh đơn vị đang chọn",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+}
+
+async function listJobTitles(scope, effectiveUnitIds, dataScope) {
+  assertUnitIdInScope(dataScope.logicalUnitId, scope);
+  assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
   return prisma.jobTitle.findMany({
-    where: {
-      ...entityUnitIdWhere(scope, effectiveUnitIds),
-    },
+    where: { unitId: dataScope.storageUnitId },
     include: JOB_TITLE_INCLUDE,
-    orderBy: [{ unitId: "asc" }, { name: "asc" }],
+    orderBy: [{ name: "asc" }],
   });
 }
 
-async function getJobTitleById(jobTitleId, scope, effectiveUnitIds) {
+async function getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope) {
   const row = await prisma.jobTitle.findFirst({
-    where: {
-      id: jobTitleId,
-      ...entityUnitIdWhere(scope, effectiveUnitIds),
-    },
+    where: { id: jobTitleId },
     include: JOB_TITLE_INCLUDE,
   });
 
@@ -55,34 +92,28 @@ async function getJobTitleById(jobTitleId, scope, effectiveUnitIds) {
     });
   }
 
+  assertJobTitleRowStorage(row.unitId, dataScope);
+  assertUnitIdInScope(dataScope.logicalUnitId, scope);
+  assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
   return row;
 }
 
-async function createJobTitle(payload, scope, effectiveUnitIds) {
+async function createJobTitle(payload, scope, effectiveUnitIds, dataScope) {
+  assertLogicalMatchesDataScope(payload.unitId, dataScope);
   assertUnitIdInScope(payload.unitId, scope);
-  if (
-    effectiveUnitIds != null &&
-    effectiveUnitIds.length > 0 &&
-    payload.unitId != null &&
-    !effectiveUnitIds.includes(payload.unitId)
-  ) {
-    throw new AppError({
-      message: "Đơn vị chức danh ngoài nhánh đang chọn (kiểm tra X-Target-Unit-Id).",
-      statusCode: 403,
-      code: ERROR_CODES.FORBIDDEN,
-    });
-  }
+  assertUnitInEffectiveBranch(payload.unitId, effectiveUnitIds);
+  await assertLogicalUnitIsLevel1ForWrite(dataScope.logicalUnitId);
+
   try {
-    const row = await prisma.jobTitle.create({
+    return await prisma.jobTitle.create({
       data: {
-        unitId: payload.unitId,
+        unitId: dataScope.storageUnitId,
         name: payload.name,
         description: payload.description ?? null,
         isActive: payload.isActive ?? true,
       },
       include: JOB_TITLE_INCLUDE,
     });
-    return row;
   } catch (error) {
     if (error.code === "P2002") {
       throw new AppError({
@@ -95,8 +126,9 @@ async function createJobTitle(payload, scope, effectiveUnitIds) {
   }
 }
 
-async function patchJobTitle(jobTitleId, payload, scope, effectiveUnitIds) {
-  await getJobTitleById(jobTitleId, scope, effectiveUnitIds);
+async function patchJobTitle(jobTitleId, payload, scope, effectiveUnitIds, dataScope) {
+  await assertLogicalUnitIsLevel1ForWrite(dataScope.logicalUnitId);
+  await getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope);
 
   const data = {
     ...(payload.name !== undefined ? { name: payload.name } : {}),
@@ -105,7 +137,7 @@ async function patchJobTitle(jobTitleId, payload, scope, effectiveUnitIds) {
   };
 
   if (!Object.keys(data).length) {
-    return getJobTitleById(jobTitleId, scope, effectiveUnitIds);
+    return getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope);
   }
 
   try {
@@ -124,11 +156,12 @@ async function patchJobTitle(jobTitleId, payload, scope, effectiveUnitIds) {
     throw error;
   }
 
-  return getJobTitleById(jobTitleId, scope, effectiveUnitIds);
+  return getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope);
 }
 
-async function deactivateJobTitle(jobTitleId, scope, effectiveUnitIds) {
-  await getJobTitleById(jobTitleId, scope, effectiveUnitIds);
+async function deactivateJobTitle(jobTitleId, scope, effectiveUnitIds, dataScope) {
+  await assertLogicalUnitIsLevel1ForWrite(dataScope.logicalUnitId);
+  await getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope);
   const inUse = await prisma.user.count({
     where: { jobTitleId, deletedAt: null },
   });
@@ -145,167 +178,16 @@ async function deactivateJobTitle(jobTitleId, scope, effectiveUnitIds) {
     data: { isActive: false },
   });
 
-  return getJobTitleById(jobTitleId, scope, effectiveUnitIds);
+  return getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope);
 }
 
-async function replaceJobTitlePermissionRows(tx, jobTitleId, permissionIds) {
-  await tx.jobTitlePermission.deleteMany({ where: { jobTitleId } });
-  if (permissionIds.length) {
-    await tx.jobTitlePermission.createMany({
-      data: permissionIds.map((permissionId) => ({ jobTitleId, permissionId })),
-    });
-  }
-}
-
-async function assertPermissionsAssignable(permissionIds, actor, scope) {
-  if (!permissionIds.length) {
-    return;
-  }
-  const perms = await prisma.permission.findMany({
-    where: { id: { in: permissionIds } },
-  });
-  if (perms.length !== permissionIds.length) {
-    throw new AppError({
-      message: "One or more permissions were not found",
-      statusCode: 404,
-      code: ERROR_CODES.NOT_FOUND,
-    });
-  }
-  if (scope?.mode !== UNIT_SCOPE_MODES.ALL) {
-    assertActorMayAssignPermissions(actor, perms);
-  }
-}
-
-async function applyJobTitleToDescendantUnit(
-  sourceJobTitleId,
-  targetUnitId,
-  actor,
-  scope,
-  effectiveUnitIds,
-) {
-  const source = await prisma.jobTitle.findFirst({
-    where: {
-      id: sourceJobTitleId,
-      ...entityUnitIdWhere(scope, effectiveUnitIds),
-    },
-    include: JOB_TITLE_INCLUDE,
-  });
-
-  if (!source) {
-    throw new AppError({
-      message: "Job title was not found",
-      statusCode: 404,
-      code: ERROR_CODES.NOT_FOUND,
-    });
-  }
-
-  assertUnitIdInScope(targetUnitId, scope);
-  if (
-    effectiveUnitIds != null &&
-    effectiveUnitIds.length > 0 &&
-    targetUnitId != null &&
-    !effectiveUnitIds.includes(targetUnitId)
-  ) {
-    throw new AppError({
-      message: "Đơn vị đích ngoài nhánh đang chọn (kiểm tra X-Target-Unit-Id).",
-      statusCode: 403,
-      code: ERROR_CODES.FORBIDDEN,
-    });
-  }
-
-  await assertTargetUnitIsStrictDescendantOf(targetUnitId, source.unitId);
-
-  const permissionIds = [...new Set((source.permissions || []).map((p) => p.permissionId))];
-  await assertPermissionsAssignable(permissionIds, actor, scope);
-
-  return prisma.$transaction(async (tx) => {
-    let existing = await tx.unitEntityFork.findUnique({
-      where: {
-        kind_sourceRecordId_targetUnitId: {
-          kind: UNIT_ENTITY_FORK_KIND.JOB_TITLE,
-          sourceRecordId: sourceJobTitleId,
-          targetUnitId,
-        },
-      },
-    });
-
-    if (existing) {
-      const targetRow = await tx.jobTitle.findFirst({
-        where: { id: existing.targetRecordId, unitId: targetUnitId },
-        include: JOB_TITLE_INCLUDE,
-      });
-      if (!targetRow) {
-        await tx.unitEntityFork.delete({ where: { id: existing.id } });
-        existing = null;
-      } else {
-        await tx.jobTitle.update({
-          where: { id: targetRow.id },
-          data: {
-            name: source.name,
-            description: source.description ?? null,
-            isActive: source.isActive,
-          },
-        });
-        await replaceJobTitlePermissionRows(tx, targetRow.id, permissionIds);
-        await tx.unitEntityFork.update({
-          where: { id: existing.id },
-          data: { appliedByUserId: actor?.id ?? null },
-        });
-        return tx.jobTitle.findFirst({
-          where: { id: targetRow.id },
-          include: JOB_TITLE_INCLUDE,
-        });
-      }
-    }
-
-    let created;
-    try {
-      created = await tx.jobTitle.create({
-        data: {
-          unitId: targetUnitId,
-          name: source.name,
-          description: source.description ?? null,
-          isActive: source.isActive,
-        },
-      });
-    } catch (error) {
-      if (error.code === "P2002") {
-        throw new AppError({
-          message:
-            "Đơn vị đích đã có chức danh trùng tên — đổi tên bản nguồn hoặc xóa/đổi chức danh trùng ở đơn vị con rồi thử lại.",
-          statusCode: 409,
-          code: ERROR_CODES.CONFLICT,
-        });
-      }
-      throw error;
-    }
-
-    await replaceJobTitlePermissionRows(tx, created.id, permissionIds);
-
-    await tx.unitEntityFork.create({
-      data: {
-        kind: UNIT_ENTITY_FORK_KIND.JOB_TITLE,
-        sourceRecordId: sourceJobTitleId,
-        sourceUnitId: source.unitId,
-        targetUnitId,
-        targetRecordId: created.id,
-        appliedByUserId: actor?.id ?? null,
-      },
-    });
-
-    return tx.jobTitle.findFirst({
-      where: { id: created.id },
-      include: JOB_TITLE_INCLUDE,
-    });
-  });
-}
-
-async function setJobTitlePermissions(jobTitleId, permissionIds, actor, scope, effectiveUnitIds) {
-  await getJobTitleById(jobTitleId, scope, effectiveUnitIds);
+async function setJobTitlePermissions(jobTitleId, permissionIds, actor, scope, effectiveUnitIds, dataScope) {
+  await assertLogicalUnitIsLevel1ForWrite(dataScope.logicalUnitId);
+  await getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope);
 
   if (!permissionIds.length) {
     await prisma.jobTitlePermission.deleteMany({ where: { jobTitleId } });
-    return getJobTitleById(jobTitleId, scope, effectiveUnitIds);
+    return getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope);
   }
 
   const perms = await prisma.permission.findMany({
@@ -324,18 +206,17 @@ async function setJobTitlePermissions(jobTitleId, permissionIds, actor, scope, e
     assertActorMayAssignPermissions(actor, perms);
   }
 
-  await prisma.$transaction([
-    prisma.jobTitlePermission.deleteMany({ where: { jobTitleId } }),
-    prisma.jobTitlePermission.createMany({
+  await prisma.$transaction(async (tx) => {
+    await tx.jobTitlePermission.deleteMany({ where: { jobTitleId } });
+    await tx.jobTitlePermission.createMany({
       data: permissionIds.map((permissionId) => ({ jobTitleId, permissionId })),
-    }),
-  ]);
+    });
+  });
 
-  return getJobTitleById(jobTitleId, scope, effectiveUnitIds);
+  return getJobTitleById(jobTitleId, scope, effectiveUnitIds, dataScope);
 }
 
 export {
-  applyJobTitleToDescendantUnit,
   createJobTitle,
   deactivateJobTitle,
   getJobTitleById,

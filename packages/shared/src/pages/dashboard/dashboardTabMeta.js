@@ -29,11 +29,6 @@ export const DASHBOARD_TAB_META = [
     routeAccessKey: "dashboard-job-titles",
   },
   {
-    path: "unit-downstream-sync",
-    label: "Đồng bộ đơn vị con",
-    routeAccessKey: "dashboard-unit-downstream-sync",
-  },
-  {
     path: "lttp",
     label: "Bảng giá LTTP",
     nestedUnder: "lttp",

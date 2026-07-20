@@ -53,19 +53,6 @@ const JOB_TITLES_ROUTE_DEFINITIONS = [
       description: "Replace permission set; each id must be held by the acting admin.",
     },
   },
-  {
-    key: "applyJobTitleToUnit",
-    method: "POST",
-    module: JOB_TITLES_MODULE_NAME,
-    path: "/:id/apply-to-unit",
-    pathRoute: "/api/job-titles/:id/apply-to-unit",
-    permission: {
-      code: JOB_TITLES_PERMISSIONS.APPLY_DOWN,
-      name: "Apply job title to child unit",
-      description:
-        "Push one job title intact to a single strict child unit; idempotent mapping avoids duplicate applications.",
-    },
-  },
 ];
 
 export { JOB_TITLES_ROUTE_DEFINITIONS };

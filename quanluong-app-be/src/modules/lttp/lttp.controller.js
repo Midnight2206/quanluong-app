@@ -3,8 +3,6 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { respondCreated, respondSuccess } from "../../shared/utils/responders.js";
 import {
-  applyLttpCommodityToDescendantUnit,
-  applyLttpPriceTableToDescendantUnit,
   buildPriceImportTemplateBuffer,
   createCommodity,
   createFoodGroup,
@@ -223,39 +221,6 @@ async function deleteCommodityController(req, res) {
   });
 }
 
-async function applyLttpCommodityToUnitController(req, res) {
-  const body = req.validatedBody;
-  const rawIds =
-    body.targetUnitIds != null && body.targetUnitIds.length > 0
-      ? body.targetUnitIds
-      : body.targetUnitId != null
-        ? [body.targetUnitId]
-        : [];
-  const targetUnitIds = [...new Set(rawIds.map((n) => Number(n)))];
-  const results = [];
-  for (const targetUnitId of targetUnitIds) {
-    const row = await applyLttpCommodityToDescendantUnit(
-      req.validatedParams.id,
-      targetUnitId,
-      req.user,
-      req.unitScope,
-      req.effectiveUnitIds,
-      req.dataScope,
-    );
-    results.push(row);
-  }
-  if (results.length === 1) {
-    return respondSuccess(res, {
-      message: "Đã áp mặt hàng xuống đơn vị con (tạo mới hoặc đồng bộ)",
-      data: results[0],
-    });
-  }
-  return respondSuccess(res, {
-    message: `Đã áp mặt hàng xuống ${results.length} đơn vị con.`,
-    data: { results },
-  });
-}
-
 async function effectivePricesController(req, res) {
   const data = await getEffectivePrices(
     req.validatedQuery,
@@ -327,42 +292,6 @@ async function deletePriceTableController(req, res) {
   return respondSuccess(res, {
     message: "Đã xóa phiên bản bảng giá",
     data: null,
-  });
-}
-
-async function applyLttpPriceTableToUnitController(req, res) {
-  const body = req.validatedBody;
-  const rawIds =
-    body.targetUnitIds != null && body.targetUnitIds.length > 0
-      ? body.targetUnitIds
-      : body.targetUnitId != null
-        ? [body.targetUnitId]
-        : [];
-  const targetUnitIds = [...new Set(rawIds.map((n) => Number(n)))];
-  const results = [];
-  const targetEffectiveDate = body.targetEffectiveDate;
-  for (const targetUnitId of targetUnitIds) {
-    const row = await applyLttpPriceTableToDescendantUnit(
-      req.validatedParams.id,
-      targetUnitId,
-      req.user,
-      req.unitScope,
-      req.effectiveUnitIds,
-      req.dataScope,
-      targetEffectiveDate,
-    );
-    results.push(row);
-  }
-  if (results.length === 1) {
-    return respondSuccess(res, {
-      message:
-        "Đã áp bảng giá xuống đơn vị con (đồng bộ mặt hàng trong từng dòng, tạo/update bảng đích theo fork)",
-      data: results[0],
-    });
-  }
-  return respondSuccess(res, {
-    message: `Đã áp bảng giá xuống ${results.length} đơn vị con.`,
-    data: { results },
   });
 }
 
@@ -657,8 +586,6 @@ async function putBuyerDefaultForUnitController(req, res) {
 }
 
 export {
-  applyLttpCommodityToUnitController,
-  applyLttpPriceTableToUnitController,
   createCommodityController,
   createFoodGroupController,
   createIssueSlipController,

@@ -270,10 +270,10 @@ export function SuperadminUnitsPanel() {
     }
   }
 
-  const parentOptionsForCreate = sorted;
+  const parentOptionsForCreate = sorted.filter((u) => (u.depth ?? 0) === 0);
 
   const parentOptionsForEdit = sorted.filter(
-    (u) => !isInvalidParentChoice(editingUnit, u),
+    (u) => !isInvalidParentChoice(editingUnit, u) && (u.depth ?? 0) === 0,
   );
 
   return (

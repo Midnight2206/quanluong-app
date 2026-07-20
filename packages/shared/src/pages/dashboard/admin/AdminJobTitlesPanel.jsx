@@ -290,6 +290,11 @@ export function AdminJobTitlesPanel() {
       notifyError("Nhập tên chức danh. Chưa xác định đơn vị — chọn trên thanh phạm vi hoặc gán đơn vị cho tài khoản.");
       return;
     }
+    const targetUnit = sortedUnits.find((u) => Number(u.id) === Number(createTargetUnitId));
+    if ((targetUnit?.depth ?? 0) !== 0) {
+      notifyError("Chỉ đơn vị cấp 1 được tạo/sửa chức danh dùng chung.");
+      return;
+    }
     try {
       await createJobTitle({
         unitId: Number(createTargetUnitId),
@@ -379,15 +384,11 @@ export function AdminJobTitlesPanel() {
       return [];
     }
     const userUnit = sortedUnits.find((x) => Number(x.id) === uid);
-    const hasLocalAdmin = unitIdsWithLocalAdmin.has(uid);
     return jobTitles.filter((j) => {
       if (!j.isActive) {
         return false;
       }
       const titleUnit = sortedUnits.find((x) => Number(x.id) === Number(j.unitId));
-      if (hasLocalAdmin) {
-        return Number(j.unitId) === uid;
-      }
       return jobTitleUnitAppliesToUserUnit(titleUnit, userUnit);
     });
   }

@@ -19,6 +19,27 @@ const USER_INCLUDE = {
 const ADMIN_TYPE_NAME = "admin";
 const SUPERADMIN_TYPE_NAME = "superadmin";
 
+async function assertAdminOnlyOnLevel1(typeId, unitId) {
+  if (unitId == null || typeId == null) {
+    return;
+  }
+  const type = await prisma.type.findUnique({ where: { id: typeId } });
+  if (!type || type.name !== ADMIN_TYPE_NAME) {
+    return;
+  }
+  const unit = await prisma.unit.findUnique({
+    where: { id: unitId },
+    select: { depth: true },
+  });
+  if (!unit || unit.depth !== 0) {
+    throw new AppError({
+      message: "Chỉ đơn vị cấp 1 được gán tài khoản admin",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+}
+
 /** Đơn vị có ít nhất một tài khoản admin đang hoạt động (nghiệp vụ địa phương). */
 async function unitHasAdminUser(unitId) {
   if (unitId == null) {
@@ -286,6 +307,7 @@ async function createUser(payload, scope, effectiveUnitIds) {
   const hashedPassword = await bcrypt.hash(payload.password, 10);
 
   const resolvedUnitId = payload.unitId || relations.assignedUnit?.unitId || null;
+  await assertAdminOnlyOnLevel1(payload.typeId, resolvedUnitId);
   if (payload.jobTitleId && resolvedUnitId) {
     await assertJobTitleAssignableToUser(payload.jobTitleId, resolvedUnitId);
   }
@@ -383,6 +405,16 @@ async function patchUser(userId, payload, scope, options = {}) {
     }
   }
 
+  const existingForAdmin = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { typeId: true, unitId: true },
+  });
+  const nextTypeId = payload.typeId ?? existingForAdmin?.typeId;
+  const nextUnitId = Object.hasOwn(payload, "unitId")
+    ? payload.unitId
+    : existingForAdmin?.unitId;
+  await assertAdminOnlyOnLevel1(nextTypeId, nextUnitId);
+
   const data = {
     ...(payload.username ? { username: payload.username } : {}),
     ...(payload.email ? { email: payload.email } : {}),
@@ -450,6 +482,8 @@ async function replaceUser(userId, payload, scope, effectiveUnitIds) {
   if (payload.jobTitleId && effectiveUnitId) {
     await assertJobTitleAssignableToUser(payload.jobTitleId, effectiveUnitId);
   }
+
+  await assertAdminOnlyOnLevel1(payload.typeId, effectiveUnitId);
 
   return prisma.user.update({
     where: {

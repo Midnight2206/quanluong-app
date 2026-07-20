@@ -934,9 +934,7 @@ export function AdminLttpPanel({
               {sub === "commodities" && canCRead ? (
                 <div className="space-y-3">
                   <p className="text-[11px] leading-snug text-muted-foreground">
-                    Áp mặt hàng xuống <span className="font-medium text-foreground">nhiều</span> đơn vị cấp dưới (dùng chung
-                    nguồn với đơn vị cha): tab{" "}
-                    <span className="font-medium text-foreground">Đồng bộ đơn vị con</span> trên bảng điều khiển. Đối tác
+                    Mặt hàng LTTP dùng chung kho đơn vị cấp 1 trong nhánh; đơn vị cấp 2 chỉ xem. Đối tác
                     mặc định (phiếu xuất) cấu hình từng dòng; chọn xong lưu ngay.
                   </p>
                   {canCWrite ? (
@@ -1176,8 +1174,7 @@ export function AdminLttpPanel({
               {sub === "tables" && canPRead ? (
                 <div className="space-y-2">
                   <p className="text-[11px] leading-snug text-muted-foreground">
-                    Áp bảng giá xuống nhiều đơn vị con — tab{" "}
-                    <span className="font-medium text-foreground">Đồng bộ đơn vị con</span>.
+                    Bảng giá LTTP dùng chung kho đơn vị cấp 1; đơn vị cấp 2 chỉ xem.
                   </p>
                   {tLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
                   <ul className="space-y-1.5">

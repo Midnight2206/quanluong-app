@@ -17,7 +17,6 @@ import {
 } from "@/hooks/usePersistedNavTab";
 import { RouteApiGuard } from "@/hocs/RouteApiGuard";
 import { AdminJobTitlesPanel } from "@/pages/dashboard/admin/AdminJobTitlesPanel";
-import { AdminUnitDataSharePanel } from "@/pages/dashboard/admin/AdminUnitDataSharePanel";
 import { AdminLttpPanel } from "@/pages/dashboard/admin/AdminLttpPanel";
 import { AdminPendingRegistrationsPanel } from "@/pages/dashboard/admin/AdminPendingRegistrationsPanel";
 import { SuperadminPermissionMatrixPanel } from "@/pages/dashboard/superadmin/SuperadminPermissionMatrixPanel";
@@ -92,14 +91,6 @@ export function DashboardJobTitlesPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col pb-1">
       <AdminJobTitlesPanel />
-    </div>
-  );
-}
-
-export function DashboardUnitDownstreamSyncPage() {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col pb-1">
-      <AdminUnitDataSharePanel />
     </div>
   );
 }
