@@ -11,6 +11,7 @@ Chuyển mô hình tổ chức từ cây nhiều cấp + đồng bộ/fork xuố
 3. **Cấp 2 chỉ đọc** 3 loại đó; cấp 1 mới ghi
 4. **Bỏ hoàn toàn** cơ chế đồng bộ đơn vị con (UI + API apply-down / fork nghiệp vụ)
 5. **Chỉ đơn vị cấp 1** được tạo tài khoản `admin`
+6. Dữ liệu 3 loại đang gắn **cấp con**: **xóa** (không migrate lên cấp 1)
 
 ## Quyết định đã chốt
 
@@ -21,7 +22,7 @@ Chuyển mô hình tổ chức từ cây nhiều cấp + đồng bộ/fork xuố
 | Quyền ghi 3 loại | Chỉ user thao tác trong ngữ cảnh **cấp 1** (có permission tương ứng) |
 | Quyền đọc 3 loại | Cấp 1 và cấp 2 trong cùng nhánh, nếu có permission |
 | Đồng bộ / fork | **Xóa** tab dashboard + API apply-down; không còn clone nghiệp vụ mới |
-| Dữ liệu cũ ở cấp 2 | **Migrate tự động lên cấp 1**, xử lý conflict, rồi dọn fork |
+| Dữ liệu cũ ở cấp 2 | **Không gộp lên cấp 1** — **xóa** 3 loại dữ liệu đang gắn đơn vị cấp con (`depth >= 1`) |
 | Admin | `type = admin` chỉ khi `unit.depth === 0` |
 | Loại dữ liệu khác | Phiếu xuất, sổ chấm cơm, kitchen, chứng từ… **không đổi** trong spec này (vẫn theo rule hiện tại) |
 
@@ -82,7 +83,7 @@ Kitchen books / phiếu xuất vẫn validate commodity thuộc `storageUnitId` 
 
 - **Không** dùng grant/fork làm đường chính cho 3 loại nữa
 - API create private-share cho các kind này: deprecate hoặc reject với message rõ
-- Bản ghi `UnitEntityFork` của 3 kind: dọn sau migrate
+- Bản ghi `UnitEntityFork` của 3 kind: dọn sau khi xóa dữ liệu cấp con
 
 ## Bỏ đồng bộ đơn vị con
 
@@ -103,7 +104,7 @@ Kitchen books / phiếu xuất vẫn validate commodity thuộc `storageUnitId` 
 - Xóa permission `*.applyDown` khỏi catalog + sync permissions (hoặc giữ code nhưng không expose route — ưu tiên **xóa sạch** route + permission sync)
 - Service `apply*ToDescendantUnit`: xóa hoặc để dead-code-free
 
-`UnitEntityFork` model có thể giữ trong schema tạm (để migrate đọc), hoặc xóa model trong migration Prisma sau khi dọn data — quyết định lúc implement: **giữ model đến khi script migrate chạy xong**, rồi có thể drop ở phase sau (YAGNI: không bắt buộc drop schema trong cùng PR nếu rủi ro).
+`UnitEntityFork` model có thể giữ trong schema tạm để script dọn đọc/xóa row, hoặc drop sau (YAGNI: không bắt buộc drop schema trong cùng PR).
 
 ## Admin chỉ ở cấp 1
 
@@ -115,45 +116,49 @@ Trong `users.service` (create / patch / replace):
 
 User admin **đã tồn tại** ở cấp 2: migration báo cáo danh sách; mặc định **không tự đổi type** — admin vận hành xử lý tay, trừ khi implement chọn harden (block login / force demote). Spec mặc định: **chỉ chặn tạo/sửa mới**; kèm script liệt kê vi phạm.
 
-## Migration dữ liệu
+## Cleanup dữ liệu (không migrate)
 
-Script một lần (Node + Prisma), chạy trước hoặc cùng deploy:
+Script một lần (Node + Prisma), chạy trước hoặc cùng deploy. **Không** chuyển bản ghi cấp con lên cấp 1.
 
 ### A. Flatten cây (nếu còn depth ≥ 2)
 
 1. Với mỗi unit `depth >= 2`: tìm ancestor `depth === 0` gần nhất
 2. Set `parentId =` ancestor đó (thành cấp 2 trực tiếp), rồi `rebuildAllUnitPaths`
-3. Nếu conflict nghiệp vụ (quá nhiều nhánh) → log + fail an toàn thay vì đoán
+3. Nếu conflict nghiệp vụ → log + fail an toàn thay vì đoán
 
-### B. Gộp 3 loại lên cấp 1
+### B. Xóa 3 loại dữ liệu của đơn vị cấp con
 
-Với mỗi bản ghi `LttpCommodity` / `LttpPriceTable` (+ rows) / `JobTitle` có `unitId` của unit `depth === 1` (hoặc từng là cấp sâu hơn trước flatten):
+Với mọi unit có `depth >= 1` (sau flatten: mọi cấp 2):
 
-1. `targetUnitId = parent cấp 1`
-2. Nếu chưa có bản ghi tương đương ở cấp 1 (commodity: cùng `code`; job title: cùng `name`; price table: cùng `effectiveDate`):
-   - `UPDATE unitId = targetUnitId`
-3. Nếu đã có tương đương ở cấp 1:
-   - **Giữ bản cấp 1**
-   - Remap FK từ bản cấp 2 sang bản cấp 1 (issue slip lines, kitchen lines, price rows, user.jobTitleId, …) nếu cần
-   - Xóa bản cấp 2 (hoặc soft-skip nếu FK Restrict chưa remap được — fail + report)
-4. Xóa `UnitEntityFork` rows liên quan 3 kind sau khi ổn định
+1. **JobTitle** thuộc `unitId` đó:
+   - `User.jobTitleId` → `SetNull` (schema đã hỗ trợ) hoặc clear trước khi xóa
+   - Xóa `JobTitle` (+ permissions cascade)
+2. **LttpPriceTable** thuộc `unitId` đó:
+   - Xóa bảng giá (rows cascade)
+3. **LttpCommodity** thuộc `unitId` đó:
+   - Các FK `onDelete: Restrict` (dòng phiếu xuất, kitchen, price row còn sót…) phải được **xóa/cắt trước** trong cùng transaction theo thứ tự an toàn, rồi mới xóa commodity
+   - **Không** remap sang commodity cấp 1
+4. Xóa `UnitEntityFork` (và share grant liên quan 3 kind nếu còn) có `sourceUnitId` / `targetUnitId` là đơn vị cấp con, hoặc kind thuộc 3 loại trên gắn unit cấp con
+
+**Hệ quả chấp nhận được theo yêu cầu nghiệp vụ:** dữ liệu 3 loại ở cấp con mất hẳn; phiếu/kitchen/… của cấp con nếu từng phụ thuộc commodity cấp con sẽ mất dòng liên quan (hoặc script fail + report nếu không xóa hết được). Dữ liệu 3 loại của **cấp 1** giữ nguyên.
 
 ### C. Báo cáo
 
-In summary: số unit flatten, số record moved, số conflict skipped/merged, danh sách admin cấp 2 còn lại.
+In summary: số unit flatten, số JobTitle / PriceTable / Commodity đã xóa theo unit cấp con, số FK phụ thuộc đã cắt, danh sách admin cấp 2 còn lại, mọi lỗi skip/fail.
 
 ## Kiểm thử / chấp nhận
 
 1. Tạo đơn vị con dưới cấp 2 → **bị từ chối**
 2. User cấp 1 CRUD LTTP / giá / chức danh → OK; bản ghi `unitId` = cấp 1
-3. User cấp 2 list cùng dữ liệu → OK; create/update/delete → **403**
+3. User cấp 2 list cùng dữ liệu kho cấp 1 → OK; create/update/delete → **403**
 4. Tab “Đồng bộ đơn vị con” không còn trên dashboard
 5. API apply-to-unit → **404** hoặc đã gỡ
 6. Tạo user `admin` gắn đơn vị cấp 2 → **bị từ chối**; cấp 1 → OK
-7. Sau migrate: không còn commodity/jobTitle/priceTable gắn unit depth 1 (trừ report conflict đã xử lý)
+7. Sau cleanup: không còn commodity / jobTitle / priceTable gắn unit `depth >= 1`
 
 ## Ngoài phạm vi
 
+- Gộp/migrate dữ liệu 3 loại từ cấp 2 lên cấp 1
 - Đổi scope meal roster / chứng từ / kitchen sang mô hình khác
 - Soft-delete đơn vị
 - Đồng bộ ngang giữa hai nhánh cấp 1 khác nhau
@@ -164,8 +169,8 @@ In summary: số unit flatten, số record moved, số conflict skipped/merged, 
 
 | Rủi ro | Giảm thiểu |
 |--------|------------|
-| Trùng `code`/`name` khi gộp | Giữ cấp 1; remap FK; report |
-| Kitchen/LTTP lines trỏ commodity cấp 2 | Remap trước khi xóa |
+| Mất dữ liệu 3 loại ở cấp con | Đúng yêu cầu; backup DB trước khi chạy script |
+| Phiếu/kitchen cấp con trỏ commodity cấp con | Xóa/cắt FK Restrict trước; report số dòng bị ảnh hưởng |
 | Unit sâu hơn 2 cấp | Flatten có kiểm soát + rebuild path |
 | FE vẫn gọi apply-down | Xóa UI + route; mutation hooks chết theo |
 | User cấp 2 mất quyền ghi bất ngờ | Đúng spec; thông báo release note |
