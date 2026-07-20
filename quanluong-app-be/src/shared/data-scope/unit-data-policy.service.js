@@ -1,7 +1,14 @@
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { getDataKindDefinition } from "./data-scope.registry.js";
+import { getLevel1UnitId } from "../units/unit-level.helpers.js";
 
 const DEFAULT_POLICY = "INDEPENDENT";
+
+const LEVEL1_SHARED_KINDS = new Set([
+  "LTTP_COMMODITY",
+  "LTTP_PRICE_TABLE",
+  "JOB_TITLE",
+]);
 
 /**
  * @param {string} path
@@ -141,6 +148,11 @@ export async function resolvePrivateStorageUnitId({
   const def = getDataKindDefinition(dataKind);
   if (!def || def.visibility !== "private") {
     return { storageUnitId: null, via: "public_kind" };
+  }
+
+  if (LEVEL1_SHARED_KINDS.has(dataKind)) {
+    const storageUnitId = await getLevel1UnitId(logicalUnitId);
+    return { storageUnitId, via: "level1_shared_kind" };
   }
 
   const grant = await findActiveShareGrant({

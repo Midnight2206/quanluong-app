@@ -11,6 +11,7 @@ import {
   getSubtreeUnitIds,
   getUnitBreadcrumbChain,
 } from "../../shared/units/unit-scope.service.js";
+import { assertLogicalUnitIsLevel1ForWrite } from "../../shared/units/unit-level.helpers.js";
 import { resolvePrivateStorageUnitId } from "../../shared/data-scope/unit-data-policy.service.js";
 import {
   markChungTuDocumentsStaleForLttpIssueSlipChange,
@@ -163,6 +164,10 @@ function assertPriceTableRowStorage(tableUnitId, dataScope) {
       code: ERROR_CODES.NOT_FOUND,
     });
   }
+}
+
+async function assertSharedKindWriteAllowed(dataScope) {
+  await assertLogicalUnitIsLevel1ForWrite(dataScope.logicalUnitId);
 }
 
 function parseDateOnly(input) {
@@ -378,6 +383,7 @@ async function assertLttpSupplierIdForCommodity(supplierId, storageUnitId) {
  * Lưu đối tác mặc định cho một mặt hàng (bảng liên kết, upsert / xóa khi null).
  */
 async function putLttpCommodityDefaultSupplier({ commodityId, lttpSupplierId }, scope, effectiveUnitIds, dataScope) {
+  await assertSharedKindWriteAllowed(dataScope);
   const cid = Number(commodityId);
   if (!Number.isInteger(cid) || cid <= 0) {
     throw new AppError({
@@ -459,6 +465,7 @@ async function getCommodityById(id, scope, effectiveUnitIds, dataScope) {
 }
 
 async function createCommodity(payload, scope, effectiveUnitIds, dataScope) {
+  await assertSharedKindWriteAllowed(dataScope);
   assertLttpLogicalMatchesDataScope(payload.unitId, dataScope);
   assertUnitIdInScope(payload.unitId, scope);
   assertUnitInEffectiveBranch(payload.unitId, effectiveUnitIds);
@@ -500,6 +507,7 @@ async function createCommodity(payload, scope, effectiveUnitIds, dataScope) {
 }
 
 async function patchCommodity(id, payload, scope, effectiveUnitIds, dataScope) {
+  await assertSharedKindWriteAllowed(dataScope);
   const existing = await getCommodityById(id, scope, effectiveUnitIds, dataScope);
   const data = {};
   if (payload.code !== undefined) {
@@ -561,6 +569,7 @@ async function patchCommodity(id, payload, scope, effectiveUnitIds, dataScope) {
 }
 
 async function deleteCommodity(id, scope, effectiveUnitIds, dataScope) {
+  await assertSharedKindWriteAllowed(dataScope);
   const row = await prisma.lttpCommodity.findFirst({
     where: { id },
   });
@@ -2050,6 +2059,7 @@ async function getPriceTableById(id, scope, effectiveUnitIds, dataScope) {
 }
 
 async function createPriceTable(payload, scope, effectiveUnitIds, dataScope) {
+  await assertSharedKindWriteAllowed(dataScope);
   const { unitId, effectiveDate, note, rows } = payload;
   assertLttpLogicalMatchesDataScope(unitId, dataScope);
   assertUnitIdInScope(unitId, scope);
@@ -2112,6 +2122,7 @@ async function createPriceTable(payload, scope, effectiveUnitIds, dataScope) {
 }
 
 async function patchPriceTable(id, payload, scope, effectiveUnitIds, dataScope) {
+  await assertSharedKindWriteAllowed(dataScope);
   const existing = await prisma.lttpPriceTable.findFirst({
     where: { id },
   });
@@ -2200,6 +2211,7 @@ async function patchPriceTable(id, payload, scope, effectiveUnitIds, dataScope) 
 }
 
 async function deletePriceTable(id, scope, effectiveUnitIds, dataScope) {
+  await assertSharedKindWriteAllowed(dataScope);
   const existing = await prisma.lttpPriceTable.findFirst({
     where: { id },
   });
@@ -2397,6 +2409,7 @@ function parseExcelBuffer(buffer) {
 }
 
 async function importPriceTableFromExcel({ buffer, unitId, effectiveDate, note }, scope, effectiveUnitIds, dataScope) {
+  await assertSharedKindWriteAllowed(dataScope);
   assertLttpLogicalMatchesDataScope(unitId, dataScope);
   assertUnitIdInScope(unitId, scope);
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
