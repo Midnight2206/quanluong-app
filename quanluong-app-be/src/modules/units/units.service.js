@@ -444,21 +444,40 @@ async function patchUnit(unitId, payload, scope, effectiveUnitIds) {
   return getUnitById(unitId, scope, effectiveUnitIds);
 }
 
-async function deactivateUnit(unitId, scope, effectiveUnitIds) {
-  return patchUnit(
-    unitId,
-    {
-      isActive: false,
-    },
-    scope,
-    effectiveUnitIds,
-  );
+async function deleteUnit(unitId, scope, effectiveUnitIds) {
+  const unit = await getUnitById(unitId, scope, effectiveUnitIds);
+  const userCount = await prisma.user.count({
+    where: { unitId, deletedAt: null },
+  });
+
+  if (userCount > 0) {
+    throw new AppError({
+      message: "Cannot delete a unit that still has users",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.unit.updateMany({
+      where: { parentId: unitId },
+      data: { parentId: unit.parentId ?? null },
+    });
+
+    await tx.unit.delete({
+      where: { id: unitId },
+    });
+  });
+
+  await afterUnitTreeMutation();
+
+  return { id: unitId };
 }
 
 export {
   createPrivateDataShares,
   createUnit,
-  deactivateUnit,
+  deleteUnit,
   getUnitById,
   listPrivateDataShares,
   listUnits,

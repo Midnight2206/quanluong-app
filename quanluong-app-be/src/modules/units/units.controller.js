@@ -7,7 +7,7 @@ import { mapUnit } from "./units.mapper.js";
 import {
   createPrivateDataShares,
   createUnit,
-  deactivateUnit,
+  deleteUnit,
   getUnitById,
   listPrivateDataShares,
   listUnits,
@@ -73,11 +73,11 @@ async function patchUnitController(req, res) {
 }
 
 async function deleteUnitController(req, res) {
-  const unit = await deactivateUnit(req.validatedParams.id, req.unitScope, req.effectiveUnitIds);
+  await deleteUnit(req.validatedParams.id, req.unitScope, req.effectiveUnitIds);
 
   return respondSuccess(res, {
-    message: "Unit deactivated successfully",
-    data: mapUnit(unit),
+    message: "Deleted unit successfully",
+    data: null,
   });
 }
 
