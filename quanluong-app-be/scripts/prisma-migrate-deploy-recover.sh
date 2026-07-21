@@ -32,6 +32,15 @@ fi
 log "prisma migrate deploy"
 npm run prisma:migrate:deploy
 
+# Idempotent: flatten cây về 2 cấp và xóa LTTP / bảng giá / chức danh của đơn vị cấp con.
+# Lỗi cleanup phải chặn app khởi động để tránh chạy code mới trên dữ liệu chưa được chuẩn hóa.
+log "cleanup dữ liệu dùng chung ở đơn vị cấp con"
+npm run db:cleanup-level2-shared -- --execute
+
+# Đồng bộ route permissions sau khi gỡ các API apply-down.
+log "sync route permissions"
+npm run sync:permissions
+
 # Idempotent: mỗi (recipientUnitId, issueDate) → đồng bộ lại dòng on_guarantee phiếu nhập kho.
 log "backfill kitchen receipt slips from LTTP issue slips"
 npm run db:backfill-kitchen-receipt-from-issue
