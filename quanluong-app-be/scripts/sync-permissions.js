@@ -6,6 +6,7 @@
 import { ROUTE_PERMISSION_DEFINITIONS } from "../src/app/route-permissions.js";
 import { syncPermissionsFromRoutes } from "../src/modules/auth/auth.service.js";
 import { prisma } from "../src/infra/database/prisma/prisma.client.js";
+import { redis } from "../src/infra/cache/redis.client.js";
 import { ensureUnitLevelPermissionCapsSeed } from "../src/shared/permissions/unit-level-cap.service.js";
 import { DEFAULT_ADMIN_PERMISSION_CODES } from "../src/shared/constants/default-admin-permissions.js";
 
@@ -86,5 +87,6 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    redis?.disconnect();
     await prisma.$disconnect();
   });
