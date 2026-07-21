@@ -25,7 +25,10 @@ function Modal({ title, children, onClose }) {
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <section className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-4 shadow-xl sm:rounded-2xl sm:p-5">
+      <section
+        data-local-scroll="true"
+        className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-4 shadow-xl sm:rounded-2xl sm:p-5"
+      >
         <div className="mb-4 flex items-start justify-between gap-3">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
           <button

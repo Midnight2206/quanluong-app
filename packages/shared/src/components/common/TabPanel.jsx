@@ -7,11 +7,11 @@ import { cn } from "@/utils/cn";
  * @param {string} [defaultTabId]
  * @param {string} [persistId] — nếu có, lưu `sessionStorage` tại khóa `quanluong:navTab:${persistId}`
  * @param {string} [className] — outer wrapper; với `scrollablePanel` bật: thường thêm `min-h-0 flex-1` khi nằm trong flex column.
- * @param {boolean} [scrollablePanel=true] — `false`: panel không có `overflow-y-auto` (tránh cuộn lồng với shell `main`; trang tự cuộn một lớp).
+ * @param {boolean} [scrollablePanel=false] — chỉ bật cho dialog/workspace có chiều cao giới hạn.
  * @param {boolean} [stickyTabList] — neo thanh tab ở đỉnh khung cuộn gần nhất khi cuộn xuống.
  * @param {boolean} [fullBleedInCard] — dùng khi `CardContent` có `p-0`: thanh tab kéo sát mép card; panel có padding ngang/dưới.
  * @param {boolean} [equalWidthTabs] — các nút tab chia đều chiều ngang (`flex-1`).
- * @param {string} [stickyTabListTopClassName] — với `stickyTabList`, class `top-*` (mặc định `top-0`; tab lồng dùng vd. `top-14`).
+ * @param {number} [stickyTabListLevel=0] — tầng sticky; tầng sau tự neo dưới tổng chiều cao các tầng trước.
  * @param {boolean} [scrollableTabList] — thanh tab cuộn ngang (nhiều tab trên mobile).
  * @param {string} [forcedActiveTabId] — nếu thuộc `tabs`, ép tab hiển thị (vd. đồng bộ segment URL); khi `undefined` dùng state nội bộ.
  * @param {(id: string) => void} [onTabSelect] — gọi sau khi đổi tab (điều hướng / side-effect ngoài).
@@ -21,9 +21,9 @@ export function TabPanel({
   defaultTabId,
   persistId,
   className,
-  scrollablePanel = true,
+  scrollablePanel = false,
   stickyTabList = false,
-  stickyTabListTopClassName,
+  stickyTabListLevel = 0,
   fullBleedInCard = false,
   equalWidthTabs = false,
   scrollableTabList = false,
@@ -91,7 +91,14 @@ export function TabPanel({
         className,
       )}
     >
-      <div className={cn("relative shrink-0", scrollableTabList && "min-w-0")}>
+      <div
+        data-sticky-level={stickyTabList ? stickyTabListLevel : undefined}
+        className={cn(
+          "relative shrink-0",
+          scrollableTabList && "min-w-0",
+          stickyTabList && "unified-sticky-surface",
+        )}
+      >
         {scrollableTabList && tabFade.left ? (
           <div
             className="pointer-events-none absolute inset-y-0 left-0 z-30 w-6 bg-gradient-to-r from-background to-transparent"
@@ -115,11 +122,6 @@ export function TabPanel({
               : null,
             scrollableTabList ? "flex-nowrap items-stretch" : equalWidthTabs ? "w-full flex-nowrap sm:flex-wrap" : "flex-wrap items-center",
             !scrollableTabList && equalWidthTabs ? "items-stretch" : null,
-            stickyTabList &&
-              cn(
-                "sticky z-20 bg-muted/90 shadow-[inset_0_-1px_0_0_hsl(var(--border))] backdrop-blur-sm supports-[backdrop-filter]:bg-muted/85",
-                stickyTabListTopClassName ?? "top-0",
-              ),
             !stickyTabList && fullBleedInCard ? "rounded-t-xl px-4 pt-4 sm:px-5 sm:pt-5" : null,
             !stickyTabList && !fullBleedInCard ? "bg-background/80 backdrop-blur-sm" : null,
             stickyTabList && fullBleedInCard ? "rounded-t-xl px-4 pt-3 sm:px-5 sm:pt-4" : null,
@@ -164,13 +166,14 @@ export function TabPanel({
       </div>
       <div
         role="tabpanel"
+        data-local-scroll={scrollablePanel ? "true" : undefined}
         id={`${baseId}-panel-${activeTab.id}`}
         aria-labelledby={`${baseId}-tab-${activeTab.id}`}
         className={cn(
           "flex min-h-0 min-w-0 w-full flex-col",
           scrollablePanel
             ? "flex-1 overflow-y-auto overflow-x-hidden overscroll-y-auto pr-0.5"
-            : "overflow-x-hidden",
+            : null,
           fullBleedInCard && "px-4 pb-5 pt-4 sm:px-5",
         )}
       >

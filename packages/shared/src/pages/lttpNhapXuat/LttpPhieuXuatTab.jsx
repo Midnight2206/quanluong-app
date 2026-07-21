@@ -334,6 +334,7 @@ function IssueSlipCommoditySearch({
     anchor &&
     createPortal(
       <ul
+        data-local-scroll="true"
         className="fixed z-[120] max-h-52 overflow-y-auto rounded-md border border-border bg-card py-1 text-left text-xs text-card-foreground shadow-float"
         style={{
           top: anchor.bottom + 6,
@@ -1605,7 +1606,10 @@ export function LttpPhieuXuatTab({
               </Button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:p-5">
+            <div
+              data-local-scroll="true"
+              className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:p-5"
+            >
               <p className="text-[10px] font-medium uppercase text-muted-foreground">
                 Tuỳ chọn bản in
               </p>
@@ -2062,7 +2066,7 @@ export function LttpPhieuXuatTab({
               <col className="w-[8%]" />
               <col className="w-[3%]" />
             </colgroup>
-            <thead className="bg-secondary/90">
+            <thead data-sticky-level="2" className="unified-sticky-surface bg-secondary/90">
               <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
                 <th className="px-0.5 py-1" rowSpan={2}>
                   STT
@@ -2481,7 +2485,10 @@ export function LttpPhieuXuatTab({
                   Chưa có dòng hợp lệ — quay lại bước Mặt hàng để nhập.
                 </p>
               ) : (
-                <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto">
+                <ul
+                  data-local-scroll="true"
+                  className="mt-2 max-h-48 space-y-2 overflow-y-auto"
+                >
                   {dataRows.map((r, i) => {
                     const c = comById.get(r.commodityId);
                     const supplier = suppliers.find(

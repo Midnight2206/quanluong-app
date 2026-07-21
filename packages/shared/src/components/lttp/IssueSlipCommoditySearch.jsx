@@ -94,6 +94,7 @@ export function IssueSlipCommoditySearch({
     anchor &&
     createPortal(
       <ul
+        data-local-scroll="true"
         className="fixed z-[120] max-h-52 overflow-y-auto rounded-md border border-border bg-card py-1 text-left text-xs text-card-foreground shadow-float"
         style={{
           top: anchor.bottom + 6,

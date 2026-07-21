@@ -13,7 +13,7 @@ import {
 } from "@/features/kitchen-books/api/kitchenBooksApi";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
-import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { classifyCommodityCalcMode } from "./kitchenMenuQuantity.js";
 import { KitchenCommodityPicker } from "./KitchenCommodityPicker.jsx";
 import { KitchenBooksUnitPicker } from "./KitchenBooksUnitPicker.jsx";
@@ -330,7 +330,7 @@ export function KitchenDishCatalogTab({
           Đang tải…
         </div>
       ) : (
-        <ResponsiveTableWrap>
+        <StickyResponsiveTable stickyLevel={1}>
           <table className="w-full min-w-[32rem] text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase text-muted-foreground">
@@ -384,7 +384,7 @@ export function KitchenDishCatalogTab({
               )}
             </tbody>
           </table>
-        </ResponsiveTableWrap>
+        </StickyResponsiveTable>
       )}
     </div>
   );

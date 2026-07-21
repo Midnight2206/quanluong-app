@@ -92,6 +92,35 @@
   .page-shell {
     @apply min-h-0 max-h-dvh h-dvh bg-app-grid bg-[size:28px_28px];
   }
+
+  [data-sticky-level] {
+    position: sticky !important;
+    top: var(--unified-sticky-top, 0px);
+  }
+
+  [data-sticky-level="0"] {
+    z-index: 30;
+  }
+
+  [data-sticky-level="1"] {
+    z-index: 29;
+  }
+
+  [data-sticky-level="2"] {
+    z-index: 28;
+  }
+
+  [data-sticky-level="3"] {
+    z-index: 27;
+  }
+
+  .unified-sticky-surface {
+    @apply bg-background/95 shadow-[0_1px_0_0_hsl(var(--border))] backdrop-blur-sm;
+  }
+
+  [data-local-scroll="true"] {
+    overscroll-behavior: contain;
+  }
 }
 
 /*
@@ -102,6 +131,10 @@
   html,
   body {
     overflow: visible !important;
+  }
+
+  [data-sticky-level] {
+    position: static !important;
   }
 
   .bkmh-a4-print-host {

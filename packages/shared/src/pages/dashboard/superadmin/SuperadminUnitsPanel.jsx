@@ -23,7 +23,7 @@ import {
   usePatchUnitMutation,
 } from "@/features/units/api/unitsApi";
 import { cn } from "@/utils/cn";
-import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { notifyError, notifySuccess, notifySuccessWithUndo } from "@/services/notify";
 
 const inputClass =
@@ -277,7 +277,7 @@ export function SuperadminUnitsPanel() {
   );
 
   return (
-    <Card className="shadow-soft flex min-h-0 flex-1 flex-col overflow-hidden">
+    <Card className="shadow-soft">
       <CardContent className="flex min-h-0 flex-1 flex-col space-y-3 !p-3 sm:!p-4">
         <form
           onSubmit={onCreate}
@@ -352,7 +352,7 @@ export function SuperadminUnitsPanel() {
         ) : null}
 
         {!isLoading && !isError ? (
-          <div className="flex min-h-0 flex-1 flex-col space-y-1.5 overflow-hidden">
+          <div className="space-y-1.5">
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               <IconButton label="Mở hết nhánh" variant="surface" onClick={expandAllBranches}>
                 <ListTree aria-hidden />
@@ -361,7 +361,7 @@ export function SuperadminUnitsPanel() {
                 <ListX aria-hidden />
               </IconButton>
             </div>
-            <ResponsiveTableWrap className="min-h-0 flex-1">
+            <StickyResponsiveTable stickyLevel={1}>
               <table className="w-full min-w-[640px] border-collapse text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-border bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -478,7 +478,7 @@ export function SuperadminUnitsPanel() {
                   })}
                 </tbody>
               </table>
-            </ResponsiveTableWrap>
+            </StickyResponsiveTable>
           </div>
         ) : null}
 

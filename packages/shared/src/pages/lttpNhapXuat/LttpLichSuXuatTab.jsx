@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Loader2, Pencil, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
-import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { cn } from "@/utils/cn";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import httpClient from "@/services/httpClient";
@@ -357,7 +357,7 @@ export function LttpLichSuXuatTab({
       ) : null}
 
       {!isLoading && slips.length > 0 && isLgUp ? (
-      <ResponsiveTableWrap className="border-border/60">
+      <StickyResponsiveTable stickyLevel={2} className="border-border/60">
         <table className="mb-px w-full min-w-[44rem] border-collapse text-left text-[11px]">
           <thead className="bg-secondary/90">
             <tr className="border-b border-border text-[9px] uppercase text-muted-foreground">
@@ -442,7 +442,7 @@ export function LttpLichSuXuatTab({
             })}
           </tbody>
         </table>
-      </ResponsiveTableWrap>
+      </StickyResponsiveTable>
       ) : null}
     </div>
   );

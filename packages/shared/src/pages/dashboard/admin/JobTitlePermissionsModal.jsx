@@ -74,7 +74,10 @@ export function JobTitlePermissionsModal({
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5">
+        <div
+          data-local-scroll="true"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"
+        >
           {actorPermissionCatalog.length === 0 ? (
             <p className="text-[11px] text-muted-foreground">
               Tài khoản của bạn không có quyền chi tiết để ủy quyền cho chức danh. Kiểm tra vai trò và ma trận cấp đơn

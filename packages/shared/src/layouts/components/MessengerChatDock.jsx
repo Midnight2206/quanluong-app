@@ -119,7 +119,10 @@ function ChatUserPicker({ open, onClose, onPick }) {
             autoFocus
           />
         </div>
-        <ul className="max-h-[min(50dvh,24rem)] overflow-y-auto p-2">
+        <ul
+          data-local-scroll="true"
+          className="max-h-[min(50dvh,24rem)] overflow-y-auto p-2"
+        >
           {isLoading ? (
             <li className="flex justify-center py-8 text-muted-foreground">
               <Loader2 className="size-6 animate-spin" />
@@ -268,7 +271,10 @@ function GroupCreateModal({ open, onClose, onCreate }) {
             />
           </div>
         </div>
-        <ul className="min-h-0 flex-1 overflow-y-auto p-2">
+        <ul
+          data-local-scroll="true"
+          className="min-h-0 flex-1 overflow-y-auto p-2"
+        >
           {isLoading ? (
             <li className="flex justify-center py-8 text-muted-foreground">
               <Loader2 className="size-6 animate-spin" />
@@ -432,7 +438,7 @@ function ChatHubPanel({
             />
           </div>
         </div>
-        <ul className="min-h-0 flex-1 overflow-y-auto">
+        <ul data-local-scroll="true" className="min-h-0 flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
             <li className="px-4 py-10 text-center text-sm text-muted-foreground">Không có hội thoại.</li>
           ) : (
@@ -608,6 +614,7 @@ function ChatWindowFrame({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        data-local-scroll="true"
         className="min-h-0 flex-1 space-y-1 overflow-y-auto bg-background/80 px-3 py-2"
       >
         {loadingOlder ? (

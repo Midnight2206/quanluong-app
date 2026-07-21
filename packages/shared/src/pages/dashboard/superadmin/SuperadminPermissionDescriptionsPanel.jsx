@@ -64,7 +64,7 @@ export function SuperadminPermissionDescriptionsPanel() {
   }
 
   return (
-    <Card className="shadow-soft flex min-h-0 flex-1 flex-col overflow-hidden">
+    <Card className="shadow-soft">
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !p-3 sm:!p-4">
         <div>
           <p className="text-xs font-medium sm:text-sm">Mô tả quyền (dùng chung toàn hệ thống)</p>
@@ -75,7 +75,7 @@ export function SuperadminPermissionDescriptionsPanel() {
         ) : null}
         {isLoading ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain pr-1">
+        <div className="space-y-4 pr-1">
           {moduleKeys.map((mod) => (
             <div key={mod}>
               <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">

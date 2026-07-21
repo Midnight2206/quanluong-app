@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Loader2, Settings2 } from "lucide-react";
 import { TabPanel } from "@/components/common/TabPanel";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import {
@@ -135,7 +136,11 @@ function LedgerMarksTable({
   const dayW = "w-[5.5rem] min-w-[5.5rem] max-w-[5.5rem] border-r border-border/40";
 
   return (
-    <div className="min-w-0 overflow-x-auto rounded-md border border-border bg-card shadow-sm">
+    <StickyResponsiveTable
+      ariaLabel={mode === "standard" ? "Sổ chấm cơm tiêu chuẩn" : "Sổ chấm cơm ăn thêm"}
+      interactiveHeader
+      stickyLevel={2}
+    >
       <table className="w-max min-w-full border-collapse text-left text-[10px] sm:text-xs">
         <thead>
           <tr>
@@ -336,7 +341,7 @@ function LedgerMarksTable({
           )}
         </tbody>
       </table>
-    </div>
+    </StickyResponsiveTable>
   );
 }
 
@@ -407,6 +412,7 @@ export function MealRosterLedgerTab({
   manualUnitId,
   setManualUnitId,
   user,
+  stickyTabListLevel,
 }) {
   const { confirm } = useConfirm();
   const skipBase = !selectedUnitId || !yearMonth || !canAccess;
@@ -955,7 +961,7 @@ export function MealRosterLedgerTab({
         defaultTabId="standard"
         scrollablePanel={false}
         stickyTabList
-        stickyTabListTopClassName="top-12 sm:top-14"
+        stickyTabListLevel={stickyTabListLevel ?? 1}
         tabs={[
           {
             id: "standard",
@@ -1042,6 +1048,7 @@ export function MealRosterLedgerTab({
                   persistId="meal-rate-picker-catalog"
                   defaultTabId="standard"
                   className="min-h-0 flex-1"
+                  scrollablePanel
                   tabs={[
                     {
                       id: "standard",

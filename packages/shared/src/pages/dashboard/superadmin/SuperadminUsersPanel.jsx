@@ -3,7 +3,7 @@ import { Loader2, Power, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
-import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { DashboardUserRowCard } from "@/pages/dashboard/components/DashboardUserRowCard";
 import { useGetTypesQuery } from "@/features/types/api/typesApi";
@@ -29,6 +29,12 @@ export function SuperadminUsersPanel() {
   const { data: types = [] } = useGetTypesQuery();
   const { data: units = [] } = useGetUnitsQuery();
   const sortedUnits = useMemo(() => sortUnitsByPath(units), [units]);
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [typeId, setTypeId] = useState("");
+  const [unitId, setUnitId] = useState("");
   const selectedUnitDepth = useMemo(() => {
     if (!unitId) return null;
     return sortedUnits.find((u) => String(u.id) === String(unitId))?.depth ?? null;
@@ -43,13 +49,6 @@ export function SuperadminUsersPanel() {
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [patchUser, { isLoading: isPatching }] = usePatchUserMutation();
   const [togglingUserId, setTogglingUserId] = useState(null);
-
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [typeId, setTypeId] = useState("");
-  const [unitId, setUnitId] = useState("");
 
   async function onCreateUser(e) {
     e.preventDefault();
@@ -101,8 +100,8 @@ export function SuperadminUsersPanel() {
   }
 
   return (
-    <Card className="shadow-soft flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <CardContent className="flex min-h-0 min-w-0 flex-1 flex-col space-y-3 overflow-hidden !p-3 sm:!p-4">
+    <Card className="shadow-soft min-w-0">
+      <CardContent className="min-w-0 space-y-3 !p-3 sm:!p-4">
         <form
           onSubmit={onCreateUser}
           className="grid shrink-0 gap-2 rounded-lg border border-border/70 bg-card/40 p-2 sm:grid-cols-2 lg:grid-cols-3"
@@ -236,8 +235,8 @@ export function SuperadminUsersPanel() {
 
         {!isLoading && !isError ? (
           isDesktop ? (
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
-              <ResponsiveTableWrap className="border-border/70">
+            <div className="min-w-0">
+              <StickyResponsiveTable stickyLevel={1} className="border-border/70">
                 <table className="w-full min-w-[560px] border-collapse text-left text-xs sm:text-sm">
                   <thead>
                     <tr className="border-b border-border bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -286,10 +285,10 @@ export function SuperadminUsersPanel() {
                     ))}
                   </tbody>
                 </table>
-              </ResponsiveTableWrap>
+              </StickyResponsiveTable>
             </div>
           ) : (
-            <div className="min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-y-contain px-3 sm:space-y-2 sm:px-0">
+            <div className="space-y-0 px-3 sm:space-y-2 sm:px-0">
               {users.map((u) => (
                 <DashboardUserRowCard
                   key={u.id}

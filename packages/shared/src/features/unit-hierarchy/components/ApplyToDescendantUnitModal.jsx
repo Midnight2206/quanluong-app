@@ -69,7 +69,10 @@ export function ApplyToDescendantUnitModal({
             <X className="h-4 w-4" aria-hidden />
           </IconButton>
         </header>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 sm:px-4">
+        <div
+          data-local-scroll="true"
+          className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3 sm:px-4"
+        >
           <label className="block space-y-1">
             <span className="text-[10px] font-medium text-muted-foreground">Đơn vị cấp dưới</span>
             <select className={selectClass} value={pick} onChange={(e) => setPick(e.target.value)}>

@@ -83,7 +83,7 @@ export function AdminPendingRegistrationsPanel() {
   }
 
   return (
-    <Card className="shadow-soft flex min-h-0 flex-1 flex-col overflow-hidden">
+    <Card className="shadow-soft">
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !px-0 !py-3 sm:!p-4">
         <div className="px-3 sm:px-0">
           <p className="text-xs font-medium sm:text-sm">Đăng ký chờ duyệt</p>
@@ -105,7 +105,7 @@ export function AdminPendingRegistrationsPanel() {
           </p>
         ) : null}
 
-        <div className="min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-y-contain px-3 sm:space-y-3 sm:px-0">
+        <div className="space-y-0 px-3 sm:space-y-3 sm:px-0">
           {pending.map((u) => (
             <div
               key={u.id}

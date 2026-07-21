@@ -170,7 +170,12 @@ export function KitchenBooksPage() {
       {
         id: "ledger",
         label: "Sổ chấm cơm",
-        panel: <MealRosterLedgerTab {...mealRosterTabProps} />,
+        panel: (
+          <MealRosterLedgerTab
+            {...mealRosterTabProps}
+            stickyTabListLevel={1}
+          />
+        ),
       },
     );
   }

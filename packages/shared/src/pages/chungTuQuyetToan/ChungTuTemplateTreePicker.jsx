@@ -106,7 +106,10 @@ export function ChungTuTemplateTreePicker({
           {!user?.googleDriveFolderId ? <ChungTuDriveLinkNotice /> : null}
         </div>
       ) : (
-        <ul className={cn("divide-y divide-border/60 overflow-auto", listMaxHeightClass)}>
+        <ul
+          data-local-scroll="true"
+          className={cn("divide-y divide-border/60 overflow-auto", listMaxHeightClass)}
+        >
           {folders.map((folder) => (
             <li key={folder.id}>
               <button

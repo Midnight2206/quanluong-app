@@ -60,75 +60,65 @@ Không chuyển sang `body` scroll vì app đang có sidebar, mobile bottom navi
 
 `AppHeader` và `WorkingUnitScopeBar` không cần `position: sticky`: chúng nằm ngoài scroll owner nên luôn cố định. Sticky chỉ áp dụng cho thành phần nằm trong nội dung route.
 
-### 2. HOC `withUnifiedPageScroll`
+### 2. Marker registry tại shell
 
-Tạo:
+Registry dùng chung nằm tại:
 
 ```text
 packages/shared/src/hocs/withUnifiedPageScroll.jsx
+packages/shared/src/hocs/stickyRegistry.js
 ```
 
-API:
+Mỗi shell render một `UnifiedPageScrollRoot`; page chỉ đánh dấu phần tử:
 
 ```jsx
-export default withUnifiedPageScroll(MyPage);
+<div data-sticky-level="0">Page header/action bar</div>
+<TabPanel stickyTabList stickyTabListLevel={1} />
+<StickyResponsiveTable stickyLevel={2}>...</StickyResponsiveTable>
 ```
 
-HOC chịu trách nhiệm:
+Registry:
 
-- Render page root theo natural flow:
-  - `min-w-0`
-  - `w-full`
-  - không `h-full`
-  - không `overflow-hidden`
-  - không `overflow-y-auto/scroll`
-- Cung cấp context cho sticky stack height.
-- Đặt CSS variable `--unified-sticky-stack-height`.
-- Giữ print mode ở natural flow.
-- Cho phép `className` bổ sung nhưng không cho page trở thành vertical scroll owner.
+- Dùng `MutationObserver` trong đúng shell để tìm marker được mount/unmount động.
+- Dùng một `ResizeObserver` cho từng DOM instance.
+- Giữ nhiều instance cùng level và lấy chiều cao lớn nhất của các instance đang hiển thị.
+- Offset level `n` là tổng chiều cao cực đại của các level nhỏ hơn.
+- Ghi `--unified-sticky-top` trực tiếp lên từng marker.
+- Dọn observer theo đúng instance khi unmount; instance cũ không thể xoá state của instance mới.
 
-HOC không tự tìm phần tử qua selector và không sửa DOM bằng mutation. Page khai báo rõ phần nào sticky qua primitive bên dưới.
+`withUnifiedPageScroll` chỉ còn là convenience wrapper cho shell đặc biệt; page nằm trong `MainLayout`/`AuthLayout` không tạo provider lồng.
 
-### 3. `UnifiedStickyStack`
+### 3. Sticky marker và primitive
 
 Cùng file HOC export:
 
 ```jsx
-<UnifiedStickyStack>
-  <PageHeader />
-  <PageTabs />
-  <PageActionBar />
+<UnifiedStickyStack level={0}>
+  <PageHeaderAndActions />
 </UnifiedStickyStack>
 ```
 
 Quy tắc:
 
-- Cả nhóm là một sticky container duy nhất: `sticky top-0`.
-- Các phần tử trong nhóm xếp theo normal flow, không cần hard-code `top-12`, `top-14`.
-- Dùng `ResizeObserver` đo chiều cao thực tế của stack.
-- Ghi chiều cao vào context/CSS variable để thành phần sticky phía dưới dùng.
+- Primitive chỉ phát `data-sticky-level`; registry tính offset.
+- Các phần tử cùng level dùng chung offset; level sau neo dưới chiều cao lớn nhất của level trước.
+- Không hard-code `top-12`, `top-14` cho page content.
 - Background, border, shadow và `backdrop-blur` thống nhất.
 - Z-index nằm dưới global header/dock và trên page content.
 
-Gom thành một stack tránh việc nhiều sticky sibling cùng `top-0` đè lên nhau.
+Có thể gom page header + action bar thành một marker để chúng là một surface.
 
 ### 4. `UnifiedStickyRegion`
 
 Dùng khi một page cần vùng sticky độc lập ngoài primary stack:
 
 ```jsx
-<UnifiedStickyRegion offset="stack">
+<UnifiedStickyRegion level={2}>
   <SecondaryActions />
 </UnifiedStickyRegion>
 ```
 
-`offset="stack"` dùng:
-
-```css
-top: var(--unified-sticky-stack-height, 0px);
-```
-
-Không cho page tự viết các offset breakpoint như `top-12 sm:top-14`, trừ trường hợp đã được ghi nhận là bounded workspace riêng.
+`UnifiedStickyRegion` cũng chỉ phát marker. CSS dùng `top: var(--unified-sticky-top, 0px)`.
 
 ## Quy tắc scroll
 
@@ -177,9 +167,10 @@ Vùng ngoại lệ phải:
 #### A. Bảng route thông thường
 
 - Vertical flow thuộc MainLayout.
-- `ResponsiveTableWrap` chỉ giải quyết chiều ngang.
-- Không hứa sticky `<thead>` theo viewport nếu bảng cần horizontal scroll.
-- Sticky page action/filter bar được ưu tiên để giữ context.
+- Dùng `StickyHorizontalTable` khi header/body được truyền riêng.
+- Dùng `StickyResponsiveTable` để nâng cấp một table JSX hiện có.
+- Visible header mirror đồng bộ `scrollLeft`; body table giữ semantic hidden header.
+- Vùng cuộn ngang có `role="region"`, nhãn và nhận focus bằng bàn phím.
 
 #### B. Bounded data-grid
 
@@ -188,7 +179,7 @@ Vùng ngoại lệ phải:
 - `<thead sticky top-0>` neo trong chính grid.
 - Đây là local-scroll exception có chủ đích.
 
-Không xây cloned/synchronized table header trong đợt này vì chi phí và rủi ro accessibility lớn hơn giá trị hiện tại.
+Header có control tương tác dùng visible mirror làm header thật và ẩn hoàn toàn header trùng trong body table.
 
 ## Thay đổi component chung
 
@@ -280,21 +271,20 @@ Tạo workspace rule:
 
 Nội dung bắt buộc:
 
-1. Full route page dùng `withUnifiedPageScroll`.
+1. Shell route dùng `UnifiedPageScrollRoot`; không tạo root/provider lồng cho từng page.
 2. Không tạo vertical scroll owner bên dưới MainLayout.
-3. Sticky page chrome dùng `UnifiedStickyStack`.
+3. Sticky page chrome dùng marker `data-sticky-level` hoặc primitive chung.
 4. Local vertical scroll phải thuộc danh sách ngoại lệ, có height bound và `data-local-scroll`.
-5. Bảng horizontal-scroll không được giả định `<thead sticky>` sẽ neo theo page.
-6. Mỗi feature mới phải smoke-test long content trên desktop/mobile.
+5. Bảng horizontal-scroll cần sticky header phải dùng component mirror dùng chung.
+6. Chạy `npm run audit:unified-scroll` và smoke-test long content trên desktop/mobile.
 
 ## Kiểm thử và tiêu chí chấp nhận
 
 ### Automated
 
-- Unit test HOC giữ class natural flow.
-- Unit test sticky stack cập nhật CSS variable khi height thay đổi (mock `ResizeObserver`).
+- Unit test registry bao phủ nhiều instance cùng level, mount/unmount, hidden element, resize và offset.
 - Unit test `TabPanel` mặc định không render `overflow-y-auto`.
-- Static audit script tìm `overflow-y-auto`, `overflow-y-scroll`, `overflow-auto` trong page/layout và yêu cầu allowlist/`data-local-scroll`.
+- Static audit script yêu cầu `data-local-scroll`/`data-page-scroll-owner`, chặn hard-coded sticky offset và marker ngoài unified shell.
 
 ### Browser smoke
 
@@ -337,7 +327,6 @@ Viewport:
 
 - Thay đổi visual branding, typography hoặc màu sắc.
 - Xây virtualized table.
-- Cloned/synchronized sticky header cho bảng horizontal-scroll.
 - Thay đổi hành vi chat/dialog ngoài việc đánh dấu local-scroll exception.
 - Chuyển app sang document/body scrolling.
 
@@ -347,7 +336,7 @@ Viewport:
 |--------|------------|
 | Nội dung page dài hơn trước do bỏ panel scroll | Đây là mục tiêu; MainLayout xử lý toàn bộ chiều dài |
 | Sticky bị vô hiệu bởi overflow ancestor | Audit/remove overflow wrappers giữa sticky và MainLayout |
-| Nhiều sticky bar overlap | Gom vào một `UnifiedStickyStack`, đo height tự động |
-| Bảng rộng mất sticky thead | Dùng bounded grid khi sticky thead là yêu cầu nghiệp vụ |
+| Nhiều sticky bar overlap | Registry cộng offset theo level và lấy max giữa các instance cùng level |
+| Bảng rộng mất sticky thead | Dùng header mirror dùng chung; bounded grid chỉ dành cho workspace có chủ đích |
 | Mobile bottom nav che nội dung | Giữ safe-area padding hiện tại và smoke-test |
 | Panel split-pane mất tính sử dụng | Giữ local scroll có chủ đích, đánh dấu exception |

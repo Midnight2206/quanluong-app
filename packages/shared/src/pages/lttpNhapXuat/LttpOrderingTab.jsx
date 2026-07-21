@@ -551,6 +551,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             <CardContent className="!p-0">
               <div
                 data-lttp-ordering-table-scroll
+                data-local-scroll="true"
                 style={{ maxHeight: "70vh" }}
                 className="min-w-0 overflow-auto overscroll-x-contain pr-3 [-webkit-overflow-scrolling:touch]"
               >
@@ -573,7 +574,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       <th
                         scope="col"
                         className={cn(
-                          "sticky top-2 z-40 border-b border-r border-border !bg-muted px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
+                          "sticky top-0 z-40 border-b border-r border-border !bg-muted px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
                           "print:relative print:top-auto print:shadow-none",
                         )}
                         style={{ ...ORDER_COL_STYLE.index, left: ORDER_STICKY_LEFT_PX.index }}
@@ -583,7 +584,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       <th
                         scope="col"
                         className={cn(
-                          "sticky top-2 z-40 border-b border-r border-border !bg-muted px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
+                          "sticky top-0 z-40 border-b border-r border-border !bg-muted px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
                           "print:relative print:top-auto print:shadow-none",
                         )}
                         style={{ ...ORDER_COL_STYLE.name, left: ORDER_STICKY_LEFT_PX.name }}
@@ -593,7 +594,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       <th
                         scope="col"
                         className={cn(
-                          "sticky top-2 z-40 border-b border-r border-border !bg-muted px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
+                          "sticky top-0 z-40 border-b border-r border-border !bg-muted px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
                           "print:relative print:top-auto print:shadow-none",
                         )}
                         style={{ ...ORDER_COL_STYLE.unit, left: ORDER_STICKY_LEFT_PX.unit }}
@@ -607,7 +608,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                             key={col.key}
                             scope="col"
                             className={cn(
-                              "sticky top-2 z-40 border-b border-l border-border/60 !bg-muted px-1.5 py-2 align-top shadow-sm",
+                              "sticky top-0 z-40 border-b border-l border-border/60 !bg-muted px-1.5 py-2 align-top shadow-sm",
                               tint.cell,
                               "print:relative print:top-auto print:shadow-none",
                             )}
@@ -629,7 +630,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       <th
                         scope="col"
                         className={cn(
-                          "sticky top-2 z-40 border-b border-l-2 border-primary/40 !bg-muted px-1.5 py-2.5 text-center text-[11px] font-bold uppercase text-primary shadow-sm sm:text-[10px]",
+                          "sticky top-0 z-40 border-b border-l-2 border-primary/40 !bg-muted px-1.5 py-2.5 text-center text-[11px] font-bold uppercase text-primary shadow-sm sm:text-[10px]",
                           "print:relative print:top-auto print:shadow-none",
                         )}
                         style={ORDER_COL_STYLE.total}
@@ -683,7 +684,10 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
               <p className="text-sm font-medium text-white">Ảnh toàn bộ bảng đặt hàng</p>
               <span className="text-[11px] text-white/75">Vuốt để xem toàn bộ ảnh</span>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-1 pb-16">
+            <div
+              data-local-scroll="true"
+              className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-1 pb-16"
+            >
               {tablePreviewImageUrl ? (
                 <img src={tablePreviewImageUrl} alt="Ảnh chụp bảng đặt hàng" className="mx-auto h-auto max-w-none rounded-md" />
               ) : (

@@ -58,7 +58,11 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
   return (
     <>
       <aside className="hidden h-full w-24 shrink-0 flex-col border-r border-border bg-card text-card-foreground print:hidden lg:flex">
-        <nav className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 py-4" aria-label="Điều hướng chính">
+        <nav
+          data-local-scroll="true"
+          className="flex flex-1 flex-col gap-2 overflow-y-auto px-2 py-4"
+          aria-label="Điều hướng chính"
+        >
           {visibleItems.map((item) => {
             const classNameBuilder = ({ isActive }) => {
               const active = navItemPathMatches(item, pathname) || isActive;

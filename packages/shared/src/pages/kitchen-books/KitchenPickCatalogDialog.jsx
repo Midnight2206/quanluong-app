@@ -55,7 +55,10 @@ export function KitchenPickCatalogDialog({ open, onClose, unitId, menuDate, meal
             />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-2 py-2">
+        <div
+          className="flex-1 overflow-y-auto overscroll-contain px-2 py-2"
+          data-local-scroll="true"
+        >
           {isLoading ? (
             <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />

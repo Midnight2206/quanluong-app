@@ -210,7 +210,10 @@ export function LttpIssueSlipPrintDialog({
         </div>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,22rem)_1fr]">
-          <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain border-b border-border p-4 lg:border-b-0 lg:border-r sm:p-5">
+          <div
+            data-local-scroll="true"
+            className="min-h-0 space-y-3 overflow-y-auto overscroll-contain border-b border-border p-4 lg:border-b-0 lg:border-r sm:p-5"
+          >
             <p className="text-[10px] font-medium uppercase text-muted-foreground">
               Tuỳ chọn bản in
             </p>
@@ -368,7 +371,10 @@ export function LttpIssueSlipPrintDialog({
             </p>
           </div>
 
-          <div className="min-h-0 overflow-auto bg-muted/30 p-3 sm:p-4">
+          <div
+            data-local-scroll="true"
+            className="min-h-0 overflow-auto bg-muted/30 p-3 sm:p-4"
+          >
             <p className="mb-2 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
               Xem trước
             </p>

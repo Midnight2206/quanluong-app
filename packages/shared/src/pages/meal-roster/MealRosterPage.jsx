@@ -83,7 +83,12 @@ export function MealRosterPage() {
           {
             id: "ledger",
             label: "Sổ chấm cơm",
-            panel: <MealRosterLedgerTab {...tabProps} />,
+            panel: (
+              <MealRosterLedgerTab
+                {...tabProps}
+                stickyTabListLevel={1}
+              />
+            ),
           },
         ]}
       />

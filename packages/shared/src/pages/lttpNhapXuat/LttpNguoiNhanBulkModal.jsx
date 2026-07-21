@@ -162,7 +162,10 @@ export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
           </Button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div
+          data-local-scroll="true"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        >
           <div className="overflow-x-auto p-3 sm:p-4">
             {listLoad ? (
               <p className="px-2 py-4 text-[11px] text-muted-foreground">

@@ -440,6 +440,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             </div>
           </div>
           <div
+            data-local-scroll="true"
             className={cn(
               "grid gap-1 overflow-auto rounded-xl border border-border bg-background/80 p-2 sm:grid-cols-2",
               unitsListMaxH,

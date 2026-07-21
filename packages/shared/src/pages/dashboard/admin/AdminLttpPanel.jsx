@@ -40,7 +40,8 @@ import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { resolveDefaultLttpStorageUnitId, LTTP_STORAGE_UNIT_NAME } from "@/pages/lttpNhapXuat/lttpStorageUnitDefault";
 import { DASHBOARD_LTTP_SUB_ACCESS_KEY } from "@/features/route-access/routeAccessRegistry";
 import { GuardedNavLink } from "@/hocs/GuardedNavLink";
-import { ResponsiveTableWrap, ScrollableHorizontalStrip } from "@/components/common/ScrollableHorizontalStrip";
+import { ScrollableHorizontalStrip } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
 import httpClient from "@/services/httpClient";
@@ -889,7 +890,7 @@ export function AdminLttpPanel({
                     </Button>
                   </form>
                   {fgCatLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
-                  <ResponsiveTableWrap className="border-border/60">
+                  <StickyResponsiveTable stickyLevel={1} className="border-border/60">
                     <table className="w-full min-w-[520px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="border-b border-border bg-secondary/40 text-[10px] uppercase text-muted-foreground">
@@ -927,7 +928,7 @@ export function AdminLttpPanel({
                         ))}
                       </tbody>
                     </table>
-                  </ResponsiveTableWrap>
+                  </StickyResponsiveTable>
                 </div>
               ) : null}
 
@@ -987,7 +988,7 @@ export function AdminLttpPanel({
                     </form>
                   ) : null}
                   {cLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
-                  <ResponsiveTableWrap className="border-border/60">
+                  <StickyResponsiveTable stickyLevel={1} className="border-border/60">
                     <table className="w-full min-w-[880px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="border-b border-border bg-secondary/40 text-[10px] uppercase text-muted-foreground">
@@ -1062,7 +1063,7 @@ export function AdminLttpPanel({
                         ))}
                       </tbody>
                     </table>
-                  </ResponsiveTableWrap>
+                  </StickyResponsiveTable>
                 </div>
               ) : null}
 
@@ -1126,7 +1127,7 @@ export function AdminLttpPanel({
                     </form>
                   ) : null}
                   {supLoad ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
-                  <ResponsiveTableWrap className="border-border/60">
+                  <StickyResponsiveTable stickyLevel={1} className="border-border/60">
                     <table className="w-full min-w-[640px] border-collapse text-left text-xs">
                       <thead>
                         <tr className="border-b border-border bg-secondary/40 text-[10px] uppercase text-muted-foreground">
@@ -1164,7 +1165,7 @@ export function AdminLttpPanel({
                         ))}
                       </tbody>
                     </table>
-                  </ResponsiveTableWrap>
+                  </StickyResponsiveTable>
                   {!suppliers.length && !supLoad ? (
                     <p className="text-xs text-muted-foreground">Chưa có đối tác nào.</p>
                   ) : null}
@@ -1223,7 +1224,7 @@ export function AdminLttpPanel({
                     <span className="font-medium text-foreground">{effectiveData?.appliedEffectiveDate ?? "—"}</span>
                     {effectiveData?.note ? ` — ${effectiveData.note}` : ""}
                   </p>
-                  <ResponsiveTableWrap className="border-border/60">
+                  <StickyResponsiveTable stickyLevel={1} className="border-border/60">
                     <table className="w-full min-w-[36rem] table-fixed border-collapse text-xs">
                       <colgroup>
                         <col className="w-[9%]" />
@@ -1231,7 +1232,7 @@ export function AdminLttpPanel({
                         <col className="w-[22.5%]" />
                         <col className="w-[22.5%]" />
                       </colgroup>
-                      <thead className="sticky top-0 z-[1] bg-secondary/95 shadow-[0_1px_0_0_hsl(var(--border))] backdrop-blur-sm">
+                      <thead className="bg-secondary/95">
                         <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
                           <th className="border-b border-border px-3 py-2.5 text-left font-semibold">Mã</th>
                           <th className="border-b border-border px-3 py-2.5 text-left font-semibold">Tên</th>
@@ -1271,7 +1272,7 @@ export function AdminLttpPanel({
                         )}
                       </tbody>
                     </table>
-                  </ResponsiveTableWrap>
+                  </StickyResponsiveTable>
                 </div>
               ) : null}
 
@@ -1310,9 +1311,9 @@ export function AdminLttpPanel({
                       <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
                     ) : null}
                   </div>
-                  <ResponsiveTableWrap className="border-border/60">
+                  <StickyResponsiveTable stickyLevel={1} className="border-border/60">
                     <table className="w-full min-w-[56rem] border-collapse text-left text-[11px]">
-                      <thead className="sticky top-0 bg-secondary/90">
+                      <thead className="bg-secondary/90">
                         <tr className="border-b border-border text-[10px] uppercase text-muted-foreground">
                           <th className="px-2 py-1.5">Mã</th>
                           <th className="px-2 py-1.5">Tên</th>
@@ -1374,7 +1375,7 @@ export function AdminLttpPanel({
                         })}
                       </tbody>
                     </table>
-                  </ResponsiveTableWrap>
+                  </StickyResponsiveTable>
                   <Button type="submit" className="gap-1.5 text-xs">
                     <Save className="size-3.5" aria-hidden />
                     Lưu bảng giá
@@ -1458,6 +1459,7 @@ export function AdminLttpPanel({
                     </div>
                     <form
                       onSubmit={onSaveEdit}
+                      data-local-scroll="true"
                       className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"
                     >
                       <div className="grid gap-2 sm:grid-cols-2">
@@ -1546,6 +1548,7 @@ export function AdminLttpPanel({
                     </div>
                     <form
                       onSubmit={onSaveSupEdit}
+                      data-local-scroll="true"
                       className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"
                     >
                       <div className="grid gap-2 sm:grid-cols-2">

@@ -1,0 +1,16 @@
+---
+description: Keep one vertical scroll owner and registry-driven sticky layers
+globs: "{apps,packages}/**/*.{js,jsx,ts,tsx}"
+alwaysApply: false
+---
+
+# Unified page scroll
+
+- Shells own vertical page scrolling through `data-page-scroll-owner="true"` and `UnifiedPageScrollRoot`.
+- Ordinary pages, cards, tables, and tab panels must not add vertical scroll owners.
+- Mark real exceptions—dialogs, popovers, sidebars, chat, and intentionally bounded grids—with `data-local-scroll="true"` and `overscroll-behavior: contain`.
+- Mark page chrome with `data-sticky-level="0"`; nested tabs and table headers use consecutive levels.
+- Do not write hard-coded vertical sticky offsets (`top-*`) for page content. The registry sets `--unified-sticky-top`.
+- Use `TabPanel` for sticky tab bars and `StickyHorizontalTable` or `StickyResponsiveTable` for horizontally scrolling tables.
+- Keep horizontal scrolling local and keyboard reachable; do not reintroduce nested vertical scrolling to solve wide tables.
+- Run `npm run audit:unified-scroll` after changing frontend layout or overflow behavior.

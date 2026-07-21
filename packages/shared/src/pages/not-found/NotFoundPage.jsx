@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Home } from "lucide-react";
+import { UnifiedPageScrollRoot } from "@/hocs/withUnifiedPageScroll";
 import { cn } from "@/utils/cn";
 
 const primaryBtn =
@@ -7,20 +8,25 @@ const primaryBtn =
 
 export function NotFoundPage() {
   return (
-    <div className="page-shell flex min-h-screen items-center justify-center px-4">
-      <div className="max-w-lg space-y-4 rounded-[1.75rem] border bg-card/90 p-8 text-center shadow-float">
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
-          404
-        </p>
-        <h1 className="text-3xl font-semibold">Không tìm thấy trang</h1>
-        <p className="text-sm text-muted-foreground">
-          Đường dẫn này chưa được khai báo hoặc đã được chuyển đi.
-        </p>
-        <Link href="/" className={cn(primaryBtn)}>
-          <Home className="size-4 shrink-0" aria-hidden />
-          <span>Quay về dashboard</span>
-        </Link>
-      </div>
+    <div
+      data-page-scroll-owner="true"
+      className="page-shell overflow-y-auto overscroll-y-contain"
+    >
+      <UnifiedPageScrollRoot className="flex min-h-full items-center justify-center px-4 py-8">
+        <div className="max-w-lg space-y-4 rounded-[1.75rem] border bg-card/90 p-8 text-center shadow-float">
+          <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
+            404
+          </p>
+          <h1 className="text-3xl font-semibold">Không tìm thấy trang</h1>
+          <p className="text-sm text-muted-foreground">
+            Đường dẫn này chưa được khai báo hoặc đã được chuyển đi.
+          </p>
+          <Link href="/" className={cn(primaryBtn)}>
+            <Home className="size-4 shrink-0" aria-hidden />
+            <span>Quay về dashboard</span>
+          </Link>
+        </div>
+      </UnifiedPageScrollRoot>
     </div>
   );
 }

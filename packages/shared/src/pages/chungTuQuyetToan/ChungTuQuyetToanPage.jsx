@@ -37,13 +37,7 @@ export function ChungTuQuyetToanPage() {
 
   return (
     <section className="min-w-0 space-y-3 pb-6">
-      <div className="space-y-2">
-        <h1 className="text-base font-semibold tracking-tight sm:text-lg">
-          Chứng từ quyết toán
-        </h1>
-      </div>
-
-      <Card className="shadow-soft overflow-hidden">
+      <Card className="shadow-soft">
         <CardContent className="p-0">
           <TabPanel
             persistId="chungtu-doc-type-tabs-v1"
@@ -51,8 +45,8 @@ export function ChungTuQuyetToanPage() {
             scrollablePanel={false}
             scrollableTabList
             stickyTabList
+            stickyTabListLevel={0}
             fullBleedInCard
-            stickyTabListTopClassName="top-0"
             tabs={tabs}
           />
         </CardContent>

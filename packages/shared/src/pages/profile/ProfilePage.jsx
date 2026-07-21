@@ -311,7 +311,10 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <header className="mb-6 border-b border-border/80 pb-5">
+      <header
+        data-sticky-level="0"
+        className="unified-sticky-surface mb-6 border-b border-border/80 pb-5"
+      >
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Trang cá nhân</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Cập nhật ảnh đại diện, thông tin liên hệ và mật khẩu. Ảnh đại diện được xử lý qua hàng đợi khi có

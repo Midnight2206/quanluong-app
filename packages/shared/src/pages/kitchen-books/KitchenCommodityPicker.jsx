@@ -70,7 +70,8 @@ export function KitchenCommodityPicker({ commodities, commodityId, onPick, disab
     open && anchor && typeof document !== "undefined"
       ? createPortal(
           <ul
-            className="fixed z-[200] max-h-56 overflow-auto rounded-md border border-border bg-popover py-1 text-sm shadow-lg"
+            className="fixed z-[200] max-h-56 overflow-auto overscroll-contain rounded-md border border-border bg-popover py-1 text-sm shadow-lg"
+            data-local-scroll="true"
             style={{
               top: anchor.bottom + 4,
               left: anchor.left,

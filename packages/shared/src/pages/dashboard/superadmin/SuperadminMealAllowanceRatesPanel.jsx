@@ -3,7 +3,7 @@ import { Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
-import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { DashboardMealRateCard } from "@/pages/dashboard/components/DashboardMealRateCard";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
@@ -204,9 +204,9 @@ export function SuperadminMealAllowanceRatesPanel() {
 
         {!isLoading && !isError ? (
           isDesktop ? (
-            <ResponsiveTableWrap className="border-border/60">
+            <StickyResponsiveTable stickyLevel={1} className="border-border/60">
               <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
-                <thead className="sticky top-0 z-[1] bg-secondary/95">
+                <thead className="bg-secondary/95">
                   <tr className="border-b border-border text-[10px] uppercase text-muted-foreground">
                     <th className="px-2 py-2 font-medium">Loại</th>
                     <th className="min-w-[12rem] px-2 py-2 font-medium">Đối tượng</th>
@@ -254,7 +254,7 @@ export function SuperadminMealAllowanceRatesPanel() {
                   )}
                 </tbody>
               </table>
-            </ResponsiveTableWrap>
+            </StickyResponsiveTable>
           ) : (
             <div className="space-y-0 px-3 sm:space-y-2 sm:px-0">
               {filtered.length === 0 ? (
@@ -314,6 +314,7 @@ export function SuperadminMealAllowanceRatesPanel() {
             </div>
             <form
               onSubmit={onCreate}
+              data-local-scroll="true"
               className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"
             >
               <label className="block space-y-0.5">
@@ -403,6 +404,7 @@ export function SuperadminMealAllowanceRatesPanel() {
                 e.preventDefault();
                 void saveEdit();
               }}
+              data-local-scroll="true"
               className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"
             >
               <label className="block space-y-0.5">

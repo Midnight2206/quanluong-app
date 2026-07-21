@@ -3,6 +3,7 @@ import { ClipboardPaste, Download, Eye, Loader2, Plus, Trash2, Upload } from "lu
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import {
   useCopyMealRosterPreviousMutation,
   useCreateMealRosterEntryMutation,
@@ -424,7 +425,7 @@ export function MealRosterGuarantyTab({
         </p>
       ) : null}
 
-      <div className="min-w-0 overflow-x-auto rounded-md border border-border">
+      <StickyResponsiveTable stickyLevel={1} ariaLabel="Danh sách bảo đảm">
         <table className="w-full min-w-[720px] table-auto border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
@@ -569,7 +570,7 @@ export function MealRosterGuarantyTab({
             )}
           </tbody>
         </table>
-      </div>
+      </StickyResponsiveTable>
 
       <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 p-3 sm:p-4">
         <p className="mb-2 text-xs font-medium text-muted-foreground">Thêm dòng mới</p>

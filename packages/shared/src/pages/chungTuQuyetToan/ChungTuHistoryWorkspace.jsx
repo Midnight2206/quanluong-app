@@ -3,7 +3,7 @@
 import { ExternalLink, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { cn } from "@/utils/cn";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useHasPermission } from "@/features/auth/model/authSlice";
@@ -191,7 +191,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
           ))}
         </ChungTuExportWizardCard>
       ) : (
-        <ResponsiveTableWrap className="border-border/80">
+        <StickyResponsiveTable stickyLevel={2} className="border-border/80">
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead>
               <tr className="border-b border-border/80 bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -273,7 +273,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
               })}
             </tbody>
           </table>
-        </ResponsiveTableWrap>
+        </StickyResponsiveTable>
       )}
     </div>
   );

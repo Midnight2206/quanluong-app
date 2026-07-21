@@ -11,6 +11,7 @@ import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
 import { TabPanel } from "@/components/common/TabPanel";
 import { useSyncPersistedNavTabFromRoute, writePersistedNavTab } from "@/hooks/usePersistedNavTab";
+import { cn } from "@/utils/cn";
 import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpOrderingTab } from "./LttpOrderingTab";
@@ -93,8 +94,14 @@ export function LttpNhapXuatPage() {
   const [bulkBuyerOpen, setBulkBuyerOpen] = useState(false);
   const [editingSlip, setEditingSlip] = useState(null);
   const [tabRemountKey, setTabRemountKey] = useState(0);
+  const [isToolbarCompact, setIsToolbarCompact] = useState(false);
+  const effectiveUnitId = useMemo(
+    () => manualUnitId ?? selectedUnitId,
+    [manualUnitId, selectedUnitId],
+  );
 
   const didRestoreManualUnitRef = useRef(false);
+  const toolbarSentinelRef = useRef(null);
   useEffect(() => {
     didRestoreManualUnitRef.current = false;
   }, [user?.id]);
@@ -121,6 +128,20 @@ export function LttpNhapXuatPage() {
     writeStoredManualUnitId(null);
     setEditingSlip(null);
   }, [workingUnitId]);
+
+  useEffect(() => {
+    const sentinel = toolbarSentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") {
+      return undefined;
+    }
+    const scrollOwner = sentinel.closest("[data-page-scroll-owner]");
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsToolbarCompact(!entry.isIntersecting),
+      { root: scrollOwner, threshold: 0, rootMargin: "-1px 0px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [canPickUnits, effectiveUnitId]);
 
   const persistManualUnitId = useCallback((next) => {
     setManualUnitId(next);
@@ -159,8 +180,6 @@ export function LttpNhapXuatPage() {
     orderingRouteForced ? LTTP_ORDER_TAB_ID : undefined,
   );
 
-  const effectiveUnitId = useMemo(() => manualUnitId ?? selectedUnitId, [manualUnitId, selectedUnitId]);
-
   /** Dropdown kho: user thường chỉ các đơn vị trong nhánh (path) của đơn vị gốc — khớp scope SUBTREE API. */
   const unitsForKhoDropdown = useMemo(() => {
     if (!isPrivileged && defaultUnitId != null) {
@@ -194,17 +213,43 @@ export function LttpNhapXuatPage() {
 
   return (
     <section className="min-w-0 pb-6 print:hidden">
-      <div className="mb-3">
-        <h1 className="text-base font-semibold tracking-tight sm:text-lg">Nhập xuất LTTP</h1>
-      </div>
-
       {canPickUnits && unitsForKhoDropdown.length > 0 && effectiveUnitId != null ? (
-        <div className="mb-3 flex flex-col gap-3 rounded-xl border border-border/80 bg-card/40 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-          <label className="min-w-0 flex-1 space-y-1 sm:max-w-md" htmlFor="lttp-io-unit">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">Đơn vị cấp phát (kho dữ liệu)</span>
+        <>
+          <div ref={toolbarSentinelRef} className="h-px" aria-hidden />
+          <div
+            data-sticky-level="0"
+            data-toolbar-compact={isToolbarCompact ? "true" : "false"}
+            className={cn(
+              "unified-sticky-surface mb-3 grid min-w-0 gap-3 rounded-xl border border-border/80 bg-background/95 shadow-sm transition-[padding,gap,border-radius] duration-200",
+              isToolbarCompact
+                ? "grid-cols-1 p-1.5 sm:p-2"
+                : "p-3 sm:grid-cols-2 sm:items-end lg:grid-cols-[minmax(18rem,1fr)_auto]",
+            )}
+          >
+          <label
+            className={cn(
+              "min-w-0 space-y-1",
+              isToolbarCompact
+                ? "w-full sm:max-w-sm xl:max-w-md"
+                : "sm:col-span-2 lg:col-span-1 lg:max-w-md",
+            )}
+            htmlFor="lttp-io-unit"
+          >
+            <span
+              className={cn(
+                "text-[10px] font-semibold uppercase tracking-wide text-foreground",
+                isToolbarCompact && "sr-only",
+              )}
+            >
+              Đơn vị cấp phát (kho dữ liệu)
+            </span>
             <select
               id="lttp-io-unit"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium outline-none focus:border-primary"
+              aria-label={isToolbarCompact ? "Đơn vị cấp phát" : undefined}
+              className={cn(
+                "w-full rounded-lg border border-border bg-background px-3 text-sm font-medium outline-none transition-[height,padding] focus:border-primary focus:ring-2 focus:ring-ring/30",
+                isToolbarCompact ? "h-9 py-1.5" : "min-h-10 py-2",
+              )}
               value={String(effectiveUnitId ?? "")}
               onChange={(e) => {
                 const v = e.target.value;
@@ -218,12 +263,12 @@ export function LttpNhapXuatPage() {
               ))}
             </select>
           </label>
-          {canWrite ? (
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {canWrite && !isToolbarCompact ? (
+            <div className="grid w-full grid-cols-1 gap-2 sm:col-span-2 sm:grid-cols-2 lg:col-span-1 lg:w-auto">
               <Button
                 type="button"
                 variant="secondary"
-                className="h-9 w-full gap-2 text-xs sm:w-auto"
+                className="h-auto min-h-10 w-full gap-2 whitespace-normal px-3 py-2 text-xs leading-tight lg:w-auto xl:whitespace-nowrap"
                 onClick={() => setBulkBuyerOpen(true)}
               >
                 <Users className="size-3.5" />
@@ -232,7 +277,7 @@ export function LttpNhapXuatPage() {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-9 w-full gap-2 text-xs sm:w-auto"
+                className="h-auto min-h-10 w-full gap-2 whitespace-normal px-3 py-2 text-xs leading-tight lg:w-auto xl:whitespace-nowrap"
                 onClick={() => setBulkRecipientOpen(true)}
               >
                 <Users className="size-3.5" />
@@ -240,7 +285,8 @@ export function LttpNhapXuatPage() {
               </Button>
             </div>
           ) : null}
-        </div>
+          </div>
+        </>
       ) : null}
 
       {canWrite ? (
@@ -269,6 +315,7 @@ export function LttpNhapXuatPage() {
               key={tabRemountKey}
               scrollablePanel={false}
               stickyTabList
+              stickyTabListLevel={1}
               equalWidthTabs
               persistId={LTTP_TAB_PERSIST_ID}
               defaultTabId="phieu-xuat"

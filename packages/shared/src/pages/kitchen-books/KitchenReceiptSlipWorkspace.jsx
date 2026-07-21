@@ -13,6 +13,7 @@ import { TabPanel } from "@/components/common/TabPanel";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { IssueSlipCommoditySearch } from "@/components/lttp/IssueSlipCommoditySearch";
+import { StickyHorizontalTable } from "@/components/common/StickyHorizontalTable";
 import { readPersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { cn } from "@/utils/cn";
 import {
@@ -66,12 +67,6 @@ const tableInputClass =
 
 const tableQtyDisplayClass =
   "flex h-7 w-full min-w-0 items-center justify-center rounded-md border border-border bg-muted/35 px-0.5 text-center text-[10px] tabular-nums text-muted-foreground";
-
-const TABLE_SCROLL_WRAP =
-  "min-w-0 max-h-[min(70vh,36rem)] overflow-auto overscroll-contain rounded-lg border border-border/60";
-
-const stickyTheadClass =
-  "sticky top-0 z-10 bg-secondary shadow-[0_1px_0_0_hsl(var(--border))]";
 
 const RECEIPT_SUB_TAB_PERSIST = "kitchen-receipt-slip-sub";
 const RECEIPT_SUB_TAB_IDS = ["mua-tt", "tgsx", "tong-hop"];
@@ -488,8 +483,11 @@ export function KitchenReceiptSlipWorkspace({
         {cLoad || effPricesLoading || daySlipLoading ? (
           <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label="Đang tải" />
         ) : null}
-        <div className={TABLE_SCROLL_WRAP}>
-          <table className="w-full min-w-[40rem] table-fixed border-separate border-spacing-0 text-left text-[11px]">
+        <StickyHorizontalTable
+          ariaLabel="Bảng mặt hàng phiếu nhập kho"
+          minWidthClass="min-w-[40rem]"
+          stickyLevel={2}
+          colGroup={
             <colgroup>
               <col style={{ width: "2.5rem" }} />
               <col />
@@ -499,7 +497,9 @@ export function KitchenReceiptSlipWorkspace({
               <col style={{ width: "7rem" }} />
               <col style={{ width: "2.5rem" }} />
             </colgroup>
-            <thead className={stickyTheadClass}>
+          }
+          header={
+            <thead>
               <tr className="text-[9px] uppercase text-muted-foreground">
                 <th className="border-b border-border bg-secondary px-1 py-1.5 text-center">TT</th>
                 <th className="border-b border-border bg-secondary px-1 py-1.5 text-left">
@@ -520,7 +520,9 @@ export function KitchenReceiptSlipWorkspace({
                 <th className="border-b border-border bg-secondary px-0.5 py-1.5" />
               </tr>
             </thead>
-            <tbody>
+          }
+        >
+          <tbody>
               {visibleRows.map((r, i) => {
                 const c = r.commodityId ? comById.get(r.commodityId) : null;
                 const dupRow = isDuplicateRow(r);
@@ -624,9 +626,8 @@ export function KitchenReceiptSlipWorkspace({
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+          </tbody>
+        </StickyHorizontalTable>
       </div>
     );
   }
@@ -644,9 +645,11 @@ export function KitchenReceiptSlipWorkspace({
 
   const tongHopPanel = (
     <div className="flex flex-col gap-2">
-      <div className={TABLE_SCROLL_WRAP}>
-        {/* 1 hàng header = 1 cột body — tránh rowspan/colspan làm lệch cột với table-fixed */}
-        <table className="w-full min-w-[48rem] table-fixed border-separate border-spacing-0 text-left text-[11px]">
+      <StickyHorizontalTable
+        ariaLabel="Bảng tổng hợp phiếu nhập kho"
+        minWidthClass="min-w-[48rem]"
+        stickyLevel={2}
+        colGroup={
           <colgroup>
             <col style={{ width: "2.25rem" }} />
             <col />
@@ -658,7 +661,9 @@ export function KitchenReceiptSlipWorkspace({
             <col style={{ width: "6.5rem" }} />
             <col style={{ width: "6.5rem" }} />
           </colgroup>
-          <thead className={stickyTheadClass}>
+        }
+        header={
+          <thead>
             <tr>
               <th className="border-b border-border bg-secondary px-1 py-1.5 text-center text-[9px] uppercase text-muted-foreground">
                 TT
@@ -681,7 +686,10 @@ export function KitchenReceiptSlipWorkspace({
               </th>
             </tr>
           </thead>
-          <tbody>
+        }
+      >
+        {/* 1 hàng header = 1 cột body — tránh rowspan/colspan làm lệch cột với table-fixed */}
+        <tbody>
             {tongHopRows.map((r, i) => {
               const c = r.commodityId ? comById.get(r.commodityId) : null;
               const name = c?.name ?? "—";
@@ -727,9 +735,8 @@ export function KitchenReceiptSlipWorkspace({
                 </tr>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+        </tbody>
+      </StickyHorizontalTable>
       {tongHopRows.length ? (
         <div className="text-right text-[11px] text-muted-foreground">
           Tổng hợp thành tiền:{" "}
@@ -800,6 +807,8 @@ export function KitchenReceiptSlipWorkspace({
 
       <TabPanel
         scrollablePanel={false}
+        stickyTabList
+        stickyTabListLevel={1}
         scrollableTabList
         equalWidthTabs={false}
         persistId={RECEIPT_SUB_TAB_PERSIST}

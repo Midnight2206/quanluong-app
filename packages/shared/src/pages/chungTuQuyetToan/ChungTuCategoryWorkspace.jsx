@@ -42,8 +42,8 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
       scrollableTabList
       scrollablePanel={false}
       stickyTabList
+      stickyTabListLevel={1}
       fullBleedInCard
-      stickyTabListTopClassName="top-0"
       tabs={tabs}
     />
   );

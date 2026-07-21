@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
-import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import {
   useCreateJobTitleMutation,
   useDeleteJobTitleMutation,
@@ -493,7 +493,7 @@ export function AdminJobTitlesPanel() {
             <p className="text-xs text-destructive">Không tải được danh sách chức danh.</p>
           ) : null}
 
-          <ResponsiveTableWrap className="border-border/60">
+          <StickyResponsiveTable stickyLevel={1} className="border-border/60">
             {jtLoading ? (
               <p className="p-3 text-xs text-muted-foreground">Đang tải…</p>
             ) : (
@@ -579,7 +579,7 @@ export function AdminJobTitlesPanel() {
                 </tbody>
               </table>
             )}
-          </ResponsiveTableWrap>
+          </StickyResponsiveTable>
 
           {canJtPatch ? (
             <JobTitlePermissionsModal
@@ -626,7 +626,7 @@ export function AdminJobTitlesPanel() {
           <CardContent className="flex flex-col gap-2 !p-3 sm:!p-4">
             <p className="shrink-0 text-xs font-medium sm:text-sm">Gán chức danh cho nhân sự (nhận gói phân quyền)</p>
             
-            <ResponsiveTableWrap className="border-border/60">
+            <StickyResponsiveTable stickyLevel={1} className="border-border/60">
               {usLoading ? (
                 <p className="p-3 text-xs text-muted-foreground">Đang tải người dùng…</p>
               ) : (
@@ -723,7 +723,7 @@ export function AdminJobTitlesPanel() {
                   </tbody>
                 </table>
               )}
-            </ResponsiveTableWrap>
+            </StickyResponsiveTable>
           </CardContent>
         </Card>
       ) : (

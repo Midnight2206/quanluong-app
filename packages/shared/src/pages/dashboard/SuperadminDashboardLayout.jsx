@@ -50,52 +50,51 @@ export function SuperadminDashboardLayout({ children }) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-      <header className="shrink-0 flex flex-wrap items-end justify-between gap-2 border-b border-border/60 pb-2">
-        <div className="space-y-1">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Bảng điều khiển</p>
-          <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight sm:text-xl">
-            <LayoutDashboard className="h-5 w-5 text-primary" aria-hidden />
-            Quản lý hệ thống
-          </h1>
-        </div>
-      </header>
+    <div className="min-w-0 space-y-3 pb-6">
+      <div data-sticky-level="0" className="unified-sticky-surface space-y-2">
+        <header className="flex flex-wrap items-end justify-between gap-2 border-b border-border/60 pb-2">
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Bảng điều khiển</p>
+            <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight sm:text-xl">
+              <LayoutDashboard className="h-5 w-5 text-primary" aria-hidden />
+              Quản lý hệ thống
+            </h1>
+          </div>
+        </header>
 
-      <ScrollableHorizontalStrip
-        role="tablist"
-        aria-label="Mục quản lý hệ thống"
-        className="shrink-0 border-b border-border bg-background/80 pb-px backdrop-blur-sm"
-        innerClassName="flex flex-nowrap gap-0.5"
-      >
-        {visibleTabs.map((tab) => {
-          const href = tab.nestedUnder === "lttp" ? "/dashboard/lttp" : `/dashboard/${tab.path}`;
-          const useEnd = tab.nestedUnder !== "lttp";
-          return (
-            <GuardedNavLink
-              key={tab.path}
-              routeAccessKey={tab.routeAccessKey}
-              href={href}
-              end={useEnd}
-              role="tab"
-              className={({ isActive }) =>
-                cn(
-                  "relative shrink-0 whitespace-nowrap rounded-t-md px-2.5 py-2.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-9 sm:text-sm sm:px-3",
-                  isActive
-                    ? "text-foreground after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                )
-              }
-            >
-              {tab.label}
-            </GuardedNavLink>
-          );
-        })}
-      </ScrollableHorizontalStrip>
+        <ScrollableHorizontalStrip
+          role="tablist"
+          aria-label="Mục quản lý hệ thống"
+          className="border-b border-border bg-background/80 pb-px backdrop-blur-sm"
+          innerClassName="flex flex-nowrap gap-0.5"
+        >
+          {visibleTabs.map((tab) => {
+            const href = tab.nestedUnder === "lttp" ? "/dashboard/lttp" : `/dashboard/${tab.path}`;
+            const useEnd = tab.nestedUnder !== "lttp";
+            return (
+              <GuardedNavLink
+                key={tab.path}
+                routeAccessKey={tab.routeAccessKey}
+                href={href}
+                end={useEnd}
+                role="tab"
+                className={({ isActive }) =>
+                  cn(
+                    "relative shrink-0 whitespace-nowrap rounded-t-md px-2.5 py-2.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-9 sm:text-sm sm:px-3",
+                    isActive
+                      ? "text-foreground after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )
+                }
+              >
+                {tab.label}
+              </GuardedNavLink>
+            );
+          })}
+        </ScrollableHorizontalStrip>
+      </div>
 
-      <div
-        role="tabpanel"
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain pr-0.5"
-      >
+      <div role="tabpanel" className="min-w-0">
         {children}
       </div>
     </div>

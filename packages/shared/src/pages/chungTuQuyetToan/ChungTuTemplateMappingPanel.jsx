@@ -3,7 +3,7 @@
 import { Loader2, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { ResponsiveTableWrap } from "@/components/common/ScrollableHorizontalStrip";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   useChungTuTemplateFillMappingQuery,
@@ -370,7 +370,7 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
             ))}
           </div>
         ) : (
-          <ResponsiveTableWrap className="border-border/80">
+          <StickyResponsiveTable stickyLevel={2} className="border-border/80">
             <table className="w-full min-w-[28rem] text-left text-xs">
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-[10px] uppercase text-muted-foreground">
@@ -411,7 +411,7 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
                 ))}
               </tbody>
             </table>
-          </ResponsiveTableWrap>
+          </StickyResponsiveTable>
         )}
       </div>
 
