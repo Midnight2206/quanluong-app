@@ -22,12 +22,12 @@ export function KitchenSoThucDonTab(props) {
     {
       id: "chi-tiet",
       label: "Thực đơn chi tiết",
-      panel: <KitchenMenuDetailTab {...props} canAccess={canAccess} />,
+      panel: <KitchenMenuTab {...props} canAccess={canAccess} />,
     },
     {
       id: "so-thuc-don",
       label: "Sổ thực đơn",
-      panel: <KitchenMenuTab {...props} canAccess={canAccess} />,
+      panel: <KitchenMenuDetailTab {...props} canAccess={canAccess} />,
     },
     {
       id: "ke-hoach-tuan",

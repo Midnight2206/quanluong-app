@@ -85,14 +85,19 @@ export function KitchenMenuDetailTab({
         data-sticky-level="2"
         className="unified-sticky-surface flex flex-wrap items-end justify-between gap-3 border-b border-border/60 bg-background/95 py-2 backdrop-blur-sm"
       >
-        <UnitPicker
-          canPickUnits={canPickUnits}
-          sortedUnits={sortedUnits}
-          selectedUnitId={selectedUnitId}
-          manualUnitId={manualUnitId}
-          setManualUnitId={setManualUnitId}
-          user={user}
-        />
+        <div className="space-y-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Sổ thực đơn — xem tổng hợp (chỉ đọc)
+          </p>
+          <UnitPicker
+            canPickUnits={canPickUnits}
+            sortedUnits={sortedUnits}
+            selectedUnitId={selectedUnitId}
+            manualUnitId={manualUnitId}
+            setManualUnitId={setManualUnitId}
+            user={user}
+          />
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" size="icon" onClick={() => setMenuDate(shiftDate(menuDate, -1))}>
             <ChevronLeft className="h-4 w-4" />
@@ -129,7 +134,7 @@ export function KitchenMenuDetailTab({
         </div>
       ) : !hasAnyDish ? (
         <p className="text-sm text-muted-foreground">
-          Chưa có món cho ngày này. Lập thực đơn ở tab «Sổ thực đơn».
+          Chưa có món cho ngày này. Nhập ở tab «Thực đơn chi tiết».
         </p>
       ) : (
         <>
