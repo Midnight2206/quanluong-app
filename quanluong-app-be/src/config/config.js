@@ -56,6 +56,15 @@ const config = {
     root: env.mediaRoot,
     publicPath: env.mediaPublicPath,
   },
+  menuAi: {
+    provider: env.menuAiProvider,
+    apiKey: env.menuAiApiKey,
+    model:
+      env.menuAiModel ||
+      (env.menuAiProvider === "gemini" ? "gemini-2.0-flash" : "gpt-4o-mini"),
+    baseUrl: env.menuAiBaseUrl,
+    timeoutMs: env.menuAiTimeoutMs,
+  },
   mail: {
     transport: env.mailTransport,
     gmailSenderRefreshToken: env.gmailSenderRefreshToken,

@@ -155,6 +155,17 @@ const env = {
     const p = (process.env.MEDIA_PUBLIC_PATH || "/media").trim().replace(/\/+$/, "") || "/media";
     return p.startsWith("/") ? p : `/${p}`;
   })(),
+  menuAiProvider: (() => {
+    const p = String(process.env.MENU_AI_PROVIDER || "openai").trim().toLowerCase();
+    return p === "gemini" ? "gemini" : "openai";
+  })(),
+  menuAiApiKey: (process.env.MENU_AI_API_KEY || "").trim(),
+  menuAiModel: (process.env.MENU_AI_MODEL || "").trim(),
+  menuAiBaseUrl: (process.env.MENU_AI_BASE_URL || "https://api.openai.com/v1").trim().replace(/\/+$/, ""),
+  menuAiTimeoutMs: (() => {
+    const n = Number(process.env.MENU_AI_TIMEOUT_MS || 60_000);
+    return Number.isFinite(n) && n >= 5_000 ? Math.min(n, 300_000) : 60_000;
+  })(),
 };
 
 export { env };
