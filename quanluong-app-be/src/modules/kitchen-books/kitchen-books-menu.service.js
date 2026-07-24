@@ -7,9 +7,13 @@ import {
   assertKitchenWriteUnit,
   parseDateOnly,
 } from "./kitchen-books-scope.helpers.js";
+import { getEffectivePrices } from "../lttp/lttp.service.js";
 import { getHeadcountsForDay } from "./kitchen-books-headcount.service.js";
 import { mapMenuDish, mapMenuPeriod } from "./kitchen-books.mapper.js";
 import { MEAL_PERIODS } from "./kitchen-books.constants.js";
+import { enrichMenuDayDetail } from "./kitchen-books-menu-detail.js";
+import { scheduleMenuDayVectorUpsert } from "./kitchen-books-menu-ai-vector.js";
+import { formatMenuHistoryForPrompt } from "./kitchen-books-menu-ai-history.js";
 import {
   CATALOG_INCLUDE,
   getCatalogById,
@@ -114,6 +118,23 @@ async function getMenuDay({ unitId, date }, scope, effectiveUnitIds, dataScope) 
   };
 }
 
+async function getMenuDayDetail({ unitId, date }, scope, effectiveUnitIds, dataScope) {
+  const menu = await getMenuDay({ unitId, date }, scope, effectiveUnitIds, dataScope);
+  const eff = await getEffectivePrices({ unitId, date }, scope, effectiveUnitIds, dataScope);
+  const priceByCommodityId = new Map(
+    (eff.items || []).map((item) => [
+      Number(item.commodity?.id),
+      item.unitPrice != null && Number.isFinite(Number(item.unitPrice))
+        ? Number(item.unitPrice)
+        : null,
+    ]),
+  );
+  return enrichMenuDayDetail(menu, priceByCommodityId, {
+    appliedPriceTableId: eff.appliedPriceTableId ?? null,
+    appliedEffectiveDate: eff.appliedEffectiveDate ?? null,
+  });
+}
+
 async function validateDishLines(lines, storageUnitId) {
   if (!Array.isArray(lines)) {
     throw new AppError({
@@ -185,7 +206,51 @@ async function putMenuPeriod(payload, scope, effectiveUnitIds, dataScope) {
     }
   });
 
-  return getMenuDay({ unitId: payload.unitId, date: payload.date }, scope, effectiveUnitIds, dataScope);
+  const saved = await getMenuDay(
+    { unitId: payload.unitId, date: payload.date },
+    scope,
+    effectiveUnitIds,
+    dataScope,
+  );
+  try {
+    const dayRow = await prisma.kitchenMenuDay.findUnique({
+      where: { unitId_menuDate: { unitId: storageUnitId, menuDate } },
+      select: { id: true },
+    });
+    if (dayRow?.id) {
+      const text = formatMenuHistoryForPrompt([
+        {
+          menuDate: payload.date,
+          periods: Object.fromEntries(
+            MEAL_PERIODS.map((meal) => [
+              meal,
+              {
+                dishes: (saved.periods?.[meal]?.dishes || []).map((d) => ({
+                  name: d.name,
+                  lines: (d.lines || []).map((l) => ({
+                    commodityName: l.commodity?.name,
+                    calcMode: l.calcMode,
+                    perPersonAmount: l.perPersonAmount,
+                    perPersonUnit: l.perPersonUnit,
+                    peoplePerUnit: l.peoplePerUnit,
+                  })),
+                })),
+              },
+            ]),
+          ),
+        },
+      ]);
+      scheduleMenuDayVectorUpsert({
+        menuDayId: dayRow.id,
+        unitId: storageUnitId,
+        menuDate: payload.date,
+        text,
+      });
+    }
+  } catch {
+    /* index scaffold must not break save */
+  }
+  return saved;
 }
 
 async function importCatalogToPeriod(payload, scope, effectiveUnitIds, dataScope) {
@@ -313,6 +378,7 @@ async function listMenuMonthMarkers({ unitId, yearMonth }, scope, effectiveUnitI
 
 export {
   getMenuDay,
+  getMenuDayDetail,
   putMenuPeriod,
   importCatalogToPeriod,
   deleteMenuDish,
