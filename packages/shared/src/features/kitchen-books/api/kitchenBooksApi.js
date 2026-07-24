@@ -11,6 +11,7 @@ function invalidateKitchenBooks(qc, unitId, date, yearMonth) {
     qc.invalidateQueries({ queryKey: qk.kitchenBooks.catalog(unitId) });
     if (date) {
       qc.invalidateQueries({ queryKey: qk.kitchenBooks.menu(unitId, date) });
+      qc.invalidateQueries({ queryKey: qk.kitchenBooks.menuDetail(unitId, date) });
     }
     if (yearMonth) {
       qc.invalidateQueries({ queryKey: qk.kitchenBooks.monthMarkers(unitId, yearMonth) });
@@ -42,6 +43,22 @@ export function useGetKitchenMenuQuery(arg, options = {}) {
     queryFn: () =>
       apiRequest({
         url: "/kitchen-books/menu",
+        method: "get",
+        params: { unitId, date },
+      }),
+    enabled: skip !== true && unitId != null && date != null && date !== "",
+    ...rest,
+  });
+}
+
+export function useGetKitchenMenuDetailQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.menuDetail(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/kitchen-books/menu/detail",
         method: "get",
         params: { unitId, date },
       }),
@@ -107,6 +124,25 @@ export function usePutKitchenMenuMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
     mutationFn: (body) => apiRequest({ url: "/kitchen-books/menu", method: "put", data: body }),
+    onSuccess: (_d, vars) => {
+      const ym = vars?.date ? String(vars.date).slice(0, 7) : null;
+      invalidateKitchenBooks(qc, vars?.unitId, vars?.date, ym);
+    },
+  });
+}
+
+export function useSuggestKitchenMenuAiMutation() {
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/menu/ai-suggest", method: "post", data: body }),
+  });
+}
+
+export function useApplyKitchenMenuAiMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/menu/ai-apply", method: "post", data: body }),
     onSuccess: (_d, vars) => {
       const ym = vars?.date ? String(vars.date).slice(0, 7) : null;
       invalidateKitchenBooks(qc, vars?.unitId, vars?.date, ym);

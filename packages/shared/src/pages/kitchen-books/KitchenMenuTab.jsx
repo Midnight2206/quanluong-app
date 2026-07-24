@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BookMarked, ChevronLeft, ChevronRight, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { BookMarked, ChevronLeft, ChevronRight, Loader2, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { useGetLttpCommoditiesQuery } from "@/features/lttp/api/lttpApi";
@@ -10,10 +10,12 @@ import {
   useGetKitchenMenuMonthMarkersQuery,
   useGetKitchenMenuQuery,
   usePutKitchenMenuMutation,
+  useSuggestKitchenMenuAiMutation,
 } from "@/features/kitchen-books/api/kitchenBooksApi";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 import { KitchenCommodityPicker } from "./KitchenCommodityPicker.jsx";
+import { KitchenMenuAiSuggestDialog } from "./KitchenMenuAiSuggestDialog.jsx";
 import { KitchenPickCatalogDialog } from "./KitchenPickCatalogDialog.jsx";
 import {
   MEAL_PERIOD_LABELS,
@@ -73,6 +75,9 @@ export function KitchenMenuTab({
   const [note, setNote] = useState("");
   const [pickOpen, setPickOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPreview, setAiPreview] = useState(null);
+  const [aiWarnings, setAiWarnings] = useState([]);
 
   const skip = !selectedUnitId || !menuDate || !canAccess;
   const { data: menuData, isLoading, isFetching } = useGetKitchenMenuQuery(
@@ -88,6 +93,7 @@ export function KitchenMenuTab({
 
   const [putMenu, { isLoading: saving }] = usePutKitchenMenuMutation();
   const [createCatalog, { isLoading: savingCatalog }] = useCreateKitchenCatalogMutation();
+  const [suggestAi, { isLoading: suggestingAi }] = useSuggestKitchenMenuAiMutation();
 
   const headcount = menuData?.periods?.[mealPeriod]?.headcount ?? menuData?.headcounts?.[mealPeriod] ?? 0;
   const daysWithMenu = useMemo(() => new Set(markers?.daysWithMenu ?? []), [markers]);
@@ -171,6 +177,26 @@ export function KitchenMenuTab({
   function removeDish(idx) {
     setDirty(true);
     setDraftDishes((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function handleAiSuggest() {
+    if (!selectedUnitId || !menuDate) {
+      return;
+    }
+    if (dirty) {
+      const ok = window.confirm("Bạn có thay đổi chưa lưu. Gợi ý AI sẽ không giữ draft hiện tại. Tiếp tục?");
+      if (!ok) {
+        return;
+      }
+    }
+    try {
+      const data = await suggestAi({ unitId: selectedUnitId, date: menuDate }).unwrap();
+      setAiPreview(data);
+      setAiWarnings(data?.warnings ?? []);
+      setAiOpen(true);
+    } catch (e) {
+      notifyError(e?.data?.message ?? "AI gợi ý thất bại");
+    }
   }
 
   async function handleSave() {
@@ -319,6 +345,20 @@ export function KitchenMenuTab({
       </label>
 
       <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!canAccess || suggestingAi || !selectedUnitId || !menuDate}
+          onClick={handleAiSuggest}
+        >
+          {suggestingAi ? (
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="mr-1 h-4 w-4" />
+          )}
+          AI gợi ý ngày
+        </Button>
         <Button type="button" size="sm" variant="outline" onClick={() => setPickOpen(true)}>
           <BookMarked className="mr-1 h-4 w-4" />
           Chọn từ danh mục
@@ -476,6 +516,22 @@ export function KitchenMenuTab({
         unitId={selectedUnitId}
         menuDate={menuDate}
         mealPeriod={mealPeriod}
+      />
+      <KitchenMenuAiSuggestDialog
+        open={aiOpen}
+        onClose={() => {
+          setAiOpen(false);
+          setAiPreview(null);
+          setAiWarnings([]);
+        }}
+        unitId={selectedUnitId}
+        date={menuDate}
+        preview={aiPreview}
+        warnings={aiWarnings}
+        menuData={menuData}
+        onApplied={() => {
+          setDirty(false);
+        }}
       />
     </div>
   );
