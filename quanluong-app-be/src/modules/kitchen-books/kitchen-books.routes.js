@@ -13,6 +13,9 @@ import {
   deleteMenuDishController,
   getCatalogController,
   getMenuController,
+  getMenuDetailController,
+  suggestMenuAiController,
+  applyMenuAiController,
   importCatalogController,
   listCatalogController,
   monthMarkersController,
@@ -30,6 +33,7 @@ import {
   guaranteeFromIssueController,
 } from "./kitchen-books.controller.js";
 import { KITCHEN_BOOKS_ROUTE_DEFINITIONS } from "./kitchen-books.route-definitions.js";
+import { menuAiSuggestRateLimit } from "../../middlewares/menu-ai-rate-limit.middleware.js";
 import {
   catalogIdParamsSchema,
   catalogIdQuerySchema,
@@ -41,6 +45,8 @@ import {
   menuQuerySchema,
   monthMarkersQuerySchema,
   putMenuBodySchema,
+  aiSuggestBodySchema,
+  aiApplyBodySchema,
   updateCatalogBodySchema,
   receiptSlipListQuerySchema,
   receiptSlipIdParamsSchema,
@@ -114,6 +120,31 @@ kitchenBooksRouter.get(
   validateRequest({ query: menuQuerySchema }),
   permissionMiddleware([routePermissions.getKitchenMenu]),
   asyncHandler(getMenuController),
+);
+
+kitchenBooksRouter.get(
+  "/menu/detail",
+  dataScopeMw,
+  validateRequest({ query: menuQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenMenuDetail]),
+  asyncHandler(getMenuDetailController),
+);
+
+kitchenBooksRouter.post(
+  "/menu/ai-suggest",
+  dataScopeMw,
+  validateRequest({ body: aiSuggestBodySchema }),
+  permissionMiddleware([routePermissions.suggestKitchenMenuAi]),
+  menuAiSuggestRateLimit,
+  asyncHandler(suggestMenuAiController),
+);
+
+kitchenBooksRouter.post(
+  "/menu/ai-apply",
+  dataScopeMw,
+  validateRequest({ body: aiApplyBodySchema }),
+  permissionMiddleware([routePermissions.applyKitchenMenuAi]),
+  asyncHandler(applyMenuAiController),
 );
 
 kitchenBooksRouter.put(

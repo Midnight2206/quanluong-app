@@ -9,10 +9,12 @@ import {
 import {
   deleteMenuDish,
   getMenuDay,
+  getMenuDayDetail,
   importCatalogToPeriod,
   listMenuMonthMarkers,
   putMenuPeriod,
 } from "./kitchen-books-menu.service.js";
+import { applyMenuDayAi, suggestMenuDay } from "./kitchen-books-menu-ai.service.js";
 import {
   createKitchenReceiptSlip,
   deleteKitchenReceiptSlip,
@@ -87,6 +89,36 @@ async function getMenuController(req, res) {
     req.dataScope,
   );
   return respondSuccess(res, { message: "Đã tải thực đơn ngày", data });
+}
+
+async function getMenuDetailController(req, res) {
+  const data = await getMenuDayDetail(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã tải thực đơn chi tiết", data });
+}
+
+async function suggestMenuAiController(req, res) {
+  const data = await suggestMenuDay(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã tạo gợi ý thực đơn", data });
+}
+
+async function applyMenuAiController(req, res) {
+  const data = await applyMenuDayAi(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã áp dụng gợi ý AI", data });
 }
 
 async function putMenuController(req, res) {
@@ -246,6 +278,9 @@ export {
   updateCatalogController,
   deleteCatalogController,
   getMenuController,
+  getMenuDetailController,
+  suggestMenuAiController,
+  applyMenuAiController,
   putMenuController,
   importCatalogController,
   monthMarkersController,
