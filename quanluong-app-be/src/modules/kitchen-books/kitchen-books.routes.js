@@ -11,6 +11,11 @@ import {
   createCatalogController,
   deleteCatalogController,
   deleteMenuDishController,
+  listMenuSamplesController,
+  createMenuSampleController,
+  updateMenuSampleController,
+  deleteMenuSampleController,
+  applyMenuSampleController,
   getCatalogController,
   getMenuController,
   getMenuDetailController,
@@ -42,6 +47,10 @@ import {
   deleteDishQuerySchema,
   dishIdParamsSchema,
   importCatalogBodySchema,
+  menuSamplesListQuerySchema,
+  menuSampleBodySchema,
+  menuSampleIdParamsSchema,
+  applyMenuSampleBodySchema,
   menuQuerySchema,
   monthMarkersQuerySchema,
   putMenuBodySchema,
@@ -177,6 +186,46 @@ kitchenBooksRouter.delete(
   validateRequest({ params: dishIdParamsSchema, query: deleteDishQuerySchema }),
   permissionMiddleware([routePermissions.deleteKitchenMenuDish]),
   asyncHandler(deleteMenuDishController),
+);
+
+kitchenBooksRouter.get(
+  "/menu-samples",
+  dataScopeMw,
+  validateRequest({ query: menuSamplesListQuerySchema }),
+  permissionMiddleware([routePermissions.listKitchenMenuSamples]),
+  asyncHandler(listMenuSamplesController),
+);
+
+kitchenBooksRouter.post(
+  "/menu-samples",
+  dataScopeMw,
+  validateRequest({ body: menuSampleBodySchema }),
+  permissionMiddleware([routePermissions.createKitchenMenuSample]),
+  asyncHandler(createMenuSampleController),
+);
+
+kitchenBooksRouter.put(
+  "/menu-samples/:id",
+  dataScopeMw,
+  validateRequest({ params: menuSampleIdParamsSchema, body: menuSampleBodySchema }),
+  permissionMiddleware([routePermissions.updateKitchenMenuSample]),
+  asyncHandler(updateMenuSampleController),
+);
+
+kitchenBooksRouter.delete(
+  "/menu-samples/:id",
+  dataScopeMw,
+  validateRequest({ params: menuSampleIdParamsSchema, query: catalogIdQuerySchema }),
+  permissionMiddleware([routePermissions.deleteKitchenMenuSample]),
+  asyncHandler(deleteMenuSampleController),
+);
+
+kitchenBooksRouter.post(
+  "/menu-samples/:id/apply",
+  dataScopeMw,
+  validateRequest({ params: menuSampleIdParamsSchema, body: applyMenuSampleBodySchema }),
+  permissionMiddleware([routePermissions.applyKitchenMenuSample]),
+  asyncHandler(applyMenuSampleController),
 );
 
 kitchenBooksRouter.get(
