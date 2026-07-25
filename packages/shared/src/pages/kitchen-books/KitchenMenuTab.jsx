@@ -128,7 +128,11 @@ export function KitchenMenuTab({
 
   const skip = !selectedUnitId || !canAccess;
   const { data: commodities } = useGetLttpCommoditiesQuery(selectedUnitId, { skip });
-  const { data: mealMeta } = useGetMealRosterMetaQuery({ unitId: selectedUnitId }, { skip });
+  const {
+    data: mealMeta,
+    error: mealMetaError,
+    isError: isMealMetaError,
+  } = useGetMealRosterMetaQuery({ unitId: selectedUnitId }, { skip });
   const { data: samples, isLoading: loadingSamples } = useGetKitchenMenuSamplesQuery(
     { unitId: selectedUnitId, mealPeriod, rateId },
     { skip: skip || !rateId },
@@ -139,6 +143,8 @@ export function KitchenMenuTab({
   const commodityList = commodities ?? [];
   const rateList = mealMeta?.rates ?? [];
   const needsMealRateSelection = Boolean(mealMeta?.needsMealRateSelection);
+  const mealMetaForbidden = mealMetaError?.status === 403 || mealMetaError?.response?.status === 403;
+  const mealRateUnavailable = Boolean(selectedUnitId && (isMealMetaError || (mealMeta && rateList.length === 0)));
   const saving = creating || updating;
 
   useEffect(() => {
@@ -147,8 +153,9 @@ export function KitchenMenuTab({
 
   useEffect(() => {
     const unitChanged = previousUnitId.current !== selectedUnitId;
+    const initialUnitResolution = previousUnitId.current == null && selectedUnitId != null;
     previousUnitId.current = selectedUnitId;
-    if (unitChanged) {
+    if (unitChanged && !initialUnitResolution) {
       setRateId(null);
       return;
     }
@@ -262,6 +269,29 @@ export function KitchenMenuTab({
       notifyError("Chọn mức tiền ăn trước khi lưu mẫu");
       return;
     }
+    if (draftDishes.length === 0 || draftDishes.some((dish) => !String(dish.name).trim())) {
+      notifyError("Cần thêm ít nhất một món có tên trước khi lưu mẫu.");
+      return;
+    }
+    const hasInvalidLine = draftDishes.some((dish) =>
+      dish.lines.length === 0 ||
+      dish.lines.some((line) => {
+        if (!Number.isInteger(Number(line.commodityId)) || Number(line.commodityId) <= 0) {
+          return true;
+        }
+        return line.calcMode === "per_person"
+          ? !Number.isFinite(Number(line.perPersonAmount)) ||
+              Number(line.perPersonAmount) <= 0 ||
+              !["g", "ml"].includes(line.perPersonUnit)
+          : line.calcMode !== "per_unit_shared" ||
+              !Number.isFinite(Number(line.peoplePerUnit)) ||
+              Number(line.peoplePerUnit) <= 0;
+      }),
+    );
+    if (hasInvalidLine) {
+      notifyError("Mỗi món cần ít nhất một dòng LTTP hợp lệ.");
+      return;
+    }
     const dishes = draftDishes.map((dish, dishIndex) => ({
       name: String(dish.name).trim(),
       sortOrder: dishIndex,
@@ -344,9 +374,10 @@ export function KitchenMenuTab({
         </div>
       </div>
 
-      {needsMealRateSelection ? (
+      {needsMealRateSelection || mealRateUnavailable ? (
         <p className="text-sm text-amber-700 dark:text-amber-200">
-          Chưa chọn mức tiền ăn áp dụng cho đơn vị — mở Sổ chấm cơm để chọn mức, rồi quay lại đây.
+          Đơn vị cần chọn mức tiền ăn trong Sổ chấm cơm trước khi lập thực đơn mẫu.
+          {mealMetaForbidden ? " Bạn có thể cần quyền mealRoster.access." : ""}
         </p>
       ) : null}
       {dirty ? (
@@ -455,7 +486,12 @@ export function KitchenMenuTab({
                       type="button"
                       aria-label="Xóa nguyên liệu"
                       className="self-center rounded p-1 text-muted-foreground hover:text-destructive"
-                      onClick={() => updateDish(dishIndex, { lines: dish.lines.filter((_, index) => index !== lineIndex) })}
+                    disabled={dish.lines.length === 1}
+                    onClick={() => {
+                      if (dish.lines.length > 1) {
+                        updateDish(dishIndex, { lines: dish.lines.filter((_, index) => index !== lineIndex) });
+                      }
+                    }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

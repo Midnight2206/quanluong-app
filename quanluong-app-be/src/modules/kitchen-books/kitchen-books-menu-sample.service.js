@@ -10,6 +10,7 @@ import { getMenuDay, putMenuPeriod } from "./kitchen-books-menu.service.js";
 import { MEAL_PERIODS } from "./kitchen-books.constants.js";
 import { assertStandardMealRateForUnit } from "../meal-roster/meal-roster.service.js";
 import { normalizeSampleDishes, buildSampleVectorPayload } from "./kitchen-books-menu-sample-normalize.js";
+import { dishesJsonToPutMenuDishes, periodHasDishes } from "./kitchen-books-menu-sample-apply.js";
 import { scheduleMenuSampleVectorUpsert } from "./kitchen-books-menu-ai-vector.js";
 
 const SAMPLE_INCLUDE = {
@@ -59,25 +60,6 @@ function serializeSample(row) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
-}
-
-function dishesJsonToPutMenuDishes(dishesJson) {
-  return (Array.isArray(dishesJson) ? dishesJson : []).map((dish, index) => ({
-    name: dish.name,
-    sortOrder: dish.sortOrder ?? index,
-    lines: (Array.isArray(dish.lines) ? dish.lines : []).map((line, lineIndex) => ({
-      commodityId: line.commodityId,
-      calcMode: line.calcMode,
-      perPersonAmount: line.perPersonAmount,
-      perPersonUnit: line.perPersonUnit,
-      peoplePerUnit: line.peoplePerUnit,
-      sortOrder: line.sortOrder ?? lineIndex,
-    })),
-  }));
-}
-
-function periodHasDishes(menuDayPeriods, mealPeriod) {
-  return Array.isArray(menuDayPeriods?.[mealPeriod]?.dishes) && menuDayPeriods[mealPeriod].dishes.length > 0;
 }
 
 async function getSampleOrThrow(id, unitId, scope, effectiveUnitIds, dataScope) {
@@ -130,7 +112,7 @@ async function createMenuSample(payload, userId, scope, effectiveUnitIds, dataSc
   assertKitchenWriteUnit(payload.unitId, scope, effectiveUnitIds);
   assertMealPeriod(payload.mealPeriod);
   const storageUnitId = dataScope.storageUnitId;
-  await assertStandardMealRateForUnit(storageUnitId, payload.mealAllowanceRateId);
+  await assertStandardMealRateForUnit(dataScope.logicalUnitId, payload.mealAllowanceRateId);
   const dishesJson = await validateSampleDishesAgainstScope(payload.dishes, storageUnitId);
   const row = await prisma.kitchenMenuSample.create({
     data: {
@@ -152,7 +134,7 @@ async function updateMenuSample(id, payload, userId, scope, effectiveUnitIds, da
   const mealPeriod = payload.mealPeriod ?? existing.mealPeriod;
   const mealAllowanceRateId = payload.mealAllowanceRateId ?? existing.mealAllowanceRateId;
   assertMealPeriod(mealPeriod);
-  await assertStandardMealRateForUnit(storageUnitId, mealAllowanceRateId);
+  await assertStandardMealRateForUnit(dataScope.logicalUnitId, mealAllowanceRateId);
   const dishesJson =
     payload.dishes != null
       ? await validateSampleDishesAgainstScope(payload.dishes, storageUnitId)
@@ -190,6 +172,7 @@ async function applyMenuSample(id, body, scope, effectiveUnitIds, dataScope) {
       unitId,
       date: body.date,
       mealPeriod: sample.mealPeriod,
+      note: menuPreview.periods[sample.mealPeriod]?.note ?? null,
       dishes: dishesJsonToPutMenuDishes(sample.dishesJson),
     },
     scope,
@@ -203,8 +186,6 @@ export {
   applyMenuSample,
   createMenuSample,
   deleteMenuSample,
-  dishesJsonToPutMenuDishes,
   listMenuSamples,
-  periodHasDishes,
   updateMenuSample,
 };

@@ -3,15 +3,21 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/contexts/ConfirmProvider";
 import { useApplyKitchenMenuSampleMutation } from "@/features/kitchen-books/api/kitchenBooksApi";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { MEAL_PERIOD_LABELS } from "./KitchenDishCatalogTab.jsx";
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export function KitchenMenuSampleApplyDialog({ open, onClose, sample, unitId }) {
+  const { confirm } = useConfirm();
   const [date, setDate] = useState(today);
   const [applySample, { isLoading: applying }] = useApplyKitchenMenuSampleMutation();
 
@@ -35,9 +41,12 @@ export function KitchenMenuSampleApplyDialog({ open, onClose, sample, unitId }) 
         confirmOverwrite: false,
       }).unwrap();
       if (result.willOverwrite && !result.applied) {
-        const confirmed = window.confirm(
-          `Ngày ${date} đã có món buổi ${MEAL_PERIOD_LABELS[sample.mealPeriod] ?? sample.mealPeriod}. Ghi đè?`,
-        );
+        const confirmed = await confirm({
+          title: "Ghi đè thực đơn?",
+          description: `Ngày ${date} đã có món buổi ${MEAL_PERIOD_LABELS[sample.mealPeriod] ?? sample.mealPeriod}.`,
+          confirmLabel: "Ghi đè",
+          destructive: true,
+        });
         if (!confirmed) {
           return;
         }

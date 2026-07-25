@@ -80,6 +80,10 @@ const dishInputSchema = z.object({
   lines: z.array(lineInputSchema).default([]),
 });
 
+const menuSampleDishInputSchema = dishInputSchema.extend({
+  lines: z.array(lineInputSchema).min(1),
+});
+
 const menuSamplesListQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   mealPeriod: mealPeriodSchema.optional(),
@@ -90,7 +94,7 @@ const menuSampleBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   mealPeriod: mealPeriodSchema,
   rateId: z.coerce.number().int().positive(),
-  dishes: z.array(dishInputSchema).min(1),
+  dishes: z.array(menuSampleDishInputSchema).min(1),
 });
 
 const menuSampleIdParamsSchema = z.object({
@@ -98,6 +102,7 @@ const menuSampleIdParamsSchema = z.object({
 });
 
 const applyMenuSampleBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
   date: dateSchema,
   confirmOverwrite: z.boolean().optional(),
 });

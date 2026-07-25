@@ -1,4 +1,14 @@
 /** Pure normalize + vector text for KitchenMenuSample dishesJson (no Prisma). */
+import { AppError } from "../../errors/app-error.js";
+import { ERROR_CODES } from "../../errors/error-codes.js";
+
+function validationError(message) {
+  return new AppError({
+    message,
+    statusCode: 400,
+    code: ERROR_CODES.VALIDATION_ERROR,
+  });
+}
 
 function normalizeCalcMode(v) {
   return String(v || "").trim() === "per_unit_shared" ? "per_unit_shared" : "per_person";
@@ -11,7 +21,7 @@ function normalizePerPersonUnit(v) {
 function normalizeLine(line, index) {
   const commodityId = Number(line?.commodityId);
   if (!Number.isInteger(commodityId) || commodityId <= 0) {
-    throw new Error(`Dòng LTTP ${index + 1}: thiếu commodityId hợp lệ`);
+    throw validationError(`Dòng LTTP ${index + 1}: thiếu commodityId hợp lệ`);
   }
 
   const calcMode = normalizeCalcMode(line?.calcMode);
@@ -22,7 +32,7 @@ function normalizeLine(line, index) {
     const amount = Number(line?.perPersonAmount);
     const unit = line?.perPersonUnit;
     if (!Number.isFinite(amount) || amount <= 0 || unit == null || String(unit).trim() === "") {
-      throw new Error("per_person cần perPersonAmount và perPersonUnit");
+      throw validationError("per_person cần perPersonAmount và perPersonUnit");
     }
     out.perPersonAmount = amount;
     out.perPersonUnit = normalizePerPersonUnit(unit);
@@ -30,7 +40,7 @@ function normalizeLine(line, index) {
   } else {
     const people = Number(line?.peoplePerUnit);
     if (!Number.isFinite(people) || people <= 0) {
-      throw new Error("per_unit_shared cần peoplePerUnit");
+      throw validationError("per_unit_shared cần peoplePerUnit");
     }
     out.peoplePerUnit = people;
     out.perPersonAmount = null;
@@ -46,18 +56,18 @@ function normalizeLine(line, index) {
  */
 function normalizeSampleDishes(dishes) {
   if (!Array.isArray(dishes) || dishes.length === 0) {
-    throw new Error("Cần ít nhất một món");
+    throw validationError("Cần ít nhất một món");
   }
 
   return dishes.map((dish, di) => {
     const name = String(dish?.name ?? "").trim();
     if (!name) {
-      throw new Error(`Món ${di + 1}: thiếu tên món`);
+      throw validationError(`Món ${di + 1}: thiếu tên món`);
     }
 
     const rawLines = dish?.lines;
     if (!Array.isArray(rawLines) || rawLines.length === 0) {
-      throw new Error(`Món «${name}»: cần ít nhất một dòng LTTP`);
+      throw validationError(`Món «${name}»: cần ít nhất một dòng LTTP`);
     }
 
     const sortOrder = dish?.sortOrder != null ? Number(dish.sortOrder) : di;

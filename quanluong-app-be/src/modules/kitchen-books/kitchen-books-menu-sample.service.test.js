@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   dishesJsonToPutMenuDishes,
   periodHasDishes,
-} from "./kitchen-books-menu-sample.service.js";
+} from "./kitchen-books-menu-sample-apply.js";
 
 test("periodHasDishes true when dishes exist", () => {
   assert.equal(periodHasDishes({ trua: { dishes: [{ name: "A" }] } }, "trua"), true);

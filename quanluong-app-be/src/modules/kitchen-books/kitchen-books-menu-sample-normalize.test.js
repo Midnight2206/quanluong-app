@@ -5,6 +5,7 @@ import {
   formatSampleTextForVector,
   buildSampleVectorPayload,
 } from "./kitchen-books-menu-sample-normalize.js";
+import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
   isQdrantEnabled,
   scheduleMenuSampleVectorUpsert,
@@ -13,6 +14,13 @@ import {
 
 test("normalize rejects empty dishes", () => {
   assert.throws(() => normalizeSampleDishes([]), /ít nhất một món/);
+});
+
+test("normalize reports empty dish lines as validation error", () => {
+  assert.throws(
+    () => normalizeSampleDishes([{ name: "Canh", lines: [] }]),
+    (error) => error.statusCode === 400 && error.code === ERROR_CODES.VALIDATION_ERROR,
+  );
 });
 
 test("normalize keeps per_person line", () => {

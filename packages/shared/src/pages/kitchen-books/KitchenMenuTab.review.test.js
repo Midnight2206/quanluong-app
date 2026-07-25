@@ -21,8 +21,20 @@ test("changing units or loading an invalid rate clears the selected rate", () =>
   assert.match(source, /import \{ useEffect, useRef, useState \} from "react";/);
   assert.match(source, /const previousUnitId = useRef\(selectedUnitId\);/);
   assert.match(source, /previousUnitId\.current !== selectedUnitId/);
+  assert.match(source, /previousUnitId\.current == null/);
   assert.match(source, /setRateId\(null\);/);
   assert.match(source, /needsMealRateSelection \|\| !mealMeta\.rates\.some\(\(rate\) => rate\.id === rateId\)/);
+});
+
+test("blocks saving incomplete sample dishes and protects the final line", () => {
+  assert.match(source, /Cần thêm ít nhất một món có tên trước khi lưu mẫu/);
+  assert.match(source, /Mỗi món cần ít nhất một dòng LTTP hợp lệ/);
+  assert.match(source, /disabled=\{dish\.lines\.length === 1\}/);
+});
+
+test("explains unavailable meal allowance rates", () => {
+  assert.match(source, /Đơn vị cần chọn mức tiền ăn trong Sổ chấm cơm trước khi lập thực đơn mẫu\./);
+  assert.match(source, /mealRoster\.access/);
 });
 
 test("lists filtered samples and wires editing, deletion, and application", () => {

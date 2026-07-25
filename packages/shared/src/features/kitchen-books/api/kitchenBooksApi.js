@@ -147,7 +147,7 @@ export function useDeleteKitchenMenuSampleMutation() {
 export function useApplyKitchenMenuSampleMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
-    mutationFn: ({ id, unitId, ...body }) =>
+    mutationFn: ({ id, ...body }) =>
       apiRequest({
         url: `/kitchen-books/menu-samples/${id}/apply`,
         method: "post",

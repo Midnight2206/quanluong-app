@@ -14,15 +14,15 @@ Bổ sung view **tính tiền + tổng hợp LTTP ngày** trên dữ liệu th�
 | Vị trí | Tab chính **Sổ thực đơn** → 3 tab con |
 | Tab con | **Thực đơn chi tiết** (mặc định) · **Sổ thực đơn** (bảng tổng hợp theo ngày + giá) · **Kế hoạch LTTP tuần** (placeholder) |
 | Thực đơn chi tiết | Form nhập **thực đơn mẫu** (một buổi + mức tiền ăn + món/LTTP) — **không** nhập theo ngày. Chi tiết UI/API/lưu trữ: `2026-07-25-kitchen-menu-sample-design.md` |
-| Sổ thực đơn | View theo **ngày** trên `KitchenMenuDay`: xem/tổng hợp món, LTTP, đơn giá thị trường, thành tiền; nhập/sửa thực đơn ngày (hoặc nhận từ **Áp dụng mẫu**) |
-| Dữ liệu ngày | `KitchenMenuDay` — mẫu (`KitchenMenuSample`) áp dụng sang ngày qua `putMenuPeriod`; tab Sổ thực đơn đọc/ghi dữ liệu ngày |
+| Sổ thực đơn | View theo **ngày** trên `KitchenMenuDay`: chỉ đọc, xem/tổng hợp món, LTTP, đơn giá thị trường, thành tiền. Ghi ngày hiện chỉ qua **Áp dụng mẫu** từ Thực đơn chi tiết; chờ quyết định sản phẩm nếu khôi phục trình sửa ngày. |
+| Dữ liệu ngày | `KitchenMenuDay` — mẫu (`KitchenMenuSample`) áp dụng sang ngày qua `putMenuPeriod`; tab Sổ thực đơn chỉ đọc dữ liệu ngày |
 | Đơn giá | Tự lấy **giá thị trường** (`unitPrice`) từ bảng giá LTTP hiệu lực theo ngày; không sửa trên tab Sổ thực đơn |
 | Layout Sổ thực đơn | Xếp dọc theo bữa + bảng tổng hợp LTTP cuối trang |
 | Schema | Không lưu giá trên dòng thực đơn ngày |
 
 ## API
 
-- Giữ `GET/PUT /kitchen-books/menu` — phục vụ tab **Sổ thực đơn** (nhập/xem theo ngày).
+- Giữ `GET/PUT /kitchen-books/menu` — `GET` phục vụ tab **Sổ thực đơn** chỉ đọc; `PUT` hiện được dùng khi **Áp dụng mẫu** ghi theo ngày.
 - `GET /kitchen-books/menu/detail?unitId&date` — phục vụ tab **Sổ thực đơn** (tính tiền + tổng hợp LTTP):
   - Permission `kitchenBooks.access`, cùng data scope LTTP.
   - Mỗi dòng: `unitPrice`, `lineAmount` (null nếu thiếu giá).
