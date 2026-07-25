@@ -96,46 +96,44 @@ export function writeStoredKitchenYearMonth(ym) {
   writeString(KEYS.yearMonth, typeof ym === "string" && YM_RE.test(ym) ? ym : null);
 }
 
-/** @returns {{ rateId: number|null, amountPerPerson: number|null }} */
+/** @returns {{ mealPeriod: "sang"|"trua"|"chieu", rateId: number|null }} */
 export function readStoredKitchenMenuAllowance() {
   if (typeof sessionStorage === "undefined") {
-    return { rateId: null, amountPerPerson: null };
+    return { mealPeriod: "trua", rateId: null };
   }
   try {
     const raw = sessionStorage.getItem(KEYS.menuAllowance);
     if (!raw) {
-      return { rateId: null, amountPerPerson: null };
+      return { mealPeriod: "trua", rateId: null };
     }
     const o = JSON.parse(raw);
     const rateId = Number(o?.rateId);
-    const amountPerPerson = Number(o?.amountPerPerson);
     return {
+      mealPeriod: ["sang", "trua", "chieu"].includes(o?.mealPeriod) ? o.mealPeriod : "trua",
       rateId: Number.isInteger(rateId) && rateId > 0 ? rateId : null,
-      amountPerPerson: Number.isFinite(amountPerPerson) && amountPerPerson >= 0 ? amountPerPerson : null,
     };
   } catch {
-    return { rateId: null, amountPerPerson: null };
+    return { mealPeriod: "trua", rateId: null };
   }
 }
 
-/** @param {{ rateId?: number|null, amountPerPerson?: number|null }} value */
+/** @param {{ mealPeriod?: "sang"|"trua"|"chieu", rateId?: number|null }} value */
 export function writeStoredKitchenMenuAllowance(value) {
   if (typeof sessionStorage === "undefined") {
     return;
   }
   try {
     const rateId = value?.rateId != null ? Number(value.rateId) : null;
-    const amountPerPerson = value?.amountPerPerson != null ? Number(value.amountPerPerson) : null;
-    if ((rateId == null || !Number.isInteger(rateId)) && (amountPerPerson == null || !Number.isFinite(amountPerPerson))) {
+    const mealPeriod = ["sang", "trua", "chieu"].includes(value?.mealPeriod) ? value.mealPeriod : "trua";
+    if ((rateId == null || !Number.isInteger(rateId)) && mealPeriod === "trua") {
       sessionStorage.removeItem(KEYS.menuAllowance);
       return;
     }
     sessionStorage.setItem(
       KEYS.menuAllowance,
       JSON.stringify({
+        mealPeriod,
         rateId: Number.isInteger(rateId) && rateId > 0 ? rateId : null,
-        amountPerPerson:
-          Number.isFinite(amountPerPerson) && amountPerPerson >= 0 ? amountPerPerson : null,
       }),
     );
   } catch {
