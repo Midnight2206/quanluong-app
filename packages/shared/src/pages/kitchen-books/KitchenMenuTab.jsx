@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/app/query/queryKeys";
 import { BookMarked, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/contexts/ConfirmProvider";
@@ -111,6 +113,7 @@ export function KitchenMenuTab({
   user,
 }) {
   const { confirm } = useConfirm();
+  const queryClient = useQueryClient();
   const [storedAllowance] = useState(readStoredKitchenMenuAllowance);
   const [mealPeriod, setMealPeriod] = useState(storedAllowance.mealPeriod);
   const [rateId, setRateId] = useState(storedAllowance.rateId);
@@ -118,11 +121,12 @@ export function KitchenMenuTab({
   const [dirty, setDirty] = useState(false);
   const [pickOpen, setPickOpen] = useState(false);
   const [editingSampleId, setEditingSampleId] = useState(null);
+  const previousUnitId = useRef(selectedUnitId);
 
   const skip = !selectedUnitId || !canAccess;
   const { data: commodities } = useGetLttpCommoditiesQuery(selectedUnitId, { skip });
   const { data: mealMeta } = useGetMealRosterMetaQuery({ unitId: selectedUnitId }, { skip });
-  const { data: samples } = useGetKitchenMenuSamplesQuery(
+  useGetKitchenMenuSamplesQuery(
     { unitId: selectedUnitId, mealPeriod, rateId },
     { skip: skip || !rateId },
   );
@@ -136,6 +140,18 @@ export function KitchenMenuTab({
   useEffect(() => {
     writeStoredKitchenMenuAllowance({ mealPeriod, rateId });
   }, [mealPeriod, rateId]);
+
+  useEffect(() => {
+    const unitChanged = previousUnitId.current !== selectedUnitId;
+    previousUnitId.current = selectedUnitId;
+    if (unitChanged) {
+      setRateId(null);
+      return;
+    }
+    if (mealMeta && (needsMealRateSelection || !mealMeta.rates.some((rate) => rate.id === rateId))) {
+      setRateId(null);
+    }
+  }, [mealMeta, needsMealRateSelection, rateId, selectedUnitId]);
 
   function updateDish(dishIndex, patch) {
     setDirty(true);
@@ -231,11 +247,14 @@ export function KitchenMenuTab({
       } else {
         await createSample(payload).unwrap();
       }
-      const sampleCount = (samples ?? []).length + (editingSampleId ? 0 : 1);
+      await queryClient.refetchQueries({
+        queryKey: qk.kitchenBooks.menuSamples(selectedUnitId, mealPeriod, rateId),
+      });
+      const refreshedSamples = queryClient.getQueryData(qk.kitchenBooks.menuSamples(selectedUnitId, mealPeriod, rateId)) ?? [];
       setDirty(false);
       setEditingSampleId(null);
       setDraftDishes([]);
-      notifySuccess(`Đã lưu mẫu. Hiện có ${sampleCount} mẫu cho buổi và mức này.`);
+      notifySuccess(`Đã lưu mẫu. Hiện có ${refreshedSamples.length} mẫu cho buổi và mức này.`);
     } catch (error) {
       notifyError(error?.data?.message ?? "Lưu mẫu thất bại");
     }
