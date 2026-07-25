@@ -9,6 +9,7 @@ import { useConfirm } from "@/contexts/ConfirmProvider";
 import { useGetLttpCommoditiesQuery } from "@/features/lttp/api/lttpApi";
 import {
   useCreateKitchenMenuSampleMutation,
+  useDeleteKitchenMenuSampleMutation,
   useGetKitchenCatalogQuery,
   useGetKitchenMenuSamplesQuery,
   useUpdateKitchenMenuSampleMutation,
@@ -21,6 +22,7 @@ import { KitchenCommodityPicker } from "./KitchenCommodityPicker.jsx";
 import { MEAL_PERIOD_LABELS, UnitPicker, emptyLine, inputClass } from "./KitchenDishCatalogTab.jsx";
 import { classifyCommodityCalcMode } from "./kitchenMenuQuantity.js";
 import { readStoredKitchenMenuAllowance, writeStoredKitchenMenuAllowance } from "./kitchenBooksSessionPersist.js";
+import { KitchenMenuSampleApplyDialog } from "./KitchenMenuSampleApplyDialog.jsx";
 
 const PERIODS = ["sang", "trua", "chieu"];
 
@@ -121,17 +123,19 @@ export function KitchenMenuTab({
   const [dirty, setDirty] = useState(false);
   const [pickOpen, setPickOpen] = useState(false);
   const [editingSampleId, setEditingSampleId] = useState(null);
+  const [applySample, setApplySample] = useState(null);
   const previousUnitId = useRef(selectedUnitId);
 
   const skip = !selectedUnitId || !canAccess;
   const { data: commodities } = useGetLttpCommoditiesQuery(selectedUnitId, { skip });
   const { data: mealMeta } = useGetMealRosterMetaQuery({ unitId: selectedUnitId }, { skip });
-  useGetKitchenMenuSamplesQuery(
+  const { data: samples, isLoading: loadingSamples } = useGetKitchenMenuSamplesQuery(
     { unitId: selectedUnitId, mealPeriod, rateId },
     { skip: skip || !rateId },
   );
   const [createSample, { isLoading: creating }] = useCreateKitchenMenuSampleMutation();
   const [updateSample, { isLoading: updating }] = useUpdateKitchenMenuSampleMutation();
+  const [deleteSample, { isLoading: deleting }] = useDeleteKitchenMenuSampleMutation();
   const commodityList = commodities ?? [];
   const rateList = mealMeta?.rates ?? [];
   const needsMealRateSelection = Boolean(mealMeta?.needsMealRateSelection);
@@ -221,6 +225,36 @@ export function KitchenMenuTab({
     setDirty(true);
     setDraftDishes((dishes) => [...dishes, toDraftDish(item)]);
     setPickOpen(false);
+  }
+
+  async function handleEditSample(sample) {
+    if (!(await discardDirty("Sửa mẫu khác sẽ bỏ bản nháp hiện tại."))) {
+      return;
+    }
+    setDraftDishes((sample.dishes ?? []).map(toDraftDish));
+    setEditingSampleId(sample.id);
+    setDirty(false);
+  }
+
+  async function handleDeleteSample(sample) {
+    const confirmed = await confirm({
+      title: "Xóa thực đơn mẫu?",
+      description: `Mẫu gồm ${(sample.dishes ?? []).map((dish) => dish.name).join(", ") || "chưa có món"} sẽ bị xóa.`,
+      confirmLabel: "Xóa mẫu",
+      destructive: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await deleteSample({ id: sample.id, unitId: selectedUnitId }).unwrap();
+      if (editingSampleId === sample.id) {
+        setEditingSampleId(null);
+      }
+      notifySuccess("Đã xóa mẫu thực đơn.");
+    } catch (error) {
+      notifyError(error?.data?.message ?? "Xóa mẫu thất bại");
+    }
   }
 
   async function handleSave() {
@@ -453,7 +487,49 @@ export function KitchenMenuTab({
         </div>
       )}
 
+      <section className="space-y-2 border-t border-border pt-4">
+        <div>
+          <h2 className="font-semibold">Mẫu đã lưu</h2>
+          <p className="text-sm text-muted-foreground">Các mẫu cho buổi và mức tiền ăn đang chọn.</p>
+        </div>
+        {!rateId ? (
+          <p className="text-sm text-muted-foreground">Chọn mức tiền ăn để xem mẫu.</p>
+        ) : loadingSamples ? (
+          <p className="text-sm text-muted-foreground">Đang tải mẫu…</p>
+        ) : (samples ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">Chưa có mẫu nào.</p>
+        ) : (
+          <ul className="space-y-2">
+            {(samples ?? []).map((sample) => (
+              <li key={sample.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{(sample.dishes ?? []).map((dish) => dish.name).join(", ") || "Chưa đặt tên món"}</p>
+                  <p className="text-sm text-muted-foreground">{formatMealAmountOnly(sample.mucTienAn)} đ/người</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => handleEditSample(sample)}>
+                    Sửa
+                  </Button>
+                  <Button type="button" size="sm" onClick={() => setApplySample(sample)}>
+                    Áp dụng
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" disabled={deleting} onClick={() => handleDeleteSample(sample)}>
+                    Xóa
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <CatalogPicker open={pickOpen} onClose={() => setPickOpen(false)} onPick={pickCatalog} unitId={selectedUnitId} />
+      <KitchenMenuSampleApplyDialog
+        open={Boolean(applySample)}
+        onClose={() => setApplySample(null)}
+        sample={applySample}
+        unitId={selectedUnitId}
+      />
     </div>
   );
 }

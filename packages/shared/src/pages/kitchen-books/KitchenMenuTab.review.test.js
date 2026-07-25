@@ -24,3 +24,12 @@ test("changing units or loading an invalid rate clears the selected rate", () =>
   assert.match(source, /setRateId\(null\);/);
   assert.match(source, /needsMealRateSelection \|\| !mealMeta\.rates\.some\(\(rate\) => rate\.id === rateId\)/);
 });
+
+test("lists filtered samples and wires editing, deletion, and application", () => {
+  assert.match(source, /useGetKitchenMenuSamplesQuery\(\s*\{ unitId: selectedUnitId, mealPeriod, rateId \},/);
+  assert.match(source, /useDeleteKitchenMenuSampleMutation/);
+  assert.match(source, /setDraftDishes\(\(sample\.dishes \?\? \[\]\)\.map\(toDraftDish\)\);/);
+  assert.match(source, /setEditingSampleId\(sample\.id\);/);
+  assert.match(source, /deleteSample\(\{ id: sample\.id, unitId: selectedUnitId \}\)\.unwrap\(\)/);
+  assert.match(source, /<KitchenMenuSampleApplyDialog/);
+});
