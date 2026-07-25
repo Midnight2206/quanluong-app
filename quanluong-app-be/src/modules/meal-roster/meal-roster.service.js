@@ -458,7 +458,7 @@ async function assertMealAllowanceRateIdForUnit(unitId, rateId) {
   }
 }
 
-async function assertStandardMealRateForGuaranty(unitId, rateId) {
+async function assertStandardMealRateForUnit(unitId, rateId) {
   await assertMealAllowanceRateIdForUnit(unitId, rateId);
   const r = await prisma.mealAllowanceRate.findUnique({
     where: { id: rateId },
@@ -466,11 +466,15 @@ async function assertStandardMealRateForGuaranty(unitId, rateId) {
   });
   if (r?.type !== "an_tieu_chuan") {
     throw new AppError({
-      message: "Danh sách bảo đảm và nhập Excel chỉ dùng mức «ăn tiêu chuẩn»",
+      message: "Chỉ dùng mức «ăn tiêu chuẩn» đã chọn cho đơn vị",
       statusCode: 400,
       code: ERROR_CODES.VALIDATION_ERROR,
     });
   }
+}
+
+async function assertStandardMealRateForGuaranty(unitId, rateId) {
+  await assertStandardMealRateForUnit(unitId, rateId);
 }
 
 async function assertRateIdsInUnitSelection(unitId, ids) {
@@ -1289,4 +1293,5 @@ export {
   patchMealRosterEntry,
   putUnitSelectedMealRates,
   replaceMealRosterDayMarks,
+  assertStandardMealRateForUnit,
 };
