@@ -15,7 +15,10 @@ def parse_xlsx(data: bytes, sheet: str | None = None) -> dict:
     if not data:
         raise ValueError("Dữ liệu Excel trống hoặc không hợp lệ")
 
-    wb = load_workbook(BytesIO(data), data_only=True)
+    try:
+        wb = load_workbook(BytesIO(data), data_only=True)
+    except Exception as exc:
+        raise ValueError("Dữ liệu Excel trống hoặc không hợp lệ") from exc
     sheets = wb.sheetnames
     if not sheets:
         raise ValueError("Workbook Excel không có sheet nào")
