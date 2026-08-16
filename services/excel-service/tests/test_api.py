@@ -29,6 +29,21 @@ def test_parse_unauthorized():
         },
     )
     assert r.status_code == 401
+    body = r.json()
+    assert body["error"]["code"] == "UNAUTHORIZED"
+    assert "detail" not in body
+
+
+def test_parse_rejects_xls():
+    r = client.post(
+        "/v1/parse",
+        headers={"X-Service-Key": "test-key"},
+        files={"file": ("legacy.xls", b"not-xlsx", "application/vnd.ms-excel")},
+    )
+    assert r.status_code == 400
+    body = r.json()
+    assert body["error"]["code"] == "INVALID_FORMAT"
+    assert "detail" not in body
 
 
 def test_parse_ok():

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
-from fastapi.responses import Response
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app.auth import require_service_key
@@ -14,6 +14,19 @@ from app.parse import parse_xlsx
 MAX_UPLOAD = 5 * 1024 * 1024
 
 app = FastAPI()
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_request: Request, exc: HTTPException):
+    detail = exc.detail
+    if isinstance(detail, dict) and "error" in detail:
+        body = detail
+    elif isinstance(detail, dict) and "code" in detail and "message" in detail:
+        body = {"error": detail}
+    else:
+        message = detail if isinstance(detail, str) else str(detail)
+        body = {"error": {"code": "HTTP_ERROR", "message": message}}
+    return JSONResponse(status_code=exc.status_code, content=body)
 
 
 @app.get("/health")
