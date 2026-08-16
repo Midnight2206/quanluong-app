@@ -65,6 +65,11 @@ const config = {
     baseUrl: env.menuAiBaseUrl,
     timeoutMs: env.menuAiTimeoutMs,
   },
+  excelService: {
+    url: env.excelServiceUrl,
+    key: env.excelServiceKey,
+    timeoutMs: env.excelServiceTimeoutMs,
+  },
   mail: {
     transport: env.mailTransport,
     gmailSenderRefreshToken: env.gmailSenderRefreshToken,
