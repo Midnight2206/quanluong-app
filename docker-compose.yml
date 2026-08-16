@@ -28,6 +28,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      excel:
+        condition: service_healthy
     ports:
       - "3000:3000"
       - "3030:3030"
@@ -135,6 +137,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  excel:
+    build:
+      context: ./services/excel-service
+    image: quanluong-excel:latest
+    container_name: quanluong-excel
+    restart: unless-stopped
+    environment:
+      EXCEL_SERVICE_KEY: ${EXCEL_SERVICE_KEY:-dev-excel-key-change-me}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # Vector store cho AI thực đơn (optional). Tắt bằng cách không set QDRANT_URL trên app.
   qdrant:
