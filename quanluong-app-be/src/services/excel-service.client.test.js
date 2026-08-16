@@ -64,10 +64,10 @@ test("parseWorkbook posts the workbook and returns parsed JSON", async () => {
   }
 });
 
-test("parseWorkbook maps upstream 4xx error message to AppError 400", async () => {
+test("parseWorkbook keeps upstream 400 error message in AppError 400", async () => {
   const restore = mockFetch(async () =>
     new Response(JSON.stringify({ error: { code: "INVALID_XLSX", message: "Tệp không hợp lệ" } }), {
-      status: 401,
+      status: 400,
       headers: { "content-type": "application/json" },
     }),
   );
@@ -83,6 +83,28 @@ test("parseWorkbook maps upstream 4xx error message to AppError 400", async () =
     restore();
   }
 });
+
+for (const status of [401, 403]) {
+  test(`parseWorkbook maps upstream ${status} to a generic AppError 502`, async () => {
+    const restore = mockFetch(async () =>
+      new Response(JSON.stringify({ error: { message: "Invalid service key" } }), {
+        status,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    try {
+      await assert.rejects(
+        parseWorkbook(Buffer.from("bad")),
+        (error) =>
+          error instanceof AppError &&
+          error.statusCode === 502 &&
+          error.message === "Excel service xác thực nội bộ thất bại",
+      );
+    } finally {
+      restore();
+    }
+  });
+}
 
 test("parseWorkbook maps upstream 5xx to AppError 502", async () => {
   const restore = mockFetch(async () => new Response("failure", { status: 500 }));
@@ -124,6 +146,26 @@ test("exportWorkbook posts JSON and returns a Buffer", async () => {
     const result = await exportWorkbook({ sheet: "Sheet1", rows: [["Mã"], ["A01"]] });
     assert.ok(Buffer.isBuffer(result));
     assert.deepEqual(result, Buffer.from(bytes));
+  } finally {
+    restore();
+  }
+});
+
+test("exportWorkbook maps an invalid binary response to AppError 502", async () => {
+  const restore = mockFetch(async () => ({
+    ok: true,
+    arrayBuffer: async () => {
+      throw new TypeError("terminated");
+    },
+  }));
+  try {
+    await assert.rejects(
+      exportWorkbook({ sheet: "Sheet1", rows: [["Mã"]] }),
+      (error) =>
+        error instanceof AppError &&
+        error.statusCode === 502 &&
+        error.message === "Excel service trả về dữ liệu không hợp lệ",
+    );
   } finally {
     restore();
   }

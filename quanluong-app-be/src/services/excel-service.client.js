@@ -33,13 +33,14 @@ async function requestExcel(path, options) {
       signal: AbortSignal.timeout(config.excelService.timeoutMs),
     });
     if (!response.ok) {
+      const isBadRequest = response.status === 400;
+      const isAuthFailure = response.status === 401 || response.status === 403;
       throw new AppError({
-        message: await readErrorMessage(response),
-        statusCode: response.status >= 400 && response.status < 500 ? 400 : 502,
-        code:
-          response.status >= 400 && response.status < 500
-            ? ERROR_CODES.VALIDATION_ERROR
-            : ERROR_CODES.INTERNAL_SERVER_ERROR,
+        message: isAuthFailure
+          ? "Excel service xác thực nội bộ thất bại"
+          : await readErrorMessage(response),
+        statusCode: isBadRequest ? 400 : 502,
+        code: isBadRequest ? ERROR_CODES.VALIDATION_ERROR : ERROR_CODES.INTERNAL_SERVER_ERROR,
       });
     }
     return response;
@@ -84,7 +85,15 @@ async function exportWorkbook({ sheet, rows }) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...(sheet ? { sheet } : {}), rows }),
   });
-  return Buffer.from(await response.arrayBuffer());
+  try {
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    throw new AppError({
+      message: "Excel service trả về dữ liệu không hợp lệ",
+      statusCode: 502,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
 }
 
 export { exportWorkbook, isExcelServiceConfigured, parseWorkbook };

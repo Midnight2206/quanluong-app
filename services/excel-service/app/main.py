@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from app.auth import require_service_key
 from app.errors import error_detail, value_error_detail
@@ -29,6 +31,14 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content=body)
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_request: Request, _exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content=error_detail("BAD_REQUEST", "Dữ liệu yêu cầu không hợp lệ"),
+    )
+
+
 @app.get("/health")
 def health():
     return {"ok": True, "service": "excel"}
@@ -41,7 +51,7 @@ async def parse_upload(
     sheet: Optional[str] = Query(default=None),
 ):
     filename = (file.filename or "").lower()
-    if filename.endswith(".xls") and not filename.endswith(".xlsx"):
+    if not filename.endswith(".xlsx"):
         raise HTTPException(
             status_code=400,
             detail=error_detail("INVALID_FORMAT", "Chỉ hỗ trợ file .xlsx"),
@@ -57,7 +67,7 @@ async def parse_upload(
         )
 
     try:
-        return parse_xlsx(data, sheet=sheet)
+        return await run_in_threadpool(parse_xlsx, data, sheet=sheet)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=value_error_detail(exc))
 
