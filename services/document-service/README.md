@@ -1,8 +1,8 @@
-# Document microservice (P1 + P2)
+# Document microservice (P1 + P2 + P3)
 
-Internal FastAPI: `.xlsx` parse/export, Postgres template schema, Pagination Engine (`end_bias`, 18–28pt). P2 adds ReportLab PDF renderer (module only). Node BE only.
+Internal FastAPI: `.xlsx` parse/export, Postgres template schema, Pagination Engine (`end_bias`, 18–28pt). P2 adds ReportLab PDF renderer (module only). P3 adds `.xlsx` template importer → `TemplateMetadata` + DB persist (module only). Node BE only.
 
-Docs: [P1 design](../../docs/superpowers/specs/2026-08-17-document-service-p1-design.md) · [P1 plan](../../docs/superpowers/plans/2026-08-17-document-service-p1.md) · [P2 design](../../docs/superpowers/specs/2026-08-17-document-service-p2-design.md)
+Docs: [P1 design](../../docs/superpowers/specs/2026-08-17-document-service-p1-design.md) · [P1 plan](../../docs/superpowers/plans/2026-08-17-document-service-p1.md) · [P2 design](../../docs/superpowers/specs/2026-08-17-document-service-p2-design.md) · [P3 design](../../docs/superpowers/specs/2026-08-17-document-service-p3-design.md)
 
 ## P1 scope
 
@@ -19,6 +19,30 @@ pdf = render_demo_pdf(fields={"don_vi": "…", "ngay_thang": "…", ...}, rows=[
 
 Run PDF tests: `pytest tests/test_pdf_renderer.py -v` (pypdf page count + Vietnamese text). Full suite: `pytest -v`.
 
+## P3 scope
+
+**In:** `TemplateMetadata` (`app/template/metadata.py`) — shared contract for importer ↔ renderer. `parse_template(xlsx_bytes, name, version)` reads Named Ranges → metadata. `import_template(session, …)` persists to Postgres via `NullBlobStore` (`file_path = null`). `render_pdf(metadata, …)` replaces hardcoded demo layout; `render_demo_pdf()` kept as P2 wrapper.
+
+| Named Range | Role |
+|-------------|------|
+| `FIELD_<name>` | Single field cell; `<name>` → snake_case `field_name` |
+| `TABLE_HEADER` | Header row → column defs (required) |
+| `TABLE_DATA_ROW` | Sample data row → row style (required; same sheet + column layout as header) |
+| `TABLE_SIGNATURE` | Signature block start (optional; default 80pt height) |
+
+**Out:** HTTP template upload, MinIO, `required_fields` enforcement, PDF-from-DB routes — no new routes in `main.py`.
+
+```python
+from app.import.template_importer import parse_template
+from app.import.template_service import import_template
+from app.import.blob import NullBlobStore
+
+metadata = parse_template(xlsx_bytes, name="bien_ban", version="1")
+template_id = import_template(session, name="bien_ban", version="1", xlsx_bytes=xlsx_bytes)
+```
+
+P3 tests: `test_template_metadata`, `test_template_importer`, `test_template_service`, `test_excel_coords`, `test_blob`. Fixtures: `tests/fixtures/templates/`.
+
 ## Environment
 
 `DOCUMENT_SERVICE_KEY` (header `X-Service-Key`), `DOCUMENT_DATABASE_URL` (`postgresql+psycopg://…`, optional locally). Node: `DOCUMENT_SERVICE_URL`, `DOCUMENT_SERVICE_KEY`, `DOCUMENT_SERVICE_TIMEOUT_MS` — see `quanluong-app-be/.env.example`.
@@ -29,7 +53,7 @@ Run PDF tests: `pytest tests/test_pdf_renderer.py -v` (pypdf page count + Vietna
 cd services/document-service && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 export DOCUMENT_SERVICE_KEY=dev-key DOCUMENT_DATABASE_URL=postgresql+psycopg://document:document@127.0.0.1:5432/document
 alembic upgrade head && uvicorn app.main:app --reload --port 8000
-pytest -v   # P1 + P2 (incl. test_pdf_renderer, test_fonts, test_draw, test_demo_template)
+pytest -v   # P1 + P2 + P3 (incl. test_pdf_renderer, test_template_importer, …)
 ```
 
 Docker: `document` + `document-db` (Postgres 16); entrypoint runs migrations. No host port; `app` depends on `document` (`service_started`).
