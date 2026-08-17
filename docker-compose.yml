@@ -138,6 +138,26 @@ services:
       timeout: 5s
       retries: 10
 
+  document-db:
+    image: postgres:16-alpine
+    container_name: quanluong-document-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DOCUMENT_DB_USER:-document}
+      POSTGRES_PASSWORD: ${DOCUMENT_DB_PASSWORD:-document}
+      POSTGRES_DB: ${DOCUMENT_DB_NAME:-document}
+    volumes:
+      - document_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DOCUMENT_DB_USER:-document} -d ${DOCUMENT_DB_NAME:-document}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   document:
     build:
       context: ./services/document-service
@@ -146,6 +166,10 @@ services:
     restart: unless-stopped
     environment:
       DOCUMENT_SERVICE_KEY: ${DOCUMENT_SERVICE_KEY:-dev-document-key-change-me}
+      DOCUMENT_DATABASE_URL: postgresql+psycopg://${DOCUMENT_DB_USER:-document}:${DOCUMENT_DB_PASSWORD:-document}@document-db:5432/${DOCUMENT_DB_NAME:-document}
+    depends_on:
+      document-db:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -183,5 +207,6 @@ services:
 volumes:
   mariadb_data:
   redis_data:
+  document_pg_data:
   media_data:
   qdrant_data:

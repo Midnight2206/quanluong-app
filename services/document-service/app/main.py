@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
 from typing import Optional
 
@@ -7,11 +8,15 @@ from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Uploa
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.concurrency import run_in_threadpool
 
 from app.auth import require_service_key
+from app.db import get_session
 from app.errors import error_detail, value_error_detail
 from app.export import export_xlsx
+from app.models import Template
 from app.pagination import plan_pages
 from app.parse import parse_xlsx
 
@@ -44,6 +49,41 @@ async def validation_exception_handler(_request: Request, _exc: RequestValidatio
 @app.get("/health")
 def health():
     return {"ok": True, "service": "document"}
+
+
+@app.get("/v1/templates")
+def list_templates(_: None = Depends(require_service_key)):
+    if not (os.environ.get("DOCUMENT_DATABASE_URL") or "").strip():
+        return []
+
+    try:
+        with get_session() as session:
+            templates = session.scalars(select(Template).order_by(Template.id)).all()
+    except (SQLAlchemyError, RuntimeError):
+        raise HTTPException(
+            status_code=502,
+            detail=error_detail(
+                "DATABASE_UNAVAILABLE",
+                "Không thể kết nối cơ sở dữ liệu tài liệu",
+            ),
+        )
+
+    return [
+        {
+            "id": template.id,
+            "name": template.name,
+            "version": template.version,
+            "file_path": template.file_path,
+            "page_size": template.page_size,
+            "orientation": template.orientation,
+            "margin_top": template.margin_top,
+            "margin_right": template.margin_right,
+            "margin_bottom": template.margin_bottom,
+            "margin_left": template.margin_left,
+            "created_at": template.created_at,
+        }
+        for template in templates
+    ]
 
 
 @app.post("/v1/parse")
