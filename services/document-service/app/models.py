@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from sqlalchemy import (
     DateTime,
@@ -69,7 +69,9 @@ class TemplateTableConfig(Base):
     )
     header_row_range: Mapped[str] = mapped_column(String(50), nullable=False)
     data_row_template: Mapped[str] = mapped_column(String(50), nullable=False)
-    column_defs: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
+    column_defs: Mapped[
+        Optional[Union[list[dict[str, Any]], dict[str, Any]]]
+    ] = mapped_column(JSON)
     data_row_style: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
     subtotal_row_style: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
     header_height_pt: Mapped[float] = mapped_column(
