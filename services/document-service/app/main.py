@@ -4,6 +4,7 @@ import os
 from dataclasses import asdict
 from importlib import import_module
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -20,6 +21,7 @@ from app.export import export_xlsx
 from app.models import Template
 from app.pagination import plan_pages
 from app.parse import parse_xlsx
+from app.render.pdf_renderer import render_pdf
 
 _template_errors = import_module("app.import.errors")
 import_template = import_module("app.import.template_service").import_template
@@ -56,6 +58,14 @@ def _database_unavailable() -> HTTPException:
             "DATABASE_UNAVAILABLE",
             "Không thể kết nối cơ sở dữ liệu tài liệu",
         ),
+    )
+
+
+def _document_content_disposition(name: str, version: str) -> str:
+    encoded_name = quote(f"{name}-{version}", safe="")
+    return (
+        'attachment; filename="document.pdf"; '
+        f"filename*=UTF-8''{encoded_name}.pdf"
     )
 
 
@@ -145,6 +155,53 @@ def get_template_fields(template_id: int, _: None = Depends(require_service_key)
             for column in metadata.table.columns
         ],
     }
+
+
+class DocumentBody(BaseModel):
+    fields: dict
+    rows: list[dict]
+
+
+@app.post("/v1/templates/{template_id}/documents")
+async def create_document(
+    template_id: int,
+    body: DocumentBody,
+    _: None = Depends(require_service_key),
+):
+    try:
+        with get_session() as session:
+            metadata = load_metadata_from_db(session, template_id)
+    except (SQLAlchemyError, RuntimeError):
+        raise _database_unavailable()
+
+    if metadata is None:
+        raise HTTPException(
+            status_code=404,
+            detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
+        )
+
+    try:
+        content = await run_in_threadpool(
+            render_pdf,
+            metadata=metadata,
+            fields=body.fields,
+            rows=body.rows,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("PAGINATION_FAILED", str(exc)),
+        )
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": _document_content_disposition(
+                metadata.name, metadata.version
+            )
+        },
+    )
 
 
 @app.post("/v1/templates", status_code=201)

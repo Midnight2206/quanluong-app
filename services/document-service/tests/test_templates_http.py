@@ -1,8 +1,10 @@
 import os
 from io import BytesIO
+from urllib.parse import quote
 
 os.environ["DOCUMENT_SERVICE_KEY"] = "test-key"
 
+import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from sqlalchemy import create_engine
@@ -37,6 +39,17 @@ def _upload(*, content=None, filename="template.xlsx", name="Phiếu nhập", ve
         headers=AUTH_HEADERS,
         data={"name": name, "version": version},
         files={"file": (filename, content or make_minimal_template(), XLSX_TYPE)},
+    )
+
+
+def _create_document(template_id, *, fields=None, rows=None):
+    return client.post(
+        f"/v1/templates/{template_id}/documents",
+        headers=AUTH_HEADERS,
+        json={
+            "fields": fields or {},
+            "rows": rows if rows is not None else [],
+        },
     )
 
 
@@ -212,3 +225,120 @@ def test_get_template_fields_requires_service_key():
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "UNAUTHORIZED"
+
+
+def test_create_document_renders_three_rows_as_pdf(monkeypatch):
+    _database(monkeypatch)
+    template_id = _upload().json()["id"]
+
+    response = _create_document(
+        template_id,
+        fields={"don_vi": "Bếp ăn"},
+        rows=[
+            {"stt": "1", "ten_hang": "Gạo"},
+            {"stt": "2", "ten_hang": "Muối"},
+            {"stt": "3", "ten_hang": "Dầu"},
+        ],
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content.startswith(b"%PDF")
+
+
+def test_create_document_silently_ignores_extra_row_keys(monkeypatch):
+    _database(monkeypatch)
+    template_id = _upload().json()["id"]
+
+    response = _create_document(
+        template_id,
+        rows=[{"stt": "1", "ten_hang": "Gạo", "future_client_key": "ignored"}],
+    )
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF")
+
+
+def test_create_document_returns_404_when_template_missing(monkeypatch):
+    _database(monkeypatch)
+
+    response = _create_document(999)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {"code": "NOT_FOUND", "message": main.NOT_FOUND_MESSAGE},
+    }
+
+
+@pytest.mark.parametrize("rows", [{"stt": "1"}, ["not an object"]])
+def test_create_document_rejects_bad_rows_type(monkeypatch, rows):
+    _database(monkeypatch)
+
+    response = client.post(
+        "/v1/templates/1/documents",
+        headers=AUTH_HEADERS,
+        json={"fields": {}, "rows": rows},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "BAD_REQUEST"
+
+
+def test_create_document_uses_rfc5987_filename_for_vietnamese_name(monkeypatch):
+    _database(monkeypatch)
+    name = "Phiếu nhập"
+    version = "bản 1"
+    template_id = _upload(name=name, version=version).json()["id"]
+
+    response = _create_document(template_id)
+
+    encoded_name = quote(f"{name}-{version}", safe="")
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="document.pdf"; '
+        f"filename*=UTF-8''{encoded_name}.pdf"
+    )
+
+
+def test_create_document_maps_pagination_failure_verbatim(monkeypatch):
+    _database(monkeypatch)
+    template_id = _upload().json()["id"]
+    planner_message = "Không đủ chiều cao để phân trang"
+
+    def fail_render(**_kwargs):
+        raise ValueError(planner_message)
+
+    monkeypatch.setattr(main, "render_pdf", fail_render, raising=False)
+
+    response = _create_document(template_id)
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": {"code": "PAGINATION_FAILED", "message": planner_message},
+    }
+
+
+def test_create_document_runs_render_in_threadpool(monkeypatch):
+    _database(monkeypatch)
+    template_id = _upload().json()["id"]
+    calls = []
+
+    async def fake_run_in_threadpool(func, *args, **kwargs):
+        calls.append((func, args, kwargs))
+        return b"%PDF fake"
+
+    monkeypatch.setattr(main, "run_in_threadpool", fake_run_in_threadpool)
+
+    response = _create_document(template_id)
+
+    assert response.status_code == 200
+    assert calls == [
+        (
+            main.render_pdf,
+            (),
+            {
+                "metadata": calls[0][2]["metadata"],
+                "fields": {},
+                "rows": [],
+            },
+        )
+    ]
