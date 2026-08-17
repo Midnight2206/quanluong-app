@@ -5,7 +5,6 @@ from io import BytesIO
 from reportlab.pdfgen import canvas
 
 from app.pagination import PagePlan, plan_pages
-from app.render import fonts as _fonts  # noqa: F401
 from app.render.demo_template import (
     CARRY_HEIGHT,
     CONTENT_WIDTH,
@@ -13,13 +12,14 @@ from app.render.demo_template import (
     DEMO_FIELDS,
     HEADER_HEIGHT,
     MARGIN_TOP,
+    MIN_ROWS_LAST_PAGE,
     PAGE_HEIGHT,
     PAGE_WIDTH,
     ROW_HEIGHT_MAX,
     ROW_HEIGHT_MIN,
     SIGNATURE_HEIGHT,
     TABLE_LEFT,
-    content_height_continuation,
+    content_height_page1,
     table_top_y_page1,
 )
 from app.render.draw import draw_merged_cell, draw_table_row, draw_text
@@ -150,12 +150,13 @@ def render_demo_pdf(
     if rows:
         pages = plan_pages(
             n_rows=len(rows),
-            page_content_height=content_height_continuation(),
+            page_content_height=content_height_page1(),
             header_height=HEADER_HEIGHT,
             carry_row_height=CARRY_HEIGHT,
             signature_block_height=SIGNATURE_HEIGHT,
             row_height_min=ROW_HEIGHT_MIN,
             row_height_max=ROW_HEIGHT_MAX,
+            min_rows_last_page=MIN_ROWS_LAST_PAGE,
         ).pages
     else:
         pages = [

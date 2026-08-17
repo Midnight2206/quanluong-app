@@ -6,8 +6,11 @@ from app.pagination import plan_pages
 from app.render.demo_template import (
     CARRY_HEIGHT,
     HEADER_HEIGHT,
+    MIN_ROWS_LAST_PAGE,
+    ROW_HEIGHT_MAX,
+    ROW_HEIGHT_MIN,
     SIGNATURE_HEIGHT,
-    content_height_continuation,
+    content_height_page1,
 )
 from app.render.pdf_renderer import render_demo_pdf
 
@@ -48,18 +51,26 @@ def test_vietnamese_text_extracted():
     assert "Thành tiền" in text
 
 
-def test_page_count_matches_planner():
-    rows = _sample_rows(15)
+def test_multi_page_pdf_matches_first_page_plan():
+    rows = _sample_rows(45)
     pdf = render_demo_pdf(fields=_sample_fields(), rows=rows)
     expected = plan_pages(
         n_rows=len(rows),
-        page_content_height=content_height_continuation(),
+        page_content_height=content_height_page1(),
         header_height=HEADER_HEIGHT,
         carry_row_height=CARRY_HEIGHT,
         signature_block_height=SIGNATURE_HEIGHT,
+        row_height_min=ROW_HEIGHT_MIN,
+        row_height_max=ROW_HEIGHT_MAX,
+        min_rows_last_page=MIN_ROWS_LAST_PAGE,
     )
+    actual_pages = PdfReader(BytesIO(pdf)).pages
 
-    assert len(PdfReader(BytesIO(pdf)).pages) == max(1, len(expected.pages))
+    assert len(actual_pages) == len(expected.pages) >= 2
+    assert [
+        (page.extract_text() or "").count("Mặt hàng") for page in actual_pages
+    ] == [len(page.row_indices) for page in expected.pages]
+    assert len(expected.pages[-1].row_indices) >= MIN_ROWS_LAST_PAGE
 
 
 def test_three_rows_single_page():

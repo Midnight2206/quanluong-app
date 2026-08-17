@@ -15,7 +15,7 @@ def _register_fonts() -> None:
     if not _REGULAR_PATH.is_file():
         raise RuntimeError("Không tìm thấy font DejaVuSans")
     if not _BOLD_PATH.is_file():
-        raise RuntimeError("Không tìm thấy font DejaVuSans")
+        raise RuntimeError("Không tìm thấy font DejaVuSans-Bold")
 
     pdfmetrics.registerFont(TTFont(FONT_REGULAR, str(_REGULAR_PATH)))
     pdfmetrics.registerFont(TTFont(FONT_BOLD, str(_BOLD_PATH)))

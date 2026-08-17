@@ -145,7 +145,7 @@ Không thêm route FastAPI; `main.py` không đổi ở P2.
 2. `render_demo_pdf()` trả bytes bắt đầu `%PDF`
 3. `pypdf`: số trang khớp `len(plan_pages(...).pages)`
 4. Extract text chứa chuỗi tiếng Việt có dấu (vd. «Đơn vị», «Thành tiền»)
-5. 15 dòng demo → ≥2 trang; trang cuối ≥2 dòng data
+5. 45 dòng demo → ≥2 trang; trang cuối ≥2 dòng data (15 dòng là 1 trang với chiều cao hiện tại)
 6. 3 dòng demo → 1 trang
 7. Font trong repo; Docker build OK
 8. Không regression `/v1/parse`, `/v1/export`, `/v1/pagination/plan`
