@@ -125,3 +125,90 @@ def test_create_template_runs_import_in_threadpool(monkeypatch):
     assert response.status_code == 201
     assert response.json()["id"] == 9
     assert calls[0][0] is main.import_template
+
+
+def test_get_template_returns_item_with_created_at(monkeypatch):
+    _database(monkeypatch)
+    template_id = _upload().json()["id"]
+
+    response = client.get(f"/v1/templates/{template_id}", headers=AUTH_HEADERS)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "id": template_id,
+        "name": "Phiếu nhập",
+        "version": "1",
+        "file_path": None,
+        "page_size": body["page_size"],
+        "orientation": body["orientation"],
+        "margin_top": body["margin_top"],
+        "margin_right": body["margin_right"],
+        "margin_bottom": body["margin_bottom"],
+        "margin_left": body["margin_left"],
+        "created_at": body["created_at"],
+    }
+    assert body["created_at"]
+
+
+def test_get_template_returns_404_when_missing(monkeypatch):
+    _database(monkeypatch)
+
+    response = client.get("/v1/templates/999", headers=AUTH_HEADERS)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {"code": "NOT_FOUND", "message": main.NOT_FOUND_MESSAGE},
+    }
+
+
+def test_get_template_requires_service_key():
+    response = client.get("/v1/templates/1")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHORIZED"
+
+
+def test_get_template_fields_returns_form_schema(monkeypatch):
+    _database(monkeypatch)
+    template_id = _upload().json()["id"]
+
+    response = client.get(
+        f"/v1/templates/{template_id}/fields", headers=AUTH_HEADERS
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [field["field_name"] for field in body["fields"]] == [
+        "don_vi",
+        "ngay_thang",
+    ]
+    assert all(set(field) == {"field_name", "cell_ref"} for field in body["fields"])
+    assert [column["key"] for column in body["columns"]] == [
+        "stt",
+        "ten_hang",
+        "dvt",
+        "so_luong",
+        "ghi_chu",
+    ]
+    assert all(
+        set(column) == {"key", "title", "align_h"} for column in body["columns"]
+    )
+
+
+def test_get_template_fields_returns_404_when_missing(monkeypatch):
+    _database(monkeypatch)
+
+    response = client.get("/v1/templates/999/fields", headers=AUTH_HEADERS)
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {"code": "NOT_FOUND", "message": main.NOT_FOUND_MESSAGE},
+    }
+
+
+def test_get_template_fields_requires_service_key():
+    response = client.get("/v1/templates/1/fields")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHORIZED"

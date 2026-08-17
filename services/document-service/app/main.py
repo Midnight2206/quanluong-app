@@ -23,12 +23,40 @@ from app.parse import parse_xlsx
 
 _template_errors = import_module("app.import.errors")
 import_template = import_module("app.import.template_service").import_template
+load_metadata_from_db = import_module("app.import.metadata_store").load_metadata_from_db
 TemplateExistsError = _template_errors.TemplateExistsError
 TemplateValidationError = _template_errors.TemplateValidationError
 
 MAX_UPLOAD = 5 * 1024 * 1024
+NOT_FOUND_MESSAGE = "Không tìm thấy mẫu"
 
 app = FastAPI()
+
+
+def _template_item(template: Template) -> dict:
+    return {
+        "id": template.id,
+        "name": template.name,
+        "version": template.version,
+        "file_path": template.file_path,
+        "page_size": template.page_size,
+        "orientation": template.orientation,
+        "margin_top": template.margin_top,
+        "margin_right": template.margin_right,
+        "margin_bottom": template.margin_bottom,
+        "margin_left": template.margin_left,
+        "created_at": template.created_at,
+    }
+
+
+def _database_unavailable() -> HTTPException:
+    return HTTPException(
+        status_code=502,
+        detail=error_detail(
+            "DATABASE_UNAVAILABLE",
+            "Không thể kết nối cơ sở dữ liệu tài liệu",
+        ),
+    )
 
 
 @app.exception_handler(HTTPException)
@@ -66,30 +94,57 @@ def list_templates(_: None = Depends(require_service_key)):
         with get_session() as session:
             templates = session.scalars(select(Template).order_by(Template.id)).all()
     except (SQLAlchemyError, RuntimeError):
+        raise _database_unavailable()
+
+    return [_template_item(template) for template in templates]
+
+
+@app.get("/v1/templates/{template_id}")
+def get_template(template_id: int, _: None = Depends(require_service_key)):
+    try:
+        with get_session() as session:
+            template = session.get(Template, template_id)
+    except (SQLAlchemyError, RuntimeError):
+        raise _database_unavailable()
+
+    if template is None:
         raise HTTPException(
-            status_code=502,
-            detail=error_detail(
-                "DATABASE_UNAVAILABLE",
-                "Không thể kết nối cơ sở dữ liệu tài liệu",
-            ),
+            status_code=404,
+            detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
         )
 
-    return [
-        {
-            "id": template.id,
-            "name": template.name,
-            "version": template.version,
-            "file_path": template.file_path,
-            "page_size": template.page_size,
-            "orientation": template.orientation,
-            "margin_top": template.margin_top,
-            "margin_right": template.margin_right,
-            "margin_bottom": template.margin_bottom,
-            "margin_left": template.margin_left,
-            "created_at": template.created_at,
-        }
-        for template in templates
-    ]
+    return _template_item(template)
+
+
+@app.get("/v1/templates/{template_id}/fields")
+def get_template_fields(template_id: int, _: None = Depends(require_service_key)):
+    try:
+        with get_session() as session:
+            metadata = load_metadata_from_db(session, template_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=404,
+            detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
+        )
+    except (SQLAlchemyError, RuntimeError):
+        raise _database_unavailable()
+
+    if metadata is None:
+        raise HTTPException(
+            status_code=404,
+            detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
+        )
+
+    return {
+        "fields": [
+            {"field_name": field.field_name, "cell_ref": field.cell_ref}
+            for field in metadata.fields
+        ],
+        "columns": [
+            {"key": column.key, "title": column.title, "align_h": column.align_h}
+            for column in metadata.table.columns
+        ],
+    }
 
 
 @app.post("/v1/templates", status_code=201)
@@ -141,13 +196,7 @@ async def create_template(
             detail=error_detail("BAD_REQUEST", str(exc)),
         )
     except (SQLAlchemyError, RuntimeError):
-        raise HTTPException(
-            status_code=502,
-            detail=error_detail(
-                "DATABASE_UNAVAILABLE",
-                "Không thể kết nối cơ sở dữ liệu tài liệu",
-            ),
-        )
+        raise _database_unavailable()
 
     return {
         "id": template_id,
