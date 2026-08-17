@@ -152,17 +152,16 @@ Không thêm route FastAPI; `main.py` không đổi ở P2.
 
 ## Ngoài P2 (P3+)
 
+P3: xem **`2026-08-17-document-service-p3-design.md`** (TemplateMetadata, Importer, Named Range).
+
 - `POST /v1/render/*`, `POST /templates/{id}/documents`
-- Template Importer + Named Range
-- Metadata từ Postgres thay `demo_template.py`
 - MinIO, `documents.pdf_path`
 - Node client PDF
 - pdfplumber QA (P5)
 - Nối sổ nhiều chứng từ (P6)
-- Vertical align phức tạp — P2: top/middle đơn giản
 
-## Checklist mở (chốt trước P3)
+## Checklist P3 (đã chốt — chi tiết trong spec P3)
 
-- [ ] Naming convention Named Range field đơn lẻ
-- [ ] Named Range vùng bảng (`DATA_TABLE_HEADER` / `DATA_TABLE_START`)
-- [ ] Danh sách field bắt buộc mọi template (validate import)
+- [x] Named Range field: `FIELD_*`
+- [x] Named Range bảng: `TABLE_HEADER`, `TABLE_DATA_ROW`, `TABLE_SIGNATURE`
+- [x] Field bắt buộc nghiệp vụ: defer P4 (`required_fields` param)

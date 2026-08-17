@@ -112,9 +112,9 @@ Lỗi: envelope `{ "error": { "code", "message" } }` (giữ pattern excel-servic
 P2: xem `2026-08-17-document-service-p2-design.md` (ReportLab + DejaVu Sans, template synthetic).  
 P3+: MinIO; Template Importer + Named Range; API tạo chứng từ; pdfplumber QA; nối sổ nhiều chứng từ.
 
-## Checklist còn mở (chốt trước P3)
+## Checklist P3 (đã chốt)
 
-- [ ] Naming convention Named Range field đơn lẻ
-- [ ] Named Range vùng bảng (`DATA_TABLE_HEADER` / `DATA_TABLE_START`…)
-- [x] Font `.ttf` tiếng Việt — DejaVu Sans (P2)
-- [ ] Danh sách field bắt buộc mọi template (P3 validate)
+- [x] Named Range field: `FIELD_*` — xem `2026-08-17-document-service-p3-design.md`
+- [x] Named Range bảng: `TABLE_HEADER`, `TABLE_DATA_ROW`, `TABLE_SIGNATURE`
+- [x] Font DejaVu Sans (P2)
+- [x] Field bắt buộc nghiệp vụ: defer P4 (`required_fields` param); P3 chỉ bắt TABLE_*
