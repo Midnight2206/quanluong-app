@@ -29,6 +29,7 @@ def _pack(
     header_height: float,
     carry_row_height: float,
     signature_block_height: float,
+    min_rows_last_page: int,
 ) -> Optional[List[PagePlan]]:
     pages: List[PagePlan] = []
     next_row = 0
@@ -66,10 +67,15 @@ def _pack(
             - carry_row_height
         )
         regular_capacity = max(0, floor(regular_height / row_height))
-        if regular_capacity <= 0 or regular_capacity >= remaining:
+        if regular_capacity <= 0:
             return None
+        rows_on_page = regular_capacity
+        if regular_capacity >= remaining:
+            rows_on_page = min(
+                regular_capacity, max(1, remaining - min_rows_last_page)
+            )
 
-        row_indices = list(range(next_row, next_row + regular_capacity))
+        row_indices = list(range(next_row, next_row + rows_on_page))
         pages.append(
             PagePlan(
                 page_index=len(pages),
@@ -80,9 +86,9 @@ def _pack(
                 is_last=False,
             )
         )
-        next_row += regular_capacity
+        next_row += rows_on_page
 
-    return pages
+    return pages if pages and pages[-1].is_last else None
 
 
 def plan_pages(
@@ -106,6 +112,8 @@ def plan_pages(
     if n_rows == 0:
         return PaginationResult([], stretch_strategy, row_height_min, row_height_max)
 
+    # ponytail: uniform-height search only; upgrade to true end_bias by
+    # stretching trailing rows while keeping the requested strategy echo.
     steps = floor((row_height_max - row_height_min) * 2)
     candidates = [row_height_min + step * 0.5 for step in range(steps + 1)]
     if candidates[-1] < row_height_max:
@@ -119,6 +127,7 @@ def plan_pages(
             header_height=header_height,
             carry_row_height=carry_row_height,
             signature_block_height=signature_block_height,
+            min_rows_last_page=min_rows_last_page,
         )
         if pages is None:
             continue

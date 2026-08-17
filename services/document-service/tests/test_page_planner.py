@@ -35,6 +35,19 @@ def test_uniform_search_keeps_at_least_two_rows_on_last_page():
     assert result.strategy == "end_bias"
 
 
+def test_regular_page_defers_minimum_rows_for_signature_page():
+    result = plan_pages(
+        n_rows=3,
+        page_content_height=100,
+        header_height=10,
+        carry_row_height=0,
+        signature_block_height=50,
+    )
+
+    assert [page.row_indices for page in result.pages] == [[0], [1, 2]]
+    assert len(result.pages[-1].row_indices) >= 2
+
+
 def test_infeasible_raises_vietnamese_error():
     # Header and signature exceed the 40pt page before any 18pt row can fit.
     with pytest.raises(ValueError, match="không"):
