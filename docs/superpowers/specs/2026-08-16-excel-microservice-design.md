@@ -1,6 +1,7 @@
 # Excel microservice (Python) — khung nền tảng
 
-Ngày: 2026-08-16
+Ngày: 2026-08-16  
+**Trạng thái:** Superseded bởi `2026-08-17-document-service-p1-design.md` — rename thành `document-service`, giữ parse/export, thêm Postgres + pagination. Giữ file này làm lịch sử quyết định khung Excel ban đầu.
 
 ## Mục tiêu
 
