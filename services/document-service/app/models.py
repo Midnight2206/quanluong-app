@@ -57,7 +57,14 @@ class TemplateTableConfig(Base):
     header_row_range: Mapped[str] = mapped_column(String(50), nullable=False)
     data_row_template: Mapped[str] = mapped_column(String(50), nullable=False)
     column_defs: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
+    data_row_style: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
     subtotal_row_style: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
+    header_height_pt: Mapped[float] = mapped_column(
+        Float, nullable=False, default=22, server_default=text("22")
+    )
+    carry_height_pt: Mapped[float] = mapped_column(
+        Float, nullable=False, default=18, server_default=text("18")
+    )
     signature_block_height: Mapped[float] = mapped_column(Float, nullable=False)
     row_height_min: Mapped[float] = mapped_column(
         Float, nullable=False, default=18, server_default=text("18")

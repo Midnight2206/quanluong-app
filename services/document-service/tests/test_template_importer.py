@@ -52,6 +52,35 @@ def test_parse_minimal_template():
     assert metadata.table.signature_block_height_pt == 80
 
 
+def test_parse_sheet_scoped_named_ranges():
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    sheet = workbook["ChungTu"]
+    for name, defined_name in list(workbook.defined_names.items()):
+        cell_range = defined_name.attr_text.split("!", 1)[1]
+        del workbook.defined_names[name]
+        sheet.defined_names.add(DefinedName(name, attr_text=cell_range))
+    output = BytesIO()
+    workbook.save(output)
+
+    metadata = _parse_template(output.getvalue())
+
+    assert metadata.table.header_row_range == "A5:G5"
+    assert {field.field_name for field in metadata.fields} == {"don_vi", "ngay_thang"}
+
+
+def test_invalid_signature_height_uses_default():
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    workbook.defined_names.add(
+        DefinedName("TABLE_SIGNATURE", attr_text="'ChungTu'!$A$100")
+    )
+    output = BytesIO()
+    workbook.save(output)
+
+    metadata = _parse_template(output.getvalue())
+
+    assert metadata.table.signature_block_height_pt == 80
+
+
 def test_rejects_mismatched_column_count():
     errors = importlib.import_module("app.import.errors")
 

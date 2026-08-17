@@ -33,7 +33,7 @@ def import_template(
     required_fields: list[str] | None = None,
 ) -> int:
     blob_store = blob_store or NullBlobStore()
-    file_path = blob_store.save(f"{name}/{version}.xlsx", xlsx_bytes)
+    file_path = blob_store.save(f"templates/{name}/{version}.xlsx", xlsx_bytes)
     metadata = parse_template(xlsx_bytes, name=name, version=version)
     if required_fields is not None:
         _validate_required_fields(metadata, required_fields)
@@ -75,7 +75,9 @@ def import_template(
             header_row_range=table.header_row_range,
             data_row_template=table.data_row_template,
             column_defs=[asdict(column) for column in table.columns],
-            subtotal_row_style=table.row_style,
+            data_row_style=table.row_style,
+            header_height_pt=table.header_height_pt,
+            carry_height_pt=table.carry_height_pt,
             signature_block_height=table.signature_block_height_pt,
             row_height_min=table.row_height_min,
             row_height_max=table.row_height_max,

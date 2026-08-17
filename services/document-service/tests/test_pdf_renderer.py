@@ -1,7 +1,9 @@
+import importlib
 from io import BytesIO
 
 from pypdf import PdfReader
 
+from conftest import make_minimal_template
 from app.pagination import plan_pages
 from app.render.demo_template import (
     CARRY_HEIGHT,
@@ -12,7 +14,7 @@ from app.render.demo_template import (
     SIGNATURE_HEIGHT,
     content_height_page1,
 )
-from app.render.pdf_renderer import render_demo_pdf
+from app.render.pdf_renderer import render_demo_pdf, render_pdf
 
 
 def _sample_fields():
@@ -41,6 +43,18 @@ def test_pdf_magic_bytes():
     pdf = render_demo_pdf(fields=_sample_fields(), rows=_sample_rows(3))
 
     assert pdf[:4] == b"%PDF"
+
+
+def test_imported_minimal_template_renders_pdf():
+    importer = importlib.import_module("app.import.template_importer")
+    metadata = importer.parse_template(
+        make_minimal_template(), name="chung-tu", version="1"
+    )
+    metadata.fields[0].font["size"] = None
+
+    pdf = render_pdf(metadata=metadata, fields={"don_vi": "Bếp A"}, rows=[])
+
+    assert pdf.startswith(b"%PDF")
 
 
 def test_vietnamese_text_extracted():

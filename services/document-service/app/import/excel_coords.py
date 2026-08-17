@@ -39,8 +39,9 @@ def cell_top_left_pt(
     *,
     page_height: float,
     margin_top: float,
+    margin_left: float,
 ) -> tuple[float, float]:
-    x = sum(
+    x = margin_left + sum(
         col_width_to_pt(_column_width_char(sheet, c))
         for c in range(1, col)
     )

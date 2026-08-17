@@ -11,6 +11,7 @@ signature_block_height_pt = excel_coords.signature_block_height_pt
 PAGE_HEIGHT = 842.0
 MARGIN_TOP = 40.0
 MARGIN_BOTTOM = 40.0
+MARGIN_LEFT = 36.0
 
 
 def test_col_width_to_pt():
@@ -45,6 +46,13 @@ def test_cell_top_left_pt():
     ws.row_dimensions[1].height = 20.0
     ws.row_dimensions[2].height = 15.0
 
-    x, y = cell_top_left_pt(ws, 2, 2, page_height=PAGE_HEIGHT, margin_top=MARGIN_TOP)
-    assert x == col_width_to_pt(10.0)
+    x, y = cell_top_left_pt(
+        ws,
+        2,
+        2,
+        page_height=PAGE_HEIGHT,
+        margin_top=MARGIN_TOP,
+        margin_left=MARGIN_LEFT,
+    )
+    assert x == MARGIN_LEFT + col_width_to_pt(10.0)
     assert y == PAGE_HEIGHT - MARGIN_TOP - 20.0

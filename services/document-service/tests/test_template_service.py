@@ -57,6 +57,10 @@ def test_import_template_persists_template_fields_and_table_config():
     assert table_config.header_row_range == "A5:G5"
     assert table_config.data_row_template == "A6:G6"
     assert len(table_config.column_defs) == 5
+    assert table_config.data_row_style["font"]["name"] == "Calibri"
+    assert table_config.subtotal_row_style is None
+    assert table_config.header_height_pt == 24
+    assert table_config.carry_height_pt == 18
     assert table_config.signature_block_height == 80
 
 
@@ -66,9 +70,9 @@ def test_import_template_uses_blob_store_save_result():
 
     class StubBlobStore(blob.BlobStore):
         def save(self, key, content):
-            assert key == "demo/v2.xlsx"
+            assert key == "templates/demo/v2.xlsx"
             assert content
-            return "s3://bucket/demo/v2.xlsx"
+            return "s3://bucket/templates/demo/v2.xlsx"
 
         def load(self, key: str) -> bytes:
             raise NotImplementedError
@@ -88,4 +92,4 @@ def test_import_template_uses_blob_store_save_result():
 
     assert template_id == 7
     template = next(obj for obj in added if isinstance(obj, Template))
-    assert template.file_path == "s3://bucket/demo/v2.xlsx"
+    assert template.file_path == "s3://bucket/templates/demo/v2.xlsx"

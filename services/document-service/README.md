@@ -33,15 +33,18 @@ Run PDF tests: `pytest tests/test_pdf_renderer.py -v` (pypdf page count + Vietna
 **Out:** HTTP template upload, MinIO, `required_fields` enforcement, PDF-from-DB routes — no new routes in `main.py`.
 
 ```python
-from app.import.template_importer import parse_template
-from app.import.template_service import import_template
-from app.import.blob import NullBlobStore
+import importlib
+
+parse_template = importlib.import_module("app.import.template_importer").parse_template
+import_template = importlib.import_module("app.import.template_service").import_template
 
 metadata = parse_template(xlsx_bytes, name="bien_ban", version="1")
-template_id = import_template(session, name="bien_ban", version="1", xlsx_bytes=xlsx_bytes)
+template_id = import_template(
+    session, name="bien_ban", version="1", xlsx_bytes=xlsx_bytes
+)
 ```
 
-P3 tests: `test_template_metadata`, `test_template_importer`, `test_template_service`, `test_excel_coords`, `test_blob`. Fixtures: `tests/fixtures/templates/`.
+P3 tests: `test_template_metadata`, `test_template_importer`, `test_template_service`, `test_excel_coords`, `test_blob`. Minimal `.xlsx` inputs are built by the `make_minimal_template` factory in `tests/conftest.py`.
 
 ## Environment
 

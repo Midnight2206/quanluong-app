@@ -21,6 +21,13 @@ class _RenderColumn:
     align: str
 
 
+def _render_font(font: dict) -> tuple[str, float]:
+    return (
+        FONT_BOLD if font.get("bold", False) else FONT_REGULAR,
+        font.get("size") or 10,
+    )
+
+
 def _page_dimensions(metadata: TemplateMetadata) -> tuple[float, float]:
     size = getattr(pagesizes, metadata.page.page_size.upper(), pagesizes.A4)
     width, height = (round(dimension) for dimension in size)
@@ -50,6 +57,7 @@ def _draw_static_fields(
 ) -> None:
     for field in metadata.fields:
         font = field.font or {}
+        font_name, font_size = _render_font(font)
         align = (field.align or {}).get("h", "left")
         value = f"{field.label_prefix}{fields.get(field.field_name, '')}"
         draw_text(
@@ -57,10 +65,8 @@ def _draw_static_fields(
             x=field.x,
             y=field.y,
             text=value,
-            font_name=font.get(
-                "name", FONT_BOLD if font.get("bold", False) else FONT_REGULAR
-            ),
-            font_size=font.get("size", 10),
+            font_name=font_name,
+            font_size=font_size,
             align=align,
             max_width=content_width if align == "center" else None,
         )

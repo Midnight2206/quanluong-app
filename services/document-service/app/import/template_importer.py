@@ -19,21 +19,36 @@ from ..template.metadata import (
 )
 from .errors import TemplateValidationError
 from .excel_coords import (
+    DEFAULT_ROW_HEIGHT_PT,
     cell_top_left_pt,
     merged_range_width_pt,
     signature_block_height_pt,
 )
 
 _FIELD_NAME_RE = re.compile(r"^[a-z0-9_]+$")
-_DEFAULT_ROW_HEIGHT_PT = 15.0
 
 
-def _resolve_range(workbook, name: str):
+def _find_defined_name(workbook, name: str):
     defined_name = workbook.defined_names.get(name)
-    if defined_name is None:
-        raise TemplateValidationError(f"Thiếu Named Range bắt buộc: {name}")
+    if defined_name is not None:
+        return defined_name, None
+    matches = [
+        (sheet.defined_names[name], sheet)
+        for sheet in workbook.worksheets
+        if name in sheet.defined_names
+    ]
+    if len(matches) > 1:
+        raise TemplateValidationError(f"Named Range {name} bị trùng giữa nhiều sheet")
+    return matches[0] if matches else None
+
+
+def _resolve_defined_range(workbook, defined_name, owner_sheet=None):
+    name = defined_name.name
     try:
-        destinations = list(defined_name.destinations)
+        if owner_sheet is not None and "!" not in defined_name.attr_text:
+            destinations = [(owner_sheet.title, defined_name.attr_text)]
+        else:
+            destinations = list(defined_name.destinations)
     except (AttributeError, TypeError, ValueError) as exc:
         raise TemplateValidationError(
             f"Named Range {name} phải là một vùng hình chữ nhật"
@@ -59,6 +74,21 @@ def _resolve_range(workbook, name: str):
         f"{get_column_letter(max_col)}{max_row}"
     )
     return workbook[sheet_name], normalized, (min_col, min_row, max_col, max_row)
+
+
+def _resolve_range(workbook, name: str):
+    found = _find_defined_name(workbook, name)
+    if found is None:
+        raise TemplateValidationError(f"Thiếu Named Range bắt buộc: {name}")
+    return _resolve_defined_range(workbook, *found)
+
+
+def _all_defined_names(workbook):
+    yield from ((defined_name, None) for defined_name in workbook.defined_names.values())
+    for sheet in workbook.worksheets:
+        yield from (
+            (defined_name, sheet) for defined_name in sheet.defined_names.values()
+        )
 
 
 def _merge_groups(sheet, bounds: tuple[int, int, int, int], name: str):
@@ -140,7 +170,7 @@ def _page_height(page: PageMeta) -> float:
 
 def _build_fields(workbook, page: PageMeta) -> list[FieldMeta]:
     fields = []
-    for defined_name in workbook.defined_names.values():
+    for defined_name, owner_sheet in _all_defined_names(workbook):
         if not defined_name.name.startswith("FIELD_"):
             continue
         field_name = defined_name.name[len("FIELD_") :]
@@ -148,7 +178,9 @@ def _build_fields(workbook, page: PageMeta) -> list[FieldMeta]:
             raise TemplateValidationError(
                 f"Named Range {defined_name.name} có field_name không hợp lệ"
             )
-        sheet, _, bounds = _resolve_range(workbook, defined_name.name)
+        sheet, _, bounds = _resolve_defined_range(
+            workbook, defined_name, owner_sheet
+        )
         min_col, min_row, max_col, max_row = bounds
         if (min_col, min_row) != (max_col, max_row):
             raise TemplateValidationError(
@@ -161,6 +193,7 @@ def _build_fields(workbook, page: PageMeta) -> list[FieldMeta]:
             min_col,
             page_height=_page_height(page),
             margin_top=page.margin_top,
+            margin_left=page.margin_left,
         )
         font, align, border = _style_dict(cell)
         fields.append(
@@ -235,7 +268,7 @@ def parse_template(
 
     page = _page_meta(header_sheet)
     signature_height = 80.0
-    if workbook.defined_names.get("TABLE_SIGNATURE") is not None:
+    if _find_defined_name(workbook, "TABLE_SIGNATURE") is not None:
         signature_sheet, _, signature_bounds = _resolve_range(
             workbook, "TABLE_SIGNATURE"
         )
@@ -249,10 +282,13 @@ def parse_template(
             signature_bounds[0],
             page_height=_page_height(page),
             margin_top=page.margin_top,
+            margin_left=page.margin_left,
         )[1]
-        signature_height = signature_block_height_pt(
+        computed_signature_height = signature_block_height_pt(
             signature_y, page.margin_bottom
         )
+        if computed_signature_height > 0:
+            signature_height = computed_signature_height
 
     header_height = header_sheet.row_dimensions[header_row].height
     data_cell = data_sheet.cell(data_bounds[1], data_bounds[0])
@@ -267,7 +303,7 @@ def parse_template(
             "align": row_align,
             "border": row_border,
         },
-        header_height_pt=float(header_height or _DEFAULT_ROW_HEIGHT_PT),
+        header_height_pt=float(header_height or DEFAULT_ROW_HEIGHT_PT),
         signature_block_height_pt=signature_height,
     )
     return TemplateMetadata(
