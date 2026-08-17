@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
+from importlib import import_module
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -19,6 +20,11 @@ from app.export import export_xlsx
 from app.models import Template
 from app.pagination import plan_pages
 from app.parse import parse_xlsx
+
+_template_errors = import_module("app.import.errors")
+import_template = import_module("app.import.template_service").import_template
+TemplateExistsError = _template_errors.TemplateExistsError
+TemplateValidationError = _template_errors.TemplateValidationError
 
 MAX_UPLOAD = 5 * 1024 * 1024
 
@@ -84,6 +90,71 @@ def list_templates(_: None = Depends(require_service_key)):
         }
         for template in templates
     ]
+
+
+@app.post("/v1/templates", status_code=201)
+async def create_template(
+    _: None = Depends(require_service_key),
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    version: str = Form(...),
+):
+    name = name.strip()
+    version = version.strip()
+    if not (file.filename or "").lower().endswith(".xlsx") or not name or not version:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("BAD_REQUEST", "Dữ liệu yêu cầu không hợp lệ"),
+        )
+
+    data = await file.read()
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail(
+                "BAD_REQUEST", f"File vượt quá {MAX_UPLOAD // (1024 * 1024)} MB"
+            ),
+        )
+
+    try:
+        with get_session() as session:
+            template_id = await run_in_threadpool(
+                import_template,
+                session,
+                name=name,
+                version=version,
+                xlsx_bytes=data,
+            )
+    except TemplateValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("TEMPLATE_INVALID", str(exc)),
+        )
+    except TemplateExistsError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("TEMPLATE_EXISTS", str(exc)),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("BAD_REQUEST", str(exc)),
+        )
+    except (SQLAlchemyError, RuntimeError):
+        raise HTTPException(
+            status_code=502,
+            detail=error_detail(
+                "DATABASE_UNAVAILABLE",
+                "Không thể kết nối cơ sở dữ liệu tài liệu",
+            ),
+        )
+
+    return {
+        "id": template_id,
+        "name": name,
+        "version": version,
+        "file_path": None,
+    }
 
 
 @app.post("/v1/parse")
