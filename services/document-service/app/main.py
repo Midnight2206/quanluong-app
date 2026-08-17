@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -11,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from app.auth import require_service_key
 from app.errors import error_detail, value_error_detail
 from app.export import export_xlsx
+from app.pagination import plan_pages
 from app.parse import parse_xlsx
 
 MAX_UPLOAD = 5 * 1024 * 1024
@@ -92,3 +94,38 @@ def export(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="export.xlsx"'},
     )
+
+
+class PaginationPlanBody(BaseModel):
+    n_rows: int
+    page_content_height: float
+    header_height: float = 0
+    carry_row_height: float = 0
+    signature_block_height: float = 0
+    row_height_min: float = 18
+    row_height_max: float = 28
+    min_rows_last_page: int = 2
+    stretch_strategy: str = "end_bias"
+
+
+@app.post("/v1/pagination/plan")
+def pagination_plan(
+    body: PaginationPlanBody,
+    _: None = Depends(require_service_key),
+):
+    try:
+        result = plan_pages(
+            n_rows=body.n_rows,
+            page_content_height=body.page_content_height,
+            header_height=body.header_height,
+            carry_row_height=body.carry_row_height,
+            signature_block_height=body.signature_block_height,
+            row_height_min=body.row_height_min,
+            row_height_max=body.row_height_max,
+            min_rows_last_page=body.min_rows_last_page,
+            stretch_strategy=body.stretch_strategy,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=value_error_detail(exc))
+
+    return asdict(result)
