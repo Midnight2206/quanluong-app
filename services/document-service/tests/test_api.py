@@ -1,6 +1,6 @@
 import os
 
-os.environ["EXCEL_SERVICE_KEY"] = "test-key"
+os.environ["DOCUMENT_SERVICE_KEY"] = "test-key"
 
 import app.main as main
 from fastapi.testclient import TestClient

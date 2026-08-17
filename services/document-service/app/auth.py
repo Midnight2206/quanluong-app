@@ -9,7 +9,7 @@ from fastapi import Header, HTTPException
 def require_service_key(
     x_service_key: Optional[str] = Header(default=None, alias="X-Service-Key"),
 ):
-    expected = (os.environ.get("EXCEL_SERVICE_KEY") or "").strip()
+    expected = (os.environ.get("DOCUMENT_SERVICE_KEY") or "").strip()
     if not expected or x_service_key != expected:
         raise HTTPException(
             status_code=401,

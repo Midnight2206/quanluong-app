@@ -28,7 +28,7 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-      excel:
+      document:
         condition: service_started
     ports:
       - "3000:3000"
@@ -138,14 +138,14 @@ services:
       timeout: 5s
       retries: 10
 
-  excel:
+  document:
     build:
-      context: ./services/excel-service
-    image: quanluong-excel:latest
-    container_name: quanluong-excel
+      context: ./services/document-service
+    image: quanluong-document:latest
+    container_name: quanluong-document
     restart: unless-stopped
     environment:
-      EXCEL_SERVICE_KEY: ${EXCEL_SERVICE_KEY:-dev-excel-key-change-me}
+      DOCUMENT_SERVICE_KEY: ${DOCUMENT_SERVICE_KEY:-dev-document-key-change-me}
     healthcheck:
       test:
         [

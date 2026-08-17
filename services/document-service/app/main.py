@@ -41,7 +41,7 @@ async def validation_exception_handler(_request: Request, _exc: RequestValidatio
 
 @app.get("/health")
 def health():
-    return {"ok": True, "service": "excel"}
+    return {"ok": True, "service": "document"}
 
 
 @app.post("/v1/parse")
