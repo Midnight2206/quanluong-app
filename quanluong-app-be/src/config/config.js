@@ -65,10 +65,10 @@ const config = {
     baseUrl: env.menuAiBaseUrl,
     timeoutMs: env.menuAiTimeoutMs,
   },
-  excelService: {
-    url: env.excelServiceUrl,
-    key: env.excelServiceKey,
-    timeoutMs: env.excelServiceTimeoutMs,
+  documentService: {
+    url: env.documentServiceUrl,
+    key: env.documentServiceKey,
+    timeoutMs: env.documentServiceTimeoutMs,
   },
   mail: {
     transport: env.mailTransport,

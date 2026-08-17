@@ -166,10 +166,10 @@ const env = {
     const n = Number(process.env.MENU_AI_TIMEOUT_MS || 60_000);
     return Number.isFinite(n) && n >= 5_000 ? Math.min(n, 300_000) : 60_000;
   })(),
-  excelServiceUrl: (process.env.EXCEL_SERVICE_URL || "").trim().replace(/\/+$/, ""),
-  excelServiceKey: (process.env.EXCEL_SERVICE_KEY || "").trim(),
-  excelServiceTimeoutMs: (() => {
-    const n = Number(process.env.EXCEL_SERVICE_TIMEOUT_MS || 15_000);
+  documentServiceUrl: (process.env.DOCUMENT_SERVICE_URL || "").trim().replace(/\/+$/, ""),
+  documentServiceKey: (process.env.DOCUMENT_SERVICE_KEY || "").trim(),
+  documentServiceTimeoutMs: (() => {
+    const n = Number(process.env.DOCUMENT_SERVICE_TIMEOUT_MS || 15_000);
     return Number.isFinite(n) && n > 0 ? n : 15_000;
   })(),
 };
