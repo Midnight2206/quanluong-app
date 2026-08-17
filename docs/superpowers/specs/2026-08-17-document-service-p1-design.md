@@ -109,11 +109,12 @@ Lỗi: envelope `{ "error": { "code", "message" } }` (giữ pattern excel-servic
 
 ## Ngoài P1 (P2+)
 
-ReportLab PDF; MinIO; Template Importer + Named Range conventions; API tạo chứng từ; pdfplumber QA; nối sổ nhiều chứng từ; font tiếng Việt cụ thể (chốt trước P2).
+P2: xem `2026-08-17-document-service-p2-design.md` (ReportLab + DejaVu Sans, template synthetic).  
+P3+: MinIO; Template Importer + Named Range; API tạo chứng từ; pdfplumber QA; nối sổ nhiều chứng từ.
 
-## Checklist còn mở (chốt trước P3 / P2)
+## Checklist còn mở (chốt trước P3)
 
 - [ ] Naming convention Named Range field đơn lẻ
 - [ ] Named Range vùng bảng (`DATA_TABLE_HEADER` / `DATA_TABLE_START`…)
-- [ ] Font `.ttf` tiếng Việt cụ thể (P2)
+- [x] Font `.ttf` tiếng Việt — DejaVu Sans (P2)
 - [ ] Danh sách field bắt buộc mọi template (P3 validate)
