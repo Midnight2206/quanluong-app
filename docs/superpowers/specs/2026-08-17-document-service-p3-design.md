@@ -225,14 +225,13 @@ Không thêm route FastAPI; `main.py` không đổi ở P3.
 
 ## Ngoài P3 (P4+)
 
-- `POST /v1/templates` upload
-- `MinIOBlobStore`
+P4: xem **`2026-08-17-document-service-p4-design.md`** (HTTP upload + PDF từ DB).
+
+- MinIO / `MinIOBlobStore`
 - `required_fields` theo loại chứng từ (document type)
-- `POST /templates/{id}/documents` → PDF
-- Renderer đọc metadata từ DB thay vì in-memory
-- Node client
+- Node client / FE
 - pdfplumber QA (P5)
-- Hiệu chỉnh lại heuristic `width_pt = col_width * 7` bằng template thật
+- Hiệu chỉnh heuristic `width_pt = col_width * 7`
 - Hỗ trợ nhiều sheet cho vùng bảng (nếu phát sinh nhu cầu)
 
 ## Mapping DB (persist)
