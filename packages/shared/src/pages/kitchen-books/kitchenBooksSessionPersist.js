@@ -7,6 +7,7 @@ const KEYS = {
   receiptDate: "quanluong:kitchen-books:receipt-date",
   menuDate: "quanluong:kitchen-books:menu-date",
   yearMonth: "quanluong:kitchen-books:year-month",
+  menuAllowance: "quanluong:kitchen-books:menu-allowance",
 };
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -93,4 +94,51 @@ export function readStoredKitchenYearMonth() {
 
 export function writeStoredKitchenYearMonth(ym) {
   writeString(KEYS.yearMonth, typeof ym === "string" && YM_RE.test(ym) ? ym : null);
+}
+
+/** @returns {{ rateId: number|null, amountPerPerson: number|null }} */
+export function readStoredKitchenMenuAllowance() {
+  if (typeof sessionStorage === "undefined") {
+    return { rateId: null, amountPerPerson: null };
+  }
+  try {
+    const raw = sessionStorage.getItem(KEYS.menuAllowance);
+    if (!raw) {
+      return { rateId: null, amountPerPerson: null };
+    }
+    const o = JSON.parse(raw);
+    const rateId = Number(o?.rateId);
+    const amountPerPerson = Number(o?.amountPerPerson);
+    return {
+      rateId: Number.isInteger(rateId) && rateId > 0 ? rateId : null,
+      amountPerPerson: Number.isFinite(amountPerPerson) && amountPerPerson >= 0 ? amountPerPerson : null,
+    };
+  } catch {
+    return { rateId: null, amountPerPerson: null };
+  }
+}
+
+/** @param {{ rateId?: number|null, amountPerPerson?: number|null }} value */
+export function writeStoredKitchenMenuAllowance(value) {
+  if (typeof sessionStorage === "undefined") {
+    return;
+  }
+  try {
+    const rateId = value?.rateId != null ? Number(value.rateId) : null;
+    const amountPerPerson = value?.amountPerPerson != null ? Number(value.amountPerPerson) : null;
+    if ((rateId == null || !Number.isInteger(rateId)) && (amountPerPerson == null || !Number.isFinite(amountPerPerson))) {
+      sessionStorage.removeItem(KEYS.menuAllowance);
+      return;
+    }
+    sessionStorage.setItem(
+      KEYS.menuAllowance,
+      JSON.stringify({
+        rateId: Number.isInteger(rateId) && rateId > 0 ? rateId : null,
+        amountPerPerson:
+          Number.isFinite(amountPerPerson) && amountPerPerson >= 0 ? amountPerPerson : null,
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
 }

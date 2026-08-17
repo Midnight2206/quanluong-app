@@ -70,6 +70,7 @@ export const qk = {
     catalog: (unitId, q) => ["kitchenBooks", "catalog", String(unitId), q ?? ""],
     catalogDetail: (unitId, id) => ["kitchenBooks", "catalogDetail", String(unitId), String(id)],
     menu: (unitId, date) => ["kitchenBooks", "menu", String(unitId), String(date)],
+    menuDetail: (unitId, date) => ["kitchenBooks", "menuDetail", String(unitId), String(date)],
     monthMarkers: (unitId, yearMonth) => [
       "kitchenBooks",
       "monthMarkers",

@@ -6,3 +6,4 @@ dist/
 .turbo/
 *.log
 .env*.local
+.superpowers/

@@ -75,6 +75,42 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "getKitchenMenuDetail",
+    method: "GET",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/menu/detail",
+    pathRoute: "/api/kitchen-books/menu/detail",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Xem thực đơn chi tiết (đơn giá + tổng hợp LTTP).",
+    },
+  },
+  {
+    key: "suggestKitchenMenuAi",
+    method: "POST",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/menu/ai-suggest",
+    pathRoute: "/api/kitchen-books/menu/ai-suggest",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "AI gợi ý thực đơn một ngày.",
+    },
+  },
+  {
+    key: "applyKitchenMenuAi",
+    method: "POST",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/menu/ai-apply",
+    pathRoute: "/api/kitchen-books/menu/ai-apply",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Áp dụng gợi ý AI vào thực đơn ngày.",
+    },
+  },
+  {
     key: "putKitchenMenu",
     method: "PUT",
     module: KITCHEN_BOOKS_MODULE_NAME,

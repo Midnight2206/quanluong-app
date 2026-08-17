@@ -88,6 +88,41 @@ const putMenuBodySchema = z.object({
   dishes: z.array(dishInputSchema).default([]),
 });
 
+const aiSuggestBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema,
+});
+
+const aiApplyLineSchema = z.object({
+  commodityId: z.coerce.number().int().positive().optional().nullable(),
+  commodityName: z.string().trim().max(255).optional().nullable(),
+  calcMode: calcModeSchema.optional(),
+  perPersonAmount: z.coerce.number().positive().optional().nullable(),
+  perPersonUnit: perPersonUnitSchema.optional().nullable(),
+  peoplePerUnit: z.coerce.number().positive().optional().nullable(),
+  mapped: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+});
+
+const aiApplyDishSchema = z.object({
+  name: z.string().trim().min(1).max(300),
+  lines: z.array(aiApplyLineSchema).default([]),
+});
+
+const aiApplyPeriodSchema = z.object({
+  dishes: z.array(aiApplyDishSchema).default([]),
+});
+
+const aiApplyBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema,
+  periods: z.object({
+    sang: aiApplyPeriodSchema.optional(),
+    trua: aiApplyPeriodSchema.optional(),
+    chieu: aiApplyPeriodSchema.optional(),
+  }),
+});
+
 const importCatalogBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   date: dateSchema,
@@ -169,6 +204,8 @@ export {
   menuQuerySchema,
   monthMarkersQuerySchema,
   putMenuBodySchema,
+  aiSuggestBodySchema,
+  aiApplyBodySchema,
   importCatalogBodySchema,
   dishIdParamsSchema,
   deleteDishQuerySchema,
