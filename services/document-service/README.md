@@ -1,12 +1,23 @@
-# Document microservice (P1)
+# Document microservice (P1 + P2)
 
-Internal FastAPI: `.xlsx` parse/export, Postgres template schema, Pagination Engine (`end_bias`, 18–28pt). Node BE only.
+Internal FastAPI: `.xlsx` parse/export, Postgres template schema, Pagination Engine (`end_bias`, 18–28pt). P2 adds ReportLab PDF renderer (module only). Node BE only.
 
-Docs: [design](../../docs/superpowers/specs/2026-08-17-document-service-p1-design.md) · [plan](../../docs/superpowers/plans/2026-08-17-document-service-p1.md)
+Docs: [P1 design](../../docs/superpowers/specs/2026-08-17-document-service-p1-design.md) · [P1 plan](../../docs/superpowers/plans/2026-08-17-document-service-p1.md) · [P2 design](../../docs/superpowers/specs/2026-08-17-document-service-p2-design.md)
 
 ## P1 scope
 
-**In:** `/health`, `/v1/parse`, `/v1/export`, `POST /v1/pagination/plan`, `GET /v1/templates`. **Out:** PDF, MinIO, importer, document-create.
+**In:** `/health`, `/v1/parse`, `/v1/export`, `POST /v1/pagination/plan`, `GET /v1/templates`. **Out:** HTTP PDF, MinIO, importer, document-create.
+
+## P2 scope
+
+**In:** `render_demo_pdf(fields, rows) -> bytes` — synthetic demo template (fields + 5-col table + pagination via P1 planner). Fonts bundled in `fonts/` (`DejaVuSans.ttf`, `DejaVuSans-Bold.ttf`); registered on import via `app/render/fonts.py`. **Out:** HTTP PDF endpoint (no new routes in `main.py`).
+
+```python
+from app.render import render_demo_pdf
+pdf = render_demo_pdf(fields={"don_vi": "…", "ngay_thang": "…", ...}, rows=[{"stt": "1", "ten_hang": "…", ...}])
+```
+
+Run PDF tests: `pytest tests/test_pdf_renderer.py -v` (pypdf page count + Vietnamese text). Full suite: `pytest -v`.
 
 ## Environment
 
@@ -18,7 +29,7 @@ Docs: [design](../../docs/superpowers/specs/2026-08-17-document-service-p1-desig
 cd services/document-service && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 export DOCUMENT_SERVICE_KEY=dev-key DOCUMENT_DATABASE_URL=postgresql+psycopg://document:document@127.0.0.1:5432/document
 alembic upgrade head && uvicorn app.main:app --reload --port 8000
-pytest -v   # test_page_planner, test_pagination_api, test_api, test_templates
+pytest -v   # P1 + P2 (incl. test_pdf_renderer, test_fonts, test_draw, test_demo_template)
 ```
 
 Docker: `document` + `document-db` (Postgres 16); entrypoint runs migrations. No host port; `app` depends on `document` (`service_started`).
