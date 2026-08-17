@@ -2,6 +2,7 @@ import importlib
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.models import Template, TemplateField, TemplateTableConfig
 from conftest import make_minimal_template
@@ -154,3 +155,27 @@ def test_import_template_second_import_same_name_version_raises():
             version="1",
             xlsx_bytes=xlsx,
         )
+
+
+def test_import_template_maps_postgres_name_version_unique_violation():
+    session = MagicMock()
+    session.scalar.return_value = None
+    added: list[object] = []
+    session.add.side_effect = added.append
+    session.flush.side_effect = lambda: setattr(
+        next(obj for obj in added if isinstance(obj, Template)), "id", 7
+    )
+    orig = Exception(
+        'duplicate key value violates unique constraint "templates_name_version_key"'
+    )
+    session.commit.side_effect = IntegrityError("INSERT INTO templates", {}, orig)
+
+    with pytest.raises(errors.TemplateExistsError):
+        template_service.import_template(
+            session,
+            name="chung-tu",
+            version="1",
+            xlsx_bytes=make_minimal_template(),
+        )
+
+    session.rollback.assert_called_once()

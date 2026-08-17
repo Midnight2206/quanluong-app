@@ -3,6 +3,10 @@ from math import floor
 from typing import List, Optional
 
 
+class PaginationError(ValueError):
+    """Pagination input or feasibility failure."""
+
+
 @dataclass
 class PagePlan:
     page_index: int
@@ -104,11 +108,11 @@ def plan_pages(
     stretch_strategy: str = "end_bias",
 ) -> PaginationResult:
     if n_rows < 0:
-        raise ValueError("Số dòng không được âm")
+        raise PaginationError("Số dòng không được âm")
     if row_height_min <= 0 or row_height_min > row_height_max:
-        raise ValueError("Khoảng chiều cao dòng không hợp lệ")
+        raise PaginationError("Khoảng chiều cao dòng không hợp lệ")
     if stretch_strategy != "end_bias":
-        raise ValueError("Chiến lược giãn dòng không được hỗ trợ")
+        raise PaginationError("Chiến lược giãn dòng không được hỗ trợ")
     if n_rows == 0:
         return PaginationResult([], stretch_strategy, row_height_min, row_height_max)
 
@@ -140,4 +144,4 @@ def plan_pages(
             row_height_max=row_height_max,
         )
 
-    raise ValueError("Phân trang không khả thi với giới hạn chiều cao dòng đã cho")
+    raise PaginationError("Phân trang không khả thi với giới hạn chiều cao dòng đã cho")

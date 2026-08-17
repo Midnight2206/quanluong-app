@@ -19,7 +19,7 @@ from app.db import get_session
 from app.errors import error_detail, value_error_detail
 from app.export import export_xlsx
 from app.models import Template
-from app.pagination import plan_pages
+from app.pagination import PaginationError, plan_pages
 from app.parse import parse_xlsx
 from app.render.pdf_renderer import render_pdf
 
@@ -131,11 +131,6 @@ def get_template_fields(template_id: int, _: None = Depends(require_service_key)
     try:
         with get_session() as session:
             metadata = load_metadata_from_db(session, template_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=404,
-            detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
-        )
     except (SQLAlchemyError, RuntimeError):
         raise _database_unavailable()
 
@@ -187,10 +182,15 @@ async def create_document(
             fields=body.fields,
             rows=body.rows,
         )
-    except ValueError as exc:
+    except PaginationError as exc:
         raise HTTPException(
             status_code=400,
             detail=error_detail("PAGINATION_FAILED", str(exc)),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("BAD_REQUEST", str(exc)),
         )
 
     return Response(

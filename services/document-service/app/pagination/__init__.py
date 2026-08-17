@@ -1,3 +1,3 @@
-from .page_planner import PagePlan, PaginationResult, plan_pages
+from .page_planner import PagePlan, PaginationError, PaginationResult, plan_pages
 
-__all__ = ["PagePlan", "PaginationResult", "plan_pages"]
+__all__ = ["PagePlan", "PaginationError", "PaginationResult", "plan_pages"]

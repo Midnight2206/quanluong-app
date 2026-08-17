@@ -41,7 +41,7 @@ def load_metadata_from_db(
         )
     )
     if table_config is None:
-        raise ValueError(f"Template {template_id} has no table configuration")
+        return None
 
     columns = [
         ColumnMeta(

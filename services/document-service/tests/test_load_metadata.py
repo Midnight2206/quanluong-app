@@ -45,6 +45,7 @@ def test_import_and_load_metadata_round_trip():
         column.align_h for column in parsed.table.columns
     ]
     assert all(field.label_prefix == "" for field in loaded.fields)
+    assert loaded == parsed
 
 
 def test_load_metadata_returns_none_for_unknown_template():
@@ -53,3 +54,26 @@ def test_load_metadata_returns_none_for_unknown_template():
 
     with Session(engine) as session:
         assert metadata_store.load_metadata_from_db(session, 999) is None
+
+
+def test_load_metadata_returns_none_without_table_config():
+    engine = create_engine("sqlite://")
+    Template.__table__.create(engine)
+    TemplateField.__table__.create(engine)
+    TemplateTableConfig.__table__.create(engine)
+
+    with Session(engine) as session:
+        template = Template(
+            name="incomplete",
+            version="1",
+            page_size="A4",
+            orientation="portrait",
+            margin_top=40,
+            margin_right=36,
+            margin_bottom=40,
+            margin_left=36,
+        )
+        session.add(template)
+        session.commit()
+
+        assert metadata_store.load_metadata_from_db(session, template.id) is None

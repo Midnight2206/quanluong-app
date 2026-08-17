@@ -220,6 +220,21 @@ def test_get_template_fields_returns_404_when_missing(monkeypatch):
     }
 
 
+def test_get_template_fields_returns_404_without_table_config(monkeypatch):
+    engine = _database(monkeypatch)
+    template_id = _upload().json()["id"]
+    with Session(engine) as session:
+        session.query(TemplateTableConfig).delete()
+        session.commit()
+
+    response = client.get(
+        f"/v1/templates/{template_id}/fields", headers=AUTH_HEADERS
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
 def test_get_template_fields_requires_service_key():
     response = client.get("/v1/templates/1/fields")
 
@@ -270,6 +285,19 @@ def test_create_document_returns_404_when_template_missing(monkeypatch):
     }
 
 
+def test_create_document_returns_404_without_table_config(monkeypatch):
+    engine = _database(monkeypatch)
+    template_id = _upload().json()["id"]
+    with Session(engine) as session:
+        session.query(TemplateTableConfig).delete()
+        session.commit()
+
+    response = _create_document(template_id)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
 @pytest.mark.parametrize("rows", [{"stt": "1"}, ["not an object"]])
 def test_create_document_rejects_bad_rows_type(monkeypatch, rows):
     _database(monkeypatch)
@@ -300,20 +328,39 @@ def test_create_document_uses_rfc5987_filename_for_vietnamese_name(monkeypatch):
 
 
 def test_create_document_maps_pagination_failure_verbatim(monkeypatch):
+    engine = _database(monkeypatch)
+    template_id = _upload().json()["id"]
+    with Session(engine) as session:
+        table = session.query(TemplateTableConfig).one()
+        table.row_height_min = 1000
+        table.row_height_max = 1000
+        session.commit()
+
+    response = _create_document(template_id, rows=[{"stt": "1"}])
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": {
+            "code": "PAGINATION_FAILED",
+            "message": "Phân trang không khả thi với giới hạn chiều cao dòng đã cho",
+        },
+    }
+
+
+def test_create_document_maps_other_render_value_error_to_bad_request(monkeypatch):
     _database(monkeypatch)
     template_id = _upload().json()["id"]
-    planner_message = "Không đủ chiều cao để phân trang"
 
     def fail_render(**_kwargs):
-        raise ValueError(planner_message)
+        raise ValueError("Dữ liệu render không hợp lệ")
 
-    monkeypatch.setattr(main, "render_pdf", fail_render, raising=False)
+    monkeypatch.setattr(main, "render_pdf", fail_render)
 
     response = _create_document(template_id)
 
     assert response.status_code == 400
     assert response.json() == {
-        "error": {"code": "PAGINATION_FAILED", "message": planner_message},
+        "error": {"code": "BAD_REQUEST", "message": "Dữ liệu render không hợp lệ"},
     }
 
 
