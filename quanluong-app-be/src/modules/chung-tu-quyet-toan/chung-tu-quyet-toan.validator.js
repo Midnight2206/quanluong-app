@@ -20,6 +20,31 @@ const driveFileIdParamsSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/),
 });
 
+const chungTuPdfTemplateListQuerySchema = z.object({
+  categoryKey: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(80)),
+});
+
+const chungTuPdfTemplateIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+/** multipart (multer): categoryKey + displayName + name + version */
+const chungTuPdfTemplateUploadBodySchema = z.object({
+  categoryKey: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(80)),
+  displayName: z.preprocess(
+    (v) => {
+      if (v == null) {
+        return undefined;
+      }
+      const value = String(v).trim();
+      return value || undefined;
+    },
+    z.string().min(1).max(200).optional(),
+  ),
+  name: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(120)),
+  version: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(64)),
+});
+
 const putTemplateFillRulesBodySchema = z
   .object({
     fillRules: z.unknown().optional(),
@@ -255,6 +280,9 @@ export {
   driveImportBodySchema,
   driveImportQuerySchema,
   driveFileIdParamsSchema,
+  chungTuPdfTemplateIdParamSchema,
+  chungTuPdfTemplateListQuerySchema,
+  chungTuPdfTemplateUploadBodySchema,
   templateCatalogCreateBodySchema,
   templateCatalogUploadBodySchema,
   templateCatalogIdParamSchema,

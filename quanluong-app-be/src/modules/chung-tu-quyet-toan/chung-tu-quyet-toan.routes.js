@@ -16,16 +16,20 @@ import {
   chungTuQuyetToanHealthController,
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
+  createChungTuPdfTemplateController,
   createChungTuDocumentController,
+  deactivateChungTuPdfTemplateController,
   createTemplateCatalogController,
   deleteChungTuDocumentController,
   deleteTemplateCatalogController,
   getChungTuDocumentController,
+  getChungTuPdfTemplateFieldsController,
   getChungTuUnitProfileController,
   getCategoryTemplateFillMappingController,
   getTemplateFillRulesController,
   importDriveFileController,
   listCategoryTemplatesController,
+  listChungTuPdfTemplatesController,
   listChungTuDocumentsController,
   listBkmhSnapshotsController,
   listDriveTemplatesController,
@@ -47,6 +51,9 @@ import {
 import {
   categoryKeyParamSchema,
   categoryTemplateDriveParamsSchema,
+  chungTuPdfTemplateIdParamSchema,
+  chungTuPdfTemplateListQuerySchema,
+  chungTuPdfTemplateUploadBodySchema,
   putCategoryTemplateFillMappingBodySchema,
   chungTuContextPreviewBodySchema,
   chungTuDocumentCreateBodySchema,
@@ -195,6 +202,35 @@ chungTuQuyetToanRouter.get(
   permissionMiddleware([routePermissions.templateCatalogList]),
   validateRequest({ query: templateCatalogQuerySchema }),
   asyncHandler(listTemplateCatalogController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-templates",
+  permissionMiddleware([routePermissions.pdfTemplateList]),
+  validateRequest({ query: chungTuPdfTemplateListQuerySchema }),
+  asyncHandler(listChungTuPdfTemplatesController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-templates",
+  permissionMiddleware([routePermissions.pdfTemplateCreate]),
+  driveImportMulterMiddleware,
+  validateRequest({ body: chungTuPdfTemplateUploadBodySchema }),
+  asyncHandler(createChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.delete(
+  "/pdf-templates/:id",
+  permissionMiddleware([routePermissions.pdfTemplateDelete]),
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(deactivateChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-templates/:id/fields",
+  permissionMiddleware([routePermissions.pdfTemplateFields]),
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(getChungTuPdfTemplateFieldsController),
 );
 
 chungTuQuyetToanRouter.get(

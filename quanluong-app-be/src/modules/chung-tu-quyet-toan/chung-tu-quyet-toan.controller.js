@@ -1,4 +1,4 @@
-import { respondSuccess } from "../../shared/utils/responders.js";
+import { respondCreated, respondSuccess } from "../../shared/utils/responders.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
@@ -38,6 +38,12 @@ import {
   getCategoryTemplateFillMapping,
   putCategoryTemplateFillMapping,
 } from "./chung-tu-template-fill-config.service.js";
+import {
+  createChungTuPdfTemplate,
+  deactivateChungTuPdfTemplate,
+  getChungTuPdfTemplateFields,
+  listChungTuPdfTemplates,
+} from "./chung-tu-pdf-template.service.js";
 
 async function chungTuQuyetToanHealthController(req, res) {
   const data = await getChungTuQuyetToanHealth({
@@ -134,6 +140,58 @@ async function listTemplateCatalogController(req, res) {
   return respondSuccess(res, {
     message: "Danh sách mẫu chứng từ (Drive đã liên kết).",
     data: { items },
+  });
+}
+
+async function listChungTuPdfTemplatesController(req, res) {
+  const items = await listChungTuPdfTemplates({
+    categoryKey: req.validatedQuery.categoryKey,
+  });
+  return respondSuccess(res, {
+    message: "Danh sách mẫu PDF chứng từ đang hoạt động.",
+    data: { items },
+  });
+}
+
+async function createChungTuPdfTemplateController(req, res) {
+  if (!req.file?.buffer) {
+    throw new AppError({
+      message: "Thiếu file (multipart field «file»).",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  const data = await createChungTuPdfTemplate({
+    categoryKey: req.validatedBody.categoryKey,
+    displayName: req.validatedBody.displayName,
+    name: req.validatedBody.name,
+    version: req.validatedBody.version,
+    buffer: req.file.buffer,
+    uploadedById: req.user.id,
+  });
+  return respondCreated(res, {
+    message: "Đã tải mẫu PDF lên Document service.",
+    data,
+  });
+}
+
+async function deactivateChungTuPdfTemplateController(req, res) {
+  const data = await deactivateChungTuPdfTemplate({
+    id: req.validatedParams.id,
+  });
+  return respondSuccess(res, {
+    message: "Đã ngừng kích hoạt mẫu PDF.",
+    data,
+  });
+}
+
+async function getChungTuPdfTemplateFieldsController(req, res) {
+  const data = await getChungTuPdfTemplateFields({
+    id: req.validatedParams.id,
+  });
+  return respondSuccess(res, {
+    message: "Schema field của mẫu PDF.",
+    data,
   });
 }
 
@@ -429,16 +487,20 @@ export {
   chungTuQuyetToanHealthController,
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
+  createChungTuPdfTemplateController,
   createChungTuDocumentController,
+  deactivateChungTuPdfTemplateController,
   deleteChungTuDocumentController,
   createTemplateCatalogController,
   deleteTemplateCatalogController,
   getChungTuDocumentController,
+  getChungTuPdfTemplateFieldsController,
   getCategoryTemplateFillMappingController,
   getChungTuUnitProfileController,
   getTemplateFillRulesController,
   importDriveFileController,
   listCategoryTemplatesController,
+  listChungTuPdfTemplatesController,
   listChungTuDocumentsController,
   listBkmhSnapshotsController,
   listDriveTemplatesController,
