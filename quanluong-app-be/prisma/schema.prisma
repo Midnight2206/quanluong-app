@@ -156,6 +156,8 @@ model User {
   lttpAsDefaultForRecipientUnit          LttpRecipientUnitDefaultUser[] @relation("LttpRecipientDefaultUserUser")
   chungTuQuyetToanTemplateConfigs        ChungTuQuyetToanTemplateConfig[]
   chungTuDocumentsCreated                ChungTuDocument[] @relation("ChungTuDocumentCreatedBy")
+  chungTuPdfTemplatesUploaded            ChungTuPdfTemplate[] @relation("ChungTuPdfTemplateUploadedBy")
+  chungTuPdfExportsCreated               ChungTuPdfExport[] @relation("ChungTuPdfExportCreatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
 
@@ -270,6 +272,48 @@ model ChungTuDocument {
   @@index([unitId, categoryKey, periodDate])
   @@index([issueSlipId])
   @@index([unitId, categoryKey])
+}
+
+model ChungTuPdfTemplate {
+  id                         Int      @id @default(autoincrement())
+  categoryKey                String   @db.VarChar(80)
+  displayName                String   @db.VarChar(200)
+  documentServiceTemplateId  Int
+  name                       String   @db.VarChar(120)
+  version                    String   @db.VarChar(64)
+  isActive                   Boolean  @default(true)
+  uploadedById               Int
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  uploadedBy                 User     @relation("ChungTuPdfTemplateUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@unique([categoryKey, documentServiceTemplateId])
+  @@index([categoryKey, isActive])
+}
+
+model ChungTuPdfExport {
+  id                         Int      @id @default(autoincrement())
+  exportKey                  String   @unique @db.VarChar(200)
+  categoryKey                String   @db.VarChar(80)
+  unitId                     Int
+  periodMonth                String?  @db.VarChar(7)
+  periodDate                 DateTime? @db.Date
+  issueSlipId                Int?
+  unitIdsJson                Json
+  aggregationMode            String?  @db.VarChar(32)
+  pdfTemplateId              Int
+  documentServiceTemplateId  Int
+  fileName                   String   @db.VarChar(255)
+  storagePath                String   @db.VarChar(512)
+  sourceDataHash             String?  @db.VarChar(64)
+  signaturesJson             Json?
+  createdById                Int
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  unit                       Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy                  User     @relation("ChungTuPdfExportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([categoryKey, unitId, createdAt])
 }
 
 /// Snapshot BKMH mỗi lần tạo/đồng bộ (theo ngày hoặc cả tháng).
@@ -455,6 +499,7 @@ model Unit {
   unitMealPeriodSplits      UnitMealPeriodSplit[]
   chungTuUnitProfile        ChungTuUnitProfile?
   chungTuDocuments          ChungTuDocument[]
+  chungTuPdfExports         ChungTuPdfExport[]
   kitchenDishCatalogs       KitchenDishCatalog[]
   kitchenMenuDays           KitchenMenuDay[]
   kitchenReceiptSlips       KitchenReceiptSlip[]
