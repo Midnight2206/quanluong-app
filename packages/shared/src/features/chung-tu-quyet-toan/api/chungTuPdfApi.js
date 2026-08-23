@@ -23,6 +23,19 @@ function invalidateChungTuPdfExports(qc, unitId, categoryKey) {
   qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.root });
 }
 
+function invalidateChungTuPdfExportBatches(qc, unitId, categoryKey) {
+  const key = normalizeCategoryKey(categoryKey);
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.pdfExportBatches(unitId, key) });
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.pdfExportBatches(unitId) });
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.root });
+}
+
+function invalidateChungTuSignatureSettings(qc, categoryKey) {
+  const key = normalizeCategoryKey(categoryKey);
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.signatureSettings(key) });
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.root });
+}
+
 export function useChungTuPdfTemplatesQuery(categoryKey, options = {}) {
   const { skip, ...rest } = options;
   const key = normalizeCategoryKey(categoryKey);
@@ -113,6 +126,25 @@ export function useCreateChungTuPdfExportMutation() {
   });
 }
 
+export function useCreateChungTuPdfExportBatchMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({
+        url: "/chungtuquyettoan/pdf-export-batches",
+        method: "post",
+        data: body,
+      }),
+    onSuccess: (data, variables) => {
+      invalidateChungTuPdfExportBatches(
+        qc,
+        data?.unitId ?? variables?.unitId,
+        data?.categoryKey ?? variables?.categoryKey,
+      );
+    },
+  });
+}
+
 export function useChungTuPdfExportsQuery({ unitId, categoryKey } = {}, options = {}) {
   const { skip, ...rest } = options;
   const key = normalizeCategoryKey(categoryKey);
@@ -141,6 +173,85 @@ export function useDeleteChungTuPdfExportMutation() {
     onSuccess: (_data, variables) => {
       invalidateChungTuPdfExports(qc, variables?.unitId, variables?.categoryKey);
     },
+  });
+}
+
+export function useChungTuPdfExportBatchesQuery({ unitId, categoryKey } = {}, options = {}) {
+  const { skip, ...rest } = options;
+  const key = normalizeCategoryKey(categoryKey);
+  return useQuery({
+    queryKey: qk.chungTuQuyetToan.pdfExportBatches(unitId, key),
+    queryFn: () =>
+      apiRequest({
+        url: "/chungtuquyettoan/pdf-export-batches",
+        method: "get",
+        params: { unitId, ...(key ? { categoryKey: key } : {}) },
+      }),
+    select: (data) => (Array.isArray(data?.items) ? data.items : []),
+    enabled: Boolean(skip !== true && unitId != null && unitId !== ""),
+    ...rest,
+  });
+}
+
+export function useDeleteChungTuPdfExportBatchMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ batchKey }) =>
+      apiRequest({
+        url: `/chungtuquyettoan/pdf-export-batches/${encodeURIComponent(batchKey)}`,
+        method: "delete",
+      }),
+    onSuccess: (_data, variables) => {
+      invalidateChungTuPdfExportBatches(qc, variables?.unitId, variables?.categoryKey);
+    },
+  });
+}
+
+export function useChungTuSignatureSettingsQuery(categoryKey, options = {}) {
+  const { skip, ...rest } = options;
+  const key = normalizeCategoryKey(categoryKey);
+  return useQuery({
+    queryKey: qk.chungTuQuyetToan.signatureSettings(key),
+    queryFn: () =>
+      apiRequest({
+        url: "/chungtuquyettoan/signature-settings",
+        method: "get",
+        params: { categoryKey: key },
+      }),
+    enabled: Boolean(skip !== true && key.length > 0),
+    ...rest,
+  });
+}
+
+export function useUpsertChungTuSignatureSettingsMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ categoryKey, signatureBlock }) =>
+      apiRequest({
+        url: "/chungtuquyettoan/signature-settings",
+        method: "put",
+        data: {
+          categoryKey: normalizeCategoryKey(categoryKey),
+          signatureBlock,
+        },
+      }),
+    onSuccess: (data, variables) => {
+      invalidateChungTuSignatureSettings(qc, data?.categoryKey ?? variables?.categoryKey);
+    },
+  });
+}
+
+export function useChungTuPdfFieldCatalogQuery(options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.chungTuQuyetToan.pdfFieldCatalog(),
+    queryFn: () =>
+      apiRequest({
+        url: "/chungtuquyettoan/pdf-template-field-catalog",
+        method: "get",
+      }),
+    enabled: skip !== true,
+    ...rest,
   });
 }
 
@@ -179,4 +290,62 @@ export async function downloadChungTuPdfExport(exportKey) {
   const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
   const fileName = filenameFromContentDisposition(cd) ?? `${key}.pdf`;
   downloadBlobAsFile(pdfBlob, fileName);
+}
+
+export async function downloadChungTuPdfBatchZip(batchKey) {
+  const key = batchKey != null ? String(batchKey).trim() : "";
+  const { data: blob, headers } = await apiRequest({
+    url: `/chungtuquyettoan/pdf-export-batches/${encodeURIComponent(key)}/zip`,
+    method: "get",
+    responseType: "blob",
+    returnHeaders: true,
+  });
+  const zipBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/zip" });
+  const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
+  const fileName = filenameFromContentDisposition(cd) ?? `${key}.zip`;
+  downloadBlobAsFile(zipBlob, fileName);
+}
+
+export async function openChungTuPdfBatchMergedPdf(batchKey, options = {}) {
+  const key = batchKey != null ? String(batchKey).trim() : "";
+  const { targetWindow = null } = options ?? {};
+  const { data: blob, headers } = await apiRequest({
+    url: `/chungtuquyettoan/pdf-export-batches/${encodeURIComponent(key)}/merged.pdf`,
+    method: "get",
+    responseType: "blob",
+    returnHeaders: true,
+  });
+  const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/pdf" });
+  const objectUrl = URL.createObjectURL(pdfBlob);
+  const openedWindow =
+    targetWindow ?? window.open("about:blank", "_blank", "noopener,noreferrer");
+  if (!openedWindow) {
+    URL.revokeObjectURL(objectUrl);
+    throw new Error("Trình duyệt chặn cửa sổ mới.");
+  }
+  openedWindow.location.href = objectUrl;
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 120_000);
+  const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
+  return {
+    openedWindow,
+    objectUrl,
+    fileName: filenameFromContentDisposition(cd) ?? `${key}-merged.pdf`,
+  };
+}
+
+export async function downloadChungTuPdfBatchFile(batchKey, fileId, fileName) {
+  const batch = batchKey != null ? String(batchKey).trim() : "";
+  const file = fileId != null ? String(fileId).trim() : "";
+  const { data: blob, headers } = await apiRequest({
+    url: `/chungtuquyettoan/pdf-export-batches/${encodeURIComponent(batch)}/files/${encodeURIComponent(file)}`,
+    method: "get",
+    responseType: "blob",
+    returnHeaders: true,
+  });
+  const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/pdf" });
+  const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
+  downloadBlobAsFile(
+    pdfBlob,
+    fileName || filenameFromContentDisposition(cd) || `${batch}-${file}.pdf`,
+  );
 }

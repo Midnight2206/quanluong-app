@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { TabPanel } from "@/components/common/TabPanel";
 import { ChungTuExportWorkspace } from "./ChungTuExportWorkspace.jsx";
 import { ChungTuHistoryWorkspace } from "./ChungTuHistoryWorkspace.jsx";
+import { ChungTuSignatureSettingsWorkspace } from "./ChungTuSignatureSettingsWorkspace.jsx";
 import { getChungTuCategoryConfig } from "./chungTuCategoryConfig";
 
 /**
@@ -29,6 +30,11 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
         id: "history",
         label: "Lịch sử",
         panel: <ChungTuHistoryWorkspace categoryKey={categoryKey} exportKind={config?.exportKind} />,
+      },
+      {
+        id: "signature-settings",
+        label: "Cài đặt chữ ký",
+        panel: <ChungTuSignatureSettingsWorkspace categoryKey={categoryKey} />,
       },
     ],
     [categoryKey, config?.exportKind],

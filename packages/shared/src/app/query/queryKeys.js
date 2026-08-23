@@ -117,6 +117,19 @@ export const qk = {
       String(unitId ?? ""),
       categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
     ],
+    pdfExportBatches: (unitId, categoryKey) => [
+      "chungTuQuyetToan",
+      "pdfExportBatches",
+      String(unitId ?? ""),
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
+    pdfExportBatch: (batchKey) => ["chungTuQuyetToan", "pdfExportBatch", String(batchKey ?? "")],
+    signatureSettings: (categoryKey) => [
+      "chungTuQuyetToan",
+      "signatureSettings",
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
+    pdfFieldCatalog: () => ["chungTuQuyetToan", "pdfFieldCatalog"],
     templateCatalog: (categoryKey) => [
       "chungTuQuyetToan",
       "templateCatalog",

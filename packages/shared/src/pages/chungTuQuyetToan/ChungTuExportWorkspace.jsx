@@ -1,6 +1,6 @@
 "use client";
 
-import { FileUp, Loader2 } from "lucide-react";
+import { BookOpen, FileUp, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
@@ -15,10 +15,11 @@ import {
   useChungTuContextPreviewMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
 import {
-  downloadChungTuPdfExport,
+  useChungTuPdfFieldCatalogQuery,
+  useChungTuSignatureSettingsQuery,
   useChungTuPdfTemplateFieldsQuery,
   useChungTuPdfTemplatesQuery,
-  useCreateChungTuPdfExportMutation,
+  useCreateChungTuPdfExportBatchMutation,
   useUploadChungTuPdfTemplateMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { CHUNG_TU_EXPORT_KIND } from "@/pages/chungTuQuyetToan/chungTuCategoryConfig";
@@ -102,6 +103,41 @@ function normalizeSignatureSlots(signatureBlock) {
   return slots.length ? slots : DEFAULT_SIGNATURE_SLOTS;
 }
 
+function normalizeSignatureBlockConfig(signatureBlock) {
+  if (!signatureBlock || typeof signatureBlock !== "object") {
+    return null;
+  }
+  const slots = (Array.isArray(signatureBlock.slots) ? signatureBlock.slots : [])
+    .map((slot, index) => {
+      const key = typeof slot?.key === "string" ? slot.key.trim() : "";
+      const label = formatSignatureSlotLabel(slot?.label || key);
+      if (!key || !label) {
+        return null;
+      }
+      return {
+        key,
+        label,
+        col: Number.isFinite(Number(slot?.col)) ? Number(slot.col) : index,
+        col_span: Number.isFinite(Number(slot?.col_span)) ? Number(slot.col_span) : 1,
+        source: slot?.source === "static" ? "static" : "dynamic",
+        static_name: typeof slot?.static_name === "string" ? slot.static_name.trim() : "",
+        show_date_line: Boolean(slot?.show_date_line),
+      };
+    })
+    .filter(Boolean);
+  if (slots.length === 0) {
+    return null;
+  }
+  return {
+    columns: Number.isFinite(Number(signatureBlock.columns)) ? Number(signatureBlock.columns) : 2,
+    gap_pt: Number.isFinite(Number(signatureBlock.gap_pt)) ? Number(signatureBlock.gap_pt) : 40,
+    date_line_gap_pt: Number.isFinite(Number(signatureBlock.date_line_gap_pt))
+      ? Number(signatureBlock.date_line_gap_pt)
+      : 14,
+    slots,
+  };
+}
+
 /**
  * @param {{
  *   categoryKey: string,
@@ -133,6 +169,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const [signatures, setSignatures] = useState({});
   const [signatureDates, setSignatureDates] = useState({});
   const [previewInfo, setPreviewInfo] = useState(null);
+  const [lastBatchInfo, setLastBatchInfo] = useState(null);
   const [actionError, setActionError] = useState(null);
 
   const allowedUnitIds = useMemo(
@@ -182,6 +219,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     setSignatures({});
     setSignatureDates({});
     setPreviewInfo(null);
+    setLastBatchInfo(null);
     setActionError(null);
     setIssueSlipId("");
   }, [categoryKey]);
@@ -205,20 +243,31 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     useChungTuPdfTemplateFieldsQuery(selectedTemplate?.id, {
       skip: !selectedTemplate?.id,
     });
+  const { data: savedSignatureSettings, isLoading: signatureSettingsLoading } =
+    useChungTuSignatureSettingsQuery(categoryKey, { skip: !categoryKey });
+  const { data: fieldCatalog, isLoading: fieldCatalogLoading } = useChungTuPdfFieldCatalogQuery();
 
   const templateSignatureBlock = useMemo(
     () => extractSignatureBlock(templateFieldsPayload),
     [templateFieldsPayload],
   );
+  const savedSignatureBlock = useMemo(
+    () => normalizeSignatureBlockConfig(savedSignatureSettings?.signatureBlock),
+    [savedSignatureSettings?.signatureBlock],
+  );
+  const activeSignatureBlock = useMemo(
+    () => savedSignatureBlock ?? templateSignatureBlock ?? null,
+    [savedSignatureBlock, templateSignatureBlock],
+  );
   const signatureSlots = useMemo(
-    () => normalizeSignatureSlots(templateSignatureBlock),
-    [templateSignatureBlock],
+    () => normalizeSignatureSlots(activeSignatureBlock),
+    [activeSignatureBlock],
   );
   const editableSignatureSlots = useMemo(
     () => signatureSlots.filter((slot) => slot.source !== "static"),
     [signatureSlots],
   );
-  const hasTemplateSignatureSlots = Array.isArray(templateSignatureBlock?.slots);
+  const hasSavedSignatureConfig = Array.isArray(savedSignatureBlock?.slots);
   const signatureStateShape = useMemo(
     () =>
       editableSignatureSlots
@@ -263,7 +312,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   );
   const slips = slipsPayload?.items ?? [];
 
-  const [createPdfExport, { isLoading: creating }] = useCreateChungTuPdfExportMutation();
+  const [createPdfExportBatch, { isLoading: creating }] = useCreateChungTuPdfExportBatchMutation();
   const [previewCtx, { isLoading: previewing }] = useChungTuContextPreviewMutation();
   const [uploadTemplate, { isLoading: uploadingTemplate }] = useUploadChungTuPdfTemplateMutation();
 
@@ -366,20 +415,30 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       setActionError("Đang tải cấu hình chữ ký của mẫu.");
       return;
     }
+    if (signatureSettingsLoading) {
+      setActionError("Đang tải cài đặt chữ ký đã lưu.");
+      return;
+    }
     setActionError(null);
     try {
-      const result = await createPdfExport({
+      const result = await createPdfExportBatch({
         ...buildPayloadBase(),
         pdfTemplateId: Number(selectedTemplate.id),
         signatures,
         signatureDates,
-        ...(hasTemplateSignatureSlots ? { signatureBlock: templateSignatureBlock } : {}),
+        ...(activeSignatureBlock ? { signatureBlock: activeSignatureBlock } : {}),
       }).unwrap();
-      if (!result?.exportKey) {
-        throw new Error("Thiếu mã file PDF vừa tạo.");
-      }
-      await downloadChungTuPdfExport(result.exportKey);
-      notifySuccess("Đã xuất PDF.");
+      const fileCount = Number(result?.fileCount ?? 0);
+      setLastBatchInfo({
+        batchKey: result?.batchKey ?? "",
+        fileCount,
+        displayName: result?.displayName ?? "",
+      });
+      notifySuccess(
+        fileCount > 0
+          ? `Đã tạo ${fileCount} file trong folder lịch sử.`
+          : "Đã tạo folder lịch sử nhưng chưa có file PDF.",
+      );
     } catch (e) {
       const message = e?.data?.message || e?.message || "Không xuất được PDF.";
       setActionError(message);
@@ -673,9 +732,11 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             <p className="text-[10px] leading-relaxed text-muted-foreground">
               {templateFieldsLoading
                 ? "Đang tải cấu hình chữ ký của mẫu…"
-                : hasTemplateSignatureSlots
-                  ? "Nhập tên người ký theo các vị trí mà mẫu PDF đã khai báo."
-                  : "Mẫu chưa khai báo slot riêng, dùng block mặc định gồm Người lập và Thủ trưởng đơn vị."}
+                : hasSavedSignatureConfig
+                  ? "Đang dùng khối chữ ký đã lưu ở tab Cài đặt chữ ký."
+                  : Array.isArray(templateSignatureBlock?.slots)
+                    ? "Nhập tên người ký theo các vị trí mà mẫu PDF đã khai báo."
+                    : "Chưa có cấu hình lưu riêng, hệ thống dùng block mặc định gồm Người lập và Thủ trưởng đơn vị."}
             </p>
           </div>
 
@@ -816,6 +877,59 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           </Button>
         </div>
       ) : null}
+
+      <details className="rounded-xl border border-border/70 bg-muted/10">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground">
+          <BookOpen className="size-4 text-muted-foreground" />
+          Catalog Named Range cho mẫu PDF
+        </summary>
+        <div className="space-y-3 border-t border-border/60 px-3 py-3">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Dùng các Named Range `FIELD_*` cho dữ liệu đơn và `TABLE_HEADER`/`TABLE_DATA_ROW`
+            cho phần bảng dòng hàng. Panel này chỉ để tra cứu nhanh khi làm mẫu Excel.
+          </p>
+          {fieldCatalogLoading ? (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" />
+              Đang tải catalog field…
+            </p>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="space-y-2 rounded-lg border border-border/60 bg-background p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
+                  Scalar fields
+                </p>
+                <div className="space-y-2 text-xs">
+                  {(fieldCatalog?.scalarFields ?? []).map((field) => (
+                    <div key={field.namedRange} className="rounded-md bg-muted/25 px-2.5 py-2">
+                      <p className="font-mono text-[11px] text-foreground">{field.namedRange}</p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        {field.fieldKey} · {field.label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2 rounded-lg border border-border/60 bg-background p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
+                  Gợi ý tiêu đề cột bảng
+                </p>
+                <div className="space-y-2 text-xs">
+                  {(fieldCatalog?.tableColumns ?? []).map((column, index) => (
+                    <div
+                      key={`${column.label}-${column.fieldKey}-${index}`}
+                      className="rounded-md bg-muted/25 px-2.5 py-2"
+                    >
+                      <p className="font-medium text-foreground">{column.label}</p>
+                      <p className="mt-0.5 text-muted-foreground">fieldKey: {column.fieldKey}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 
@@ -837,7 +951,9 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           type="button"
           size="sm"
           className="h-10 w-full gap-1.5 text-xs sm:w-auto"
-          disabled={!effectiveUnitId || !canRun || busy || templateFieldsLoading}
+            disabled={
+              !effectiveUnitId || !canRun || busy || templateFieldsLoading || signatureSettingsLoading
+            }
           onClick={handleCreate}
         >
           {creating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
@@ -966,6 +1082,14 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       {previewInfo ? (
         <p className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
           Xem trước: {previewInfo.lineCount} dòng dữ liệu · Tổng {previewInfo.tongTien || "0"} đ
+        </p>
+      ) : null}
+
+      {lastBatchInfo ? (
+        <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
+          Đã tạo {lastBatchInfo.fileCount} file trong folder lịch sử
+          {lastBatchInfo.displayName ? ` "${lastBatchInfo.displayName}"` : ""}. Mở tab Lịch sử để tải
+          zip, tải từng file hoặc in gộp.
         </p>
       ) : null}
 
