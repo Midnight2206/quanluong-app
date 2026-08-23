@@ -28,3 +28,34 @@ Planned message: `feat(chung-tu): PDF template list/upload/fields API`
 
 - Repository is already dirty outside Task 4, so staging must stay limited to the PDF template files plus this report.
 - There is no existing authenticated API test harness for this module, so verification is limited to schema tests and module smoke loading.
+
+## Review fix (2026-08-23)
+
+- Added `chung-tu-pdf-template.service.test.js` with `node:test` `mock.module` mocks for document-service client + prisma (no live HTTP/DB).
+- Reused `CHUNG_TU_CATEGORY_KEYS` allowlist in service + validator (`chungTuPdfCategoryKeySchema`).
+
+### Test command
+
+```bash
+node --test --experimental-test-module-mocks \
+  quanluong-app-be/src/modules/chung-tu-quyet-toan/chung-tu-pdf-template.service.test.js \
+  quanluong-app-be/src/modules/chung-tu-quyet-toan/chung-tu-pdf-template.validator.test.js
+```
+
+### Test output
+
+```
+✔ listChungTuPdfTemplates filters by categoryKey and isActive
+✔ createChungTuPdfTemplate uploads then persists document-service template id
+✔ deactivateChungTuPdfTemplate soft-deletes active row
+✔ getChungTuPdfTemplateFields loads fields from document service
+✔ unsupported categoryKey throws validation AppError
+✔ chungTuPdfTemplateListQuerySchema requires a trimmed category key
+✔ chungTuPdfTemplateIdParamSchema coerces numeric ids
+✔ chungTuPdfTemplateUploadBodySchema normalizes multipart fields
+ℹ tests 8 | pass 8 | fail 0
+```
+
+### Commit
+
+`test(chung-tu): mock PDF template service unit tests`

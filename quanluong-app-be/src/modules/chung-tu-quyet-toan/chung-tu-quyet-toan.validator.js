@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 
 /** Chỉ filter — `displayName` lấy từ multipart field (multer → req.body), tin cậy UTF-8 hơn query khi POST FormData */
 const driveImportQuerySchema = z.object({
@@ -20,8 +21,17 @@ const driveFileIdParamsSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/),
 });
 
+const chungTuPdfCategoryKeySchema = z.preprocess(
+  (v) => (v == null ? "" : String(v).trim()),
+  z.enum([
+    CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO,
+    CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+  ]),
+);
+
 const chungTuPdfTemplateListQuerySchema = z.object({
-  categoryKey: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(80)),
+  categoryKey: chungTuPdfCategoryKeySchema,
 });
 
 const chungTuPdfTemplateIdParamSchema = z.object({
@@ -30,7 +40,7 @@ const chungTuPdfTemplateIdParamSchema = z.object({
 
 /** multipart (multer): categoryKey + displayName + name + version */
 const chungTuPdfTemplateUploadBodySchema = z.object({
-  categoryKey: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(80)),
+  categoryKey: chungTuPdfCategoryKeySchema,
   displayName: z.preprocess(
     (v) => {
       if (v == null) {

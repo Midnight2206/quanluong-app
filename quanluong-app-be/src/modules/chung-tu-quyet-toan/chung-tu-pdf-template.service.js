@@ -5,12 +5,9 @@ import {
   getTemplateFields,
   uploadTemplate,
 } from "../../services/document-service.client.js";
+import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 
-const ALLOWED_CHUNG_TU_PDF_CATEGORIES = new Set([
-  "bang-ke-mua-hang",
-  "phieu-xuat-kho",
-  "phieu-nhap-kho",
-]);
+const ALLOWED_CHUNG_TU_PDF_CATEGORIES = new Set(Object.values(CHUNG_TU_CATEGORY_KEYS));
 
 function normalizeCategoryKey(value) {
   return String(value ?? "").trim();
