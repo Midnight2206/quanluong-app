@@ -17,7 +17,7 @@ export const CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS = [
     status: CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
     mode: "by-date",
     subtitle:
-      "Tổng hợp dòng LTTP theo ngày → Google Sheets (mẫu C34). Chọn kho, ngày, mẫu Drive rồi Tạo / Đồng bộ.",
+      "Tổng hợp dòng LTTP theo ngày → PDF (document-service). Chọn kho, ngày, mẫu PDF rồi xuất file.",
   },
   {
     id: "phieu-xuat-kho",
@@ -25,7 +25,7 @@ export const CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS = [
     status: CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
     mode: "by-date",
     subtitle:
-      "Tổng hợp LTTP theo tháng → Google Sheets (SS14-QN10). Chọn tháng, đơn vị và chế độ gộp dữ liệu.",
+      "Tổng hợp LTTP theo tháng → PDF (document-service). Chọn tháng, đơn vị, chế độ gộp dữ liệu và mẫu PDF.",
   },
   {
     id: "phieu-nhap-kho",
@@ -33,7 +33,7 @@ export const CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS = [
     status: CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
     mode: "by-date",
     subtitle:
-      "Tổng hợp LTTP theo tháng → Google Sheets. Căn cứ BKMH tự điền từ snapshot đã đồng bộ.",
+      "Tổng hợp LTTP theo tháng → PDF (document-service). Căn cứ BKMH tự điền từ snapshot đã đồng bộ.",
   },
   {
     id: "giay-de-nghi-thanh-toan",

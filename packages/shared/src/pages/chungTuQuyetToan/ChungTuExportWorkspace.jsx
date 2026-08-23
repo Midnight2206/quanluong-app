@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, ExternalLink, Loader2 } from "lucide-react";
+import { FileUp, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
@@ -9,16 +9,18 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { useGetLttpIssueSlipsQuery } from "@/features/lttp/api/lttpApi";
-import { useSeedChungTuTemplatesMutation } from "@/features/chung-tu-quyet-toan/api/chungTuTemplateSeedApi";
 import {
   CHUNG_TU_AGGREGATION_MODE_OPTIONS,
   CHUNG_TU_AGGREGATION_MODES,
   useChungTuContextPreviewMutation,
-  useCreateChungTuDocumentMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
-import { ChungTuTemplateTreePicker } from "@/pages/chungTuQuyetToan/ChungTuTemplateTreePicker";
-import { ChungTuTemplateMappingPanel } from "@/pages/chungTuQuyetToan/ChungTuTemplateMappingPanel";
-import { ChungTuDriveLinkNotice } from "@/pages/chungTuQuyetToan/ChungTuDriveLinkNotice";
+import {
+  downloadChungTuPdfExport,
+  useChungTuPdfTemplateFieldsQuery,
+  useChungTuPdfTemplatesQuery,
+  useCreateChungTuPdfExportMutation,
+  useUploadChungTuPdfTemplateMutation,
+} from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { CHUNG_TU_EXPORT_KIND } from "@/pages/chungTuQuyetToan/chungTuCategoryConfig";
 import {
   formatPeriodMonth,
@@ -34,6 +36,71 @@ import {
 
 const fieldClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
+
+const DEFAULT_SIGNATURE_SLOTS = [
+  {
+    key: "nguoi_lap",
+    label: "Người lập",
+    source: "dynamic",
+    showDateLine: false,
+    staticName: "",
+  },
+  {
+    key: "thu_truong",
+    label: "Thủ trưởng đơn vị",
+    source: "dynamic",
+    showDateLine: false,
+    staticName: "",
+  },
+];
+
+function getTemplateLabel(template) {
+  if (!template) return "";
+  const base = template.displayName || template.name || `Mẫu #${template.id}`;
+  return template.version ? `${base} (v${template.version})` : base;
+}
+
+function formatSignatureSlotLabel(label) {
+  return String(label ?? "").replace(/\\n/g, "\n").trim();
+}
+
+function extractSignatureBlock(payload) {
+  const root = payload && typeof payload === "object" ? payload : {};
+  const candidates = [
+    root.signatureBlock,
+    root.signature_block,
+    root.fields?.signatureBlock,
+    root.fields?.signature_block,
+    root.fields?.data?.signatureBlock,
+    root.fields?.data?.signature_block,
+    root.data?.signatureBlock,
+    root.data?.signature_block,
+  ];
+  return (
+    candidates.find((candidate) => candidate && typeof candidate === "object" && Array.isArray(candidate.slots)) ??
+    null
+  );
+}
+
+function normalizeSignatureSlots(signatureBlock) {
+  if (!Array.isArray(signatureBlock?.slots) || signatureBlock.slots.length === 0) {
+    return DEFAULT_SIGNATURE_SLOTS;
+  }
+  const slots = signatureBlock.slots
+    .map((slot) => {
+      const key = typeof slot?.key === "string" ? slot.key.trim() : "";
+      if (!key) return null;
+      return {
+        key,
+        label: formatSignatureSlotLabel(slot.label || key),
+        source: slot?.source === "static" ? "static" : "dynamic",
+        showDateLine: Boolean(slot?.show_date_line),
+        staticName: typeof slot?.static_name === "string" ? slot.static_name.trim() : "",
+      };
+    })
+    .filter(Boolean);
+  return slots.length ? slots : DEFAULT_SIGNATURE_SLOTS;
+}
 
 /**
  * @param {{
@@ -59,10 +126,14 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const [issueSlipId, setIssueSlipId] = useState("");
   const [selectedDataUnitIds, setSelectedDataUnitIds] = useState([]);
   const [aggregationMode, setAggregationMode] = useState(CHUNG_TU_AGGREGATION_MODES.BY_DAY);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadDisplayName, setUploadDisplayName] = useState("");
+  const [uploadVersion, setUploadVersion] = useState("1");
+  const [signatures, setSignatures] = useState({});
+  const [signatureDates, setSignatureDates] = useState({});
   const [previewInfo, setPreviewInfo] = useState(null);
   const [actionError, setActionError] = useState(null);
-  const [lastOpenedLink, setLastOpenedLink] = useState(null);
 
   const allowedUnitIds = useMemo(
     () => unitsForDropdown.map((u) => Number(u.id)).filter(Number.isFinite),
@@ -104,12 +175,81 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
   useEffect(() => {
     setWizardStep(0);
-    setSelectedTemplate(null);
+    setSelectedTemplateId("");
+    setUploadFile(null);
+    setUploadDisplayName("");
+    setUploadVersion("1");
+    setSignatures({});
+    setSignatureDates({});
     setPreviewInfo(null);
     setActionError(null);
-    setLastOpenedLink(null);
     setIssueSlipId("");
   }, [categoryKey]);
+
+  const { data: templates = [], isLoading: templatesLoading } = useChungTuPdfTemplatesQuery(categoryKey, {
+    skip: !categoryKey,
+  });
+
+  const selectedTemplate = useMemo(
+    () => templates.find((template) => String(template.id) === String(selectedTemplateId)) ?? null,
+    [selectedTemplateId, templates],
+  );
+
+  useEffect(() => {
+    if (!selectedTemplateId) return;
+    if (templates.some((template) => String(template.id) === String(selectedTemplateId))) return;
+    setSelectedTemplateId("");
+  }, [selectedTemplateId, templates]);
+
+  const { data: templateFieldsPayload, isLoading: templateFieldsLoading } =
+    useChungTuPdfTemplateFieldsQuery(selectedTemplate?.id, {
+      skip: !selectedTemplate?.id,
+    });
+
+  const templateSignatureBlock = useMemo(
+    () => extractSignatureBlock(templateFieldsPayload),
+    [templateFieldsPayload],
+  );
+  const signatureSlots = useMemo(
+    () => normalizeSignatureSlots(templateSignatureBlock),
+    [templateSignatureBlock],
+  );
+  const editableSignatureSlots = useMemo(
+    () => signatureSlots.filter((slot) => slot.source !== "static"),
+    [signatureSlots],
+  );
+  const hasTemplateSignatureSlots = Array.isArray(templateSignatureBlock?.slots);
+  const signatureStateShape = useMemo(
+    () =>
+      editableSignatureSlots
+        .map((slot) => `${slot.key}:${slot.showDateLine ? "date" : "name"}`)
+        .join("|"),
+    [editableSignatureSlots],
+  );
+
+  useEffect(() => {
+    if (!selectedTemplate) {
+      setSignatures({});
+      setSignatureDates({});
+      return;
+    }
+    setSignatures((prev) => {
+      const next = {};
+      for (const slot of editableSignatureSlots) {
+        next[slot.key] = prev[slot.key] ?? "";
+      }
+      return next;
+    });
+    setSignatureDates((prev) => {
+      const next = {};
+      for (const slot of editableSignatureSlots) {
+        if (slot.showDateLine) {
+          next[slot.key] = prev[slot.key] ?? "";
+        }
+      }
+      return next;
+    });
+  }, [selectedTemplate, signatureStateShape, editableSignatureSlots]);
 
   const { data: slipsPayload, isLoading: slipsLoading } = useGetLttpIssueSlipsQuery(
     {
@@ -123,30 +263,12 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   );
   const slips = slipsPayload?.items ?? [];
 
-  const [createDoc, { isLoading: creating }] = useCreateChungTuDocumentMutation();
+  const [createPdfExport, { isLoading: creating }] = useCreateChungTuPdfExportMutation();
   const [previewCtx, { isLoading: previewing }] = useChungTuContextPreviewMutation();
-  const [seedTemplates, { isLoading: seeding }] = useSeedChungTuTemplatesMutation();
-
-  const handleSeedTemplates = async () => {
-    try {
-      const result = await seedTemplates();
-      const totals = result?.totals ?? { available: 0, copied: 0, skipped: 0 };
-      if (totals.available === 0) {
-        notifySuccess("Drive hệ thống chưa có mẫu nào để sao chép.");
-      } else {
-        notifySuccess(`Đã sao chép ${totals.copied} mẫu, bỏ qua ${totals.skipped} mẫu đã có.`);
-      }
-    } catch (e) {
-      notifyError(e?.data?.message || e?.message || "Không sao chép được mẫu từ hệ thống.");
-    }
-  };
+  const [uploadTemplate, { isLoading: uploadingTemplate }] = useUploadChungTuPdfTemplateMutation();
 
   const buildPayloadBase = useCallback(() => {
-    const base = {
-      categoryKey,
-      unitId: effectiveUnitId,
-      templateDisplayName: selectedTemplate?.fullDocumentName ?? selectedTemplate?.displayName,
-    };
+    const base = { categoryKey, unitId: effectiveUnitId };
     if (isMonthly) {
       return {
         ...base,
@@ -179,9 +301,35 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     issueSlipId,
   ]);
 
+  const handleUploadTemplate = async () => {
+    if (!uploadFile) {
+      notifyError("Chọn file mẫu .xlsx trước khi tải lên.");
+      return;
+    }
+    const baseName = uploadFile.name.replace(/\.[^.]+$/, "").trim();
+    const displayName = uploadDisplayName.trim() || baseName || "Mẫu PDF";
+    const version = uploadVersion.trim() || "1";
+    try {
+      const template = await uploadTemplate({
+        file: uploadFile,
+        categoryKey,
+        displayName,
+        name: displayName,
+        version,
+      }).unwrap();
+      if (template?.id != null) {
+        setSelectedTemplateId(String(template.id));
+      }
+      setUploadFile(null);
+      notifySuccess(`Đã tải mẫu PDF "${displayName}".`);
+    } catch (e) {
+      notifyError(e?.data?.message || e?.message || "Không tải được mẫu PDF.");
+    }
+  };
+
   const handlePreview = async () => {
     if (!selectedTemplate) {
-      setActionError("Chọn mẫu chứng từ.");
+      setActionError("Chọn mẫu PDF.");
       return;
     }
     if (isBySlip && !issueSlipId) {
@@ -192,11 +340,8 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     setPreviewInfo(null);
     try {
       const data = await previewCtx(buildPayloadBase());
-      const sheetCount = data?.context?.sheetContexts?.length ?? 0;
       setPreviewInfo({
         lineCount: data?.context?.detailRows?.length ?? 0,
-        sheetCount:
-          isMonthly && aggregationMode === CHUNG_TU_AGGREGATION_MODES.FULL ? 1 : sheetCount,
         tongTien: data?.context?.tongTien ?? "",
       });
     } catch (e) {
@@ -206,7 +351,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
   const handleCreate = async () => {
     if (!selectedTemplate) {
-      setActionError("Chọn mẫu chứng từ.");
+      setActionError("Chọn mẫu PDF.");
       return;
     }
     if (isMonthly && selectedDataUnitIds.length === 0) {
@@ -217,23 +362,32 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       setActionError("Chọn phiếu xuất LTTP.");
       return;
     }
+    if (templateFieldsLoading) {
+      setActionError("Đang tải cấu hình chữ ký của mẫu.");
+      return;
+    }
     setActionError(null);
     try {
-      const result = await createDoc({
+      const result = await createPdfExport({
         ...buildPayloadBase(),
-        templateDriveFileId: selectedTemplate.driveFileId,
-      });
-      const link = result?.document?.outputWebViewLink;
-      if (link) {
-        setLastOpenedLink(link);
-        window.open(link, "_blank", "noopener,noreferrer");
+        pdfTemplateId: Number(selectedTemplate.id),
+        signatures,
+        signatureDates,
+        ...(hasTemplateSignatureSlots ? { signatureBlock: templateSignatureBlock } : {}),
+      }).unwrap();
+      if (!result?.exportKey) {
+        throw new Error("Thiếu mã file PDF vừa tạo.");
       }
+      await downloadChungTuPdfExport(result.exportKey);
+      notifySuccess("Đã xuất PDF.");
     } catch (e) {
-      setActionError(e?.data?.message || e?.message || "Không tạo được chứng từ.");
+      const message = e?.data?.message || e?.message || "Không xuất được PDF.";
+      setActionError(message);
+      notifyError(message);
     }
   };
 
-  const busy = creating || previewing;
+  const busy = creating || previewing || uploadingTemplate;
   const canRun =
     Boolean(selectedTemplate) &&
     (isMonthly
@@ -259,8 +413,8 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       setActionError("Chọn ngày chứng từ.");
       return false;
     }
-    if (!selectedTemplate?.driveFileId) {
-      setActionError("Chọn mẫu chứng từ từ Drive.");
+    if (!selectedTemplate?.id) {
+      setActionError("Chọn mẫu PDF.");
       return false;
     }
     setActionError(null);
@@ -272,7 +426,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     selectedDataUnitIds.length,
     issueSlipId,
     periodDate,
-    selectedTemplate?.driveFileId,
+    selectedTemplate?.id,
   ]);
 
   const goWizardNext = useCallback(() => {
@@ -287,10 +441,9 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   }, []);
 
   const wizardShowParams = useWizardLayout && wizardStep === 0;
-  const wizardShowMap = useWizardLayout && wizardStep === 1;
+  const wizardShowReview = useWizardLayout && wizardStep === 1;
   const showDesktopLayout = !useWizardLayout;
   const unitsListMaxH = useWizardLayout ? "max-h-[min(20rem,42vh)]" : "max-h-48";
-  const templateListMaxH = useWizardLayout ? "max-h-[min(22rem,48vh)]" : "max-h-64";
   const expandedCards = useWizardLayout;
 
   const paramsFields = (
@@ -478,52 +631,193 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   );
 
   const templatePickerBlock = (
-    <>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        {canWrite ? (
+    <div className="space-y-3">
+      <label className="block min-w-0 space-y-1" htmlFor={`ct-export-template-${categoryKey}`}>
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+          Mẫu PDF
+        </span>
+        <select
+          id={`ct-export-template-${categoryKey}`}
+          className={fieldClass}
+          value={selectedTemplateId}
+          disabled={templatesLoading || templates.length === 0}
+          onChange={(e) => setSelectedTemplateId(e.target.value)}
+        >
+          <option value="">
+            {templatesLoading
+              ? "Đang tải mẫu…"
+              : templates.length
+                ? "— Chọn mẫu PDF —"
+                : "Chưa có mẫu PDF"}
+          </option>
+          {templates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {getTemplateLabel(template)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {selectedTemplate ? (
+        <p className="rounded-lg bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
+          Đã chọn: <span className="font-medium text-foreground">{getTemplateLabel(selectedTemplate)}</span>
+        </p>
+      ) : null}
+
+      {selectedTemplate ? (
+        <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
+              Thông tin chữ ký
+            </p>
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              {templateFieldsLoading
+                ? "Đang tải cấu hình chữ ký của mẫu…"
+                : hasTemplateSignatureSlots
+                  ? "Nhập tên người ký theo các vị trí mà mẫu PDF đã khai báo."
+                  : "Mẫu chưa khai báo slot riêng, dùng block mặc định gồm Người lập và Thủ trưởng đơn vị."}
+            </p>
+          </div>
+
+          {templateFieldsLoading ? (
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" />
+              Đang đọc field chữ ký…
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {signatureSlots.map((slot) =>
+                slot.source === "static" ? (
+                  <div
+                    key={slot.key}
+                    className="rounded-lg border border-border/60 bg-background px-3 py-2 text-xs"
+                  >
+                    <p className="font-medium whitespace-pre-line">{slot.label}</p>
+                    <p className="mt-1 text-muted-foreground">
+                      Tên ký cố định{slot.staticName ? `: ${slot.staticName}` : "."}
+                    </p>
+                  </div>
+                ) : (
+                  <div key={slot.key} className="space-y-3 rounded-lg border border-border/60 bg-background p-3">
+                    <label className="block space-y-1" htmlFor={`ct-signature-name-${categoryKey}-${slot.key}`}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground whitespace-pre-line">
+                        {slot.label}
+                      </span>
+                      <input
+                        id={`ct-signature-name-${categoryKey}-${slot.key}`}
+                        className={fieldClass}
+                        value={signatures[slot.key] ?? ""}
+                        onChange={(e) =>
+                          setSignatures((prev) => ({ ...prev, [slot.key]: e.target.value }))
+                        }
+                        placeholder="Tên người ký"
+                      />
+                    </label>
+
+                    {slot.showDateLine ? (
+                      <label
+                        className="block space-y-1"
+                        htmlFor={`ct-signature-date-${categoryKey}-${slot.key}`}
+                      >
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                          Dòng ngày ký
+                        </span>
+                        <input
+                          id={`ct-signature-date-${categoryKey}-${slot.key}`}
+                          className={fieldClass}
+                          value={signatureDates[slot.key] ?? ""}
+                          onChange={(e) =>
+                            setSignatureDates((prev) => ({ ...prev, [slot.key]: e.target.value }))
+                          }
+                          placeholder="Hà Nội, ngày … tháng … năm …"
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                ),
+              )}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {canWrite ? (
+        <div className="space-y-3 rounded-xl border border-dashed border-border/70 bg-muted/10 p-3">
+          <div className="space-y-1">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
+              Tải mẫu .xlsx mới
+            </p>
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              Dùng file Excel đã chuẩn Named Ranges của document-service để thêm mẫu PDF cho tab này.
+            </p>
+          </div>
+
+          <label className="block space-y-1" htmlFor={`ct-template-file-${categoryKey}`}>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+              File mẫu
+            </span>
+            <input
+              id={`ct-template-file-${categoryKey}`}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className={fieldClass}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                setUploadFile(file);
+                if (file) {
+                  setUploadDisplayName(file.name.replace(/\.[^.]+$/, ""));
+                }
+              }}
+            />
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-1" htmlFor={`ct-template-name-${categoryKey}`}>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                Tên hiển thị
+              </span>
+              <input
+                id={`ct-template-name-${categoryKey}`}
+                className={fieldClass}
+                value={uploadDisplayName}
+                onChange={(e) => setUploadDisplayName(e.target.value)}
+                placeholder="Ví dụ: BKMH C34"
+              />
+            </label>
+
+            <label className="block space-y-1" htmlFor={`ct-template-version-${categoryKey}`}>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                Phiên bản
+              </span>
+              <input
+                id={`ct-template-version-${categoryKey}`}
+                className={fieldClass}
+                value={uploadVersion}
+                onChange={(e) => setUploadVersion(e.target.value)}
+                placeholder="1"
+              />
+            </label>
+          </div>
+
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-10 w-full gap-1.5 text-xs sm:ml-auto sm:w-auto"
-            disabled={seeding}
-            onClick={handleSeedTemplates}
-            title="Sao chép mẫu có sẵn từ Drive hệ thống vào Drive của bạn"
+            className="h-10 w-full gap-1.5 text-xs sm:w-auto"
+            disabled={uploadingTemplate || !uploadFile}
+            onClick={handleUploadTemplate}
           >
-            {seeding ? (
+            {uploadingTemplate ? (
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Copy className="mr-1.5 h-3.5 w-3.5" />
+              <FileUp className="mr-1.5 h-3.5 w-3.5" />
             )}
-            Sao chép mẫu từ hệ thống
+            Tải mẫu Excel
           </Button>
-        ) : null}
-      </div>
-      <ChungTuTemplateTreePicker
-        categoryKey={categoryKey}
-        selectedDriveFileId={selectedTemplate?.driveFileId ?? ""}
-        onSelect={setSelectedTemplate}
-        listMaxHeightClass={templateListMaxH}
-      />
-      {selectedTemplate ? (
-        <p className="rounded-lg bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-          Đã chọn:{" "}
-          <span className="font-medium text-foreground">{selectedTemplate.fullDocumentName}</span>
-        </p>
+        </div>
       ) : null}
-    </>
+    </div>
   );
-
-  const mappingBlock =
-    selectedTemplate?.driveFileId ? (
-      <ChungTuTemplateMappingPanel
-        categoryKey={categoryKey}
-        driveFileId={selectedTemplate.driveFileId}
-        canWrite={canWrite}
-      />
-    ) : (
-      <p className="text-xs text-muted-foreground">Chọn mẫu ở bước trước để map cột dữ liệu.</p>
-    );
 
   const actionButtons = (
     <>
@@ -532,7 +826,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         variant="outline"
         size="sm"
         className="h-10 w-full gap-1.5 text-xs sm:w-auto"
-        disabled={!effectiveUnitId || !canRun || busy}
+        disabled={!effectiveUnitId || !canRun || busy || templateFieldsLoading}
         onClick={handlePreview}
       >
         {previewing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
@@ -543,23 +837,12 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           type="button"
           size="sm"
           className="h-10 w-full gap-1.5 text-xs sm:w-auto"
-          disabled={!effectiveUnitId || !canRun || busy}
+          disabled={!effectiveUnitId || !canRun || busy || templateFieldsLoading}
           onClick={handleCreate}
         >
           {creating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-          Tạo / mở Google Sheet
+          Xuất PDF
         </Button>
-      ) : null}
-      {lastOpenedLink ? (
-        <a
-          href={lastOpenedLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-10 w-full items-center justify-center gap-1 text-xs text-primary hover:underline sm:w-auto"
-        >
-          Mở sheet vừa tạo
-          <ExternalLink className="h-3 w-3" />
-        </a>
       ) : null}
     </>
   );
@@ -589,7 +872,17 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       <div className="rounded-lg bg-muted/25 px-3 py-2 sm:col-span-2">
         <dt className="text-[10px] uppercase text-muted-foreground">Mẫu</dt>
         <dd className="mt-0.5 font-medium leading-snug">
-          {selectedTemplate?.fullDocumentName ?? "—"}
+          {selectedTemplate ? getTemplateLabel(selectedTemplate) : "—"}
+        </dd>
+      </div>
+      <div className="rounded-lg bg-muted/25 px-3 py-2 sm:col-span-2">
+        <dt className="text-[10px] uppercase text-muted-foreground">Chữ ký</dt>
+        <dd className="mt-0.5 text-xs leading-snug text-foreground">
+          {editableSignatureSlots.length
+            ? editableSignatureSlots
+                .map((slot) => `${slot.label.replace(/\n/g, " / ")}: ${signatures[slot.key] || "—"}`)
+                .join(" · ")
+            : "Mẫu dùng tên ký cố định."}
         </dd>
       </div>
     </dl>
@@ -603,14 +896,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         useWizardLayout && wizardStep === 0 && "pb-20",
       )}
     >
-      <ChungTuDriveLinkNotice
-        className={
-          expandedCards
-            ? "-mx-4 rounded-none border-x-0 sm:mx-0 sm:rounded-lg sm:border-x"
-            : undefined
-        }
-      />
-
       {useWizardLayout ? (
         <ChungTuExportWizardStepper stepIndex={wizardStep} className="-mx-1" />
       ) : null}
@@ -625,14 +910,10 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           </ChungTuExportWizardCard>
 
           <ChungTuExportWizardCard
-            title="Mẫu chứng từ (Drive)"
-            description="Chọn mẫu, map cột và tạo Google Sheet."
+            title="Mẫu PDF & chữ ký"
+            description="Chọn mẫu xuất PDF, nhập người ký và tải mẫu mới nếu cần."
           >
             {templatePickerBlock}
-            <p className="text-[10px] text-muted-foreground">
-              Map cột bảng chi tiết trước khi tạo/đồng bộ.
-            </p>
-            {mappingBlock}
           </ChungTuExportWizardCard>
         </>
       ) : null}
@@ -648,8 +929,8 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           </ChungTuExportWizardCard>
 
           <ChungTuExportWizardCard
-            title="Mẫu chứng từ (Drive)"
-            description="Chọn file mẫu Google Sheets để điền dữ liệu."
+            title="Mẫu PDF & chữ ký"
+            description="Chọn mẫu và chuẩn bị thông tin người ký trước khi xuất file."
             expanded={expandedCards}
           >
             {templatePickerBlock}
@@ -657,19 +938,21 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         </>
       ) : null}
 
-      {wizardShowMap ? (
+      {wizardShowReview ? (
         <>
           <ChungTuExportWizardCard title="Tóm tắt" expanded={expandedCards} bodyClassName="py-3">
             {wizardSummary}
           </ChungTuExportWizardCard>
 
           <ChungTuExportWizardCard
-            title="Map dữ liệu → ô mẫu"
-            description="Gán cột bảng chi tiết trước khi tạo Sheet."
+            title="Kiểm tra trước khi xuất"
+            description="Xem trước dữ liệu LTTP rồi xuất PDF từ mẫu đã chọn."
             expanded={expandedCards}
             bodyClassName="space-y-4"
           >
-            {mappingBlock}
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Bước này giữ nguyên phần xem trước dữ liệu trước khi tải file PDF từ mẫu đã chọn.
+            </p>
           </ChungTuExportWizardCard>
         </>
       ) : null}
@@ -682,9 +965,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
       {previewInfo ? (
         <p className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          Xem trước: {previewInfo.lineCount} dòng
-          {previewInfo.sheetCount > 0 ? ` · ${previewInfo.sheetCount} sheet` : ""} · Tổng{" "}
-          {previewInfo.tongTien || "0"} đ
+          Xem trước: {previewInfo.lineCount} dòng dữ liệu · Tổng {previewInfo.tongTien || "0"} đ
         </p>
       ) : null}
 
