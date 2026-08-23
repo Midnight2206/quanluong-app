@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/app/query/queryKeys";
 import { useWrappedMutation } from "@/lib/useWrappedMutation";
 import { apiRequest } from "@/services/apiRequest";
+import { downloadBlobAsFile } from "@/utils/captureElementToPngCore";
 
 function normalizeCategoryKey(categoryKey) {
   return categoryKey != null ? String(categoryKey).trim() : "";
@@ -143,28 +144,39 @@ export function useDeleteChungTuPdfExportMutation() {
   });
 }
 
+function filenameFromContentDisposition(header) {
+  if (!header || typeof header !== "string") {
+    return null;
+  }
+  const utf8 = /filename\*=(?:UTF-8''|utf-8'')([^;\n]+)/i.exec(header);
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1].trim());
+    } catch {
+      return utf8[1].trim();
+    }
+  }
+  const quoted = /filename="([^"]+)"/i.exec(header);
+  if (quoted?.[1]) {
+    return quoted[1];
+  }
+  const plain = /filename=([^;\n]+)/i.exec(header);
+  if (plain?.[1]) {
+    return plain[1].trim().replace(/^["']|["']$/g, "");
+  }
+  return null;
+}
+
 export async function downloadChungTuPdfExport(exportKey) {
   const key = exportKey != null ? String(exportKey).trim() : "";
-  const tab = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
-  try {
-    const blob = await apiRequest({
-      url: `/chungtuquyettoan/pdf-exports/${encodeURIComponent(key)}/file`,
-      method: "get",
-      responseType: "blob",
-    });
-    const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/pdf" });
-    const url = URL.createObjectURL(pdfBlob);
-    if (tab) {
-      tab.location.href = url;
-    } else if (typeof window !== "undefined") {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 120_000);
-    return url;
-  } catch (error) {
-    if (tab) {
-      tab.close();
-    }
-    throw error;
-  }
+  const { data: blob, headers } = await apiRequest({
+    url: `/chungtuquyettoan/pdf-exports/${encodeURIComponent(key)}/file`,
+    method: "get",
+    responseType: "blob",
+    returnHeaders: true,
+  });
+  const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/pdf" });
+  const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
+  const fileName = filenameFromContentDisposition(cd) ?? `${key}.pdf`;
+  downloadBlobAsFile(pdfBlob, fileName);
 }

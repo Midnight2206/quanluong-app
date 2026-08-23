@@ -22,6 +22,7 @@ export async function apiRequest({
   params,
   headers,
   responseType,
+  returnHeaders,
   skipTargetUnitHeader,
   meta,
 } = {}) {
@@ -37,6 +38,9 @@ export async function apiRequest({
       skipTargetUnitHeader: skip,
     });
     if (responseType === "blob") {
+      if (returnHeaders) {
+        return { data: result.data, headers: result.headers };
+      }
       return result.data;
     }
     const body = result.data;
