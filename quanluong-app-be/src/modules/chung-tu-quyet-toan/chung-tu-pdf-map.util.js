@@ -1,4 +1,7 @@
-import { resolveColumnFieldKey } from "./chung-tu-pdf-column-alias.util.js";
+import {
+  resolveColumnFieldKey,
+  resolveScalarFieldKey,
+} from "./chung-tu-pdf-column-alias.util.js";
 
 export function camelToSnake(key) {
   return String(key ?? "")
@@ -26,7 +29,7 @@ function lookupContextValue(context, templateKey) {
 export function pickMappedFields(context, fieldKeys) {
   const out = {};
   for (const key of fieldKeys) {
-    const fieldKey = resolveColumnFieldKey(key);
+    const fieldKey = resolveScalarFieldKey(key);
     const raw = fieldKey
       ? lookupContextValue(context, fieldKey) ?? lookupContextValue(context, camelToSnake(fieldKey))
       : lookupContextValue(context, key);

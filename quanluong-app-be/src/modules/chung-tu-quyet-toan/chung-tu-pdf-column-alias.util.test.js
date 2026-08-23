@@ -17,3 +17,7 @@ test("resolveScalarFieldKey maps tong_tien_bang_chu to tongTienBangChu", () => {
 test("resolveScalarFieldKey maps ngay_thang_nam to ngayThangNam", () => {
   assert.equal(resolveScalarFieldKey("ngay_thang_nam"), "ngayThangNam");
 });
+
+test("resolveScalarFieldKey maps tong_tien to tongTien", () => {
+  assert.equal(resolveScalarFieldKey("tong_tien"), "tongTien");
+});

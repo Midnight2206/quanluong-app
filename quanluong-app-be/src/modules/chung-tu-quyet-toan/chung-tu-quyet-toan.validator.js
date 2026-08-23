@@ -287,8 +287,33 @@ const chungTuPdfExportCreateBodySchema = chungTuDocumentBaseBodySchema
   })
   .superRefine(refineChungTuDocumentBody);
 
+const chungTuPdfExportBatchCreateBodySchema = chungTuPdfExportCreateBodySchema;
+
 const chungTuPdfExportKeyParamSchema = z.object({
   exportKey: z.string().min(8).max(200),
+});
+
+const chungTuPdfExportBatchListQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  categoryKey: chungTuPdfCategoryKeySchema.optional(),
+});
+
+const chungTuPdfExportBatchKeyParamSchema = z.object({
+  batchKey: z.string().min(8).max(200),
+});
+
+const chungTuPdfExportBatchFileParamsSchema = z.object({
+  batchKey: z.string().min(8).max(200),
+  fileId: z.coerce.number().int().positive(),
+});
+
+const chungTuSignatureSettingsQuerySchema = z.object({
+  categoryKey: chungTuPdfCategoryKeySchema,
+});
+
+const chungTuSignatureSettingsPutBodySchema = z.object({
+  categoryKey: chungTuPdfCategoryKeySchema,
+  signatureBlock: z.record(z.unknown()),
 });
 
 const templateTreeQuerySchema = z.object({
@@ -329,7 +354,13 @@ export {
   chungTuDocumentCreateBodySchema,
   chungTuContextPreviewBodySchema,
   chungTuPdfExportCreateBodySchema,
+  chungTuPdfExportBatchCreateBodySchema,
   chungTuPdfExportKeyParamSchema,
+  chungTuPdfExportBatchListQuerySchema,
+  chungTuPdfExportBatchKeyParamSchema,
+  chungTuPdfExportBatchFileParamsSchema,
+  chungTuSignatureSettingsQuerySchema,
+  chungTuSignatureSettingsPutBodySchema,
   templateTreeQuerySchema,
   templateTreeFileParamsSchema,
 };

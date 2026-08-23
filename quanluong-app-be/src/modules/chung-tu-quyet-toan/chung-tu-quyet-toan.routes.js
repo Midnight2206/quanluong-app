@@ -16,22 +16,28 @@ import {
   chungTuQuyetToanHealthController,
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
+  createChungTuPdfExportBatchController,
   createChungTuPdfTemplateController,
   createChungTuPdfExportController,
   createChungTuDocumentController,
   deactivateChungTuPdfTemplateController,
   createTemplateCatalogController,
   deleteChungTuDocumentController,
+  deleteChungTuPdfExportBatchController,
   deleteChungTuPdfExportController,
   deleteTemplateCatalogController,
   getChungTuDocumentController,
+  getChungTuPdfExportBatchController,
   getChungTuPdfExportFileController,
+  getChungTuPdfFieldCatalogController,
   getChungTuPdfTemplateFieldsController,
+  getChungTuSignatureSettingsController,
   getChungTuUnitProfileController,
   getCategoryTemplateFillMappingController,
   getTemplateFillRulesController,
   importDriveFileController,
   listCategoryTemplatesController,
+  listChungTuPdfExportBatchesController,
   listChungTuPdfExportsController,
   listChungTuPdfTemplatesController,
   listChungTuDocumentsController,
@@ -46,8 +52,12 @@ import {
   patchTemplateCatalogController,
   previewChungTuContextController,
   putCategoryTemplateFillMappingController,
+  putChungTuSignatureSettingsController,
   putChungTuUnitProfileController,
   putTemplateFillRulesController,
+  streamChungTuPdfExportBatchFileController,
+  streamChungTuPdfExportBatchMergedPdfController,
+  streamChungTuPdfExportBatchZipController,
   syncChungTuDocumentController,
   templateCatalogFieldRegistryController,
   uploadTemplateCatalogOfficeController,
@@ -55,11 +65,17 @@ import {
 import {
   categoryKeyParamSchema,
   categoryTemplateDriveParamsSchema,
+  chungTuPdfExportBatchCreateBodySchema,
+  chungTuPdfExportBatchFileParamsSchema,
+  chungTuPdfExportBatchKeyParamSchema,
+  chungTuPdfExportBatchListQuerySchema,
   chungTuPdfTemplateIdParamSchema,
   chungTuPdfExportCreateBodySchema,
   chungTuPdfExportKeyParamSchema,
   chungTuPdfTemplateListQuerySchema,
   chungTuPdfTemplateUploadBodySchema,
+  chungTuSignatureSettingsPutBodySchema,
+  chungTuSignatureSettingsQuerySchema,
   putCategoryTemplateFillMappingBodySchema,
   chungTuContextPreviewBodySchema,
   chungTuDocumentCreateBodySchema,
@@ -268,6 +284,77 @@ chungTuQuyetToanRouter.delete(
   permissionMiddleware([routePermissions.pdfExportDelete]),
   validateRequest({ params: chungTuPdfExportKeyParamSchema }),
   asyncHandler(deleteChungTuPdfExportController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches",
+  permissionMiddleware([routePermissions.pdfExportBatchList]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  validateRequest({ query: chungTuPdfExportBatchListQuerySchema }),
+  asyncHandler(listChungTuPdfExportBatchesController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-export-batches",
+  permissionMiddleware([routePermissions.pdfExportBatchCreate]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["periodDate"] }),
+  validateRequest({ body: chungTuPdfExportBatchCreateBodySchema }),
+  asyncHandler(createChungTuPdfExportBatchController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey",
+  permissionMiddleware([routePermissions.pdfExportBatchDetail]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(getChungTuPdfExportBatchController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey/zip",
+  permissionMiddleware([routePermissions.pdfExportBatchZip]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(streamChungTuPdfExportBatchZipController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey/merged.pdf",
+  permissionMiddleware([routePermissions.pdfExportBatchMergedPdf]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(streamChungTuPdfExportBatchMergedPdfController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey/files/:fileId",
+  permissionMiddleware([routePermissions.pdfExportBatchFile]),
+  validateRequest({ params: chungTuPdfExportBatchFileParamsSchema }),
+  asyncHandler(streamChungTuPdfExportBatchFileController),
+);
+
+chungTuQuyetToanRouter.delete(
+  "/pdf-export-batches/:batchKey",
+  permissionMiddleware([routePermissions.pdfExportBatchDelete]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(deleteChungTuPdfExportBatchController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/signature-settings",
+  permissionMiddleware([routePermissions.signatureSettingsGet]),
+  validateRequest({ query: chungTuSignatureSettingsQuerySchema }),
+  asyncHandler(getChungTuSignatureSettingsController),
+);
+
+chungTuQuyetToanRouter.put(
+  "/signature-settings",
+  permissionMiddleware([routePermissions.signatureSettingsPut]),
+  validateRequest({ body: chungTuSignatureSettingsPutBodySchema }),
+  asyncHandler(putChungTuSignatureSettingsController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-template-field-catalog",
+  permissionMiddleware([routePermissions.pdfTemplateFieldCatalog]),
+  asyncHandler(getChungTuPdfFieldCatalogController),
 );
 
 chungTuQuyetToanRouter.get(

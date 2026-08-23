@@ -13,16 +13,27 @@ const STATIC_ALIASES = Object.freeze({
   ngay_thang_nam: "ngayThangNam",
 });
 
+function snakeToCamel(key) {
+  return String(key ?? "").replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
 export function resolveColumnFieldKey(templateColumnKey) {
   const key = String(templateColumnKey ?? "").trim();
   if (!key) return "";
   if (STATIC_ALIASES[key]) return STATIC_ALIASES[key];
   if (CHUNG_TU_DETAIL_FIELD_KEYS.has(key)) return key;
-  const snakeAsCamel = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+  const snakeAsCamel = snakeToCamel(key);
   if (CHUNG_TU_DETAIL_FIELD_KEYS.has(snakeAsCamel)) return snakeAsCamel;
   const fromLabel = guessDetailFieldKeyFromLabel(key.replace(/_/g, " "));
   if (fromLabel) return fromLabel;
   return camelToSnake(key) === key ? snakeAsCamel : "";
 }
 
-export const resolveScalarFieldKey = resolveColumnFieldKey;
+export function resolveScalarFieldKey(templateFieldKey) {
+  const raw = String(templateFieldKey ?? "").trim();
+  const key = raw.startsWith("FIELD_") ? raw.slice("FIELD_".length) : raw;
+  if (!key) return "";
+  if (STATIC_ALIASES[key]) return STATIC_ALIASES[key];
+  if (camelToSnake(key) === key) return snakeToCamel(key);
+  return key;
+}
