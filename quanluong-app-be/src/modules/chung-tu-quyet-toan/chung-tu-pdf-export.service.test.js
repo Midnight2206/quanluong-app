@@ -22,8 +22,8 @@ const resolveChungTuContext = mock.fn(async () => ({
   sourceDataHash: "hash-123",
 }));
 const getTemplateFields = mock.fn(async () => ({
-  fields: [{ name: "don_vi" }, { name: "tong_tien" }],
-  columns: [{ key: "stt" }, { key: "ten_hang" }],
+  fields: [{ field_name: "don_vi", cell_ref: "B2" }, { field_name: "tong_tien", cell_ref: "B3" }],
+  columns: [{ key: "stt", title: "STT" }, { key: "ten_hang", title: "Ten hang" }],
 }));
 const renderDocumentPdf = mock.fn(async () => Buffer.from("%PDF-1.4 test"));
 const writeChungTuPdfFile = mock.fn(async () => "/tmp/chung-tu.pdf");
@@ -65,7 +65,22 @@ mock.module("./chung-tu-pdf-storage.util.js", {
   },
 });
 
-const { createChungTuPdfExport } = await import("./chung-tu-pdf-export.service.js");
+const { createChungTuPdfExport, extractTemplateKeys } = await import(
+  "./chung-tu-pdf-export.service.js"
+);
+
+test("extractTemplateKeys reads document-service field_name and column key shape", () => {
+  const { fieldKeys, columnKeys } = extractTemplateKeys({
+    fields: [
+      { field_name: "don_vi", cell_ref: "B2" },
+      { field_name: "tong_tien", cell_ref: "B3" },
+    ],
+    columns: [{ key: "stt", title: "STT" }, { key: "ten_hang", title: "Ten hang" }],
+  });
+
+  assert.deepEqual(fieldKeys, ["don_vi", "tong_tien"]);
+  assert.deepEqual(columnKeys, ["stt", "ten_hang"]);
+});
 
 test.beforeEach(() => {
   prismaTemplateFindFirst.mock.resetCalls();

@@ -85,6 +85,7 @@ function extractTemplateKeys(fieldsPayload) {
   const container =
     root.data && typeof root.data === "object" ? root.data : root;
   const fieldKeys = extractNamedKeys(container.fields, [
+    "field_name",
     "name",
     "key",
     "fieldKey",
