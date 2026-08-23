@@ -11,10 +11,17 @@ process.env.SESSION_SECRET ||= "test-session-secret";
 const { config } = await import("../config/config.js");
 const { AppError } = await import("../errors/app-error.js");
 const {
+  createDocumentFolder,
   exportWorkbook,
+  getDocumentFolder,
+  getTemplateFields,
   isDocumentServiceConfigured,
+  listTemplates,
   parseWorkbook,
   planPagination,
+  renderDocumentPdf,
+  renderToDocumentFolder,
+  uploadTemplate,
 } = await import("./document-service.client.js");
 
 function mockFetch(impl) {
@@ -189,6 +196,169 @@ test("planPagination posts JSON and returns pagination plan", async () => {
   });
   try {
     assert.deepEqual(await planPagination(body), { pages: [{ row_count: 10 }] });
+  } finally {
+    restore();
+  }
+});
+
+test("listTemplates returns upstream JSON array", async () => {
+  const restore = mockFetch(async (url) => {
+    assert.equal(url.toString(), "http://document.test/v1/templates");
+    return new Response(JSON.stringify([{ id: 1, name: "a", version: "1" }]), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  try {
+    assert.deepEqual(await listTemplates(), [{ id: 1, name: "a", version: "1" }]);
+  } finally {
+    restore();
+  }
+});
+
+test("renderDocumentPdf returns a Buffer", async () => {
+  const bytes = Uint8Array.from([37, 80, 68, 70]);
+  const restore = mockFetch(async (url, options) => {
+    assert.equal(url.toString(), "http://document.test/v1/templates/3/documents");
+    assert.equal(options.method, "POST");
+    assert.deepEqual(JSON.parse(options.body), {
+      fields: { don_vi: "A" },
+      rows: [{ stt: "1" }],
+      signatures: {},
+      signature_dates: {},
+    });
+    return new Response(bytes, { status: 200 });
+  });
+  try {
+    const result = await renderDocumentPdf(3, { fields: { don_vi: "A" }, rows: [{ stt: "1" }] });
+    assert.ok(Buffer.isBuffer(result));
+    assert.deepEqual(result, Buffer.from(bytes));
+  } finally {
+    restore();
+  }
+});
+
+test("getTemplateFields maps upstream 404 to AppError 404", async () => {
+  const restore = mockFetch(async () =>
+    new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "Không tìm thấy mẫu" } }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  try {
+    await assert.rejects(
+      getTemplateFields(99),
+      (error) =>
+        error instanceof AppError &&
+        error.statusCode === 404 &&
+        error.message === "Không tìm thấy mẫu",
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("uploadTemplate posts multipart form", async () => {
+  const restore = mockFetch(async (url, options) => {
+    assert.equal(url.toString(), "http://document.test/v1/templates");
+    assert.equal(options.method, "POST");
+    assert.ok(options.body instanceof FormData);
+    assert.equal(options.body.get("name"), "bien_ban");
+    assert.equal(options.body.get("version"), "1");
+    return new Response(JSON.stringify({ id: 2, name: "bien_ban", version: "1", file_path: null }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  try {
+    assert.deepEqual(await uploadTemplate({ buffer: Buffer.from("xlsx"), name: "bien_ban", version: "1" }), {
+      id: 2,
+      name: "bien_ban",
+      version: "1",
+      file_path: null,
+    });
+  } finally {
+    restore();
+  }
+});
+
+test("createDocumentFolder posts JSON and returns folder metadata", async () => {
+  const restore = mockFetch(async (url, options) => {
+    assert.equal(url.toString(), "http://document.test/v1/folders");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["X-Service-Key"], "k");
+    assert.equal(options.headers["Content-Type"], "application/json");
+    assert.deepEqual(JSON.parse(options.body), { name: "batch-2026-06" });
+    return new Response(
+      JSON.stringify({ id: 7, name: "batch-2026-06", created_at: "2026-06-01T00:00:00Z" }),
+      { status: 201, headers: { "content-type": "application/json" } },
+    );
+  });
+  try {
+    assert.deepEqual(await createDocumentFolder({ name: "batch-2026-06" }), {
+      id: 7,
+      name: "batch-2026-06",
+      created_at: "2026-06-01T00:00:00Z",
+    });
+  } finally {
+    restore();
+  }
+});
+
+test("renderToDocumentFolder posts snake_case payload and returns file metadata", async () => {
+  const restore = mockFetch(async (url, options) => {
+    assert.equal(url.toString(), "http://document.test/v1/folders/7/documents");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["Content-Type"], "application/json");
+    assert.deepEqual(JSON.parse(options.body), {
+      template_id: 3,
+      file_name: "2026-06-01.pdf",
+      sort_key: "2026-06-01",
+      fields: { ngay_thang_nam: "Ngày 01 tháng 06 năm 2026" },
+      rows: [{ stt: "1", ten_hang: "Gạo" }],
+      signatures: { ke_toan: "Nguyễn A" },
+      signature_dates: { ke_toan: "01/06/2026" },
+      signature_block: { columns: 2 },
+    });
+    return new Response(JSON.stringify({ file_id: 11, file_name: "2026-06-01.pdf" }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  try {
+    assert.deepEqual(
+      await renderToDocumentFolder(7, {
+        templateId: 3,
+        fileName: "2026-06-01.pdf",
+        sortKey: "2026-06-01",
+        fields: { ngay_thang_nam: "Ngày 01 tháng 06 năm 2026" },
+        rows: [{ stt: "1", ten_hang: "Gạo" }],
+        signatures: { ke_toan: "Nguyễn A" },
+        signatureDates: { ke_toan: "01/06/2026" },
+        signatureBlock: { columns: 2 },
+      }),
+      { file_id: 11, file_name: "2026-06-01.pdf" },
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("getDocumentFolder maps upstream 404 to AppError 404", async () => {
+  const restore = mockFetch(async () =>
+    new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "Không tìm thấy folder" } }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  try {
+    await assert.rejects(
+      getDocumentFolder(99),
+      (error) =>
+        error instanceof AppError &&
+        error.statusCode === 404 &&
+        error.message === "Không tìm thấy folder",
+    );
   } finally {
     restore();
   }
