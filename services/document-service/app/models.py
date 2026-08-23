@@ -15,7 +15,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
@@ -93,6 +93,10 @@ class TemplateTableConfig(Base):
     stretch_strategy: Mapped[str] = mapped_column(
         String(50), nullable=False, default="end_bias", server_default=text("'end_bias'")
     )
+    static_cells: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON)
+    static_block_height_pt: Mapped[float] = mapped_column(
+        Float, nullable=False, default=80, server_default=text("80")
+    )
 
 
 class Document(Base):
@@ -107,3 +111,40 @@ class Document(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class Folder(Base):
+    __tablename__ = "folders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    files: Mapped[list["FolderFile"]] = relationship(
+        back_populates="folder",
+        cascade="all, delete-orphan",
+    )
+
+
+class FolderFile(Base):
+    __tablename__ = "folder_files"
+    __table_args__ = (
+        UniqueConstraint(
+            "folder_id",
+            "file_name",
+            name="folder_files_folder_id_file_name_key",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    folder_id: Mapped[int] = mapped_column(
+        ForeignKey("folders.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    pdf_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    sort_key: Mapped[Optional[str]] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    folder: Mapped["Folder"] = relationship(back_populates="files")
