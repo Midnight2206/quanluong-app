@@ -1,0 +1,19 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { resolveColumnFieldKey, resolveScalarFieldKey } from "./chung-tu-pdf-column-alias.util.js";
+
+test("resolveColumnFieldKey maps ten_mat_hang to tenHang", () => {
+  assert.equal(resolveColumnFieldKey("ten_mat_hang"), "tenHang");
+});
+
+test("resolveColumnFieldKey maps ten_hang to tenHang", () => {
+  assert.equal(resolveColumnFieldKey("ten_hang"), "tenHang");
+});
+
+test("resolveScalarFieldKey maps tong_tien_bang_chu to tongTienBangChu", () => {
+  assert.equal(resolveScalarFieldKey("tong_tien_bang_chu"), "tongTienBangChu");
+});
+
+test("resolveScalarFieldKey maps ngay_thang_nam to ngayThangNam", () => {
+  assert.equal(resolveScalarFieldKey("ngay_thang_nam"), "ngayThangNam");
+});

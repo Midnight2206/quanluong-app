@@ -1,3 +1,5 @@
+import { resolveColumnFieldKey } from "./chung-tu-pdf-column-alias.util.js";
+
 export function camelToSnake(key) {
   return String(key ?? "")
     .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
@@ -24,23 +26,31 @@ function lookupContextValue(context, templateKey) {
 export function pickMappedFields(context, fieldKeys) {
   const out = {};
   for (const key of fieldKeys) {
-    const raw = lookupContextValue(context, key);
+    const fieldKey = resolveColumnFieldKey(key);
+    const raw = fieldKey
+      ? lookupContextValue(context, fieldKey) ?? lookupContextValue(context, camelToSnake(fieldKey))
+      : lookupContextValue(context, key);
     if (raw !== undefined) out[key] = valueToCell(raw);
   }
   return out;
 }
 
-export function mapDetailRows(detailRows, columnKeys) {
+export function mapDetailRowsForTemplate(detailRows, templateColumnKeys) {
   const rows = Array.isArray(detailRows) ? detailRows : [];
   return rows.map((row) => {
     const mapped = {};
-    for (const key of columnKeys) {
-      const raw = lookupContextValue(row, key);
-      mapped[key] = valueToCell(raw ?? "");
+    for (const templateKey of templateColumnKeys ?? []) {
+      const fieldKey = resolveColumnFieldKey(templateKey);
+      const raw = fieldKey
+        ? lookupContextValue(row, fieldKey) ?? lookupContextValue(row, camelToSnake(fieldKey))
+        : lookupContextValue(row, templateKey);
+      mapped[templateKey] = valueToCell(raw ?? "");
     }
     return mapped;
   });
 }
+
+export const mapDetailRows = mapDetailRowsForTemplate;
 
 export function buildDocumentServicePayload({
   context,
@@ -52,7 +62,7 @@ export function buildDocumentServicePayload({
 }) {
   const payload = {
     fields: pickMappedFields(context ?? {}, fieldKeys ?? []),
-    rows: mapDetailRows(context?.detailRows, columnKeys ?? []),
+    rows: mapDetailRowsForTemplate(context?.detailRows, columnKeys ?? []),
     signatures: signatures ?? {},
     signature_dates: signatureDates ?? {},
   };

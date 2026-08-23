@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
   camelToSnake,
   pickMappedFields,
   mapDetailRows,
+  mapDetailRowsForTemplate,
   buildDocumentServicePayload,
 } from "./chung-tu-pdf-map.util.js";
 
@@ -17,6 +19,19 @@ assert.deepEqual(
   { thanh_tien: "1.000", so_chung_tu: "A1" },
 );
 
+test("pickMappedFields resolves scalar legacy aliases", () => {
+  assert.deepEqual(
+    pickMappedFields(
+      { tongTienBangChu: "Một triệu", ngayThangNam: "ngày 15 tháng 8 năm 2026" },
+      ["tong_tien_bang_chu", "ngay_thang_nam"],
+    ),
+    {
+      tong_tien_bang_chu: "Một triệu",
+      ngay_thang_nam: "ngày 15 tháng 8 năm 2026",
+    },
+  );
+});
+
 assert.deepEqual(
   mapDetailRows(
     [{ stt: "1", tenHang: "Gạo", thanhTien: "10.000", ignoreMe: true }],
@@ -24,6 +39,14 @@ assert.deepEqual(
   ),
   [{ stt: "1", ten_hang: "Gạo", thanh_tien: "10.000" }],
 );
+
+test("mapDetailRowsForTemplate writes ten_mat_hang column", () => {
+  const rows = mapDetailRowsForTemplate(
+    [{ stt: 1, tenHang: "Gạo" }],
+    ["stt", "ten_mat_hang"],
+  );
+  assert.equal(rows[0].ten_mat_hang, "Gạo");
+});
 
 const payload = buildDocumentServicePayload({
   context: { donVi: "Bếp A", detailRows: [{ stt: "1", tenHang: "Gạo" }] },
@@ -36,3 +59,12 @@ assert.deepEqual(payload.fields, { don_vi: "Bếp A" });
 assert.deepEqual(payload.rows, [{ stt: "1", ten_hang: "Gạo" }]);
 assert.deepEqual(payload.signatures, { nguoi_lap: "A" });
 assert.deepEqual(payload.signature_dates, { nguoi_lap: "ngày 1" });
+
+test("buildDocumentServicePayload maps ten_mat_hang template column", () => {
+  const p = buildDocumentServicePayload({
+    context: { detailRows: [{ stt: "1", tenHang: "Gạo" }] },
+    fieldKeys: [],
+    columnKeys: ["stt", "ten_mat_hang"],
+  });
+  assert.deepEqual(p.rows, [{ stt: "1", ten_mat_hang: "Gạo" }]);
+});
