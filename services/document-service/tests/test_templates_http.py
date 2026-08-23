@@ -207,6 +207,26 @@ def test_get_template_fields_returns_form_schema(monkeypatch):
     assert all(
         set(column) == {"key", "title", "align_h"} for column in body["columns"]
     )
+    assert body["signature_block"]["columns"] == 2
+    assert body["signature_block"]["gap_pt"] == 40
+    assert body["signature_block"]["date_line_gap_pt"] == 14
+    assert [slot["key"] for slot in body["signature_block"]["slots"]] == [
+        "nguoi_lap",
+        "thu_truong",
+    ]
+    assert all(
+        set(slot)
+        == {
+            "key",
+            "label",
+            "col",
+            "col_span",
+            "source",
+            "static_name",
+            "show_date_line",
+        }
+        for slot in body["signature_block"]["slots"]
+    )
 
 
 def test_get_template_fields_returns_404_when_missing(monkeypatch):

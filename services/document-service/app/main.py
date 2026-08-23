@@ -22,6 +22,7 @@ from app.models import Template
 from app.pagination import PaginationError, plan_pages
 from app.parse import parse_xlsx
 from app.render.pdf_renderer import render_pdf
+from app.render.signature_block import default_signature_block, parse_signature_block_config
 
 _template_errors = import_module("app.import.errors")
 import_template = import_module("app.import.template_service").import_template
@@ -149,6 +150,7 @@ def get_template_fields(template_id: int, _: None = Depends(require_service_key)
             {"key": column.key, "title": column.title, "align_h": column.align_h}
             for column in metadata.table.columns
         ],
+        "signature_block": asdict(metadata.signature_block or default_signature_block()),
     }
 
 

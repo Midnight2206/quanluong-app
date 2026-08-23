@@ -279,6 +279,7 @@ const chungTuPdfExportCreateBodySchema = chungTuDocumentBaseBodySchema
     templateDisplayName: true,
   })
   .extend({
+    categoryKey: chungTuPdfCategoryKeySchema,
     pdfTemplateId: z.coerce.number().int().positive(),
     signatures: z.record(z.string()).optional().default({}),
     signatureDates: z.record(z.string()).optional().default({}),

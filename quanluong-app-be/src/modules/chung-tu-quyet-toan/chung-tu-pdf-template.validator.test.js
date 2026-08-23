@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  chungTuPdfExportCreateBodySchema,
   chungTuPdfTemplateIdParamSchema,
   chungTuPdfTemplateListQuerySchema,
   chungTuPdfTemplateUploadBodySchema,
@@ -32,5 +33,32 @@ test("chungTuPdfTemplateUploadBodySchema normalizes multipart fields", () => {
       name: "bien-ban-test",
       version: "v1",
     },
+  );
+});
+
+test("chungTuPdfExportCreateBodySchema uses the PDF category allowlist", () => {
+  assert.deepEqual(
+    chungTuPdfExportCreateBodySchema.parse({
+      categoryKey: " phieu-nhap-kho ",
+      unitId: "1",
+      periodDate: "2026-08-23",
+      pdfTemplateId: "2",
+    }),
+    {
+      categoryKey: "phieu-nhap-kho",
+      unitId: 1,
+      periodDate: "2026-08-23",
+      pdfTemplateId: 2,
+      signatures: {},
+      signatureDates: {},
+    },
+  );
+  assert.throws(() =>
+    chungTuPdfExportCreateBodySchema.parse({
+      categoryKey: "unsupported-category",
+      unitId: 1,
+      periodDate: "2026-08-23",
+      pdfTemplateId: 2,
+    }),
   );
 });
