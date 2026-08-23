@@ -105,6 +105,18 @@ export const qk = {
   },
   chungTuQuyetToan: {
     root: ["chungTuQuyetToan"],
+    pdfTemplates: (categoryKey) => [
+      "chungTuQuyetToan",
+      "pdfTemplates",
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
+    pdfTemplateFields: (templateId) => ["chungTuQuyetToan", "pdfTemplateFields", String(templateId ?? "")],
+    pdfExports: (unitId, categoryKey) => [
+      "chungTuQuyetToan",
+      "pdfExports",
+      String(unitId ?? ""),
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
     templateCatalog: (categoryKey) => [
       "chungTuQuyetToan",
       "templateCatalog",
