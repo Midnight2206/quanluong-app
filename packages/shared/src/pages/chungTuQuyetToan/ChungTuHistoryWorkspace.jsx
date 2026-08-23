@@ -1,31 +1,51 @@
 "use client";
 
-import { ExternalLink, Loader2, RefreshCw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Download, Loader2, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { cn } from "@/utils/cn";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { useHasPermission } from "@/features/auth/model/authSlice";
+import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import {
-  useChungTuDocumentsQuery,
-  useDeleteChungTuDocumentMutation,
-  useOpenChungTuDocumentMutation,
-  useSyncChungTuDocumentMutation,
-} from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
-import { CHUNG_TU_EXPORT_KIND } from "@/pages/chungTuQuyetToan/chungTuCategoryConfig";
-import { chungTuStatusBadge, formatPeriodLabel } from "@/pages/chungTuQuyetToan/chungTuFormat";
+  downloadChungTuPdfExport,
+  useChungTuPdfExportsQuery,
+  useChungTuPdfTemplatesQuery,
+  useDeleteChungTuPdfExportMutation,
+} from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
+import { formatPeriodLabel } from "@/pages/chungTuQuyetToan/chungTuFormat";
 import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScope";
-import { ChungTuHistoryDocumentCard } from "./ChungTuHistoryDocumentCard";
 import { ChungTuExportWizardCard } from "./ChungTuExportWizard";
 
 const fieldClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
 
-function StatusBadge({ status }) {
-  const badge = chungTuStatusBadge(status);
-  return <span className={badge.className}>{badge.label}</span>;
+const exportTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
+  dateStyle: "short",
+  timeStyle: "short",
+});
+
+function formatExportedAt(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return exportTimeFormatter.format(date);
+}
+
+function getTemplateLabel(template) {
+  if (!template) return "";
+  const base = template.displayName || template.name || `Mẫu #${template.id}`;
+  return template.version ? `${base} (v${template.version})` : base;
+}
+
+function formatCreatorLabel(item, currentUser) {
+  const createdById = item?.createdById;
+  if (createdById == null || createdById === "") return "—";
+  if (String(currentUser?.id) === String(createdById)) {
+    return currentUser?.fullName?.trim() || `ID ${createdById}`;
+  }
+  return `ID ${createdById}`;
 }
 
 /**
@@ -36,67 +56,54 @@ function StatusBadge({ status }) {
  */
 export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
+  const currentUser = useCurrentUser();
   const isLgUp = useMediaQuery("(min-width: 1024px)");
   const { canPickUnits, unitsForDropdown, effectiveUnitId, persistManualUnitId } = useChungTuUnitScope();
   const [actionError, setActionError] = useState(null);
+  const [downloadingKey, setDownloadingKey] = useState("");
 
-  const { data: documents = [], isLoading: docsLoading } = useChungTuDocumentsQuery(
+  const { data: pdfExports = [], isLoading: exportsLoading } = useChungTuPdfExportsQuery(
     { unitId: effectiveUnitId, categoryKey },
     { skip: !effectiveUnitId },
   );
+  const { data: templates = [] } = useChungTuPdfTemplatesQuery(categoryKey, { skip: !categoryKey });
 
-  const [syncDoc, { isLoading: syncing }] = useSyncChungTuDocumentMutation();
-  const [openDoc, { isLoading: openingDoc }] = useOpenChungTuDocumentMutation();
-  const [deleteDoc, { isLoading: deletingDoc }] = useDeleteChungTuDocumentMutation();
+  const [deletePdfExport, { isLoading: deletingExport }] = useDeleteChungTuPdfExportMutation();
+  const templateLabelById = useMemo(
+    () =>
+      new Map(
+        templates.map((template) => [String(template.id), getTemplateLabel(template)]),
+      ),
+    [templates],
+  );
 
-  const handleSync = async (doc) => {
+  const handleDownloadPdf = async (item) => {
     setActionError(null);
+    setDownloadingKey(String(item.exportKey ?? ""));
     try {
-      const data = await syncDoc({
-        documentKey: doc.documentKey,
-        unitId: effectiveUnitId,
-        categoryKey,
-      });
-      const link = data?.outputWebViewLink;
-      if (link) window.open(link, "_blank", "noopener,noreferrer");
+      await downloadChungTuPdfExport(item.exportKey);
     } catch (e) {
-      setActionError(e?.data?.message || e?.message || "Không đồng bộ được.");
+      setActionError(e?.data?.message || e?.message || "Không tải được file PDF.");
+    } finally {
+      setDownloadingKey("");
     }
   };
 
-  const handleOpenDocument = async (doc) => {
-    setActionError(null);
-    try {
-      const data = await openDoc({
-        documentKey: doc.documentKey,
-        unitId: effectiveUnitId,
-        categoryKey,
-      });
-      const link = data?.outputWebViewLink;
-      if (link) window.open(link, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      setActionError(e?.data?.message || e?.message || "Không mở được chứng từ.");
-    }
-  };
-
-  const handleDeleteDocument = async (doc) => {
-    const ok = window.confirm("Xóa chứng từ này? File Google Sheet sẽ được đưa vào thùng rác nếu còn tồn tại.");
+  const handleDeletePdf = async (item) => {
+    const ok = window.confirm("Xóa bản PDF này khỏi lịch sử?");
     if (!ok) return;
     setActionError(null);
     try {
-      await deleteDoc({
-        documentKey: doc.documentKey,
+      await deletePdfExport({
+        exportKey: item.exportKey,
         unitId: effectiveUnitId,
         categoryKey,
-      });
+      }).unwrap();
     } catch (e) {
-      setActionError(e?.data?.message || e?.message || "Không xóa được chứng từ.");
+      setActionError(e?.data?.message || e?.message || "Không xóa được bản PDF.");
     }
   };
 
-  const showAggregation = exportKind === CHUNG_TU_EXPORT_KIND.MONTHLY;
-  const periodHeader =
-    exportKind === CHUNG_TU_EXPORT_KIND.MONTHLY ? "Tháng/Năm" : "Ngày / Phiếu";
   const expandedLayout = !isLgUp;
 
   return (
@@ -146,9 +153,9 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
         </p>
       ) : null}
 
-      {docsLoading ? (
+      {exportsLoading ? (
         <ChungTuExportWizardCard
-          title="Danh sách chứng từ"
+          title="Lịch sử PDF"
           expanded={expandedLayout}
           bodyClassName="py-6"
         >
@@ -157,114 +164,146 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
             Đang tải lịch sử…
           </p>
         </ChungTuExportWizardCard>
-      ) : documents.length === 0 ? (
+      ) : pdfExports.length === 0 ? (
         <ChungTuExportWizardCard
-          title="Danh sách chứng từ"
+          title="Lịch sử PDF"
           expanded={expandedLayout}
           bodyClassName="py-6"
         >
           <p className="text-center text-sm text-muted-foreground">
-            Chưa có chứng từ nào cho đơn vị này.
+            Chưa có bản PDF nào cho đơn vị này.
           </p>
         </ChungTuExportWizardCard>
       ) : !isLgUp ? (
         <ChungTuExportWizardCard
-          title={`Danh sách (${documents.length})`}
-          description="Chạm Mở / Đồng bộ / Xóa trên từng chứng từ."
+          title={`Lịch sử PDF (${pdfExports.length})`}
+          description="Chạm Tải PDF / Xóa trên từng bản xuất."
           expanded={expandedLayout}
           bodyClassName="divide-y divide-border/60 space-y-0 p-0"
         >
-          {documents.map((doc) => (
-            <ChungTuHistoryDocumentCard
-              key={doc.documentKey}
-              doc={doc}
-              exportKind={exportKind}
-              canWrite={canWrite}
-              syncing={syncing}
-              openingDoc={openingDoc}
-              deletingDoc={deletingDoc}
-              inset
-              onOpen={() => handleOpenDocument(doc)}
-              onSync={() => handleSync(doc)}
-              onDelete={() => handleDeleteDocument(doc)}
-            />
-          ))}
+          {pdfExports.map((item) => {
+            const isDownloading = downloadingKey === String(item.exportKey ?? "");
+            const creatorLabel = formatCreatorLabel(item, currentUser);
+            const templateLabel =
+              templateLabelById.get(String(item.pdfTemplateId ?? "")) ||
+              (item.pdfTemplateId != null ? `Mẫu #${item.pdfTemplateId}` : "—");
+            return (
+              <article key={item.exportKey} className="bg-card/30 px-3 py-3 sm:px-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="text-sm font-semibold leading-snug text-foreground">{templateLabel}</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">{item.exportKey || "—"}</p>
+                  </div>
+                  <p className="text-right text-[11px] text-muted-foreground">
+                    {formatExportedAt(item.createdAt)}
+                  </p>
+                </div>
+
+                <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+                  <div className="rounded-lg bg-muted/25 px-2.5 py-2">
+                    <dt className="text-[10px] uppercase text-muted-foreground">Kỳ</dt>
+                    <dd className="mt-0.5 font-medium text-foreground">
+                      {formatPeriodLabel(item, exportKind)}
+                    </dd>
+                  </div>
+                  <div className="rounded-lg bg-muted/25 px-2.5 py-2">
+                    <dt className="text-[10px] uppercase text-muted-foreground">Mẫu</dt>
+                    <dd className="mt-0.5 font-medium leading-snug text-foreground">{templateLabel}</dd>
+                  </div>
+                  <div className="rounded-lg bg-muted/25 px-2.5 py-2">
+                    <dt className="text-[10px] uppercase text-muted-foreground">Người tạo</dt>
+                    <dd className="mt-0.5 font-medium text-foreground">{creatorLabel}</dd>
+                  </div>
+                </dl>
+
+                <div className="mt-3 flex flex-wrap gap-2 border-t border-border/60 pt-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-10 min-w-[6rem] flex-1 gap-1.5 text-xs sm:flex-none"
+                    disabled={isDownloading || deletingExport}
+                    onClick={() => handleDownloadPdf(item)}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <Download className="size-3.5" aria-hidden />
+                    )}
+                    Tải PDF
+                  </Button>
+                  {canWrite ? (
+                    <Button
+                      type="button"
+                      variant="dangerGhost"
+                      className="h-10 min-w-[5.5rem] flex-1 gap-1.5 text-xs sm:flex-none"
+                      disabled={isDownloading || deletingExport}
+                      onClick={() => handleDeletePdf(item)}
+                    >
+                      <Trash2 className="size-3.5" aria-hidden />
+                      Xóa
+                    </Button>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
         </ChungTuExportWizardCard>
       ) : (
         <StickyResponsiveTable stickyLevel={2} className="border-border/80">
-          <table className="w-full min-w-[36rem] text-left text-sm">
+          <table className="w-full min-w-[42rem] text-left text-sm">
             <thead>
               <tr className="border-b border-border/80 bg-muted/40 text-[10px] uppercase tracking-wide text-muted-foreground">
-                <th className="px-3 py-2 font-semibold">Tên chứng từ</th>
-                <th className="px-3 py-2 font-semibold">Mã chứng từ</th>
-                <th className="px-3 py-2 font-semibold">Đơn vị</th>
-                <th className="px-3 py-2 font-semibold">{periodHeader}</th>
-                {showAggregation ? (
-                  <th className="px-3 py-2 font-semibold">Gộp</th>
-                ) : null}
-                <th className="px-3 py-2 font-semibold">TT</th>
+                <th className="px-3 py-2 font-semibold">Thời gian</th>
+                <th className="px-3 py-2 font-semibold">Kỳ</th>
+                <th className="px-3 py-2 font-semibold">Mẫu</th>
+                <th className="px-3 py-2 font-semibold">Người tạo</th>
                 <th className="px-3 py-2 font-semibold text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/70">
-              {documents.map((doc) => {
-                const unitLabel =
-                  doc.selectedUnitNames?.length > 1
-                    ? `${doc.unitName ?? ""} (${doc.selectedUnitNames.length} ĐV dữ liệu)`
-                    : doc.selectedUnitNames?.[0] ?? doc.unitName ?? "—";
+              {pdfExports.map((item) => {
+                const isDownloading = downloadingKey === String(item.exportKey ?? "");
+                const creatorLabel = formatCreatorLabel(item, currentUser);
+                const templateLabel =
+                  templateLabelById.get(String(item.pdfTemplateId ?? "")) ||
+                  (item.pdfTemplateId != null ? `Mẫu #${item.pdfTemplateId}` : "—");
                 return (
-                  <tr key={doc.documentKey} className="align-top">
-                    <td className="px-3 py-2 font-medium">
-                      {doc.documentName || doc.templateName || "—"}
+                  <tr key={item.exportKey} className="align-top">
+                    <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+                      {formatExportedAt(item.createdAt)}
                     </td>
-                    <td className="max-w-[140px] truncate px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                      {doc.documentCode || doc.templateName || "—"}
+                    <td className="whitespace-nowrap px-3 py-2 text-xs">
+                      {formatPeriodLabel(item, exportKind)}
                     </td>
-                    <td className="max-w-[160px] truncate px-3 py-2 text-xs">{unitLabel}</td>
-                    <td className="px-3 py-2 text-xs">{formatPeriodLabel(doc, exportKind)}</td>
-                    {showAggregation ? (
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {doc.aggregationModeLabel || "—"}
-                      </td>
-                    ) : null}
-                    <td className="px-3 py-2"><StatusBadge status={doc.status} /></td>
+                    <td className="max-w-[260px] truncate px-3 py-2 font-medium">{templateLabel}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs">{creatorLabel}</td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap justify-end gap-1">
-                        {doc.outputWebViewLink ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="h-8 gap-1 px-3 text-xs"
+                          disabled={isDownloading || deletingExport}
+                          onClick={() => handleDownloadPdf(item)}
+                        >
+                          {isDownloading ? (
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                          ) : (
+                            <Download className="size-3.5" aria-hidden />
+                          )}
+                          Tải PDF
+                        </Button>
+                        {canWrite ? (
                           <Button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={openingDoc}
-                            onClick={() => handleOpenDocument(doc)}
+                            variant="dangerGhost"
+                            className="h-8 gap-1 px-3 text-xs"
+                            disabled={isDownloading || deletingExport}
+                            onClick={() => handleDeletePdf(item)}
                           >
-                            Mở
-                            <ExternalLink className="h-3 w-3" />
+                            <Trash2 className="size-3.5" aria-hidden />
+                            Xóa
                           </Button>
-                        ) : null}
-                        {canWrite && doc.status !== "locked" ? (
-                          <>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={syncing}
-                              onClick={() => handleSync(doc)}
-                            >
-                              <RefreshCw className={cn("mr-1 h-3 w-3", syncing ? "animate-spin" : "")} />
-                              Đồng bộ
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={deletingDoc}
-                              onClick={() => handleDeleteDocument(doc)}
-                            >
-                              <Trash2 className="mr-1 h-3 w-3" />
-                              Xóa
-                            </Button>
-                          </>
                         ) : null}
                       </div>
                     </td>
