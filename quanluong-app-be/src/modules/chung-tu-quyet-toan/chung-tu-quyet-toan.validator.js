@@ -273,6 +273,23 @@ const chungTuContextPreviewBodySchema = chungTuDocumentBaseBodySchema.superRefin
   refineChungTuDocumentBody,
 );
 
+const chungTuPdfExportCreateBodySchema = chungTuDocumentBaseBodySchema
+  .omit({
+    templateDriveFileId: true,
+    templateDisplayName: true,
+  })
+  .extend({
+    pdfTemplateId: z.coerce.number().int().positive(),
+    signatures: z.record(z.string()).optional().default({}),
+    signatureDates: z.record(z.string()).optional().default({}),
+    signatureBlock: z.record(z.unknown()).optional(),
+  })
+  .superRefine(refineChungTuDocumentBody);
+
+const chungTuPdfExportKeyParamSchema = z.object({
+  exportKey: z.string().min(8).max(200),
+});
+
 const templateTreeQuerySchema = z.object({
   folderId: z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/).optional(),
   categoryKey: z.string().min(1).max(80).optional(),
@@ -310,6 +327,8 @@ export {
   documentKeyParamSchema,
   chungTuDocumentCreateBodySchema,
   chungTuContextPreviewBodySchema,
+  chungTuPdfExportCreateBodySchema,
+  chungTuPdfExportKeyParamSchema,
   templateTreeQuerySchema,
   templateTreeFileParamsSchema,
 };

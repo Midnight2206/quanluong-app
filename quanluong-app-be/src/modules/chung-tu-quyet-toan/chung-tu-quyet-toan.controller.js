@@ -33,6 +33,12 @@ import {
   syncChungTuDocument,
   listBkmhSnapshotsByDocumentKey,
 } from "./chung-tu-document.service.js";
+import {
+  createChungTuPdfExport,
+  deleteChungTuPdfExport,
+  getChungTuPdfExportFile,
+  listChungTuPdfExports,
+} from "./chung-tu-pdf-export.service.js";
 import { getChungTuUnitProfile, putChungTuUnitProfile } from "./chung-tu-unit-profile.service.js";
 import {
   getCategoryTemplateFillMapping,
@@ -171,6 +177,66 @@ async function createChungTuPdfTemplateController(req, res) {
   });
   return respondCreated(res, {
     message: "Đã tải mẫu PDF lên Document service.",
+    data,
+  });
+}
+
+async function listChungTuPdfExportsController(req, res) {
+  const { unitId, categoryKey, from, to } = req.validatedQuery;
+  const items = await listChungTuPdfExports({
+    unitId,
+    categoryKey,
+    from,
+    to,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Danh sách lịch sử xuất PDF.",
+    data: { items },
+  });
+}
+
+async function createChungTuPdfExportController(req, res) {
+  const body = req.validatedBody;
+  const data = await createChungTuPdfExport({
+    categoryKey: body.categoryKey,
+    unitId: body.unitId,
+    periodDate: body.periodDate,
+    periodMonth: body.periodMonth,
+    issueSlipId: body.issueSlipId,
+    unitIds: body.unitIds,
+    aggregationMode: body.aggregationMode,
+    pdfTemplateId: body.pdfTemplateId,
+    signatures: body.signatures,
+    signatureDates: body.signatureDates,
+    signatureBlock: body.signatureBlock,
+    settings: body.settings ?? {},
+    createdById: req.user.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondCreated(res, {
+    message: "Đã xuất PDF chứng từ.",
+    data,
+  });
+}
+
+async function getChungTuPdfExportFileController(req, res) {
+  const { buffer, fileName } = await getChungTuPdfExportFile({
+    exportKey: req.validatedParams.exportKey,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename=\"${fileName.replaceAll("\"", "")}\"`);
+  return res.send(buffer);
+}
+
+async function deleteChungTuPdfExportController(req, res) {
+  const data = await deleteChungTuPdfExport({
+    exportKey: req.validatedParams.exportKey,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Đã xóa bản xuất PDF.",
     data,
   });
 }
@@ -488,17 +554,21 @@ export {
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
   createChungTuPdfTemplateController,
+  createChungTuPdfExportController,
   createChungTuDocumentController,
   deactivateChungTuPdfTemplateController,
   deleteChungTuDocumentController,
+  deleteChungTuPdfExportController,
   createTemplateCatalogController,
   deleteTemplateCatalogController,
   getChungTuDocumentController,
+  getChungTuPdfExportFileController,
   getChungTuPdfTemplateFieldsController,
   getCategoryTemplateFillMappingController,
   getChungTuUnitProfileController,
   getTemplateFillRulesController,
   importDriveFileController,
+  listChungTuPdfExportsController,
   listCategoryTemplatesController,
   listChungTuPdfTemplatesController,
   listChungTuDocumentsController,

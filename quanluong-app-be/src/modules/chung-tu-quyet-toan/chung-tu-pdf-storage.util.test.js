@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
+import { AppError } from "../../errors/app-error.js";
 
 process.env.DATABASE_URL ||= "mysql://test:test@localhost/test";
 process.env.JWT_ACCESS_SECRET ||= "test-jwt-secret";
@@ -35,4 +36,20 @@ test("chung-tu PDF storage write/read/delete under injected rootDir", async () =
   await deleteChungTuPdfFile(relativePath, rootDir);
 
   await fs.rm(rootDir, { recursive: true, force: true });
+});
+
+test("chung-tu PDF storage rejects path escape on read and delete", async () => {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), "chung-tu-pdf-"));
+  try {
+    await assert.rejects(
+      () => readChungTuPdfFile("../escape.pdf", rootDir),
+      (error) => error instanceof AppError && /đường dẫn file pdf không hợp lệ/i.test(error.message),
+    );
+    await assert.rejects(
+      () => deleteChungTuPdfFile("../escape.pdf", rootDir),
+      (error) => error instanceof AppError && /đường dẫn file pdf không hợp lệ/i.test(error.message),
+    );
+  } finally {
+    await fs.rm(rootDir, { recursive: true, force: true });
+  }
 });

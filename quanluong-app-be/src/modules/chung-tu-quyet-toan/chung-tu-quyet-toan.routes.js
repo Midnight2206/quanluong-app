@@ -17,18 +17,22 @@ import {
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
   createChungTuPdfTemplateController,
+  createChungTuPdfExportController,
   createChungTuDocumentController,
   deactivateChungTuPdfTemplateController,
   createTemplateCatalogController,
   deleteChungTuDocumentController,
+  deleteChungTuPdfExportController,
   deleteTemplateCatalogController,
   getChungTuDocumentController,
+  getChungTuPdfExportFileController,
   getChungTuPdfTemplateFieldsController,
   getChungTuUnitProfileController,
   getCategoryTemplateFillMappingController,
   getTemplateFillRulesController,
   importDriveFileController,
   listCategoryTemplatesController,
+  listChungTuPdfExportsController,
   listChungTuPdfTemplatesController,
   listChungTuDocumentsController,
   listBkmhSnapshotsController,
@@ -52,6 +56,8 @@ import {
   categoryKeyParamSchema,
   categoryTemplateDriveParamsSchema,
   chungTuPdfTemplateIdParamSchema,
+  chungTuPdfExportCreateBodySchema,
+  chungTuPdfExportKeyParamSchema,
   chungTuPdfTemplateListQuerySchema,
   chungTuPdfTemplateUploadBodySchema,
   putCategoryTemplateFillMappingBodySchema,
@@ -106,6 +112,7 @@ function driveImportMulterMiddleware(req, res, next) {
 const routePermissions = Object.fromEntries(
   CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS.map((d) => [d.key, d.permission.code]),
 );
+const LTTP_COMM = DATA_SCOPE_KINDS.LTTP_COMMODITY.code;
 
 chungTuQuyetToanRouter.use(authMiddleware);
 chungTuQuyetToanRouter.use(unitScopeMiddleware);
@@ -234,6 +241,36 @@ chungTuQuyetToanRouter.get(
 );
 
 chungTuQuyetToanRouter.get(
+  "/pdf-exports",
+  permissionMiddleware([routePermissions.pdfExportList]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["from", "to"] }),
+  validateRequest({ query: chungTuDocumentsListQuerySchema }),
+  asyncHandler(listChungTuPdfExportsController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-exports",
+  permissionMiddleware([routePermissions.pdfExportCreate]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["periodDate"] }),
+  validateRequest({ body: chungTuPdfExportCreateBodySchema }),
+  asyncHandler(createChungTuPdfExportController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-exports/:exportKey/file",
+  permissionMiddleware([routePermissions.pdfExportFile]),
+  validateRequest({ params: chungTuPdfExportKeyParamSchema }),
+  asyncHandler(getChungTuPdfExportFileController),
+);
+
+chungTuQuyetToanRouter.delete(
+  "/pdf-exports/:exportKey",
+  permissionMiddleware([routePermissions.pdfExportDelete]),
+  validateRequest({ params: chungTuPdfExportKeyParamSchema }),
+  asyncHandler(deleteChungTuPdfExportController),
+);
+
+chungTuQuyetToanRouter.get(
   "/template-tree",
   permissionMiddleware([routePermissions.templateTreeBrowse]),
   validateRequest({ query: templateTreeQuerySchema }),
@@ -257,8 +294,6 @@ chungTuQuyetToanRouter.post(
   }),
   asyncHandler(importDriveFileController),
 );
-
-const LTTP_COMM = DATA_SCOPE_KINDS.LTTP_COMMODITY.code;
 
 chungTuQuyetToanRouter.get(
   "/category-templates/:categoryKey",
