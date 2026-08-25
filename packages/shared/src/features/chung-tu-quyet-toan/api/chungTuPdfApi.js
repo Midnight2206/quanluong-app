@@ -304,8 +304,19 @@ function filenameFromContentDisposition(header) {
   return null;
 }
 
-export async function openChungTuPdfTemplatePreview(templateId) {
+function openObjectUrlInNewWindow(objectUrl, targetWindow = null) {
+  const openedWindow = targetWindow ?? window.open("about:blank", "_blank");
+  if (!openedWindow) {
+    URL.revokeObjectURL(objectUrl);
+    throw new Error("Trình duyệt chặn cửa sổ mới.");
+  }
+  openedWindow.location.href = objectUrl;
+  return openedWindow;
+}
+
+export async function openChungTuPdfTemplatePreview(templateId, options = {}) {
   const id = templateId != null ? String(templateId).trim() : "";
+  const { targetWindow = null } = options ?? {};
   const { data: blob, headers } = await apiRequest({
     url: `/chungtuquyettoan/pdf-templates/${encodeURIComponent(id)}/preview`,
     method: "get",
@@ -314,11 +325,7 @@ export async function openChungTuPdfTemplatePreview(templateId) {
   });
   const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/pdf" });
   const objectUrl = URL.createObjectURL(pdfBlob);
-  const openedWindow = window.open(objectUrl, "_blank", "noopener,noreferrer");
-  if (!openedWindow) {
-    URL.revokeObjectURL(objectUrl);
-    throw new Error("Trình duyệt chặn cửa sổ mới.");
-  }
+  const openedWindow = openObjectUrlInNewWindow(objectUrl, targetWindow);
   setTimeout(() => URL.revokeObjectURL(objectUrl), 120_000);
   const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
   return {
@@ -367,13 +374,7 @@ export async function openChungTuPdfBatchMergedPdf(batchKey, options = {}) {
   });
   const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/pdf" });
   const objectUrl = URL.createObjectURL(pdfBlob);
-  const openedWindow =
-    targetWindow ?? window.open("about:blank", "_blank", "noopener,noreferrer");
-  if (!openedWindow) {
-    URL.revokeObjectURL(objectUrl);
-    throw new Error("Trình duyệt chặn cửa sổ mới.");
-  }
-  openedWindow.location.href = objectUrl;
+  const openedWindow = openObjectUrlInNewWindow(objectUrl, targetWindow);
   setTimeout(() => URL.revokeObjectURL(objectUrl), 120_000);
   const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
   return {

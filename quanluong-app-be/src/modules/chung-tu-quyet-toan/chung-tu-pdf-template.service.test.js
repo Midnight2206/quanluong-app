@@ -181,6 +181,36 @@ test("publishChungTuPdfTemplate publishes draft row in document service and pris
   assert.deepEqual(result, published);
 });
 
+test("publishChungTuPdfTemplate still updates prisma when document service already published", async () => {
+  const row = {
+    id: 15,
+    status: "draft",
+    documentServiceTemplateId: 21,
+    categoryKey: "phieu-xuat-kho",
+  };
+  const published = { ...row, status: "published" };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  publishTemplate.mock.mockImplementation(async () => {
+    throw new AppError({
+      message: "Document service lỗi HTTP 409",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  });
+  prismaUpdate.mock.mockImplementation(async () => published);
+
+  const result = await publishChungTuPdfTemplate({ id: "15" });
+
+  assert.equal(publishTemplate.mock.callCount(), 1);
+  assert.deepEqual(publishTemplate.mock.calls[0].arguments, [21]);
+  assert.equal(prismaUpdate.mock.callCount(), 1);
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 15 },
+    data: { status: "published" },
+  });
+  assert.deepEqual(result, published);
+});
+
 test("retireChungTuPdfTemplate retires published row in document service and prisma", async () => {
   const row = {
     id: 6,
@@ -201,6 +231,36 @@ test("retireChungTuPdfTemplate retires published row in document service and pri
   assert.equal(prismaUpdate.mock.callCount(), 1);
   assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
     where: { id: 6 },
+    data: { status: "retired" },
+  });
+  assert.deepEqual(result, retired);
+});
+
+test("retireChungTuPdfTemplate still updates prisma when document service already retired", async () => {
+  const row = {
+    id: 16,
+    status: "published",
+    documentServiceTemplateId: 22,
+    categoryKey: "phieu-xuat-kho",
+  };
+  const retired = { ...row, status: "retired" };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  retireTemplate.mock.mockImplementation(async () => {
+    throw new AppError({
+      message: "Document service lỗi HTTP 409",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  });
+  prismaUpdate.mock.mockImplementation(async () => retired);
+
+  const result = await retireChungTuPdfTemplate({ id: "16" });
+
+  assert.equal(retireTemplate.mock.callCount(), 1);
+  assert.deepEqual(retireTemplate.mock.calls[0].arguments, [22]);
+  assert.equal(prismaUpdate.mock.callCount(), 1);
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 16 },
     data: { status: "retired" },
   });
   assert.deepEqual(result, retired);

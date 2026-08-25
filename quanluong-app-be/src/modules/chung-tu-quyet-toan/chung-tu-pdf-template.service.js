@@ -47,6 +47,10 @@ function notFoundError() {
   });
 }
 
+function isConflictError(error) {
+  return error instanceof AppError && error.statusCode === 409;
+}
+
 async function listChungTuPdfTemplates({ categoryKey, includeNonPublished = false }) {
   const normalizedCategoryKey = normalizeCategoryKey(categoryKey);
   assertSupportedPdfCategory(normalizedCategoryKey);
@@ -113,7 +117,13 @@ async function publishChungTuPdfTemplate({ id }) {
       code: ERROR_CODES.CONFLICT,
     });
   }
-  await publishTemplate(row.documentServiceTemplateId);
+  try {
+    await publishTemplate(row.documentServiceTemplateId);
+  } catch (error) {
+    if (!isConflictError(error)) {
+      throw error;
+    }
+  }
   return prisma.chungTuPdfTemplate.update({
     where: { id: row.id },
     data: { status: "published" },
@@ -134,7 +144,13 @@ async function retireChungTuPdfTemplate({ id }) {
       code: ERROR_CODES.CONFLICT,
     });
   }
-  await retireTemplate(row.documentServiceTemplateId);
+  try {
+    await retireTemplate(row.documentServiceTemplateId);
+  } catch (error) {
+    if (!isConflictError(error)) {
+      throw error;
+    }
+  }
   return prisma.chungTuPdfTemplate.update({
     where: { id: row.id },
     data: { status: "retired" },

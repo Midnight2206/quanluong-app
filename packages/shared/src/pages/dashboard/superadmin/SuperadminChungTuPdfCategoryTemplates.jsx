@@ -126,10 +126,18 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
   };
 
   const handlePreview = async (template) => {
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      notifyError("Trình duyệt chặn cửa sổ mới. Hãy cho phép popup cho trang này.");
+      return;
+    }
     try {
       setPreviewingId(String(template.id));
-      await openChungTuPdfTemplatePreview(template.id);
+      await openChungTuPdfTemplatePreview(template.id, { targetWindow: tab });
     } catch (e) {
+      try {
+        tab.close();
+      } catch {}
       notifyError(e?.data?.message || e?.message || "Không mở được bản xem trước.");
     } finally {
       setPreviewingId("");
@@ -141,7 +149,6 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
       title: "Xuất bản mẫu PDF?",
       message: `Mẫu "${getTemplateLabel(template)}" sẽ được dùng cho đơn vị khi xuất chứng từ.`,
       confirmLabel: "Xuất bản",
-      variant: "danger",
     });
     if (!ok) return;
     try {
