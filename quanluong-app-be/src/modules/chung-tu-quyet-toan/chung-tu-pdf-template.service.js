@@ -3,7 +3,7 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
   getTemplateFields,
-  previewTemplatePdf,
+  previewTemplatePdfResponse,
   publishTemplate,
   retireTemplate,
   uploadTemplate,
@@ -162,7 +162,10 @@ async function previewChungTuPdfTemplate({ id }) {
   if (!row) {
     throw notFoundError();
   }
-  return previewTemplatePdf(row.documentServiceTemplateId);
+  return {
+    upstreamResponse: await previewTemplatePdfResponse(row.documentServiceTemplateId),
+    fallbackContentDisposition: `inline; filename="preview-${row.documentServiceTemplateId}.pdf"`,
+  };
 }
 
 export {

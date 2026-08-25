@@ -30,13 +30,21 @@ const chungTuPdfCategoryKeySchema = z.preprocess(
   ]),
 );
 
-const chungTuPdfTemplateListQuerySchema = z.object({
-  categoryKey: chungTuPdfCategoryKeySchema,
-  includeNonPublished: z
-    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
-    .optional()
-    .transform((v) => v === true || v === "true" || v === "1"),
-});
+const chungTuBooleanQueryFlagSchema = z
+  .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+  .optional()
+  .transform((v) => v === true || v === "true" || v === "1");
+
+const chungTuPdfTemplateListQuerySchema = z
+  .object({
+    categoryKey: chungTuPdfCategoryKeySchema,
+    includeNonPublished: chungTuBooleanQueryFlagSchema,
+    includeInactive: chungTuBooleanQueryFlagSchema,
+  })
+  .transform(({ categoryKey, includeNonPublished, includeInactive }) => ({
+    categoryKey,
+    includeNonPublished: Boolean(includeNonPublished || includeInactive),
+  }));
 
 const chungTuPdfTemplateIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),

@@ -21,6 +21,7 @@ const {
   parseWorkbook,
   planPagination,
   previewTemplatePdf,
+  previewTemplatePdfResponse,
   publishTemplate,
   renderDocumentPdf,
   renderToDocumentFolder,
@@ -276,6 +277,29 @@ test("previewTemplatePdf returns a Buffer", async () => {
     const result = await previewTemplatePdf(3);
     assert.ok(Buffer.isBuffer(result));
     assert.deepEqual(result, Buffer.from(bytes));
+  } finally {
+    restore();
+  }
+});
+
+test("previewTemplatePdfResponse returns the upstream Response", async () => {
+  const bytes = Uint8Array.from([37, 80, 68, 70]);
+  const restore = mockFetch(async (url) => {
+    assert.equal(url.toString(), "http://document.test/v1/templates/3/preview");
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": 'inline; filename="preview-3.pdf"',
+      },
+    });
+  });
+  try {
+    const result = await previewTemplatePdfResponse(3);
+    assert.ok(result instanceof Response);
+    assert.equal(result.headers.get("content-type"), "application/pdf");
+    assert.equal(result.headers.get("content-disposition"), 'inline; filename="preview-3.pdf"');
+    assert.deepEqual(Buffer.from(await result.arrayBuffer()), Buffer.from(bytes));
   } finally {
     restore();
   }

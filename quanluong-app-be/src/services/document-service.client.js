@@ -143,8 +143,12 @@ async function getTemplate(templateId) {
   return readJsonResponse(response);
 }
 
+async function previewTemplatePdfResponse(templateId) {
+  return requestDocument(`/v1/templates/${templateId}/preview`);
+}
+
 async function previewTemplatePdf(templateId) {
-  const response = await requestDocument(`/v1/templates/${templateId}/preview`);
+  const response = await previewTemplatePdfResponse(templateId);
   return Buffer.from(await response.arrayBuffer());
 }
 
@@ -321,6 +325,7 @@ export {
   parseWorkbook,
   planPagination,
   previewTemplatePdf,
+  previewTemplatePdfResponse,
   publishTemplate,
   renderDocumentPdf,
   renderStoredDocumentPdf,

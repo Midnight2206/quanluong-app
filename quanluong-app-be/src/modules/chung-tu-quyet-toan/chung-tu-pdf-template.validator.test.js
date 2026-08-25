@@ -11,8 +11,33 @@ import {
 test("chungTuPdfTemplateListQuerySchema requires a trimmed category key", () => {
   assert.deepEqual(chungTuPdfTemplateListQuerySchema.parse({ categoryKey: " phieu-nhap-kho " }), {
     categoryKey: "phieu-nhap-kho",
+    includeNonPublished: false,
   });
   assert.throws(() => chungTuPdfTemplateListQuerySchema.parse({ categoryKey: "   " }));
+});
+
+test("chungTuPdfTemplateListQuerySchema accepts includeInactive as legacy alias", () => {
+  assert.deepEqual(
+    chungTuPdfTemplateListQuerySchema.parse({
+      categoryKey: " phieu-nhap-kho ",
+      includeInactive: "1",
+    }),
+    {
+      categoryKey: "phieu-nhap-kho",
+      includeNonPublished: true,
+    },
+  );
+  assert.deepEqual(
+    chungTuPdfTemplateListQuerySchema.parse({
+      categoryKey: "phieu-nhap-kho",
+      includeNonPublished: false,
+      includeInactive: true,
+    }),
+    {
+      categoryKey: "phieu-nhap-kho",
+      includeNonPublished: true,
+    },
+  );
 });
 
 test("chungTuPdfTemplateIdParamSchema coerces numeric ids", () => {

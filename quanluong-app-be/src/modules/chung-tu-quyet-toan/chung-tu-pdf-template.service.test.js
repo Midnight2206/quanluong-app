@@ -12,7 +12,13 @@ const uploadTemplate = mock.fn(async ({ buffer, name, version }) => ({
   bufferLength: buffer?.length ?? 0,
 }));
 
-const previewTemplatePdf = mock.fn(async (templateId) => Buffer.from(`preview-${templateId}`));
+const previewTemplatePdfResponse = mock.fn(
+  async (templateId) =>
+    new Response(`preview-${templateId}`, {
+      status: 200,
+      headers: { "content-type": "application/pdf" },
+    }),
+);
 const publishTemplate = mock.fn(async (templateId) => ({ id: templateId, status: "published" }));
 const retireTemplate = mock.fn(async (templateId) => ({ id: templateId, status: "retired" }));
 const getTemplateFields = mock.fn(async (templateId) => [
@@ -27,7 +33,7 @@ const prismaUpdate = mock.fn(async ({ where, data }) => ({ id: where.id, ...data
 mock.module("../../services/document-service.client.js", {
   exports: {
     getTemplateFields,
-    previewTemplatePdf,
+    previewTemplatePdfResponse,
     publishTemplate,
     retireTemplate,
     uploadTemplate,
@@ -60,7 +66,7 @@ const {
 
 test.beforeEach(() => {
   uploadTemplate.mock.resetCalls();
-  previewTemplatePdf.mock.resetCalls();
+  previewTemplatePdfResponse.mock.resetCalls();
   publishTemplate.mock.resetCalls();
   retireTemplate.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
@@ -219,7 +225,7 @@ test("getChungTuPdfTemplateFields loads fields from document service", async () 
   });
 });
 
-test("previewChungTuPdfTemplate returns preview buffer for existing row", async () => {
+test("previewChungTuPdfTemplate returns upstream response for existing row", async () => {
   prismaFindUnique.mock.mockImplementation(async () => ({
     id: 8,
     status: "retired",
@@ -228,10 +234,11 @@ test("previewChungTuPdfTemplate returns preview buffer for existing row", async 
 
   const result = await previewChungTuPdfTemplate({ id: 8 });
 
-  assert.equal(previewTemplatePdf.mock.callCount(), 1);
-  assert.deepEqual(previewTemplatePdf.mock.calls[0].arguments, [123]);
-  assert.ok(Buffer.isBuffer(result));
-  assert.equal(result.toString(), "preview-123");
+  assert.equal(previewTemplatePdfResponse.mock.callCount(), 1);
+  assert.deepEqual(previewTemplatePdfResponse.mock.calls[0].arguments, [123]);
+  assert.equal(result.fallbackContentDisposition, 'inline; filename="preview-123.pdf"');
+  assert.equal(result.upstreamResponse.headers.get("content-type"), "application/pdf");
+  assert.equal(await result.upstreamResponse.text(), "preview-123");
 });
 
 test("unsupported categoryKey throws validation AppError", async () => {

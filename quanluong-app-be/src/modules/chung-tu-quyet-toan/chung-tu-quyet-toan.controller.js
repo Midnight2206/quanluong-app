@@ -186,7 +186,9 @@ function isSuperadminUser(user) {
 }
 
 async function listChungTuPdfTemplatesController(req, res) {
-  const wantNonPublished = Boolean(req.validatedQuery.includeNonPublished);
+  const wantNonPublished = Boolean(
+    req.validatedQuery.includeNonPublished || req.validatedQuery.includeInactive,
+  );
   const includeNonPublished = wantNonPublished && isSuperadminUser(req.user);
   const items = await listChungTuPdfTemplates({
     categoryKey: req.validatedQuery.categoryKey,
@@ -396,11 +398,13 @@ async function getChungTuPdfTemplateFieldsController(req, res) {
 }
 
 async function previewChungTuPdfTemplateController(req, res) {
-  const buffer = await previewChungTuPdfTemplate({
+  const { upstreamResponse, fallbackContentDisposition } = await previewChungTuPdfTemplate({
     id: req.validatedParams.id,
   });
-  res.setHeader("Content-Type", "application/pdf");
-  return res.send(buffer);
+  if (!upstreamResponse.headers.get("content-disposition")) {
+    res.setHeader("Content-Disposition", fallbackContentDisposition);
+  }
+  await pipeDocumentServiceResponse(res, upstreamResponse, "application/pdf");
 }
 
 async function listTemplateCatalogManageController(req, res) {
