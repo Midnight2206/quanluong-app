@@ -12,17 +12,26 @@ const uploadTemplate = mock.fn(async ({ buffer, name, version }) => ({
   bufferLength: buffer?.length ?? 0,
 }));
 
+const previewTemplatePdf = mock.fn(async (templateId) => Buffer.from(`preview-${templateId}`));
+const publishTemplate = mock.fn(async (templateId) => ({ id: templateId, status: "published" }));
+const retireTemplate = mock.fn(async (templateId) => ({ id: templateId, status: "retired" }));
 const getTemplateFields = mock.fn(async (templateId) => [
   { key: "don_vi", label: "Đơn vị", templateId },
 ]);
 
 const prismaFindMany = mock.fn(async () => []);
-const prismaCreate = mock.fn(async ({ data }) => ({ id: 1, isActive: true, ...data }));
+const prismaCreate = mock.fn(async ({ data }) => ({ id: 1, status: "draft", ...data }));
 const prismaFindUnique = mock.fn(async () => null);
-const prismaUpdate = mock.fn(async ({ where, data }) => ({ id: where.id, isActive: false, ...data }));
+const prismaUpdate = mock.fn(async ({ where, data }) => ({ id: where.id, ...data }));
 
 mock.module("../../services/document-service.client.js", {
-  exports: { getTemplateFields, uploadTemplate },
+  exports: {
+    getTemplateFields,
+    previewTemplatePdf,
+    publishTemplate,
+    retireTemplate,
+    uploadTemplate,
+  },
 });
 
 mock.module("../../infra/database/prisma/prisma.client.js", {
@@ -42,13 +51,18 @@ const { AppError } = await import("../../errors/app-error.js");
 const { ERROR_CODES } = await import("../../errors/error-codes.js");
 const {
   createChungTuPdfTemplate,
-  deactivateChungTuPdfTemplate,
   getChungTuPdfTemplateFields,
   listChungTuPdfTemplates,
+  previewChungTuPdfTemplate,
+  publishChungTuPdfTemplate,
+  retireChungTuPdfTemplate,
 } = await import("./chung-tu-pdf-template.service.js");
 
 test.beforeEach(() => {
   uploadTemplate.mock.resetCalls();
+  previewTemplatePdf.mock.resetCalls();
+  publishTemplate.mock.resetCalls();
+  retireTemplate.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
   prismaFindMany.mock.resetCalls();
   prismaCreate.mock.resetCalls();
@@ -56,8 +70,31 @@ test.beforeEach(() => {
   prismaUpdate.mock.resetCalls();
 });
 
-test("listChungTuPdfTemplates filters by categoryKey and isActive", async () => {
-  const rows = [{ id: 9, categoryKey: "phieu-nhap-kho", isActive: true }];
+test("listChungTuPdfTemplates includeNonPublished omits status filter", async () => {
+  prismaFindMany.mock.resetCalls();
+  await listChungTuPdfTemplates({
+    categoryKey: "bang-ke-mua-hang",
+    includeNonPublished: true,
+  });
+  const call = prismaFindMany.mock.calls[0].arguments[0];
+  assert.equal(call.where.categoryKey, "bang-ke-mua-hang");
+  assert.equal(Object.prototype.hasOwnProperty.call(call.where, "status"), false);
+});
+
+test("getChungTuPdfTemplateFields allowNonPublished returns retired row fields", async () => {
+  prismaFindUnique.mock.mockImplementation(async () => ({
+    id: 3,
+    status: "retired",
+    documentServiceTemplateId: 42,
+  }));
+  getTemplateFields.mock.resetCalls();
+  const result = await getChungTuPdfTemplateFields({ id: 3, allowNonPublished: true });
+  assert.equal(result.template.id, 3);
+  assert.equal(getTemplateFields.mock.callCount(), 1);
+});
+
+test("listChungTuPdfTemplates filters by categoryKey and published status", async () => {
+  const rows = [{ id: 9, categoryKey: "phieu-nhap-kho", status: "published" }];
   prismaFindMany.mock.mockImplementation(async () => rows);
 
   const result = await listChungTuPdfTemplates({ categoryKey: " phieu-nhap-kho " });
@@ -65,7 +102,7 @@ test("listChungTuPdfTemplates filters by categoryKey and isActive", async () => 
   assert.deepEqual(result, rows);
   assert.equal(prismaFindMany.mock.callCount(), 1);
   assert.deepEqual(prismaFindMany.mock.calls[0].arguments[0], {
-    where: { categoryKey: "phieu-nhap-kho", isActive: true },
+    where: { categoryKey: "phieu-nhap-kho", status: "published" },
     orderBy: [{ updatedAt: "desc" }],
   });
 });
@@ -80,7 +117,7 @@ test("createChungTuPdfTemplate uploads then persists document-service template i
     name: "bien-ban-a",
     version: "v1",
     uploadedById: 3,
-    isActive: true,
+    status: "draft",
   };
   prismaCreate.mock.mockImplementation(async () => created);
 
@@ -113,33 +150,60 @@ test("createChungTuPdfTemplate uploads then persists document-service template i
   assert.deepEqual(result, created);
 });
 
-test("deactivateChungTuPdfTemplate soft-deletes active row", async () => {
+test("publishChungTuPdfTemplate publishes draft row in document service and prisma", async () => {
   const row = {
     id: 5,
-    isActive: true,
+    status: "draft",
     documentServiceTemplateId: 11,
     categoryKey: "phieu-xuat-kho",
   };
-  const deactivated = { ...row, isActive: false };
+  const published = { ...row, status: "published" };
   prismaFindUnique.mock.mockImplementation(async () => row);
-  prismaUpdate.mock.mockImplementation(async () => deactivated);
+  prismaUpdate.mock.mockImplementation(async () => published);
 
-  const result = await deactivateChungTuPdfTemplate({ id: "5" });
+  const result = await publishChungTuPdfTemplate({ id: "5" });
 
   assert.equal(prismaFindUnique.mock.callCount(), 1);
   assert.deepEqual(prismaFindUnique.mock.calls[0].arguments[0], { where: { id: 5 } });
+  assert.equal(publishTemplate.mock.callCount(), 1);
+  assert.deepEqual(publishTemplate.mock.calls[0].arguments, [11]);
   assert.equal(prismaUpdate.mock.callCount(), 1);
   assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
     where: { id: 5 },
-    data: { isActive: false },
+    data: { status: "published" },
   });
-  assert.deepEqual(result, deactivated);
+  assert.deepEqual(result, published);
+});
+
+test("retireChungTuPdfTemplate retires published row in document service and prisma", async () => {
+  const row = {
+    id: 6,
+    status: "published",
+    documentServiceTemplateId: 12,
+    categoryKey: "phieu-xuat-kho",
+  };
+  const retired = { ...row, status: "retired" };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  prismaUpdate.mock.mockImplementation(async () => retired);
+
+  const result = await retireChungTuPdfTemplate({ id: "6" });
+
+  assert.equal(prismaFindUnique.mock.callCount(), 1);
+  assert.deepEqual(prismaFindUnique.mock.calls[0].arguments[0], { where: { id: 6 } });
+  assert.equal(retireTemplate.mock.callCount(), 1);
+  assert.deepEqual(retireTemplate.mock.calls[0].arguments, [12]);
+  assert.equal(prismaUpdate.mock.callCount(), 1);
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 6 },
+    data: { status: "retired" },
+  });
+  assert.deepEqual(result, retired);
 });
 
 test("getChungTuPdfTemplateFields loads fields from document service", async () => {
   const row = {
     id: 2,
-    isActive: true,
+    status: "published",
     documentServiceTemplateId: 99,
     categoryKey: "phieu-nhap-kho",
   };
@@ -153,6 +217,21 @@ test("getChungTuPdfTemplateFields loads fields from document service", async () 
     template: row,
     fields: [{ key: "don_vi", label: "Đơn vị", templateId: 99 }],
   });
+});
+
+test("previewChungTuPdfTemplate returns preview buffer for existing row", async () => {
+  prismaFindUnique.mock.mockImplementation(async () => ({
+    id: 8,
+    status: "retired",
+    documentServiceTemplateId: 123,
+  }));
+
+  const result = await previewChungTuPdfTemplate({ id: 8 });
+
+  assert.equal(previewTemplatePdf.mock.callCount(), 1);
+  assert.deepEqual(previewTemplatePdf.mock.calls[0].arguments, [123]);
+  assert.ok(Buffer.isBuffer(result));
+  assert.equal(result.toString(), "preview-123");
 });
 
 test("unsupported categoryKey throws validation AppError", async () => {

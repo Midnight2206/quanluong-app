@@ -3,6 +3,9 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
   getTemplateFields,
+  previewTemplatePdf,
+  publishTemplate,
+  retireTemplate,
   uploadTemplate,
 } from "../../services/document-service.client.js";
 import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
@@ -36,13 +39,21 @@ function resolveDocumentServiceTemplateId(uploaded) {
   return templateId;
 }
 
-async function listChungTuPdfTemplates({ categoryKey }) {
+function notFoundError() {
+  return new AppError({
+    message: "Không tìm thấy mẫu PDF.",
+    statusCode: 404,
+    code: ERROR_CODES.NOT_FOUND,
+  });
+}
+
+async function listChungTuPdfTemplates({ categoryKey, includeNonPublished = false }) {
   const normalizedCategoryKey = normalizeCategoryKey(categoryKey);
   assertSupportedPdfCategory(normalizedCategoryKey);
   return prisma.chungTuPdfTemplate.findMany({
     where: {
       categoryKey: normalizedCategoryKey,
-      isActive: true,
+      ...(includeNonPublished ? {} : { status: "published" }),
     },
     orderBy: [{ updatedAt: "desc" }],
   });
@@ -88,33 +99,54 @@ async function createChungTuPdfTemplate({
   }
 }
 
-async function deactivateChungTuPdfTemplate({ id }) {
+async function publishChungTuPdfTemplate({ id }) {
   const row = await prisma.chungTuPdfTemplate.findUnique({
     where: { id: Number(id) },
   });
-  if (!row || !row.isActive) {
+  if (!row) {
+    throw notFoundError();
+  }
+  if (row.status !== "draft") {
     throw new AppError({
-      message: "Không tìm thấy mẫu PDF.",
-      statusCode: 404,
-      code: ERROR_CODES.NOT_FOUND,
+      message: "Chỉ mẫu nháp mới publish được.",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
     });
   }
+  await publishTemplate(row.documentServiceTemplateId);
   return prisma.chungTuPdfTemplate.update({
     where: { id: row.id },
-    data: { isActive: false },
+    data: { status: "published" },
   });
 }
 
-async function getChungTuPdfTemplateFields({ id }) {
+async function retireChungTuPdfTemplate({ id }) {
   const row = await prisma.chungTuPdfTemplate.findUnique({
     where: { id: Number(id) },
   });
-  if (!row || !row.isActive) {
+  if (!row) {
+    throw notFoundError();
+  }
+  if (row.status !== "draft" && row.status !== "published") {
     throw new AppError({
-      message: "Không tìm thấy mẫu PDF.",
-      statusCode: 404,
-      code: ERROR_CODES.NOT_FOUND,
+      message: "Chỉ mẫu nháp hoặc đã publish mới retire được.",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
     });
+  }
+  await retireTemplate(row.documentServiceTemplateId);
+  return prisma.chungTuPdfTemplate.update({
+    where: { id: row.id },
+    data: { status: "retired" },
+  });
+}
+
+async function getChungTuPdfTemplateFields({ id, allowNonPublished = false }) {
+  const row = await prisma.chungTuPdfTemplate.findUnique({
+    where: { id: Number(id) },
+  });
+  if (!row || (row.status !== "published" && !allowNonPublished)) {
+    throw notFoundError();
   }
   const fields = await getTemplateFields(row.documentServiceTemplateId);
   return {
@@ -123,9 +155,21 @@ async function getChungTuPdfTemplateFields({ id }) {
   };
 }
 
+async function previewChungTuPdfTemplate({ id }) {
+  const row = await prisma.chungTuPdfTemplate.findUnique({
+    where: { id: Number(id) },
+  });
+  if (!row) {
+    throw notFoundError();
+  }
+  return previewTemplatePdf(row.documentServiceTemplateId);
+}
+
 export {
   createChungTuPdfTemplate,
-  deactivateChungTuPdfTemplate,
   getChungTuPdfTemplateFields,
   listChungTuPdfTemplates,
+  previewChungTuPdfTemplate,
+  publishChungTuPdfTemplate,
+  retireChungTuPdfTemplate,
 };

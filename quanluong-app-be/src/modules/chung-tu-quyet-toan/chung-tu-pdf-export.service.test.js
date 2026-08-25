@@ -98,7 +98,7 @@ test("createChungTuPdfExport renders document-service PDF, stores file, and retu
     categoryKey: "bang-ke-mua-hang",
     displayName: "BKMH A",
     documentServiceTemplateId: 901,
-    isActive: true,
+    status: "published",
   }));
 
   const randomBytesMock = mock.method(crypto, "randomBytes", () => Buffer.from("abcdef123456", "hex"));
@@ -120,7 +120,7 @@ test("createChungTuPdfExport renders document-service PDF, stores file, and retu
     assert.deepEqual(prismaTemplateFindFirst.mock.calls[0].arguments[0], {
       where: {
         id: 15,
-        isActive: true,
+        status: "published",
         categoryKey: "bang-ke-mua-hang",
       },
     });

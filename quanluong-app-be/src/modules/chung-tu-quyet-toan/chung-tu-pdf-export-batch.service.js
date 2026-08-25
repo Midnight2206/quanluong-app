@@ -177,7 +177,7 @@ async function createChungTuPdfExportBatch({
   const template = await prisma.chungTuPdfTemplate.findFirst({
     where: {
       id: Number(pdfTemplateId),
-      isActive: true,
+      status: "published",
       categoryKey,
     },
   });

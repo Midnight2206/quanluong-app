@@ -174,7 +174,7 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
     categoryKey: "bang-ke-mua-hang",
     displayName: "BKMH A",
     documentServiceTemplateId: 901,
-    isActive: true,
+    status: "published",
   }));
   prismaSignatureSettingsFindUnique.mock.mockImplementation(async () => ({
     id: 5,
@@ -204,6 +204,14 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
       effectiveUnitIds: [9, 10, 11],
     });
 
+    assert.equal(prismaTemplateFindFirst.mock.callCount(), 1);
+    assert.deepEqual(prismaTemplateFindFirst.mock.calls[0].arguments[0], {
+      where: {
+        id: 15,
+        status: "published",
+        categoryKey: "bang-ke-mua-hang",
+      },
+    });
     assert.equal(createDocumentFolder.mock.callCount(), 1);
     assert.equal(renderToDocumentFolder.mock.callCount(), 2);
     assert.deepEqual(
