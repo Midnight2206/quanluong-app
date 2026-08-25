@@ -283,14 +283,14 @@ model ChungTuPdfTemplate {
   documentServiceTemplateId  Int
   name                       String   @db.VarChar(120)
   version                    String   @db.VarChar(64)
-  isActive                   Boolean  @default(true)
+  status                     String   @default("draft") @db.VarChar(20)
   uploadedById               Int
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
   uploadedBy                 User     @relation("ChungTuPdfTemplateUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
 
   @@unique([categoryKey, documentServiceTemplateId])
-  @@index([categoryKey, isActive])
+  @@index([categoryKey, status])
 }
 
 /// Lô xuất PDF chứng từ (folder trên document-service + metadata file con).
