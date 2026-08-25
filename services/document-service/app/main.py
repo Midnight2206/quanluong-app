@@ -69,6 +69,7 @@ def _template_item(template: Template) -> dict:
         "margin_right": template.margin_right,
         "margin_bottom": template.margin_bottom,
         "margin_left": template.margin_left,
+        "status": template.status,
         "created_at": template.created_at,
     }
 

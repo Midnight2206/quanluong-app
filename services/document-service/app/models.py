@@ -36,6 +36,9 @@ class Template(Base):
     margin_right: Mapped[float] = mapped_column(Float, nullable=False)
     margin_bottom: Mapped[float] = mapped_column(Float, nullable=False)
     margin_left: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="draft", server_default="draft"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
