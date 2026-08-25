@@ -16,11 +16,11 @@ test("chungTuPdfTemplateListQuerySchema requires a trimmed category key", () => 
   assert.throws(() => chungTuPdfTemplateListQuerySchema.parse({ categoryKey: "   " }));
 });
 
-test("chungTuPdfTemplateListQuerySchema accepts includeInactive as legacy alias", () => {
+test("chungTuPdfTemplateListQuerySchema normalizes includeNonPublished", () => {
   assert.deepEqual(
     chungTuPdfTemplateListQuerySchema.parse({
       categoryKey: " phieu-nhap-kho ",
-      includeInactive: "1",
+      includeNonPublished: "1",
     }),
     {
       categoryKey: "phieu-nhap-kho",
@@ -31,11 +31,10 @@ test("chungTuPdfTemplateListQuerySchema accepts includeInactive as legacy alias"
     chungTuPdfTemplateListQuerySchema.parse({
       categoryKey: "phieu-nhap-kho",
       includeNonPublished: false,
-      includeInactive: true,
     }),
     {
       categoryKey: "phieu-nhap-kho",
-      includeNonPublished: true,
+      includeNonPublished: false,
     },
   );
 });

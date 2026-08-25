@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, FileUp, Loader2 } from "lucide-react";
+import { BookOpen, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
@@ -20,7 +20,6 @@ import {
   useChungTuPdfTemplateFieldsQuery,
   useChungTuPdfTemplatesQuery,
   useCreateChungTuPdfExportBatchMutation,
-  useUploadChungTuPdfTemplateMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { CHUNG_TU_EXPORT_KIND } from "@/pages/chungTuQuyetToan/chungTuCategoryConfig";
 import {
@@ -163,9 +162,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const [selectedDataUnitIds, setSelectedDataUnitIds] = useState([]);
   const [aggregationMode, setAggregationMode] = useState(CHUNG_TU_AGGREGATION_MODES.BY_DAY);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploadDisplayName, setUploadDisplayName] = useState("");
-  const [uploadVersion, setUploadVersion] = useState("1");
   const [signatures, setSignatures] = useState({});
   const [signatureDates, setSignatureDates] = useState({});
   const [previewInfo, setPreviewInfo] = useState(null);
@@ -213,9 +209,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   useEffect(() => {
     setWizardStep(0);
     setSelectedTemplateId("");
-    setUploadFile(null);
-    setUploadDisplayName("");
-    setUploadVersion("1");
     setSignatures({});
     setSignatureDates({});
     setPreviewInfo(null);
@@ -314,7 +307,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
   const [createPdfExportBatch, { isLoading: creating }] = useCreateChungTuPdfExportBatchMutation();
   const [previewCtx, { isLoading: previewing }] = useChungTuContextPreviewMutation();
-  const [uploadTemplate, { isLoading: uploadingTemplate }] = useUploadChungTuPdfTemplateMutation();
 
   const buildPayloadBase = useCallback(() => {
     const base = { categoryKey, unitId: effectiveUnitId };
@@ -349,32 +341,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     periodDate,
     issueSlipId,
   ]);
-
-  const handleUploadTemplate = async () => {
-    if (!uploadFile) {
-      notifyError("Chọn file mẫu .xlsx trước khi tải lên.");
-      return;
-    }
-    const baseName = uploadFile.name.replace(/\.[^.]+$/, "").trim();
-    const displayName = uploadDisplayName.trim() || baseName || "Mẫu PDF";
-    const version = uploadVersion.trim() || "1";
-    try {
-      const template = await uploadTemplate({
-        file: uploadFile,
-        categoryKey,
-        displayName,
-        name: displayName,
-        version,
-      }).unwrap();
-      if (template?.id != null) {
-        setSelectedTemplateId(String(template.id));
-      }
-      setUploadFile(null);
-      notifySuccess(`Đã tải mẫu PDF "${displayName}".`);
-    } catch (e) {
-      notifyError(e?.data?.message || e?.message || "Không tải được mẫu PDF.");
-    }
-  };
 
   const handlePreview = async () => {
     if (!selectedTemplate) {
@@ -446,7 +412,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     }
   };
 
-  const busy = creating || previewing || uploadingTemplate;
+  const busy = creating || previewing;
   const canRun =
     Boolean(selectedTemplate) &&
     (isMonthly
@@ -717,6 +683,12 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         </select>
       </label>
 
+      {!templatesLoading && templates.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+          Chưa có mẫu PDF do quản trị hệ thống cấu hình. Liên hệ Superadmin để tải mẫu lên.
+        </p>
+      ) : null}
+
       {selectedTemplate ? (
         <p className="rounded-lg bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
           Đã chọn: <span className="font-medium text-foreground">{getTemplateLabel(selectedTemplate)}</span>
@@ -799,82 +771,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
               )}
             </div>
           )}
-        </div>
-      ) : null}
-
-      {canWrite ? (
-        <div className="space-y-3 rounded-xl border border-dashed border-border/70 bg-muted/10 p-3">
-          <div className="space-y-1">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
-              Tải mẫu .xlsx mới
-            </p>
-            <p className="text-[10px] leading-relaxed text-muted-foreground">
-              Dùng file Excel đã chuẩn Named Ranges của document-service để thêm mẫu PDF cho tab này.
-            </p>
-          </div>
-
-          <label className="block space-y-1" htmlFor={`ct-template-file-${categoryKey}`}>
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-              File mẫu
-            </span>
-            <input
-              id={`ct-template-file-${categoryKey}`}
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className={fieldClass}
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                setUploadFile(file);
-                if (file) {
-                  setUploadDisplayName(file.name.replace(/\.[^.]+$/, ""));
-                }
-              }}
-            />
-          </label>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-1" htmlFor={`ct-template-name-${categoryKey}`}>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-                Tên hiển thị
-              </span>
-              <input
-                id={`ct-template-name-${categoryKey}`}
-                className={fieldClass}
-                value={uploadDisplayName}
-                onChange={(e) => setUploadDisplayName(e.target.value)}
-                placeholder="Ví dụ: BKMH C34"
-              />
-            </label>
-
-            <label className="block space-y-1" htmlFor={`ct-template-version-${categoryKey}`}>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-                Phiên bản
-              </span>
-              <input
-                id={`ct-template-version-${categoryKey}`}
-                className={fieldClass}
-                value={uploadVersion}
-                onChange={(e) => setUploadVersion(e.target.value)}
-                placeholder="1"
-              />
-            </label>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-10 w-full gap-1.5 text-xs sm:w-auto"
-            disabled={uploadingTemplate || !uploadFile}
-            onClick={handleUploadTemplate}
-          >
-            {uploadingTemplate ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FileUp className="mr-1.5 h-3.5 w-3.5" />
-            )}
-            Tải mẫu Excel
-          </Button>
         </div>
       ) : null}
 

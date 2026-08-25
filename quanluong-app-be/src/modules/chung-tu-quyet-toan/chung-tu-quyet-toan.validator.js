@@ -39,11 +39,10 @@ const chungTuPdfTemplateListQuerySchema = z
   .object({
     categoryKey: chungTuPdfCategoryKeySchema,
     includeNonPublished: chungTuBooleanQueryFlagSchema,
-    includeInactive: chungTuBooleanQueryFlagSchema,
   })
-  .transform(({ categoryKey, includeNonPublished, includeInactive }) => ({
+  .transform(({ categoryKey, includeNonPublished }) => ({
     categoryKey,
-    includeNonPublished: Boolean(includeNonPublished || includeInactive),
+    includeNonPublished: Boolean(includeNonPublished),
   }));
 
 const chungTuPdfTemplateIdParamSchema = z.object({

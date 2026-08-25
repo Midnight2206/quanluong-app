@@ -186,9 +186,7 @@ function isSuperadminUser(user) {
 }
 
 async function listChungTuPdfTemplatesController(req, res) {
-  const wantNonPublished = Boolean(
-    req.validatedQuery.includeNonPublished || req.validatedQuery.includeInactive,
-  );
+  const wantNonPublished = Boolean(req.validatedQuery.includeNonPublished);
   const includeNonPublished = wantNonPublished && isSuperadminUser(req.user);
   const items = await listChungTuPdfTemplates({
     categoryKey: req.validatedQuery.categoryKey,

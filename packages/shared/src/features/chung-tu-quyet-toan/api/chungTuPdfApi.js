@@ -38,9 +38,9 @@ function invalidateChungTuSignatureSettings(qc, categoryKey) {
 }
 
 export function useChungTuPdfTemplatesQuery(categoryKey, options = {}) {
-  const { skip, includeNonPublished, includeInactive, ...rest } = options;
+  const { skip, includeNonPublished, ...rest } = options;
   const key = normalizeCategoryKey(categoryKey);
-  const wantNonPublished = Boolean(includeNonPublished ?? includeInactive ?? false);
+  const wantNonPublished = Boolean(includeNonPublished);
   return useQuery({
     queryKey: qk.chungTuQuyetToan.pdfTemplates(key, wantNonPublished ? "all" : "published"),
     queryFn: () =>
