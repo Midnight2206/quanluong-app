@@ -20,7 +20,6 @@ import {
   createChungTuPdfTemplateController,
   createChungTuPdfExportController,
   createChungTuDocumentController,
-  deactivateChungTuPdfTemplateController,
   createTemplateCatalogController,
   deleteChungTuDocumentController,
   deleteChungTuPdfExportBatchController,
@@ -43,6 +42,7 @@ import {
   listChungTuDocumentsController,
   listBkmhSnapshotsController,
   listDriveTemplatesController,
+  previewChungTuPdfTemplateController,
   listSpreadsheetNamedRangesController,
   listSpreadsheetNamedRangesSuperadminController,
   listTemplateCatalogController,
@@ -51,10 +51,12 @@ import {
   getTemplateTreeFileMetaController,
   patchTemplateCatalogController,
   previewChungTuContextController,
+  publishChungTuPdfTemplateController,
   putCategoryTemplateFillMappingController,
   putChungTuSignatureSettingsController,
   putChungTuUnitProfileController,
   putTemplateFillRulesController,
+  retireChungTuPdfTemplateController,
   streamChungTuPdfExportBatchFileController,
   streamChungTuPdfExportBatchMergedPdfController,
   streamChungTuPdfExportBatchZipController,
@@ -236,7 +238,7 @@ chungTuQuyetToanRouter.get(
 
 chungTuQuyetToanRouter.post(
   "/pdf-templates",
-  permissionMiddleware([routePermissions.pdfTemplateCreate]),
+  superadminMiddleware,
   driveImportMulterMiddleware,
   validateRequest({ body: chungTuPdfTemplateUploadBodySchema }),
   asyncHandler(createChungTuPdfTemplateController),
@@ -244,9 +246,30 @@ chungTuQuyetToanRouter.post(
 
 chungTuQuyetToanRouter.delete(
   "/pdf-templates/:id",
-  permissionMiddleware([routePermissions.pdfTemplateDelete]),
+  superadminMiddleware,
   validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
-  asyncHandler(deactivateChungTuPdfTemplateController),
+  asyncHandler(retireChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-templates/:id/preview",
+  superadminMiddleware,
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(previewChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-templates/:id/publish",
+  superadminMiddleware,
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(publishChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-templates/:id/retire",
+  superadminMiddleware,
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(retireChungTuPdfTemplateController),
 );
 
 chungTuQuyetToanRouter.get(

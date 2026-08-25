@@ -57,9 +57,11 @@ import {
 } from "./chung-tu-template-fill-config.service.js";
 import {
   createChungTuPdfTemplate,
-  deactivateChungTuPdfTemplate,
   getChungTuPdfTemplateFields,
   listChungTuPdfTemplates,
+  previewChungTuPdfTemplate,
+  publishChungTuPdfTemplate,
+  retireChungTuPdfTemplate,
 } from "./chung-tu-pdf-template.service.js";
 import {
   getChungTuSignatureSettings,
@@ -179,12 +181,19 @@ async function listTemplateCatalogController(req, res) {
   });
 }
 
+function isSuperadminUser(user) {
+  return user?.type?.name === "superadmin";
+}
+
 async function listChungTuPdfTemplatesController(req, res) {
+  const wantNonPublished = Boolean(req.validatedQuery.includeNonPublished);
+  const includeNonPublished = wantNonPublished && isSuperadminUser(req.user);
   const items = await listChungTuPdfTemplates({
     categoryKey: req.validatedQuery.categoryKey,
+    includeNonPublished,
   });
   return respondSuccess(res, {
-    message: "Danh sách mẫu PDF chứng từ đang hoạt động.",
+    message: "Danh sách mẫu PDF chứng từ.",
     data: { items },
   });
 }
@@ -355,12 +364,22 @@ async function deleteChungTuPdfExportController(req, res) {
   });
 }
 
-async function deactivateChungTuPdfTemplateController(req, res) {
-  const data = await deactivateChungTuPdfTemplate({
+async function publishChungTuPdfTemplateController(req, res) {
+  const data = await publishChungTuPdfTemplate({
     id: req.validatedParams.id,
   });
   return respondSuccess(res, {
-    message: "Đã ngừng kích hoạt mẫu PDF.",
+    message: "Đã publish mẫu PDF.",
+    data,
+  });
+}
+
+async function retireChungTuPdfTemplateController(req, res) {
+  const data = await retireChungTuPdfTemplate({
+    id: req.validatedParams.id,
+  });
+  return respondSuccess(res, {
+    message: "Đã retire mẫu PDF.",
     data,
   });
 }
@@ -368,11 +387,20 @@ async function deactivateChungTuPdfTemplateController(req, res) {
 async function getChungTuPdfTemplateFieldsController(req, res) {
   const data = await getChungTuPdfTemplateFields({
     id: req.validatedParams.id,
+    allowNonPublished: isSuperadminUser(req.user),
   });
   return respondSuccess(res, {
-    message: "Schema field của mẫu PDF.",
+    message: "Schema mẫu PDF.",
     data,
   });
+}
+
+async function previewChungTuPdfTemplateController(req, res) {
+  const buffer = await previewChungTuPdfTemplate({
+    id: req.validatedParams.id,
+  });
+  res.setHeader("Content-Type", "application/pdf");
+  return res.send(buffer);
 }
 
 async function listTemplateCatalogManageController(req, res) {
@@ -700,7 +728,6 @@ export {
   createChungTuPdfExportBatchController,
   createChungTuPdfExportController,
   createChungTuDocumentController,
-  deactivateChungTuPdfTemplateController,
   deleteChungTuDocumentController,
   deleteChungTuPdfExportBatchController,
   deleteChungTuPdfExportController,
@@ -723,6 +750,7 @@ export {
   listChungTuDocumentsController,
   listBkmhSnapshotsController,
   listDriveTemplatesController,
+  previewChungTuPdfTemplateController,
   listSpreadsheetNamedRangesController,
   listSpreadsheetNamedRangesSuperadminController,
   listTemplateCatalogController,
@@ -731,10 +759,12 @@ export {
   getTemplateTreeFileMetaController,
   patchTemplateCatalogController,
   previewChungTuContextController,
+  publishChungTuPdfTemplateController,
   putCategoryTemplateFillMappingController,
   putChungTuSignatureSettingsController,
   putChungTuUnitProfileController,
   putTemplateFillRulesController,
+  retireChungTuPdfTemplateController,
   streamChungTuPdfExportBatchFileController,
   streamChungTuPdfExportBatchMergedPdfController,
   streamChungTuPdfExportBatchZipController,

@@ -32,6 +32,10 @@ const chungTuPdfCategoryKeySchema = z.preprocess(
 
 const chungTuPdfTemplateListQuerySchema = z.object({
   categoryKey: chungTuPdfCategoryKeySchema,
+  includeNonPublished: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+    .optional()
+    .transform((v) => v === true || v === "true" || v === "1"),
 });
 
 const chungTuPdfTemplateIdParamSchema = z.object({

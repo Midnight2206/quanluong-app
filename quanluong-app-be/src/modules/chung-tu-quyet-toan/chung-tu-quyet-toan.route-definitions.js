@@ -108,7 +108,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     permission: {
       code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
-      description: "Tải mẫu PDF Excel lên Document service và lưu metadata.",
+      description: "Superadmin: tải mẫu PDF Excel lên Document service và lưu metadata.",
     },
   },
   {
@@ -120,7 +120,43 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     permission: {
       code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
-      description: "Ngừng kích hoạt mẫu PDF đã tải lên.",
+      description: "Superadmin: retire mẫu PDF đã tải lên (alias DELETE).",
+    },
+  },
+  {
+    key: "pdfTemplatePreview",
+    method: "GET",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/pdf-templates/:id/preview",
+    pathRoute: "/api/chungtuquyettoan/pdf-templates/:id/preview",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      name: "Chứng từ quyết toán",
+      description: "Superadmin: xem preview PDF của mẫu trên Document service.",
+    },
+  },
+  {
+    key: "pdfTemplatePublish",
+    method: "POST",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/pdf-templates/:id/publish",
+    pathRoute: "/api/chungtuquyettoan/pdf-templates/:id/publish",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      name: "Chứng từ quyết toán",
+      description: "Superadmin: publish mẫu PDF nháp.",
+    },
+  },
+  {
+    key: "pdfTemplateRetire",
+    method: "POST",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/pdf-templates/:id/retire",
+    pathRoute: "/api/chungtuquyettoan/pdf-templates/:id/retire",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      name: "Chứng từ quyết toán",
+      description: "Superadmin: retire mẫu PDF đã publish hoặc còn nháp.",
     },
   },
   {
