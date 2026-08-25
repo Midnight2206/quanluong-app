@@ -36,6 +36,12 @@ from app.parse import parse_xlsx
 from app.render.pdf_renderer import render_pdf
 from app.render.signature_block import default_signature_block, parse_signature_block_config
 from app.templates.placeholder_data import generate_placeholder_data
+from app.templates.status import (
+    TEMPLATE_STATUSES,
+    TemplateStatusError,
+    publish_template,
+    retire_template,
+)
 
 _template_errors = import_module("app.import.errors")
 import_template = import_module("app.import.template_service").import_template
@@ -130,13 +136,24 @@ def health():
 
 
 @app.get("/v1/templates")
-def list_templates(_: None = Depends(require_service_key)):
+def list_templates(
+    status: Optional[str] = Query(default=None), _: None = Depends(require_service_key)
+):
+    if status is not None and status not in TEMPLATE_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("BAD_REQUEST", "status không hợp lệ"),
+        )
+
     if not (os.environ.get("DOCUMENT_DATABASE_URL") or "").strip():
         return []
 
     try:
         with get_session() as session:
-            templates = session.scalars(select(Template).order_by(Template.id)).all()
+            query = select(Template).order_by(Template.id)
+            if status is not None:
+                query = query.where(Template.status == status)
+            templates = session.scalars(query).all()
     except (SQLAlchemyError, RuntimeError):
         raise _database_unavailable()
 
@@ -227,6 +244,46 @@ async def preview_template(template_id: int, _: None = Depends(require_service_k
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="preview-{template_id}.pdf"'},
     )
+
+
+@app.post("/v1/templates/{template_id}/publish")
+def publish_template_route(template_id: int, _: None = Depends(require_service_key)):
+    try:
+        with get_session() as session:
+            template = session.get(Template, template_id)
+            if template is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
+                )
+            payload = _template_item(publish_template(session, template))
+            session.commit()
+    except TemplateStatusError as exc:
+        raise HTTPException(status_code=409, detail=error_detail(exc.code, str(exc)))
+    except (SQLAlchemyError, RuntimeError):
+        raise _database_unavailable()
+
+    return payload
+
+
+@app.post("/v1/templates/{template_id}/retire")
+def retire_template_route(template_id: int, _: None = Depends(require_service_key)):
+    try:
+        with get_session() as session:
+            template = session.get(Template, template_id)
+            if template is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
+                )
+            payload = _template_item(retire_template(session, template))
+            session.commit()
+    except TemplateStatusError as exc:
+        raise HTTPException(status_code=409, detail=error_detail(exc.code, str(exc)))
+    except (SQLAlchemyError, RuntimeError):
+        raise _database_unavailable()
+
+    return payload
 
 
 class SignatureSlotBody(BaseModel):
