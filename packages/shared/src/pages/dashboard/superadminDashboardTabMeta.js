@@ -34,4 +34,9 @@ export const DASHBOARD_SUPERADMIN_TAB_META = [
     label: "Mức tiền ăn (Thông tư)",
     routeAccessKey: "dashboard-meal-allowance-rates",
   },
+  {
+    path: "chung-tu-pdf-templates",
+    label: "Mẫu chứng từ",
+    routeAccessKey: "dashboard-chung-tu-pdf-templates",
+  },
 ];

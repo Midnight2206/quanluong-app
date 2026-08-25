@@ -22,6 +22,7 @@ import { AdminPendingRegistrationsPanel } from "@/pages/dashboard/admin/AdminPen
 import { SuperadminPermissionMatrixPanel } from "@/pages/dashboard/superadmin/SuperadminPermissionMatrixPanel";
 import { SuperadminUnitsPanel } from "@/pages/dashboard/superadmin/SuperadminUnitsPanel";
 import { SuperadminMealAllowanceRatesPanel } from "@/pages/dashboard/superadmin/SuperadminMealAllowanceRatesPanel";
+import { SuperadminChungTuPdfTemplatesPanel } from "@/pages/dashboard/superadmin/SuperadminChungTuPdfTemplatesPanel";
 import { SuperadminUsersPanel } from "@/pages/dashboard/superadmin/SuperadminUsersPanel";
 import { cn } from "@/utils/cn";
 import { DASHBOARD_LTTP_SUB_PATHS } from "@/pages/dashboard/dashboardTabMeta";
@@ -140,6 +141,14 @@ export function DashboardMealAllowanceRatesPage() {
   return (
     <div className="min-w-0">
       <SuperadminMealAllowanceRatesPanel />
+    </div>
+  );
+}
+
+export function DashboardChungTuPdfTemplatesPage() {
+  return (
+    <div className="min-w-0">
+      <SuperadminChungTuPdfTemplatesPanel />
     </div>
   );
 }
