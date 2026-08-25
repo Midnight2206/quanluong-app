@@ -9,9 +9,10 @@ from pypdf import PdfWriter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Folder, FolderFile
+from app.models import Folder, FolderFile, Template
 from app.render.pdf_renderer import render_pdf
 from app.render.signature_block import parse_signature_block_config
+from app.templates.status import STATUS_PUBLISHED
 
 from .local_storage import (
     absolute_pdf_path,
@@ -32,6 +33,10 @@ class FolderFileNotFoundError(LookupError):
 
 
 class TemplateMetadataNotFoundError(LookupError):
+    pass
+
+
+class TemplateNotPublishedError(ValueError):
     pass
 
 
@@ -63,6 +68,15 @@ def _require_folder(session: Session, folder_id: int) -> Folder:
     if folder is None:
         raise FolderNotFoundError("Không tìm thấy folder")
     return folder
+
+
+def require_published_template(session: Session, template_id: int) -> Template | None:
+    template = session.get(Template, template_id)
+    if template is None:
+        return None
+    if template.status != STATUS_PUBLISHED:
+        raise TemplateNotPublishedError("Chỉ mẫu đã publish mới được render PDF")
+    return template
 
 
 def _folder_files(session: Session, folder_id: int) -> list[FolderFile]:
@@ -120,6 +134,7 @@ def add_folder_document(
     ):
         raise ValueError("Tên file đã tồn tại trong folder")
 
+    require_published_template(session, template_id)
     metadata = load_metadata_from_db(session, template_id)
     if metadata is None:
         raise TemplateMetadataNotFoundError("Không tìm thấy mẫu")
@@ -190,6 +205,7 @@ __all__ = [
     "FolderFileNotFoundError",
     "FolderNotFoundError",
     "TemplateMetadataNotFoundError",
+    "TemplateNotPublishedError",
     "add_folder_document",
     "build_merged_pdf",
     "build_zip",
@@ -197,4 +213,5 @@ __all__ = [
     "delete_folder",
     "get_folder",
     "get_folder_file",
+    "require_published_template",
 ]

@@ -53,6 +53,10 @@ def _create_document(template_id, *, fields=None, rows=None):
     )
 
 
+def _publish(template_id):
+    return client.post(f"/v1/templates/{template_id}/publish", headers=AUTH_HEADERS)
+
+
 def test_create_template_returns_201_and_persists_metadata(monkeypatch):
     engine = _database(monkeypatch)
 
@@ -266,6 +270,7 @@ def test_get_template_fields_requires_service_key():
 def test_create_document_renders_three_rows_as_pdf(monkeypatch):
     _database(monkeypatch)
     template_id = _upload().json()["id"]
+    assert _publish(template_id).status_code == 200
 
     response = _create_document(
         template_id,
@@ -285,6 +290,7 @@ def test_create_document_renders_three_rows_as_pdf(monkeypatch):
 def test_create_document_silently_ignores_extra_row_keys(monkeypatch):
     _database(monkeypatch)
     template_id = _upload().json()["id"]
+    assert _publish(template_id).status_code == 200
 
     response = _create_document(
         template_id,
@@ -309,6 +315,7 @@ def test_create_document_returns_404_when_template_missing(monkeypatch):
 def test_create_document_returns_404_without_table_config(monkeypatch):
     engine = _database(monkeypatch)
     template_id = _upload().json()["id"]
+    assert _publish(template_id).status_code == 200
     with Session(engine) as session:
         session.query(TemplateTableConfig).delete()
         session.commit()
@@ -317,6 +324,21 @@ def test_create_document_returns_404_without_table_config(monkeypatch):
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_create_document_returns_409_when_template_not_published(monkeypatch):
+    _database(monkeypatch)
+    template_id = _upload().json()["id"]
+
+    response = _create_document(template_id)
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": {
+            "code": "TEMPLATE_NOT_PUBLISHED",
+            "message": "Chỉ mẫu đã publish mới được render PDF",
+        }
+    }
 
 
 @pytest.mark.parametrize("rows", [{"stt": "1"}, ["not an object"]])
@@ -338,6 +360,7 @@ def test_create_document_uses_rfc5987_filename_for_vietnamese_name(monkeypatch):
     name = "Phiếu nhập"
     version = "bản 1"
     template_id = _upload(name=name, version=version).json()["id"]
+    assert _publish(template_id).status_code == 200
 
     response = _create_document(template_id)
 
@@ -351,6 +374,7 @@ def test_create_document_uses_rfc5987_filename_for_vietnamese_name(monkeypatch):
 def test_create_document_maps_pagination_failure_verbatim(monkeypatch):
     engine = _database(monkeypatch)
     template_id = _upload().json()["id"]
+    assert _publish(template_id).status_code == 200
     with Session(engine) as session:
         table = session.query(TemplateTableConfig).one()
         table.row_height_min = 1000
@@ -371,6 +395,7 @@ def test_create_document_maps_pagination_failure_verbatim(monkeypatch):
 def test_create_document_maps_other_render_value_error_to_bad_request(monkeypatch):
     _database(monkeypatch)
     template_id = _upload().json()["id"]
+    assert _publish(template_id).status_code == 200
 
     def fail_render(**_kwargs):
         raise ValueError("Dữ liệu render không hợp lệ")
@@ -388,6 +413,7 @@ def test_create_document_maps_other_render_value_error_to_bad_request(monkeypatc
 def test_create_document_runs_render_in_threadpool(monkeypatch):
     _database(monkeypatch)
     template_id = _upload().json()["id"]
+    assert _publish(template_id).status_code == 200
     calls = []
 
     async def fake_run_in_threadpool(func, *args, **kwargs):
@@ -407,6 +433,8 @@ def test_create_document_runs_render_in_threadpool(monkeypatch):
                 "metadata": calls[0][2]["metadata"],
                 "fields": {},
                 "rows": [],
+                "signatures": {},
+                "signature_dates": {},
             },
         )
     ]

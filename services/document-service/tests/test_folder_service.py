@@ -44,6 +44,10 @@ def _upload_template():
     return response.json()["id"]
 
 
+def _publish(template_id: int):
+    return client.post(f"/v1/templates/{template_id}/publish", headers=AUTH_HEADERS)
+
+
 def _create_folder(name: str = "test-batch"):
     response = client.post("/v1/folders", headers=AUTH_HEADERS, json={"name": name})
     assert response.status_code == 201
@@ -72,6 +76,7 @@ def _add_document(folder_id: int, template_id: int, file_name: str, sort_key: st
 def test_create_folder_and_add_pdf(monkeypatch, tmp_path):
     _database(monkeypatch, tmp_path)
     template_id = _upload_template()
+    assert _publish(template_id).status_code == 200
     folder_id = _create_folder()
 
     file_id = _add_document(folder_id, template_id, "2026-06-01.pdf", "2026-06-01")
@@ -89,6 +94,7 @@ def test_create_folder_and_add_pdf(monkeypatch, tmp_path):
 def test_get_folder_lists_files(monkeypatch, tmp_path):
     _database(monkeypatch, tmp_path)
     template_id = _upload_template()
+    assert _publish(template_id).status_code == 200
     folder_id = _create_folder()
 
     _add_document(folder_id, template_id, "2026-06-02.pdf", "2026-06-02")
@@ -109,6 +115,7 @@ def test_get_folder_lists_files(monkeypatch, tmp_path):
 def test_folder_zip_and_merged_pdf_return_valid_bytes(monkeypatch, tmp_path):
     _database(monkeypatch, tmp_path)
     template_id = _upload_template()
+    assert _publish(template_id).status_code == 200
     folder_id = _create_folder()
 
     _add_document(folder_id, template_id, "2026-06-01.pdf", "2026-06-01")
@@ -134,6 +141,7 @@ def test_folder_zip_and_merged_pdf_return_valid_bytes(monkeypatch, tmp_path):
 def test_delete_folder_removes_folder(monkeypatch, tmp_path):
     engine = _database(monkeypatch, tmp_path)
     template_id = _upload_template()
+    assert _publish(template_id).status_code == 200
     folder_id = _create_folder()
 
     _add_document(folder_id, template_id, "2026-06-01.pdf", "2026-06-01")
@@ -154,3 +162,29 @@ def test_delete_folder_removes_folder(monkeypatch, tmp_path):
 
     get_response = client.get(f"/v1/folders/{folder_id}", headers=AUTH_HEADERS)
     assert get_response.status_code == 404
+
+
+def test_add_folder_document_returns_409_when_template_not_published(monkeypatch, tmp_path):
+    _database(monkeypatch, tmp_path)
+    template_id = _upload_template()
+    folder_id = _create_folder()
+
+    response = client.post(
+        f"/v1/folders/{folder_id}/documents",
+        headers=AUTH_HEADERS,
+        json={
+            "template_id": template_id,
+            "file_name": "2026-06-01.pdf",
+            "sort_key": "2026-06-01",
+            "fields": {},
+            "rows": [],
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": {
+            "code": "TEMPLATE_NOT_PUBLISHED",
+            "message": "Chỉ mẫu đã publish mới được render PDF",
+        }
+    }

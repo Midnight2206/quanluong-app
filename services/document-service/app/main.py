@@ -22,6 +22,7 @@ from app.folders.folder_service import (
     FolderFileNotFoundError,
     FolderNotFoundError,
     TemplateMetadataNotFoundError,
+    TemplateNotPublishedError,
     add_folder_document,
     build_merged_pdf,
     build_zip,
@@ -29,6 +30,7 @@ from app.folders.folder_service import (
     delete_folder,
     get_folder,
     get_folder_file,
+    require_published_template,
 )
 from app.models import Template
 from app.pagination import PaginationError, plan_pages
@@ -403,6 +405,11 @@ def add_folder_document_route(
             status_code=404,
             detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
         )
+    except TemplateNotPublishedError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail("TEMPLATE_NOT_PUBLISHED", str(exc)),
+        )
     except PaginationError as exc:
         raise HTTPException(
             status_code=400,
@@ -528,9 +535,15 @@ async def create_document(
 ):
     try:
         with get_session() as session:
+            require_published_template(session, template_id)
             metadata = load_metadata_from_db(session, template_id)
     except (SQLAlchemyError, RuntimeError):
         raise _database_unavailable()
+    except TemplateNotPublishedError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=error_detail("TEMPLATE_NOT_PUBLISHED", str(exc)),
+        )
 
     if metadata is None:
         raise HTTPException(
