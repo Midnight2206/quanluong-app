@@ -39,7 +39,7 @@ Admin (Superadmin :8081)
        → DS POST /v1/templates (status=draft)
        → Node ChungTuPdfTemplate status=draft
   Preview
-       → Node POST/GET proxy → DS GET /v1/templates/{id}/preview
+       → Node GET proxy → DS GET /v1/templates/{id}/preview
        → PDF blob → window.open (tab mới)
   Publish
        → DS POST .../publish → Node status=published
