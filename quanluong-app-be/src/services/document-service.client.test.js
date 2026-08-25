@@ -10,6 +10,7 @@ process.env.SESSION_SECRET ||= "test-session-secret";
 
 const { config } = await import("../config/config.js");
 const { AppError } = await import("../errors/app-error.js");
+const { ERROR_CODES } = await import("../errors/error-codes.js");
 const {
   createDocumentFolder,
   exportWorkbook,
@@ -19,8 +20,11 @@ const {
   listTemplates,
   parseWorkbook,
   planPagination,
+  previewTemplatePdf,
+  publishTemplate,
   renderDocumentPdf,
   renderToDocumentFolder,
+  retireTemplate,
   uploadTemplate,
 } = await import("./document-service.client.js");
 
@@ -233,6 +237,77 @@ test("renderDocumentPdf returns a Buffer", async () => {
     const result = await renderDocumentPdf(3, { fields: { don_vi: "A" }, rows: [{ stt: "1" }] });
     assert.ok(Buffer.isBuffer(result));
     assert.deepEqual(result, Buffer.from(bytes));
+  } finally {
+    restore();
+  }
+});
+
+test("renderDocumentPdf maps upstream 409 to AppError 409 with CONFLICT", async () => {
+  const restore = mockFetch(async () =>
+    new Response(
+      JSON.stringify({ error: { code: "TEMPLATE_NOT_PUBLISHED", message: "Template chưa được publish" } }),
+      {
+        status: 409,
+        headers: { "content-type": "application/json" },
+      },
+    ),
+  );
+  try {
+    await assert.rejects(
+      renderDocumentPdf(3, { fields: { don_vi: "A" } }),
+      (error) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        error.code === ERROR_CODES.CONFLICT &&
+        error.message === "Template chưa được publish",
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("previewTemplatePdf returns a Buffer", async () => {
+  const bytes = Uint8Array.from([37, 80, 68, 70]);
+  const restore = mockFetch(async (url) => {
+    assert.equal(url.toString(), "http://document.test/v1/templates/3/preview");
+    return new Response(bytes, { status: 200 });
+  });
+  try {
+    const result = await previewTemplatePdf(3);
+    assert.ok(Buffer.isBuffer(result));
+    assert.deepEqual(result, Buffer.from(bytes));
+  } finally {
+    restore();
+  }
+});
+
+test("publishTemplate posts and returns upstream JSON", async () => {
+  const restore = mockFetch(async (url, options) => {
+    assert.equal(url.toString(), "http://document.test/v1/templates/3/publish");
+    assert.equal(options.method, "POST");
+    return new Response(JSON.stringify({ id: 3, status: "published" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  try {
+    assert.deepEqual(await publishTemplate(3), { id: 3, status: "published" });
+  } finally {
+    restore();
+  }
+});
+
+test("retireTemplate posts and returns upstream JSON", async () => {
+  const restore = mockFetch(async (url, options) => {
+    assert.equal(url.toString(), "http://document.test/v1/templates/3/retire");
+    assert.equal(options.method, "POST");
+    return new Response(JSON.stringify({ id: 3, status: "retired" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  try {
+    assert.deepEqual(await retireTemplate(3), { id: 3, status: "retired" });
   } finally {
     restore();
   }

@@ -34,17 +34,20 @@ async function requestDocument(path, options = {}) {
     });
     if (!response.ok) {
       const isBadRequest = response.status === 400;
+      const isConflict = response.status === 409;
       const isNotFound = response.status === 404;
       const isAuthFailure = response.status === 401 || response.status === 403;
       throw new AppError({
         message: isAuthFailure
           ? "Document service xác thực nội bộ thất bại"
           : await readErrorMessage(response),
-        statusCode: isBadRequest ? 400 : isNotFound ? 404 : 502,
+        statusCode: isBadRequest ? 400 : isNotFound ? 404 : isConflict ? 409 : 502,
         code: isBadRequest
           ? ERROR_CODES.VALIDATION_ERROR
           : isNotFound
             ? ERROR_CODES.NOT_FOUND
+            : isConflict
+              ? ERROR_CODES.CONFLICT
             : ERROR_CODES.INTERNAL_SERVER_ERROR,
       });
     }
@@ -140,6 +143,11 @@ async function getTemplate(templateId) {
   return readJsonResponse(response);
 }
 
+async function previewTemplatePdf(templateId) {
+  const response = await requestDocument(`/v1/templates/${templateId}/preview`);
+  return Buffer.from(await response.arrayBuffer());
+}
+
 async function getTemplateFields(templateId) {
   const response = await requestDocument(`/v1/templates/${templateId}/fields`);
   return readJsonResponse(response);
@@ -153,6 +161,20 @@ async function uploadTemplate({ buffer, name, version }) {
   const response = await requestDocument("/v1/templates", {
     method: "POST",
     body: form,
+  });
+  return readJsonResponse(response);
+}
+
+async function publishTemplate(templateId) {
+  const response = await requestDocument(`/v1/templates/${templateId}/publish`, {
+    method: "POST",
+  });
+  return readJsonResponse(response);
+}
+
+async function retireTemplate(templateId) {
+  const response = await requestDocument(`/v1/templates/${templateId}/retire`, {
+    method: "POST",
   });
   return readJsonResponse(response);
 }
@@ -298,9 +320,12 @@ export {
   listTemplates,
   parseWorkbook,
   planPagination,
+  previewTemplatePdf,
+  publishTemplate,
   renderDocumentPdf,
   renderStoredDocumentPdf,
   renderToDocumentFolder,
+  retireTemplate,
   seedBienBanTestV2Demo,
   seedDemoForTemplate,
   streamDocumentFolderFile,
