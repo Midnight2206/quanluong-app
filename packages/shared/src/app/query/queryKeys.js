@@ -105,10 +105,11 @@ export const qk = {
   },
   chungTuQuyetToan: {
     root: ["chungTuQuyetToan"],
-    pdfTemplates: (categoryKey) => [
+    pdfTemplates: (categoryKey, scope = "published") => [
       "chungTuQuyetToan",
       "pdfTemplates",
       categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+      scope === "active" ? "published" : scope,
     ],
     pdfTemplateFields: (templateId) => ["chungTuQuyetToan", "pdfTemplateFields", String(templateId ?? "")],
     pdfExports: (unitId, categoryKey) => [

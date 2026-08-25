@@ -12,7 +12,8 @@ function normalizeCategoryKey(categoryKey) {
 
 function invalidateChungTuPdfTemplates(qc, categoryKey) {
   const key = normalizeCategoryKey(categoryKey);
-  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.pdfTemplates(key) });
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.pdfTemplates(key, "published") });
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.pdfTemplates(key, "all") });
   qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.root });
 }
 
@@ -37,15 +38,19 @@ function invalidateChungTuSignatureSettings(qc, categoryKey) {
 }
 
 export function useChungTuPdfTemplatesQuery(categoryKey, options = {}) {
-  const { skip, ...rest } = options;
+  const { skip, includeNonPublished, includeInactive, ...rest } = options;
   const key = normalizeCategoryKey(categoryKey);
+  const wantNonPublished = Boolean(includeNonPublished ?? includeInactive ?? false);
   return useQuery({
-    queryKey: qk.chungTuQuyetToan.pdfTemplates(key),
+    queryKey: qk.chungTuQuyetToan.pdfTemplates(key, wantNonPublished ? "all" : "published"),
     queryFn: () =>
       apiRequest({
         url: "/chungtuquyettoan/pdf-templates",
         method: "get",
-        params: { categoryKey: key },
+        params: {
+          categoryKey: key,
+          ...(wantNonPublished ? { includeNonPublished: true } : {}),
+        },
       }),
     select: (data) => (Array.isArray(data?.items) ? data.items : []),
     enabled: Boolean(skip !== true && key.length > 0),
@@ -75,13 +80,13 @@ export function useUploadChungTuPdfTemplateMutation() {
   });
 }
 
-export function useDeactivateChungTuPdfTemplateMutation() {
+export function usePublishChungTuPdfTemplateMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
     mutationFn: ({ id }) =>
       apiRequest({
-        url: `/chungtuquyettoan/pdf-templates/${encodeURIComponent(id)}`,
-        method: "delete",
+        url: `/chungtuquyettoan/pdf-templates/${encodeURIComponent(id)}/publish`,
+        method: "post",
       }),
     onSuccess: (_data, variables) => {
       invalidateChungTuPdfTemplates(qc, variables?.categoryKey);
@@ -90,6 +95,27 @@ export function useDeactivateChungTuPdfTemplateMutation() {
       }
     },
   });
+}
+
+export function useRetireChungTuPdfTemplateMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id }) =>
+      apiRequest({
+        url: `/chungtuquyettoan/pdf-templates/${encodeURIComponent(id)}/retire`,
+        method: "post",
+      }),
+    onSuccess: (_data, variables) => {
+      invalidateChungTuPdfTemplates(qc, variables?.categoryKey);
+      if (variables?.id != null) {
+        qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.pdfTemplateFields(variables.id) });
+      }
+    },
+  });
+}
+
+export function useDeactivateChungTuPdfTemplateMutation() {
+  return useRetireChungTuPdfTemplateMutation();
 }
 
 export function useChungTuPdfTemplateFieldsQuery(templateId, options = {}) {
@@ -276,6 +302,30 @@ function filenameFromContentDisposition(header) {
     return plain[1].trim().replace(/^["']|["']$/g, "");
   }
   return null;
+}
+
+export async function openChungTuPdfTemplatePreview(templateId) {
+  const id = templateId != null ? String(templateId).trim() : "";
+  const { data: blob, headers } = await apiRequest({
+    url: `/chungtuquyettoan/pdf-templates/${encodeURIComponent(id)}/preview`,
+    method: "get",
+    responseType: "blob",
+    returnHeaders: true,
+  });
+  const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/pdf" });
+  const objectUrl = URL.createObjectURL(pdfBlob);
+  const openedWindow = window.open(objectUrl, "_blank", "noopener,noreferrer");
+  if (!openedWindow) {
+    URL.revokeObjectURL(objectUrl);
+    throw new Error("Trình duyệt chặn cửa sổ mới.");
+  }
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 120_000);
+  const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
+  return {
+    openedWindow,
+    objectUrl,
+    fileName: filenameFromContentDisposition(cd) ?? `${id}-preview.pdf`,
+  };
 }
 
 export async function downloadChungTuPdfExport(exportKey) {
