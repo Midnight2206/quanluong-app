@@ -124,6 +124,7 @@ def add_folder_document(
     sort_key: str | None = None,
 ) -> dict:
     _require_folder(session, folder_id)
+    require_published_template(session, template_id)
     clean_file_name = sanitize_file_name(file_name)
     clean_sort_key = str(sort_key).strip() or None if sort_key is not None else None
     if session.scalar(
@@ -133,8 +134,6 @@ def add_folder_document(
         )
     ):
         raise ValueError("Tên file đã tồn tại trong folder")
-
-    require_published_template(session, template_id)
     metadata = load_metadata_from_db(session, template_id)
     if metadata is None:
         raise TemplateMetadataNotFoundError("Không tìm thấy mẫu")

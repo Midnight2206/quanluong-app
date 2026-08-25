@@ -188,3 +188,34 @@ def test_add_folder_document_returns_409_when_template_not_published(monkeypatch
             "message": "Chỉ mẫu đã publish mới được render PDF",
         }
     }
+
+
+def test_add_folder_document_prefers_not_published_over_duplicate_name(monkeypatch, tmp_path):
+    _database(monkeypatch, tmp_path)
+    published_id = _upload_template()
+    assert _publish(published_id).status_code == 200
+    draft_response = client.post(
+        "/v1/templates",
+        headers=AUTH_HEADERS,
+        data={"name": "Phiếu xuất", "version": "1"},
+        files={"file": ("template.xlsx", make_minimal_template(), XLSX_TYPE)},
+    )
+    assert draft_response.status_code == 201
+    draft_id = draft_response.json()["id"]
+    folder_id = _create_folder()
+    _add_document(folder_id, published_id, "2026-06-01.pdf", "2026-06-01")
+
+    response = client.post(
+        f"/v1/folders/{folder_id}/documents",
+        headers=AUTH_HEADERS,
+        json={
+            "template_id": draft_id,
+            "file_name": "2026-06-01.pdf",
+            "sort_key": "2026-06-01",
+            "fields": {},
+            "rows": [],
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "TEMPLATE_NOT_PUBLISHED"
