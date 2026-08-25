@@ -72,6 +72,7 @@ def test_templates_queries_configured_database(monkeypatch):
         "margin_right": 15.0,
         "margin_bottom": 20.0,
         "margin_left": 15.0,
+        "status": "draft",
         "created_at": template["created_at"],
     }
     assert template["created_at"]

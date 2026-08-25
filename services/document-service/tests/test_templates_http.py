@@ -159,6 +159,7 @@ def test_get_template_returns_item_with_created_at(monkeypatch):
         "margin_right": body["margin_right"],
         "margin_bottom": body["margin_bottom"],
         "margin_left": body["margin_left"],
+        "status": "draft",
         "created_at": body["created_at"],
     }
     assert body["created_at"]
