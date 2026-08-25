@@ -35,6 +35,7 @@ from app.pagination import PaginationError, plan_pages
 from app.parse import parse_xlsx
 from app.render.pdf_renderer import render_pdf
 from app.render.signature_block import default_signature_block, parse_signature_block_config
+from app.templates.placeholder_data import generate_placeholder_data
 
 _template_errors = import_module("app.import.errors")
 import_template = import_module("app.import.template_service").import_template
@@ -184,6 +185,48 @@ def get_template_fields(template_id: int, _: None = Depends(require_service_key)
         ],
         "signature_block": asdict(metadata.signature_block or default_signature_block()),
     }
+
+
+@app.get("/v1/templates/{template_id}/preview")
+async def preview_template(template_id: int, _: None = Depends(require_service_key)):
+    try:
+        with get_session() as session:
+            metadata = load_metadata_from_db(session, template_id)
+    except (SQLAlchemyError, RuntimeError):
+        raise _database_unavailable()
+
+    if metadata is None:
+        raise HTTPException(
+            status_code=404,
+            detail=error_detail("NOT_FOUND", NOT_FOUND_MESSAGE),
+        )
+
+    fields, rows, signatures = generate_placeholder_data(metadata)
+
+    try:
+        content = await run_in_threadpool(
+            render_pdf,
+            metadata=metadata,
+            fields=fields,
+            rows=rows,
+            signatures=signatures,
+        )
+    except PaginationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("PAGINATION_FAILED", str(exc)),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=error_detail("BAD_REQUEST", str(exc)),
+        )
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="preview-{template_id}.pdf"'},
+    )
 
 
 class SignatureSlotBody(BaseModel):
