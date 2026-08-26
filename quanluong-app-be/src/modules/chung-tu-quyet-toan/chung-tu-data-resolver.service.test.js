@@ -1,10 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
+process.env.DATABASE_URL ||= "mysql://test:test@localhost/test";
+process.env.JWT_ACCESS_SECRET ||= "test-jwt-secret";
+process.env.SESSION_SECRET ||= "test-session-secret";
+
+const {
   aggregateLinesToDetailRows,
   resolveDocumentNumberFields,
-} from "./chung-tu-data-resolver.service.js";
+  resolvePdfHeaderSettings,
+} = await import("./chung-tu-data-resolver.service.js");
 import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 
 test("aggregateLinesToDetailRows sums quantity and amount for same commodity", () => {
@@ -102,4 +107,73 @@ test("resolveDocumentNumberFields ignores manual overrides for bang ke", () => {
   });
   assert.equal(result.soChungTu, "062615");
   assert.equal(result.quyenSo, "0626");
+});
+
+test("resolvePdfHeaderSettings uses exporting user profile for don vi fields", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {
+      donViCapTren: "Unit profile cap tren",
+      donVi: "Unit profile don vi",
+      donViSo: "Legacy unit profile line",
+    },
+    rawSettings: {},
+    exportingUserProfile: {
+      donViCapTren: "Su doan 372",
+      donVi: "Tieu doan 1",
+    },
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO,
+  });
+
+  assert.equal(result.donViCapTren, "Su doan 372");
+  assert.equal(result.donVi, "Tieu doan 1");
+  assert.equal(result.donViSo, "Tieu doan 1");
+});
+
+test("resolvePdfHeaderSettings prefers slip buyer over BKMH header settings", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {},
+    rawSettings: {},
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    bkmhHeaderSettings: {
+      hoTenNguoiMua: "Buyer from settings",
+      boPhan: "Bo phan from settings",
+    },
+    slips: [
+      {
+        slipNo: 1,
+        buyerDisplayName: "Buyer from slip",
+      },
+    ],
+  });
+
+  assert.equal(result.hoTenNguoiMua, "Buyer from slip");
+  assert.equal(result.nguoiMua, "Buyer from slip");
+  assert.equal(result.signerNguoiMua, "Buyer from slip");
+});
+
+test("resolvePdfHeaderSettings falls back to BKMH settings when slip buyer is empty", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {
+      boPhan: "Old merged bo phan should not win",
+    },
+    rawSettings: {},
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    bkmhHeaderSettings: {
+      hoTenNguoiMua: "Buyer from settings",
+      boPhan: "Bo phan from settings",
+    },
+    slips: [
+      {
+        slipNo: 1,
+        buyerDisplayName: "   ",
+        buyerUser: {
+          username: "   ",
+          profile: { fullName: "   " },
+        },
+      },
+    ],
+  });
+
+  assert.equal(result.hoTenNguoiMua, "Buyer from settings");
+  assert.equal(result.boPhan, "Bo phan from settings");
 });

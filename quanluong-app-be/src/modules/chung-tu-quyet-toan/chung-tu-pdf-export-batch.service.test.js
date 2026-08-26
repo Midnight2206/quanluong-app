@@ -197,6 +197,10 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
       unitIds: [10, 11],
       aggregationMode: "by-day",
       pdfTemplateId: 15,
+      exportingUserProfile: {
+        donViCapTren: "Su doan 372",
+        donVi: "Tieu doan 1",
+      },
       signatures: { ke_toan: "Nguyễn A" },
       signatureDates: { ke_toan: "Ngày 03 tháng 06 năm 2026" },
       settings: { ghiChu: "ghi chu" },
@@ -211,6 +215,20 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
         status: "published",
         categoryKey: "bang-ke-mua-hang",
       },
+    });
+    assert.deepEqual(resolveChungTuContext.mock.calls[0].arguments[0], {
+      categoryKey: "bang-ke-mua-hang",
+      unitId: 9,
+      periodDate: undefined,
+      periodMonth: "2026-06",
+      issueSlipId: undefined,
+      unitIds: [10, 11],
+      aggregationMode: "by-day",
+      exportingUserProfile: {
+        donViCapTren: "Su doan 372",
+        donVi: "Tieu doan 1",
+      },
+      settings: { ghiChu: "ghi chu" },
     });
     assert.equal(createDocumentFolder.mock.callCount(), 1);
     assert.equal(renderToDocumentFolder.mock.callCount(), 2);

@@ -108,6 +108,10 @@ test("createChungTuPdfExport renders document-service PDF, stores file, and retu
       unitId: 9,
       periodDate: "2026-08-23",
       pdfTemplateId: 15,
+      exportingUserProfile: {
+        donViCapTren: "Su doan 372",
+        donVi: "Tieu doan 1",
+      },
       signatures: { nguoi_lap: "Nguyen Van A" },
       signatureDates: { nguoi_lap: "Ngay 23 thang 08 nam 2026" },
       signatureBlock: { slots: [{ key: "nguoi_lap", label: "Nguoi lap" }], columns: 1 },
@@ -134,6 +138,10 @@ test("createChungTuPdfExport renders document-service PDF, stores file, and retu
       issueSlipId: undefined,
       unitIds: undefined,
       aggregationMode: undefined,
+      exportingUserProfile: {
+        donViCapTren: "Su doan 372",
+        donVi: "Tieu doan 1",
+      },
       settings: { ghiChu: "ghi chu" },
     });
 

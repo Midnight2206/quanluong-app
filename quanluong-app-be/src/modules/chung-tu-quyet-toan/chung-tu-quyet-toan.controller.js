@@ -254,6 +254,7 @@ async function createChungTuPdfExportController(req, res) {
     signatureDates: body.signatureDates,
     signatureBlock: body.signatureBlock,
     settings: body.settings ?? {},
+    exportingUserProfile: req.user?.profile ?? null,
     createdById: req.user.id,
     effectiveUnitIds: req.effectiveUnitIds,
   });
@@ -302,6 +303,7 @@ async function createChungTuPdfExportBatchController(req, res) {
     signatureDates: body.signatureDates,
     signatureBlock: body.signatureBlock,
     settings: body.settings ?? {},
+    exportingUserProfile: req.user?.profile ?? null,
     createdById: req.user.id,
     effectiveUnitIds: req.effectiveUnitIds,
   });
@@ -705,6 +707,7 @@ async function previewChungTuContextController(req, res) {
     unitIds: body.unitIds,
     aggregationMode: body.aggregationMode,
     settings: body.settings ?? {},
+    exportingUserProfile: req.user?.profile ?? null,
     effectiveUnitIds: req.effectiveUnitIds,
   });
   return respondSuccess(res, {

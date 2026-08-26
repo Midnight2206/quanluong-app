@@ -162,6 +162,7 @@ async function createChungTuPdfExportBatch({
   signatureDates = {},
   signatureBlock,
   settings,
+  exportingUserProfile,
   createdById,
   effectiveUnitIds,
 }) {
@@ -199,6 +200,7 @@ async function createChungTuPdfExportBatch({
       unitIds: selectedUnitIds,
       aggregationMode: safeAggregationMode,
       settings,
+      exportingUserProfile,
     }),
     getTemplateFields(template.documentServiceTemplateId),
     getChungTuSignatureSettings({ categoryKey }),

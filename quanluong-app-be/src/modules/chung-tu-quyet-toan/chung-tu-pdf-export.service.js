@@ -164,6 +164,7 @@ async function createChungTuPdfExport({
   signatureDates = {},
   signatureBlock,
   settings,
+  exportingUserProfile,
   createdById,
   effectiveUnitIds,
 }) {
@@ -200,6 +201,7 @@ async function createChungTuPdfExport({
     unitIds: selectedUnitIds,
     aggregationMode: safeAggregationMode,
     settings,
+    exportingUserProfile,
   });
 
   const fieldsPayload = await getTemplateFields(template.documentServiceTemplateId);

@@ -23,6 +23,11 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
     },
     { namedRange: "FIELD_quyen_so", fieldKey: "quyenSo", label: "Quyển số" },
     { namedRange: "FIELD_so_chung_tu", fieldKey: "soChungTu", label: "Số chứng từ" },
+    {
+      namedRange: "FIELD_ho_ten_nguoi_mua",
+      fieldKey: "hoTenNguoiMua",
+      label: "Họ và tên người mua",
+    },
     { namedRange: "FIELD_bo_phan", fieldKey: "boPhan", label: "Bộ phận" },
     { namedRange: "FIELD_ghi_chu", fieldKey: "ghiChu", label: "Ghi chú" },
   ]),

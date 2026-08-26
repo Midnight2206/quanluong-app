@@ -21,3 +21,9 @@ test("resolveScalarFieldKey maps ngay_thang_nam to ngayThangNam", () => {
 test("resolveScalarFieldKey maps tong_tien to tongTien", () => {
   assert.equal(resolveScalarFieldKey("tong_tien"), "tongTien");
 });
+
+test("resolveScalarFieldKey maps ho_ten_nguoi_mua aliases to hoTenNguoiMua", () => {
+  assert.equal(resolveScalarFieldKey("FIELD_ho_ten_nguoi_mua"), "hoTenNguoiMua");
+  assert.equal(resolveScalarFieldKey("FIELD_nguoi_mua"), "hoTenNguoiMua");
+  assert.equal(resolveScalarFieldKey("ho_ten_nguoi_mua"), "hoTenNguoiMua");
+});

@@ -329,6 +329,7 @@ async function previewChungTuContext({
   unitIds,
   aggregationMode,
   settings,
+  exportingUserProfile,
   effectiveUnitIds,
 }) {
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
@@ -347,6 +348,7 @@ async function previewChungTuContext({
     unitIds: selectedUnitIds,
     aggregationMode,
     settings,
+    exportingUserProfile,
   });
   return { context, sourceDataHash };
 }

@@ -18,6 +18,7 @@ import {
   normalizePeriodMonth,
 } from "./chung-tu-monthly-sheets.js";
 import { attachCanCuBkmhToMonthlyContexts } from "./chung-tu-pnk-bkmh-basis.service.js";
+import { getChungTuBkmhHeaderSettings } from "./chung-tu-bkmh-header-settings.service.js";
 import {
   attachRecipientUnitFillToMonthlyContexts,
   resolveRecipientUnitFillForSlip,
@@ -61,14 +62,45 @@ function resolveNguoiMuaFromSlips(slips) {
   return "";
 }
 
-function settingsWithSlipNguoiMua(settings, slips) {
-  const fromSlips = resolveNguoiMuaFromSlips(slips);
-  if (!fromSlips) return settings;
+function normalizeText(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizePlainObject(value) {
+  return value && typeof value === "object" ? value : {};
+}
+
+export function resolvePdfHeaderSettings({
+  mergedSettings,
+  rawSettings,
+  exportingUserProfile,
+  categoryKey,
+  bkmhHeaderSettings,
+  slips,
+}) {
+  const resolved = {
+    ...normalizePlainObject(mergedSettings),
+  };
+  const profile = normalizePlainObject(exportingUserProfile);
+  if (exportingUserProfile && typeof exportingUserProfile === "object") {
+    const donViCapTren = normalizeText(profile.donViCapTren);
+    const donVi = normalizeText(profile.donVi);
+    resolved.donViCapTren = donViCapTren;
+    resolved.donVi = donVi;
+    resolved.donViSo = donVi;
+  }
+  if (categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) {
+    return resolved;
+  }
+  const settings = normalizePlainObject(rawSettings);
+  const buyerName = resolveNguoiMuaFromSlips(slips) || normalizeText(bkmhHeaderSettings?.hoTenNguoiMua);
+  const boPhan = normalizeText(settings.boPhan) || normalizeText(bkmhHeaderSettings?.boPhan);
   return {
-    ...settings,
-    signerNguoiMua: fromSlips,
-    hoTenNguoiMua: fromSlips,
-    nguoiMua: fromSlips,
+    ...resolved,
+    signerNguoiMua: buyerName,
+    hoTenNguoiMua: buyerName,
+    nguoiMua: buyerName,
+    boPhan,
   };
 }
 
@@ -360,8 +392,8 @@ async function resolveMonthlySheetContexts({
   periodMonth,
   unitIds,
   aggregationMode,
-  settings,
   categoryKey,
+  resolveSettingsForSlips,
 }) {
   const selectedUnitIds = normalizeMonthUnitIds(unitIds);
   if (!selectedUnitIds.length) {
@@ -394,7 +426,7 @@ async function resolveMonthlySheetContexts({
       allLines.push(...flatLines);
       sheetContexts.push(
         buildContextBase({
-          settings: settingsWithSlipNguoiMua(settings, slips),
+          settings: resolveSettingsForSlips(slips),
           periodDate: day,
           detailRows,
           totalAmount: total,
@@ -431,7 +463,7 @@ async function resolveMonthlySheetContexts({
       allLines.push(...flatLines);
       sheetContexts.push(
         buildContextBase({
-          settings: settingsWithSlipNguoiMua(settings, slips),
+          settings: resolveSettingsForSlips(slips),
           periodDate: monthEndDate,
           detailRows,
           totalAmount: total,
@@ -464,7 +496,7 @@ async function resolveMonthlySheetContexts({
       monthlyTotal,
       monthlySlipCount,
       rootContext: buildContextBase({
-        settings: settingsWithSlipNguoiMua(settings, allSlips),
+        settings: resolveSettingsForSlips(allSlips),
         periodDate: monthEndDate,
         detailRows,
         totalAmount: total,
@@ -477,6 +509,7 @@ async function resolveMonthlySheetContexts({
           lineCount: detailRows.length,
         },
       }),
+      allSlips: allSlipsCollected,
     };
   }
 
@@ -489,7 +522,7 @@ async function resolveMonthlySheetContexts({
     monthlyTotal,
     monthlySlipCount,
     rootContext: buildContextBase({
-      settings: settingsWithSlipNguoiMua(settings, allSlipsCollected),
+      settings: resolveSettingsForSlips(allSlipsCollected),
       periodDate: rootPeriodDate,
       detailRows: sheetContexts.flatMap((ctx) => ctx.detailRows ?? []),
       totalAmount: monthlyTotal,
@@ -503,6 +536,7 @@ async function resolveMonthlySheetContexts({
         lineCount: allLines.length,
       },
     }),
+    allSlips: allSlipsCollected,
   };
 }
 
@@ -515,10 +549,28 @@ export async function resolveChungTuContext({
   unitIds,
   aggregationMode,
   settings,
+  exportingUserProfile,
 }) {
   const meta = assertKnownCategoryKey(categoryKey);
-  const profile = await getChungTuUnitProfile({ unitId });
+  const [profile, bkmhHeaderSettings] = await Promise.all([
+    getChungTuUnitProfile({ unitId }),
+    meta.key === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
+      ? getChungTuBkmhHeaderSettings({ categoryKey: meta.key })
+      : null,
+  ]);
   const merged = mergeSettings(profile, settings);
+  const resolveSettingsForSlips = (slips = [], overrides = {}) =>
+    resolvePdfHeaderSettings({
+      mergedSettings: { ...merged, ...overrides },
+      rawSettings: {
+        ...normalizePlainObject(settings),
+        ...normalizePlainObject(overrides),
+      },
+      exportingUserProfile,
+      categoryKey: meta.key,
+      bkmhHeaderSettings,
+      slips,
+    });
 
   if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO && issueSlipId && !periodMonth) {
     const slip = await loadSlipById(issueSlipId);
@@ -534,22 +586,23 @@ export async function resolveChungTuContext({
     const total = sumAmount(slip.lines ?? []);
     const slipNoDisplay = String(slip.slipNo ?? "").padStart(4, "0");
     const soPhieu = slipNoDisplay;
+    const baseSettings = resolveSettingsForSlips();
     const slipSettings = {
-      ...merged,
-      donViSo: merged.donViSo || slip.printLine1 || slip.unit?.name || "",
-      mauSo: merged.mauSo || slip.formMauSo || "",
-      quyenSo: merged.quyenSo || slip.bookMmyy || "",
-      soChungTu: merged.soChungTu || soPhieu,
-      signerWriter: merged.signerWriter || slip.signerWriter || "",
-      signerApprover: merged.signerApprover || slip.signerApprover || "",
+      ...baseSettings,
+      donViSo: baseSettings.donViSo || slip.printLine1 || slip.unit?.name || "",
+      mauSo: baseSettings.mauSo || slip.formMauSo || "",
+      quyenSo: baseSettings.quyenSo || slip.bookMmyy || "",
+      soChungTu: baseSettings.soChungTu || soPhieu,
+      signerWriter: baseSettings.signerWriter || slip.signerWriter || "",
+      signerApprover: baseSettings.signerApprover || slip.signerApprover || "",
       signerRecipient: slip.signerRecipient || slip.recipientDisplayName || slip.recipientUnit?.name || "",
-      warehouseFrom: merged.warehouseFrom || slip.warehouseFrom || "",
+      warehouseFrom: baseSettings.warehouseFrom || slip.warehouseFrom || "",
       printLine1: slip.printLine1 || "",
-      printLine2: slip.printLine2 || merged.printLine2 || "",
-      ghiChu: merged.ghiChu || slip.note || "",
+      printLine2: slip.printLine2 || baseSettings.printLine2 || "",
+      ghiChu: baseSettings.ghiChu || slip.note || "",
     };
     const context = buildContextBase({
-      settings: slipSettings,
+      settings: resolveSettingsForSlips([slip], slipSettings),
       periodDate: period,
       detailRows,
       totalAmount: total,
@@ -574,7 +627,7 @@ export async function resolveChungTuContext({
         price: String(l.unitPrice),
         amount: String(l.amount),
       })),
-      settings: merged,
+      settings: resolveSettingsForSlips([slip], slipSettings),
     };
     return { context, sourceDataHash: computeSourceDataHash(hashPayload) };
   }
@@ -584,8 +637,8 @@ export async function resolveChungTuContext({
       periodMonth,
       unitIds,
       aggregationMode,
-      settings: merged,
       categoryKey: meta.key,
+      resolveSettingsForSlips,
     });
     if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO) {
       await attachCanCuBkmhToMonthlyContexts(monthly, {
@@ -607,7 +660,7 @@ export async function resolveChungTuContext({
         price: String(l.unitPrice),
         amount: String(l.amount),
       })),
-      settings: merged,
+      settings: resolveSettingsForSlips(monthly.allSlips),
     };
     return {
       context: monthly.rootContext,
@@ -628,7 +681,7 @@ export async function resolveChungTuContext({
   const detailRows = flattenLinesFromSlips(slips);
   const total = sumAmount(flatLines);
   const context = buildContextBase({
-    settings: merged,
+    settings: resolveSettingsForSlips(slips),
     periodDate: d,
     detailRows,
     totalAmount: total,
@@ -648,7 +701,7 @@ export async function resolveChungTuContext({
       price: String(l.unitPrice),
       amount: String(l.amount),
     })),
-    settings: merged,
+    settings: resolveSettingsForSlips(slips),
   };
   return { context, sourceDataHash: computeSourceDataHash(hashPayload) };
 }
