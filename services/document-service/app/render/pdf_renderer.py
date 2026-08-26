@@ -3,14 +3,40 @@ from __future__ import annotations
 from dataclasses import dataclass
 from io import BytesIO
 
-from reportlab.lib import pagesizes
 from reportlab.pdfgen import canvas
 
 from app.pagination import PagePlan, plan_pages
-from app.render.draw import draw_merged_cell, draw_table_row, draw_text
-from app.render.fonts import FONT_BOLD, FONT_REGULAR
+from app.render.amount_in_words import (
+    draw_amount_in_words_line,
+    format_amount_in_words_line,
+    measure_amount_in_words_height,
+    resolve_document_amount,
+    should_skip_scalar_field,
+)
+from app.render.carry_totals import (
+    build_carry_row_values,
+    find_amount_column_key,
+    sum_amount,
+)
+from app.render.draw import (
+    draw_static_cell,
+    draw_table_header_frame,
+    draw_table_row,
+    draw_text,
+    has_visible_border,
+)
+from app.render.font_style import render_font
+from app.render.fonts import FONT_BOLD, FONT_BOLD_ITALIC, FONT_ITALIC, FONT_REGULAR
+from app.render.signature_block import (
+    compute_signature_block_anchor_y,
+    default_signature_block,
+    draw_signature_block,
+    signature_block_extra_height,
+)
+from app.render.text_wrap import compute_row_height, line_height_for
 from app.template.demo_metadata import build_demo_metadata
-from app.template.metadata import TemplateMetadata
+from app.template.metadata import SignatureBlockConfig, StaticCellMeta, TemplateMetadata
+from app.template.page_size import page_dimensions
 
 
 @dataclass(frozen=True)
@@ -21,19 +47,9 @@ class _RenderColumn:
     align: str
 
 
-def _render_font(font: dict) -> tuple[str, float]:
-    return (
-        FONT_BOLD if font.get("bold", False) else FONT_REGULAR,
-        font.get("size") or 10,
-    )
-
-
-def _page_dimensions(metadata: TemplateMetadata) -> tuple[float, float]:
-    size = getattr(pagesizes, metadata.page.page_size.upper(), pagesizes.A4)
-    width, height = (round(dimension) for dimension in size)
-    if metadata.page.orientation == "landscape":
-        return height, width
-    return width, height
+def _style_font(style: dict | None, key: str) -> tuple[str, float]:
+    payload = (style or {}).get(key) or (style or {}).get("font") or {}
+    return render_font(payload)
 
 
 def _render_columns(metadata: TemplateMetadata) -> list[_RenderColumn]:
@@ -48,6 +64,136 @@ def _render_columns(metadata: TemplateMetadata) -> list[_RenderColumn]:
     ]
 
 
+def _cells_by_layer(metadata: TemplateMetadata) -> dict[str, list[StaticCellMeta]]:
+    cells = metadata.static_cells or []
+    return {
+        "body": [cell for cell in cells if cell.layer == "body"],
+        "header": [cell for cell in cells if cell.layer == "header"],
+        "signature": [cell for cell in cells if cell.layer == "signature"],
+    }
+
+
+def _draw_static_cells(
+    pdf: canvas.Canvas,
+    cells: list[StaticCellMeta],
+    *,
+    y_offset: float = 0,
+) -> None:
+    for cell in cells:
+        draw_static_cell(
+            pdf,
+            x=cell.x,
+            y=cell.y + y_offset,
+            width=cell.width_pt,
+            height=cell.height_pt,
+            value=cell.value,
+            font=cell.font,
+            align=cell.align,
+            border=cell.border,
+        )
+
+
+def _layer_anchor_y(cells: list[StaticCellMeta]) -> float:
+    return min(cell.y for cell in cells)
+
+
+def _table_start_y(page_index: int, page_height: float, metadata: TemplateMetadata) -> float:
+    y = page_height - metadata.page.margin_top
+    if page_index == 0:
+        y -= metadata.page.static_block_height_pt
+    return y
+
+
+def _table_left(metadata: TemplateMetadata, columns: list[_RenderColumn]) -> float:
+    header_cells = (metadata.static_cells or [])
+    header_x = [cell.x for cell in header_cells if cell.layer == "header"]
+    if header_x:
+        return min(header_x)
+    return metadata.page.margin_left
+
+
+def _signature_config(metadata: TemplateMetadata) -> SignatureBlockConfig:
+    return metadata.signature_block or default_signature_block()
+
+
+def _planner_signature_height(metadata: TemplateMetadata, body_font_size: float) -> float:
+    return metadata.table.signature_block_height_pt + signature_block_extra_height(
+        _signature_config(metadata),
+        body_font_size=body_font_size,
+    )
+
+
+def _table_border(style: dict | None, key: str) -> dict | None:
+    """None style → khung demo; có style → dict Excel (có thể không có cạnh nào)."""
+    if style is None:
+        return None
+    return style.get(key) or {}
+
+
+def _should_draw_header_frame(
+    style: dict | None,
+    header_cells: list[StaticCellMeta],
+) -> bool:
+    if any(has_visible_border(cell.border) for cell in header_cells):
+        return True
+    if style is None:
+        return True
+    return has_visible_border(style.get("header_border"))
+
+
+def _draw_table_header(
+    pdf: canvas.Canvas,
+    *,
+    y: float,
+    metadata: TemplateMetadata,
+    columns: list[_RenderColumn],
+    header_cells: list[StaticCellMeta],
+    table_left: float,
+    table_width: float,
+) -> float:
+    header_top = y
+    table = metadata.table
+    style = metadata.table.row_style
+    style_dict = style or {}
+    header_font_name, header_font_size = _style_font(style_dict, "header_font")
+    header_border = _table_border(style, "header_border")
+
+    if header_cells:
+        header_anchor = _layer_anchor_y(header_cells)
+        header_bottom = y - table.header_height_pt
+        _draw_static_cells(
+            pdf,
+            header_cells,
+            y_offset=header_bottom - header_anchor,
+        )
+        y = header_bottom
+    else:
+        y -= table.header_height_pt
+        draw_table_row(
+            pdf,
+            x=table_left,
+            y=y,
+            height=table.header_height_pt,
+            columns=[column.title for column in columns],
+            values={},
+            col_defs=columns,
+            font_name=header_font_name,
+            font_size=header_font_size,
+            valign="middle",
+            border=header_border,
+        )
+
+    if _should_draw_header_frame(style, header_cells):
+        draw_table_header_frame(
+            pdf,
+            x=table_left,
+            y_top=header_top,
+            width=table_width,
+            height=table.header_height_pt,
+        )
+    return y
+
+
 def _draw_static_fields(
     pdf: canvas.Canvas,
     *,
@@ -56,8 +202,9 @@ def _draw_static_fields(
     content_width: float,
 ) -> None:
     for field in metadata.fields:
-        font = field.font or {}
-        font_name, font_size = _render_font(font)
+        if should_skip_scalar_field(field.field_name):
+            continue
+        font_name, font_size = render_font(field.font)
         align = (field.align or {}).get("h", "left")
         value = f"{field.label_prefix}{fields.get(field.field_name, '')}"
         draw_text(
@@ -72,42 +219,40 @@ def _draw_static_fields(
         )
 
 
-def _draw_final_block(
+def _draw_carry_row(
     pdf: canvas.Canvas,
     *,
     y: float,
     table_left: float,
-    table_width: float,
-    carry_height: float,
-    signature_block_height: float,
-) -> None:
-    total_height = carry_height
-    signature_height = signature_block_height - total_height
-    y -= total_height
-    draw_merged_cell(
+    height: float,
+    columns: list[_RenderColumn],
+    label: str,
+    amount: float,
+    amount_key: str | None,
+    font_size: float,
+    border: dict | None,
+) -> float:
+    y -= height
+    values = build_carry_row_values(
+        columns,
+        label=label,
+        amount=amount,
+        amount_key=amount_key,
+    )
+    draw_table_row(
         pdf,
         x=table_left,
         y=y,
-        width=table_width,
-        height=total_height,
-        text="Cộng",
-        font_name=FONT_BOLD,
-        font_size=10,
+        height=height,
+        columns=None,
+        values=values,
+        col_defs=columns,
+        font_name=FONT_BOLD_ITALIC,
+        font_size=font_size,
+        valign="middle",
+        border=border,
     )
-    y -= signature_height
-    half_width = table_width / 2
-    for index, label in enumerate(("Người lập", "Thủ trưởng đơn vị")):
-        draw_merged_cell(
-            pdf,
-            x=table_left + index * half_width,
-            y=y,
-            width=half_width,
-            height=signature_height,
-            text=label,
-            font_name=FONT_BOLD,
-            font_size=10,
-            valign="top",
-        )
+    return y
 
 
 def _draw_page(
@@ -118,41 +263,44 @@ def _draw_page(
     metadata: TemplateMetadata,
     columns: list[_RenderColumn],
     page_height: float,
+    static_layers: dict[str, list[StaticCellMeta]],
+    row_font_name: str,
+    row_font_size: float,
+    signatures: dict[str, str],
+    signature_dates: dict[str, str],
+    amount_in_words_text: str,
 ) -> None:
     table = metadata.table
-    table_left = metadata.page.margin_left
+    table_left = _table_left(metadata, columns)
     table_width = sum(column.width for column in columns)
-    if page.page_index == 0:
-        y = (
-            page_height
-            - metadata.page.margin_top
-            - metadata.page.static_block_height_pt
-        )
-    else:
-        y = page_height - metadata.page.margin_top
-
-    y -= table.header_height_pt
-    draw_table_row(
+    header_cells = static_layers["header"]
+    amount_key = find_amount_column_key(columns)
+    row_border = _table_border(table.row_style, "border")
+    page_rows = [rows[index] for index in page.row_indices]
+    prev_rows = rows[: page.row_indices[0]] if page.row_indices else rows[:0]
+    y = _table_start_y(page.page_index, page_height, metadata)
+    y = _draw_table_header(
         pdf,
-        x=table_left,
         y=y,
-        height=table.header_height_pt,
-        columns=[column.title for column in columns],
-        values={},
-        col_defs=columns,
+        metadata=metadata,
+        columns=columns,
+        header_cells=header_cells,
+        table_left=table_left,
+        table_width=table_width,
     )
 
     if page.has_carry_from_prev:
-        y -= table.carry_height_pt
-        draw_merged_cell(
+        y = _draw_carry_row(
             pdf,
-            x=table_left,
             y=y,
-            width=table_width,
+            table_left=table_left,
             height=table.carry_height_pt,
-            text="Mang từ trang trước",
-            font_name=FONT_REGULAR,
-            font_size=9,
+            columns=columns,
+            label="Mang từ trang trước",
+            amount=sum_amount(prev_rows, amount_key),
+            amount_key=amount_key,
+            font_size=row_font_size,
+            border=row_border,
         )
 
     for row_index, row_height in zip(page.row_indices, page.row_heights):
@@ -165,28 +313,64 @@ def _draw_page(
             columns=None,
             values=rows[row_index],
             col_defs=columns,
+            font_name=row_font_name,
+            font_size=row_font_size,
+            valign="middle",
+            border=row_border,
         )
 
     if page.has_carry_to_next:
-        y -= table.carry_height_pt
-        draw_merged_cell(
-            pdf,
-            x=table_left,
-            y=y,
-            width=table_width,
-            height=table.carry_height_pt,
-            text="Cộng chuyển trang sau",
-            font_name=FONT_REGULAR,
-            font_size=9,
-        )
-    elif page.is_last:
-        _draw_final_block(
+        # Tổng lũy kế hết trang này = "Mang từ trang trước" của trang sau.
+        y = _draw_carry_row(
             pdf,
             y=y,
             table_left=table_left,
-            table_width=table_width,
-            carry_height=table.carry_height_pt,
-            signature_block_height=table.signature_block_height_pt,
+            height=table.carry_height_pt,
+            columns=columns,
+            label="Cộng chuyển trang sau",
+            amount=sum_amount(prev_rows, amount_key) + sum_amount(page_rows, amount_key),
+            amount_key=amount_key,
+            font_size=row_font_size,
+            border=row_border,
+        )
+    elif page.is_last:
+        y = _draw_carry_row(
+            pdf,
+            y=y,
+            table_left=table_left,
+            height=table.carry_height_pt,
+            columns=columns,
+            label="Cộng",
+            amount=sum_amount(rows, amount_key),
+            amount_key=amount_key,
+            font_size=row_font_size,
+            border=row_border,
+        )
+        y = draw_amount_in_words_line(
+            pdf,
+            text=amount_in_words_text,
+            x=table_left,
+            y_top=y,
+            max_width=table_width,
+            font_size=row_font_size,
+        )
+        extra_fields = [
+            field
+            for field in metadata.fields
+            if field.below_table and not should_skip_scalar_field(field.field_name)
+        ]
+        anchor_y = compute_signature_block_anchor_y(y, extra_fields)
+        draw_signature_block(
+            pdf,
+            config=_signature_config(metadata),
+            signatures=signatures,
+            signature_dates=signature_dates,
+            anchor_y=anchor_y,
+            page=metadata.page,
+            font_name=FONT_REGULAR,
+            font_name_bold=FONT_BOLD,
+            font_name_italic=FONT_ITALIC,
+            body_font_size=row_font_size,
         )
 
 
@@ -195,28 +379,65 @@ def render_pdf(
     metadata: TemplateMetadata,
     fields: dict[str, str],
     rows: list[dict[str, str]],
+    signatures: dict[str, str] | None = None,
+    signature_dates: dict[str, str] | None = None,
 ) -> bytes:
     if not isinstance(rows, list):
         raise TypeError("rows phải là list")
     if any(not isinstance(row, dict) for row in rows):
         raise ValueError("Mỗi phần tử rows phải là dict")
 
-    page_width, page_height = _page_dimensions(metadata)
+    page_width, page_height = page_dimensions(metadata.page)
     table = metadata.table
+    columns = _render_columns(metadata)
+    table_width = sum(column.width for column in columns)
+    row_font_name, row_font_size = render_font((table.row_style or {}).get("font"))
+    line_height = line_height_for(row_font_size)
+    amount = resolve_document_amount(fields, rows, metadata.table.columns)
+    amount_in_words_text = format_amount_in_words_line(amount) if amount is not None else ""
+    amount_h = (
+        measure_amount_in_words_height(
+            amount_in_words_text,
+            FONT_BOLD,
+            row_font_size,
+            table_width,
+        )
+        + 6.0
+        if amount_in_words_text
+        else 0.0
+    )
+    needed_heights = [
+        compute_row_height(
+            row,
+            table.columns,
+            row_font_name,
+            row_font_size,
+            line_height,
+            table.row_height_min,
+        )
+        for row in rows
+    ]
+    natural_height = max(needed_heights, default=table.row_height_min)
+    sig_height = _planner_signature_height(metadata, row_font_size) + amount_h
+    page1_content = (
+        page_height
+        - metadata.page.margin_top
+        - metadata.page.margin_bottom
+        - metadata.page.static_block_height_pt
+    )
+    continuation_content = (
+        page_height - metadata.page.margin_top - metadata.page.margin_bottom
+    )
     if rows:
         pages = plan_pages(
             n_rows=len(rows),
-            page_content_height=(
-                page_height
-                - metadata.page.margin_top
-                - metadata.page.margin_bottom
-                - metadata.page.static_block_height_pt
-            ),
+            page_content_height=page1_content,
+            continuation_content_height=continuation_content,
             header_height=table.header_height_pt,
             carry_row_height=table.carry_height_pt,
-            signature_block_height=table.signature_block_height_pt,
-            row_height_min=table.row_height_min,
-            row_height_max=table.row_height_max,
+            signature_block_height=sig_height,
+            row_height_min=max(natural_height, table.row_height_min),
+            row_height_max=max(natural_height, table.row_height_max),
             min_rows_last_page=table.min_rows_last_page,
         ).pages
     else:
@@ -233,8 +454,10 @@ def render_pdf(
 
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=(page_width, page_height))
-    columns = _render_columns(metadata)
     content_width = page_width - metadata.page.margin_left - metadata.page.margin_right
+    static_layers = _cells_by_layer(metadata)
+    resolved_signatures = signatures or {}
+    resolved_dates = signature_dates or {}
     for page in pages:
         if page.page_index == 0:
             _draw_static_fields(
@@ -243,6 +466,7 @@ def render_pdf(
                 fields=fields,
                 content_width=content_width,
             )
+            _draw_static_cells(pdf, static_layers["body"])
         _draw_page(
             pdf,
             page=page,
@@ -250,6 +474,12 @@ def render_pdf(
             metadata=metadata,
             columns=columns,
             page_height=page_height,
+            static_layers=static_layers,
+            row_font_name=row_font_name,
+            row_font_size=row_font_size,
+            signatures=resolved_signatures,
+            signature_dates=resolved_dates,
+            amount_in_words_text=amount_in_words_text,
         )
         pdf.showPage()
     pdf.save()
@@ -260,8 +490,16 @@ def render_demo_pdf(
     *,
     fields: dict[str, str],
     rows: list[dict[str, str]],
+    signatures: dict[str, str] | None = None,
+    signature_dates: dict[str, str] | None = None,
 ) -> bytes:
-    return render_pdf(metadata=build_demo_metadata(), fields=fields, rows=rows)
+    return render_pdf(
+        metadata=build_demo_metadata(),
+        fields=fields,
+        rows=rows,
+        signatures=signatures,
+        signature_dates=signature_dates,
+    )
 
 
 __all__ = ["render_demo_pdf", "render_pdf"]
