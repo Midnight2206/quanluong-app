@@ -204,9 +204,25 @@ def _draw_static_fields(
     for field in metadata.fields:
         if should_skip_scalar_field(field.field_name):
             continue
+        value = f"{field.label_prefix}{fields.get(field.field_name, '')}"
+        width = field.width_pt
+        height = field.height_pt
+        if width and height and width > 0 and height > 0:
+            # Căn trong đúng ô Excel (không dùng full content_width).
+            draw_static_cell(
+                pdf,
+                x=field.x,
+                y=field.y - height,
+                width=width,
+                height=height,
+                value=value,
+                font=field.font,
+                align=field.align,
+                border=field.border,
+            )
+            continue
         font_name, font_size = render_font(field.font)
         align = (field.align or {}).get("h", "left")
-        value = f"{field.label_prefix}{fields.get(field.field_name, '')}"
         draw_text(
             pdf,
             x=field.x,
@@ -217,6 +233,15 @@ def _draw_static_fields(
             align=align,
             max_width=content_width if align == "center" else None,
         )
+
+
+def _carry_row_height(table, page: PagePlan) -> float:
+    """Cùng nhịp chiều cao với dòng dữ liệu trên trang — chữ «Cộng» căn giữa row."""
+    if page.row_heights:
+        data_h = max(page.row_heights)
+    else:
+        data_h = table.row_height_min
+    return max(float(table.carry_height_pt), float(data_h))
 
 
 def _draw_carry_row(
@@ -294,7 +319,7 @@ def _draw_page(
             pdf,
             y=y,
             table_left=table_left,
-            height=table.carry_height_pt,
+            height=_carry_row_height(table, page),
             columns=columns,
             label="Mang từ trang trước",
             amount=sum_amount(prev_rows, amount_key),
@@ -319,13 +344,14 @@ def _draw_page(
             border=row_border,
         )
 
+    carry_h = _carry_row_height(table, page)
     if page.has_carry_to_next:
         # Tổng lũy kế hết trang này = "Mang từ trang trước" của trang sau.
         y = _draw_carry_row(
             pdf,
             y=y,
             table_left=table_left,
-            height=table.carry_height_pt,
+            height=carry_h,
             columns=columns,
             label="Cộng chuyển trang sau",
             amount=sum_amount(prev_rows, amount_key) + sum_amount(page_rows, amount_key),
@@ -338,7 +364,7 @@ def _draw_page(
             pdf,
             y=y,
             table_left=table_left,
-            height=table.carry_height_pt,
+            height=carry_h,
             columns=columns,
             label="Cộng",
             amount=sum_amount(rows, amount_key),
@@ -354,6 +380,8 @@ def _draw_page(
             max_width=table_width,
             font_size=row_font_size,
         )
+        if static_layers["signature"]:
+            _draw_static_cells(pdf, static_layers["signature"])
         extra_fields = [
             field
             for field in metadata.fields
@@ -434,7 +462,10 @@ def render_pdf(
             page_content_height=page1_content,
             continuation_content_height=continuation_content,
             header_height=table.header_height_pt,
-            carry_row_height=table.carry_height_pt,
+            carry_row_height=max(
+                table.carry_height_pt,
+                max(natural_height, table.row_height_min),
+            ),
             signature_block_height=sig_height,
             row_height_min=max(natural_height, table.row_height_min),
             row_height_max=max(natural_height, table.row_height_max),

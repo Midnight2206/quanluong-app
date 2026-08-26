@@ -29,6 +29,9 @@ class FieldMeta:
     border: dict | None = None
     label_prefix: str = ""
     below_table: bool = False
+    # Kích thước ô Excel — dùng để căn chữ trong box (không stretch full page).
+    width_pt: float | None = None
+    height_pt: float | None = None
 
 
 @dataclass

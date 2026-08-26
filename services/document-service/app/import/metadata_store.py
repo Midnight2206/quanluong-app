@@ -8,6 +8,7 @@ from app.template.metadata import (
     ColumnMeta,
     FieldMeta,
     PageMeta,
+    StaticCellMeta,
     TableMeta,
     TemplateMetadata,
 )
@@ -19,6 +20,16 @@ def _sheet_name(fields: list[TemplateField], header_row_range: str) -> str:
     if "!" in header_row_range:
         return header_row_range.split("!", 1)[0].strip("'").replace("''", "'")
     return ""
+
+
+_ALIGN_META_KEYS = frozenset({"below_table", "cell_width_pt", "cell_height_pt"})
+
+
+def _align_without_meta(align: dict | None) -> dict | None:
+    if not align:
+        return align
+    cleaned = {key: value for key, value in align.items() if key not in _ALIGN_META_KEYS}
+    return cleaned or None
 
 
 def load_metadata_from_db(
@@ -52,6 +63,21 @@ def load_metadata_from_db(
         )
         for column in (table_config.column_defs or [])
     ]
+    static_cells = [
+        StaticCellMeta(
+            layer=cell["layer"],
+            row=int(cell["row"]),
+            x=float(cell["x"]),
+            y=float(cell["y"]),
+            width_pt=float(cell["width_pt"]),
+            height_pt=float(cell["height_pt"]),
+            value=str(cell.get("value") or ""),
+            font=cell.get("font"),
+            align=cell.get("align"),
+            border=cell.get("border"),
+        )
+        for cell in (table_config.static_cells or [])
+    ]
     return TemplateMetadata(
         name=template.name,
         version=template.version,
@@ -62,6 +88,9 @@ def load_metadata_from_db(
             margin_right=float(template.margin_right),
             margin_bottom=float(template.margin_bottom),
             margin_left=float(template.margin_left),
+            static_block_height_pt=float(
+                table_config.static_block_height_pt or PageMeta().static_block_height_pt
+            ),
         ),
         fields=[
             FieldMeta(
@@ -71,9 +100,20 @@ def load_metadata_from_db(
                 x=field.x,
                 y=field.y,
                 font=field.font,
-                align=field.align,
+                align=_align_without_meta(field.align),
                 border=field.border,
                 label_prefix="",
+                below_table=bool((field.align or {}).get("below_table")),
+                width_pt=(
+                    float(field.align["cell_width_pt"])
+                    if isinstance(field.align, dict) and field.align.get("cell_width_pt") is not None
+                    else None
+                ),
+                height_pt=(
+                    float(field.align["cell_height_pt"])
+                    if isinstance(field.align, dict) and field.align.get("cell_height_pt") is not None
+                    else None
+                ),
             )
             for field in fields
         ],
@@ -91,6 +131,7 @@ def load_metadata_from_db(
             min_rows_last_page=table_config.min_rows_last_page,
             stretch_strategy=table_config.stretch_strategy,
         ),
+        static_cells=static_cells or None,
     )
 
 

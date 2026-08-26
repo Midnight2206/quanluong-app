@@ -78,6 +78,13 @@ def import_template(
     session.flush()
 
     for field in metadata.fields:
+        align = dict(field.align or {})
+        if field.below_table:
+            align["below_table"] = True
+        if field.width_pt is not None:
+            align["cell_width_pt"] = float(field.width_pt)
+        if field.height_pt is not None:
+            align["cell_height_pt"] = float(field.height_pt)
         session.add(
             TemplateField(
                 template_id=template.id,
@@ -87,7 +94,7 @@ def import_template(
                 x=field.x,
                 y=field.y,
                 font=field.font,
-                align=field.align,
+                align=align or None,
                 border=field.border,
             )
         )
@@ -107,6 +114,8 @@ def import_template(
             row_height_max=table.row_height_max,
             min_rows_last_page=table.min_rows_last_page,
             stretch_strategy=table.stretch_strategy,
+            static_cells=[asdict(cell) for cell in (metadata.static_cells or [])],
+            static_block_height_pt=metadata.page.static_block_height_pt,
         )
     )
     try:
