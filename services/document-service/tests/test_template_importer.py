@@ -230,3 +230,48 @@ def test_field_geometry_uses_enclosing_merge():
         expected_x = table_left_x + (expected_x - table_left_x) * scale
     assert field.x == pytest.approx(expected_x)
     assert field.align["h"] == "center"
+
+
+def test_interior_field_merge_skips_static_cell():
+    """FIELD_* on interior merge cell skips full merge in static_cells."""
+    from app.template.page_size import page_dimensions
+
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    sheet = workbook["ChungTu"]
+    sheet.merge_cells("B2:D2")
+    sheet["B2"] = "Ngày tháng năm"
+    sheet["B2"].alignment = Alignment(horizontal="center", vertical="center")
+    del workbook.defined_names["FIELD_ngay_thang"]
+    workbook.defined_names.add(
+        DefinedName("FIELD_ngay_thang_nam", attr_text="'ChungTu'!$C$2")
+    )
+    output = BytesIO()
+    workbook.save(output)
+    xlsx_bytes = output.getvalue()
+
+    metadata = _parse_template(xlsx_bytes)
+    field = next(f for f in metadata.fields if f.field_name == "ngay_thang_nam")
+
+    parsed_wb = load_workbook(BytesIO(xlsx_bytes))
+    parsed_sheet = parsed_wb["ChungTu"]
+    raw_merge_width = merged_range_width_pt(parsed_sheet, 2, 4)
+    header_groups = [(1, 1), (2, 3), (4, 4), (5, 6), (7, 7)]
+    raw_table_total = sum(
+        merged_range_width_pt(parsed_sheet, min_col, max_col)
+        for min_col, max_col in header_groups
+    )
+    page_width, _ = page_dimensions(metadata.page)
+    usable = page_width - metadata.page.margin_left - metadata.page.margin_right
+    scale = usable / raw_table_total
+
+    assert field.width_pt == pytest.approx(raw_merge_width * scale)
+
+    field_right = field.x + field.width_pt
+    overlapping = [
+        cell
+        for cell in metadata.static_cells
+        if cell.row == 2
+        and cell.x < field_right
+        and cell.x + cell.width_pt > field.x
+    ]
+    assert overlapping == []

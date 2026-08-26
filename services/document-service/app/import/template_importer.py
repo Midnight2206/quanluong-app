@@ -7,6 +7,7 @@ from zipfile import BadZipFile
 
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter, range_boundaries
+from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 from openpyxl.utils.exceptions import InvalidFileException
 
 from ..template.metadata import (
@@ -32,7 +33,7 @@ from .excel_coords import (
 )
 from .layout_fit import fit_layout_to_page
 from .layout_validate import validate_template_layout
-from .static_cells import collect_static_cells, field_coords_from_cell_refs, static_block_height_pt
+from .static_cells import collect_static_cells, static_block_height_pt
 
 _FIELD_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 
@@ -275,6 +276,23 @@ def _build_fields(workbook, page: PageMeta) -> list[FieldMeta]:
     return fields
 
 
+def _field_skip_coords(workbook, fields: list[FieldMeta]) -> set[tuple[int, int]]:
+    coords: set[tuple[int, int]] = set()
+    for field in fields:
+        sheet = workbook[field.sheet_name]
+        column, row = coordinate_from_string(field.cell_ref)
+        col = column_index_from_string(column)
+        merge_bounds = enclosing_merge_bounds(sheet, row, col)
+        if merge_bounds is not None:
+            min_col, min_row, max_col, max_row = merge_bounds
+            for r in range(min_row, max_row + 1):
+                for c in range(min_col, max_col + 1):
+                    coords.add((r, c))
+        else:
+            coords.add((row, col))
+    return coords
+
+
 def _mark_fields_below_table(
     fields: list[FieldMeta],
     *,
@@ -360,7 +378,7 @@ def parse_template(
         page_height=page_height,
         margin_top=page.margin_top,
         margin_left=page.margin_left,
-        field_coords=field_coords_from_cell_refs([field.cell_ref for field in fields]),
+        field_coords=_field_skip_coords(workbook, fields),
     )
     page.static_block_height_pt = static_block_height_pt(header_sheet, header_bounds[1])
     signature_height = 80.0
