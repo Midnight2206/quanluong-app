@@ -5,14 +5,14 @@ import re
 _AMOUNT_KEYS = ("thanh_tien", "thanh_tien_vnd", "tong_tien", "so_tien")
 
 
-def parse_amount(value) -> float:
+def try_parse_amount(value) -> float | None:
+    """Like parse_amount but returns None when the value is empty or unparseable."""
     raw = str(value or "").strip().replace(" ", "").replace("\u00a0", "")
     if not raw:
-        return 0.0
+        return None
     if re.fullmatch(r"-?\d+", raw):
         return float(raw)
     if "," in raw and "." in raw:
-        # 1.234.567,89 hoặc 1,234,567.89 — chọn dấu cuối làm thập phân
         if raw.rfind(",") > raw.rfind("."):
             cleaned = raw.replace(".", "").replace(",", ".")
         else:
@@ -36,7 +36,11 @@ def parse_amount(value) -> float:
     try:
         return float(cleaned)
     except ValueError:
-        return 0.0
+        return None
+
+
+def parse_amount(value) -> float:
+    return try_parse_amount(value) or 0.0
 
 
 def format_amount(value: float) -> str:
@@ -93,4 +97,5 @@ __all__ = [
     "format_amount",
     "parse_amount",
     "sum_amount",
+    "try_parse_amount",
 ]

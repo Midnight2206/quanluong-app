@@ -38,3 +38,8 @@ def test_hex_string_matches_js_number():
 
 def test_numeric_separator_string_invalid():
     assert vnd_to_vietnamese_document_line("1_000") == ""
+
+
+def test_trillion_and_above_returns_empty():
+    assert vnd_to_vietnamese_document_line(1_000_000_000_000) == ""
+    assert vnd_to_vietnamese_document_line("1000000000000") == ""

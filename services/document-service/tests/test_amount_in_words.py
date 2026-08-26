@@ -62,10 +62,23 @@ def test_resolve_none_without_field_or_amount_column():
     assert resolve_document_amount({}, [], columns) is None
 
 
+def test_resolve_none_when_only_fallback_non_money_column_exists():
+    columns = [
+        ColumnMeta("stt", "STT", 30, "center"),
+        ColumnMeta("ghi_chu", "Ghi chú", 120, "left"),
+    ]
+    rows = [{"stt": "1", "ghi_chu": "ghi chu"}]
+    assert resolve_document_amount({}, rows, columns) is None
+
+
 def test_format_line_prefix():
     line = format_amount_in_words_line(100_000)
     assert line.startswith(AMOUNT_IN_WORDS_PREFIX)
     assert line == AMOUNT_IN_WORDS_PREFIX + "Một trăm nghìn đồng"
+
+
+def test_format_line_returns_empty_for_unsupported_large_amount():
+    assert format_amount_in_words_line(1_000_000_000_000) == ""
 
 
 def test_skip_tong_tien_bang_chu():

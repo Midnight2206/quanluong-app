@@ -75,6 +75,8 @@ def vnd_to_vietnamese_document_line(value: float | int | str | None) -> str:
     if not math.isfinite(n) or n < 0:
         return ""
     n = int(math.floor(n + 0.5))  # ponytail: matches JS Math.round for n >= 0
+    if n >= 1_000_000_000_000:
+        return ""
     if n == 0:
         return "Không đồng"
     r = n
