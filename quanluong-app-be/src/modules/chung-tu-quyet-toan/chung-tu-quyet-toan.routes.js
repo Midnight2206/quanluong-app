@@ -30,6 +30,7 @@ import {
   getChungTuPdfExportFileController,
   getChungTuPdfFieldCatalogController,
   getChungTuPdfTemplateFieldsController,
+  getChungTuBkmhHeaderSettingsController,
   getChungTuSignatureSettingsController,
   getChungTuUnitProfileController,
   getCategoryTemplateFillMappingController,
@@ -52,6 +53,7 @@ import {
   patchTemplateCatalogController,
   previewChungTuContextController,
   publishChungTuPdfTemplateController,
+  putChungTuBkmhHeaderSettingsController,
   putCategoryTemplateFillMappingController,
   putChungTuSignatureSettingsController,
   putChungTuUnitProfileController,
@@ -76,6 +78,8 @@ import {
   chungTuPdfExportKeyParamSchema,
   chungTuPdfTemplateListQuerySchema,
   chungTuPdfTemplateUploadBodySchema,
+  chungTuBkmhHeaderSettingsPutBodySchema,
+  chungTuBkmhHeaderSettingsQuerySchema,
   chungTuSignatureSettingsPutBodySchema,
   chungTuSignatureSettingsQuerySchema,
   putCategoryTemplateFillMappingBodySchema,
@@ -372,6 +376,20 @@ chungTuQuyetToanRouter.put(
   permissionMiddleware([routePermissions.signatureSettingsPut]),
   validateRequest({ body: chungTuSignatureSettingsPutBodySchema }),
   asyncHandler(putChungTuSignatureSettingsController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-header-settings",
+  permissionMiddleware([routePermissions.bkmhHeaderSettingsGet]),
+  validateRequest({ query: chungTuBkmhHeaderSettingsQuerySchema }),
+  asyncHandler(getChungTuBkmhHeaderSettingsController),
+);
+
+chungTuQuyetToanRouter.put(
+  "/bkmh-header-settings",
+  permissionMiddleware([routePermissions.bkmhHeaderSettingsPut]),
+  validateRequest({ body: chungTuBkmhHeaderSettingsPutBodySchema }),
+  asyncHandler(putChungTuBkmhHeaderSettingsController),
 );
 
 chungTuQuyetToanRouter.get(

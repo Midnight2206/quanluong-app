@@ -159,6 +159,7 @@ model User {
   chungTuPdfTemplatesUploaded            ChungTuPdfTemplate[] @relation("ChungTuPdfTemplateUploadedBy")
   chungTuPdfExportsCreated               ChungTuPdfExport[] @relation("ChungTuPdfExportCreatedBy")
   chungTuPdfExportBatchesCreated         ChungTuPdfExportBatch[] @relation("ChungTuPdfExportBatchCreatedBy")
+  chungTuBkmhHeaderSettingsUpdated       ChungTuBkmhHeaderSettings[] @relation("ChungTuBkmhHeaderSettingsUpdatedBy")
   chungTuSignatureSettingsUpdated        ChungTuSignatureSettings[] @relation("ChungTuSignatureSettingsUpdatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
@@ -361,6 +362,18 @@ model ChungTuSignatureSettings {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   updatedBy          User     @relation("ChungTuSignatureSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+}
+
+/// Cấu hình header BKMH theo loại chứng từ (chỉ áp dụng cho bang-ke-mua-hang).
+model ChungTuBkmhHeaderSettings {
+  id            Int      @id @default(autoincrement())
+  categoryKey   String   @unique @db.VarChar(80)
+  hoTenNguoiMua String?  @db.VarChar(191)
+  boPhan        String?  @db.VarChar(255)
+  updatedById   Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  updatedBy     User     @relation("ChungTuBkmhHeaderSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 }
 
 /// Snapshot BKMH mỗi lần tạo/đồng bộ (theo ngày hoặc cả tháng).

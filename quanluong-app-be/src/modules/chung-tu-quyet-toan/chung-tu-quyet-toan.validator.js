@@ -30,6 +30,21 @@ const chungTuPdfCategoryKeySchema = z.preprocess(
   ]),
 );
 
+const chungTuBkmhCategoryKeySchema = z.preprocess(
+  (v) => (v == null ? "" : String(v).trim()),
+  z.literal(CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG),
+);
+
+const nullableTrimmedString = (max) =>
+  z.preprocess(
+    (v) => {
+      if (v == null) return null;
+      const text = String(v).trim();
+      return text || null;
+    },
+    z.string().max(max).nullable(),
+  );
+
 const chungTuBooleanQueryFlagSchema = z
   .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
   .optional()
@@ -327,6 +342,16 @@ const chungTuSignatureSettingsPutBodySchema = z.object({
   signatureBlock: z.record(z.unknown()),
 });
 
+const chungTuBkmhHeaderSettingsQuerySchema = z.object({
+  categoryKey: chungTuBkmhCategoryKeySchema,
+});
+
+const chungTuBkmhHeaderSettingsPutBodySchema = z.object({
+  categoryKey: chungTuBkmhCategoryKeySchema,
+  hoTenNguoiMua: nullableTrimmedString(191).optional(),
+  boPhan: nullableTrimmedString(255).optional(),
+});
+
 const templateTreeQuerySchema = z.object({
   folderId: z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/).optional(),
   categoryKey: z.string().min(1).max(80).optional(),
@@ -372,6 +397,8 @@ export {
   chungTuPdfExportBatchFileParamsSchema,
   chungTuSignatureSettingsQuerySchema,
   chungTuSignatureSettingsPutBodySchema,
+  chungTuBkmhHeaderSettingsQuerySchema,
+  chungTuBkmhHeaderSettingsPutBodySchema,
   templateTreeQuerySchema,
   templateTreeFileParamsSchema,
 };

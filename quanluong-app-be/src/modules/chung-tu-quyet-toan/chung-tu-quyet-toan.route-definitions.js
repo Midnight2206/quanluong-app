@@ -328,6 +328,30 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "bkmhHeaderSettingsGet",
+    method: "GET",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/bkmh-header-settings",
+    pathRoute: "/api/chungtuquyettoan/bkmh-header-settings",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      name: "Chứng từ quyết toán",
+      description: "Xem cấu hình header BKMH cho người mua và bộ phận.",
+    },
+  },
+  {
+    key: "bkmhHeaderSettingsPut",
+    method: "PUT",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/bkmh-header-settings",
+    pathRoute: "/api/chungtuquyettoan/bkmh-header-settings",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      name: "Chứng từ quyết toán",
+      description: "Lưu cấu hình header BKMH cho người mua và bộ phận.",
+    },
+  },
+  {
     key: "pdfTemplateFieldCatalog",
     method: "GET",
     module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,

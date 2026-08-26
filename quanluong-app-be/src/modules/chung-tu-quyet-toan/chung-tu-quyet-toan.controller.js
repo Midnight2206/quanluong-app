@@ -67,6 +67,10 @@ import {
   getChungTuSignatureSettings,
   upsertChungTuSignatureSettings,
 } from "./chung-tu-signature-settings.service.js";
+import {
+  getChungTuBkmhHeaderSettings,
+  upsertChungTuBkmhHeaderSettings,
+} from "./chung-tu-bkmh-header-settings.service.js";
 import { getChungTuPdfFieldCatalog } from "./chung-tu-pdf-field-catalog.js";
 
 async function pipeDocumentServiceResponse(res, upstreamResponse, fallbackContentType) {
@@ -561,6 +565,29 @@ async function putChungTuSignatureSettingsController(req, res) {
   });
 }
 
+async function getChungTuBkmhHeaderSettingsController(req, res) {
+  const data = await getChungTuBkmhHeaderSettings({
+    categoryKey: req.validatedQuery.categoryKey,
+  });
+  return respondSuccess(res, {
+    message: data ? "Cấu hình header BKMH." : "Chưa có cấu hình header BKMH đã lưu.",
+    data,
+  });
+}
+
+async function putChungTuBkmhHeaderSettingsController(req, res) {
+  const data = await upsertChungTuBkmhHeaderSettings({
+    categoryKey: req.validatedBody.categoryKey,
+    hoTenNguoiMua: req.validatedBody.hoTenNguoiMua,
+    boPhan: req.validatedBody.boPhan,
+    updatedById: req.user.id,
+  });
+  return respondSuccess(res, {
+    message: "Đã lưu cấu hình header BKMH.",
+    data,
+  });
+}
+
 async function getChungTuPdfFieldCatalogController(req, res) {
   return respondSuccess(res, {
     message: "Catalog field cho mẫu PDF chứng từ.",
@@ -740,6 +767,7 @@ export {
   getChungTuPdfExportFileController,
   getChungTuPdfFieldCatalogController,
   getChungTuPdfTemplateFieldsController,
+  getChungTuBkmhHeaderSettingsController,
   getCategoryTemplateFillMappingController,
   getChungTuSignatureSettingsController,
   getChungTuUnitProfileController,
@@ -762,6 +790,7 @@ export {
   patchTemplateCatalogController,
   previewChungTuContextController,
   publishChungTuPdfTemplateController,
+  putChungTuBkmhHeaderSettingsController,
   putCategoryTemplateFillMappingController,
   putChungTuSignatureSettingsController,
   putChungTuUnitProfileController,
