@@ -8,7 +8,6 @@ from zipfile import BadZipFile
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter, range_boundaries
 from openpyxl.utils.exceptions import InvalidFileException
-from reportlab.lib.pagesizes import A4, landscape
 
 from ..template.metadata import (
     ColumnMeta,
@@ -17,13 +16,23 @@ from ..template.metadata import (
     TableMeta,
     TemplateMetadata,
 )
+from ..template.page_size import page_dimensions
+from ..render.font_style import font_dict_from_cell
 from .errors import TemplateValidationError
 from .excel_coords import (
     DEFAULT_ROW_HEIGHT_PT,
+    _column_width_char,
+    _row_height_pt,
     cell_top_left_pt,
+    col_width_to_pt,
+    enclosing_merge_bounds,
+    merged_range_height_pt,
     merged_range_width_pt,
     signature_block_height_pt,
 )
+from .layout_fit import fit_layout_to_page
+from .layout_validate import validate_template_layout
+from .static_cells import collect_static_cells, field_coords_from_cell_refs, static_block_height_pt
 
 _FIELD_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 
@@ -40,6 +49,17 @@ def _find_defined_name(workbook, name: str):
     if len(matches) > 1:
         raise TemplateValidationError(f"Named Range {name} bị trùng giữa nhiều sheet")
     return matches[0] if matches else None
+
+
+def _normalize_cell_range(cell_range: str) -> str:
+    normalized = (cell_range or "").strip()
+    if normalized.startswith("="):
+        normalized = normalized[1:].strip()
+    if "!" in normalized:
+        normalized = normalized.rsplit("!", 1)[1].strip()
+    if normalized.startswith("$"):
+        normalized = normalized.lstrip("$")
+    return normalized.replace("$", "")
 
 
 def _resolve_defined_range(workbook, defined_name, owner_sheet=None):
@@ -64,11 +84,18 @@ def _resolve_defined_range(workbook, defined_name, owner_sheet=None):
             f"Named Range {name} tham chiếu sheet không tồn tại: {sheet_name}"
         )
     try:
-        min_col, min_row, max_col, max_row = range_boundaries(cell_range)
+        min_col, min_row, max_col, max_row = range_boundaries(
+            _normalize_cell_range(cell_range)
+        )
     except ValueError as exc:
         raise TemplateValidationError(
             f"Named Range {name} phải là một vùng hình chữ nhật"
         ) from exc
+    if None in (min_col, min_row, max_col, max_row):
+        raise TemplateValidationError(
+            f"Named Range {name} phải tham chiếu vùng ô cụ thể "
+            f"(vd. A5:G5), không phải cả dòng/cột"
+        )
     normalized = (
         f"{get_column_letter(min_col)}{min_row}:"
         f"{get_column_letter(max_col)}{max_row}"
@@ -128,22 +155,36 @@ def _slug(text: str) -> str:
 
 
 def _style_dict(cell):
-    font = {
-        "name": cell.font.name,
-        "size": cell.font.sz,
-        "bold": bool(cell.font.bold),
-        "italic": bool(cell.font.italic),
-    }
+    font = font_dict_from_cell(cell)
     align = {
         "h": cell.alignment.horizontal or "left",
         "v": cell.alignment.vertical,
-        "wrap_text": cell.alignment.wrap_text,
+        "wrap_text": bool(cell.alignment.wrap_text),
     }
     border = {
         side: getattr(cell.border, side).style
         for side in ("left", "right", "top", "bottom")
     }
     return font, align, border
+
+
+# Excel paperSize enum → ReportLab page size name.
+# Source: OOXML spec §18.18.5 (ST_PrintLayoutPageSizing).
+_PAPER_SIZE_MAP: dict[int, str] = {
+    1: "Letter",   # 8.5 × 11 in
+    5: "Legal",    # 8.5 × 14 in
+    9: "A4",       # 210 × 297 mm  (most common in Vietnam)
+    11: "A5",
+    13: "B5",
+    17: "A3",
+}
+
+
+def _map_paper_size(paper_size_enum) -> str:
+    try:
+        return _PAPER_SIZE_MAP.get(int(paper_size_enum), "A4")
+    except (TypeError, ValueError):
+        return "A4"
 
 
 def _page_meta(sheet) -> PageMeta:
@@ -154,8 +195,11 @@ def _page_meta(sheet) -> PageMeta:
         value = getattr(margins, name, None)
         return getattr(defaults, f"margin_{name}") if value is None else float(value) * 72
 
-    orientation = sheet.page_setup.orientation or "portrait"
+    setup = sheet.page_setup
+    orientation = setup.orientation or "portrait"
+    page_size = _map_paper_size(setup.paperSize)
     return PageMeta(
+        page_size=page_size,
         orientation=orientation if orientation in {"portrait", "landscape"} else "portrait",
         margin_top=margin("top"),
         margin_right=margin("right"),
@@ -165,7 +209,7 @@ def _page_meta(sheet) -> PageMeta:
 
 
 def _page_height(page: PageMeta) -> float:
-    return float((landscape(A4) if page.orientation == "landscape" else A4)[1])
+    return page_dimensions(page)[1]
 
 
 def _build_fields(workbook, page: PageMeta) -> list[FieldMeta]:
@@ -187,28 +231,58 @@ def _build_fields(workbook, page: PageMeta) -> list[FieldMeta]:
                 f"Named Range {defined_name.name} phải tham chiếu một ô"
             )
         cell = sheet.cell(min_row, min_col)
-        x, y = cell_top_left_pt(
+        merge_bounds = enclosing_merge_bounds(sheet, min_row, min_col)
+        if merge_bounds is not None:
+            geom_col, geom_row, geom_max_col, geom_max_row = merge_bounds
+            style_cell = sheet.cell(geom_row, geom_col)
+        else:
+            geom_col, geom_row, geom_max_col, geom_max_row = (
+                min_col,
+                min_row,
+                min_col,
+                min_row,
+            )
+            style_cell = cell
+        x, y_top = cell_top_left_pt(
             sheet,
-            min_row,
-            min_col,
+            geom_row,
+            geom_col,
             page_height=_page_height(page),
             margin_top=page.margin_top,
             margin_left=page.margin_left,
         )
-        font, align, border = _style_dict(cell)
+        if merge_bounds is not None:
+            width = merged_range_width_pt(sheet, geom_col, geom_max_col)
+            height = merged_range_height_pt(sheet, geom_row, geom_max_row)
+        else:
+            width = col_width_to_pt(_column_width_char(sheet, min_col))
+            height = _row_height_pt(sheet, min_row)
+        font, align, border = _style_dict(style_cell)
         fields.append(
             FieldMeta(
                 field_name=field_name,
                 sheet_name=sheet.title,
                 cell_ref=cell.coordinate,
                 x=x,
-                y=y,
+                y=y_top,
                 font=font,
                 align=align,
                 border=border,
+                width_pt=width,
+                height_pt=height,
             )
         )
     return fields
+
+
+def _mark_fields_below_table(
+    fields: list[FieldMeta],
+    *,
+    data_row_y: float,
+) -> None:
+    """FIELD_* có y thấp hơn TABLE_DATA_ROW (gần đáy trang hơn) → below_table."""
+    for field in fields:
+        field.below_table = field.y < data_row_y
 
 
 def parse_template(
@@ -267,6 +341,28 @@ def parse_template(
         )
 
     page = _page_meta(header_sheet)
+    page_height = _page_height(page)
+    fields = _build_fields(workbook, page)
+    data_row_y = cell_top_left_pt(
+        data_sheet,
+        data_bounds[1],
+        data_bounds[0],
+        page_height=page_height,
+        margin_top=page.margin_top,
+        margin_left=page.margin_left,
+    )[1]
+    _mark_fields_below_table(fields, data_row_y=data_row_y)
+    static_cells = collect_static_cells(
+        workbook,
+        sheet_name=header_sheet.title,
+        header_bounds=header_bounds,
+        data_bounds=data_bounds,
+        page_height=page_height,
+        margin_top=page.margin_top,
+        margin_left=page.margin_left,
+        field_coords=field_coords_from_cell_refs([field.cell_ref for field in fields]),
+    )
+    page.static_block_height_pt = static_block_height_pt(header_sheet, header_bounds[1])
     signature_height = 80.0
     if _find_defined_name(workbook, "TABLE_SIGNATURE") is not None:
         signature_sheet, _, signature_bounds = _resolve_range(
@@ -292,7 +388,20 @@ def parse_template(
 
     header_height = header_sheet.row_dimensions[header_row].height
     data_cell = data_sheet.cell(data_bounds[1], data_bounds[0])
+    header_cell = header_sheet.cell(header_row, header_bounds[0])
+    header_font, header_align, header_border = _style_dict(header_cell)
     row_font, row_align, row_border = _style_dict(data_cell)
+    data_row_height = float(
+        _row_height_pt(data_sheet, data_bounds[1]) or DEFAULT_ROW_HEIGHT_PT
+    )
+    table_left_x, _ = cell_top_left_pt(
+        header_sheet,
+        header_row,
+        header_bounds[0],
+        page_height=page_height,
+        margin_top=page.margin_top,
+        margin_left=page.margin_left,
+    )
     table = TableMeta(
         sheet_name=header_sheet.title,
         header_row_range=header_ref,
@@ -302,17 +411,27 @@ def parse_template(
             "font": row_font,
             "align": row_align,
             "border": row_border,
+            "header_font": header_font,
+            "header_align": header_align,
+            "header_border": header_border,
         },
         header_height_pt=float(header_height or DEFAULT_ROW_HEIGHT_PT),
         signature_block_height_pt=signature_height,
+        row_height_min=data_row_height,
+        row_height_max=max(28.0, data_row_height),
     )
-    return TemplateMetadata(
+    metadata = TemplateMetadata(
         name=name,
         version=version,
         page=page,
-        fields=_build_fields(workbook, page),
+        fields=fields,
         table=table,
+        static_cells=static_cells,
+        signature_block=None,  # cấu hình khối ký do app/Node cung cấp lúc render; default khi vẽ
     )
+    fit_layout_to_page(metadata, table_left_x=table_left_x)
+    validate_template_layout(metadata)
+    return metadata
 
 
 __all__ = ["parse_template"]
