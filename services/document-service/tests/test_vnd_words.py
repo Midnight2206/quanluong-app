@@ -19,3 +19,13 @@ def test_zero():
 def test_invalid_returns_empty():
     assert vnd_to_vietnamese_document_line(None) == ""
     assert vnd_to_vietnamese_document_line(-1) == ""
+
+
+def test_rounding_matches_js_math_round():
+    assert vnd_to_vietnamese_document_line(0.5) == "Một đồng"
+    assert vnd_to_vietnamese_document_line(2.5) == "Ba đồng"
+
+
+def test_non_finite_returns_empty():
+    assert vnd_to_vietnamese_document_line(float("inf")) == ""
+    assert vnd_to_vietnamese_document_line("inf") == ""

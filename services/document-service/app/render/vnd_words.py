@@ -51,11 +51,12 @@ def _cap(s: str) -> str:
 def vnd_to_vietnamese_document_line(value: float | int | str | None) -> str:
     """Đọc số tiền VND thành chữ (một dòng, viết hoa chữ đầu)."""
     try:
-        n = round(float(value))  # type: ignore[arg-type]
+        n = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return ""
     if not math.isfinite(n) or n < 0:
         return ""
+    n = int(math.floor(n + 0.5))  # ponytail: matches JS Math.round for n >= 0
     if n == 0:
         return "Không đồng"
     r = n
