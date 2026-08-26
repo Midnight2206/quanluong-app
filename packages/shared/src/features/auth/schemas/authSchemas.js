@@ -51,6 +51,8 @@ const meProfileFormSchema = z.object({
   description: z.string().max(2000).optional(),
   jobTitle: z.string().max(255).optional(),
   rank: z.string().max(255).optional(),
+  donViCapTren: z.string().max(255).optional(),
+  donVi: z.string().max(255).optional(),
   birthday: z.string().optional(),
 });
 

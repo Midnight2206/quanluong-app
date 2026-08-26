@@ -63,6 +63,8 @@ function mapCurrentUser(user, { unitPath } = {}) {
           rank: user.profile.rank,
           phoneNumber: user.profile.phoneNumber,
           address: user.profile.address,
+          donViCapTren: user.profile.donViCapTren,
+          donVi: user.profile.donVi,
         }
       : null,
     permissions: (user.permissions || []).map(mapPermission),

@@ -30,6 +30,8 @@ async function updateOwnProfile(userId, patch) {
       description: data.description ?? null,
       jobTitle: data.jobTitle ?? null,
       rank: data.rank ?? null,
+      donViCapTren: data.donViCapTren ?? null,
+      donVi: data.donVi ?? null,
       birthday: data.birthday ?? null,
     },
     update: {
@@ -39,6 +41,8 @@ async function updateOwnProfile(userId, patch) {
       ...(data.description !== undefined ? { description: data.description } : {}),
       ...(data.jobTitle !== undefined ? { jobTitle: data.jobTitle } : {}),
       ...(data.rank !== undefined ? { rank: data.rank } : {}),
+      ...(data.donViCapTren !== undefined ? { donViCapTren: data.donViCapTren } : {}),
+      ...(data.donVi !== undefined ? { donVi: data.donVi } : {}),
       ...(data.birthday !== undefined ? { birthday: data.birthday } : {}),
     },
   });

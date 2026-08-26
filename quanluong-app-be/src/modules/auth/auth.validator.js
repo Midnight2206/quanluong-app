@@ -58,6 +58,8 @@ const meProfilePatchSchema = z
     description: z.string().max(2000).optional().nullable(),
     jobTitle: z.string().max(255).optional().nullable(),
     rank: z.string().max(255).optional().nullable(),
+    donViCapTren: z.string().max(255).optional().nullable(),
+    donVi: z.string().max(255).optional().nullable(),
     birthday: z.union([z.coerce.date(), z.null()]).optional(),
   })
   .refine((data) => Object.keys(data).some((key) => data[key] !== undefined), {

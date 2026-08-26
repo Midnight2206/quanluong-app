@@ -128,6 +128,8 @@ export function ProfilePage() {
       description: "",
       jobTitle: "",
       rank: "",
+      donViCapTren: "",
+      donVi: "",
       birthday: "",
     },
   });
@@ -176,6 +178,8 @@ export function ProfilePage() {
       description: user.profile?.description || "",
       jobTitle: user.profile?.jobTitle || "",
       rank: user.profile?.rank || "",
+      donViCapTren: user.profile?.donViCapTren || "",
+      donVi: user.profile?.donVi || "",
       birthday: formatDateForInput(user.profile?.birthday),
     });
   }, [user, resetProfile]);
@@ -261,6 +265,8 @@ export function ProfilePage() {
         description: values.description?.trim() || null,
         jobTitle: values.jobTitle?.trim() || null,
         rank: values.rank?.trim() || null,
+        donViCapTren: values.donViCapTren?.trim() || null,
+        donVi: values.donVi?.trim() || null,
         birthday: values.birthday ? values.birthday : null,
       }).unwrap();
       notifySuccess("Đã lưu hồ sơ.");
@@ -422,6 +428,16 @@ export function ProfilePage() {
                   <label className="block space-y-2">
                     <span className="text-sm font-medium">Cấp bậc / hàm</span>
                     <input className={fieldClass} {...regProfile("rank")} />
+                  </label>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Đơn vị cấp trên</span>
+                    <input className={fieldClass} {...regProfile("donViCapTren")} />
+                  </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Đơn vị</span>
+                    <input className={fieldClass} {...regProfile("donVi")} />
                   </label>
                 </div>
                 <label className="block space-y-2 sm:max-w-xs">
