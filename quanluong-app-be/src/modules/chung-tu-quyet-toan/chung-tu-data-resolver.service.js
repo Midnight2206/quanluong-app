@@ -85,16 +85,20 @@ export function resolvePdfHeaderSettings({
   if (exportingUserProfile && typeof exportingUserProfile === "object") {
     const donViCapTren = normalizeText(profile.donViCapTren);
     const donVi = normalizeText(profile.donVi);
-    resolved.donViCapTren = donViCapTren;
-    resolved.donVi = donVi;
-    resolved.donViSo = donVi;
+    // Empty profile must not blank unit-profile / legacy donViSo.
+    resolved.donViCapTren = donViCapTren || resolved.donViCapTren;
+    resolved.donVi = donVi || resolved.donVi;
+    resolved.donViSo = donVi || resolved.donViSo;
   }
   if (categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) {
     return resolved;
   }
   const settings = normalizePlainObject(rawSettings);
   const buyerName = resolveNguoiMuaFromSlips(slips) || normalizeText(bkmhHeaderSettings?.hoTenNguoiMua);
-  const boPhan = normalizeText(settings.boPhan) || normalizeText(bkmhHeaderSettings?.boPhan);
+  const boPhan =
+    normalizeText(settings.boPhan) ||
+    normalizeText(resolved.boPhan) ||
+    normalizeText(bkmhHeaderSettings?.boPhan);
   return {
     ...resolved,
     signerNguoiMua: buyerName,

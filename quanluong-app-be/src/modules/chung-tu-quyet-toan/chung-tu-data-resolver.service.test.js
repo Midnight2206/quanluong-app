@@ -129,6 +129,26 @@ test("resolvePdfHeaderSettings uses exporting user profile for don vi fields", (
   assert.equal(result.donViSo, "Tieu doan 1");
 });
 
+test("resolvePdfHeaderSettings keeps unit-profile don vi when profile fields empty", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {
+      donViCapTren: "Unit profile cap tren",
+      donVi: "Unit profile don vi",
+      donViSo: "Legacy unit profile line",
+    },
+    rawSettings: {},
+    exportingUserProfile: {
+      donViCapTren: null,
+      donVi: "  ",
+    },
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO,
+  });
+
+  assert.equal(result.donViCapTren, "Unit profile cap tren");
+  assert.equal(result.donVi, "Unit profile don vi");
+  assert.equal(result.donViSo, "Legacy unit profile line");
+});
+
 test("resolvePdfHeaderSettings prefers slip buyer over BKMH header settings", () => {
   const result = resolvePdfHeaderSettings({
     mergedSettings: {},
@@ -151,10 +171,37 @@ test("resolvePdfHeaderSettings prefers slip buyer over BKMH header settings", ()
   assert.equal(result.signerNguoiMua, "Buyer from slip");
 });
 
-test("resolvePdfHeaderSettings falls back to BKMH settings when slip buyer is empty", () => {
+test("resolvePdfHeaderSettings prefers unit-profile boPhan over BKMH settings", () => {
   const result = resolvePdfHeaderSettings({
     mergedSettings: {
-      boPhan: "Old merged bo phan should not win",
+      boPhan: "Bo phan from unit profile",
+    },
+    rawSettings: {},
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    bkmhHeaderSettings: {
+      hoTenNguoiMua: "Buyer from settings",
+      boPhan: "Bo phan from settings",
+    },
+    slips: [
+      {
+        slipNo: 1,
+        buyerDisplayName: "   ",
+        buyerUser: {
+          username: "   ",
+          profile: { fullName: "   " },
+        },
+      },
+    ],
+  });
+
+  assert.equal(result.hoTenNguoiMua, "Buyer from settings");
+  assert.equal(result.boPhan, "Bo phan from unit profile");
+});
+
+test("resolvePdfHeaderSettings falls back to BKMH settings when slip buyer and boPhan empty", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {
+      boPhan: "   ",
     },
     rawSettings: {},
     categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
