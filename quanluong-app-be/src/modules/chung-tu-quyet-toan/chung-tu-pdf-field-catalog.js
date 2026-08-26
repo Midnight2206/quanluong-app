@@ -11,7 +11,8 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
     {
       namedRange: "FIELD_tong_tien_bang_chu",
       fieldKey: "tongTienBangChu",
-      label: "Tổng tiền bằng chữ",
+      label:
+        "Tổng tiền bằng chữ — PDF engine tự vẽ dưới «Cộng»; Named Range không bắt buộc cho PDF (giữ cho Drive nếu có)",
     },
     { namedRange: "FIELD_tong_tien", fieldKey: "tongTien", label: "Tổng tiền (format VND)" },
     { namedRange: "FIELD_don_vi", fieldKey: "donVi", label: "Tên đơn vị" },
