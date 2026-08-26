@@ -37,6 +37,12 @@ function invalidateChungTuSignatureSettings(qc, categoryKey) {
   qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.root });
 }
 
+function invalidateChungTuBkmhHeaderSettings(qc, categoryKey) {
+  const key = normalizeCategoryKey(categoryKey);
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.bkmhHeaderSettings(key) });
+  qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.root });
+}
+
 export function useChungTuPdfTemplatesQuery(categoryKey, options = {}) {
   const { skip, includeNonPublished, ...rest } = options;
   const key = normalizeCategoryKey(categoryKey);
@@ -263,6 +269,41 @@ export function useUpsertChungTuSignatureSettingsMutation() {
       }),
     onSuccess: (data, variables) => {
       invalidateChungTuSignatureSettings(qc, data?.categoryKey ?? variables?.categoryKey);
+    },
+  });
+}
+
+export function useChungTuBkmhHeaderSettingsQuery(categoryKey, options = {}) {
+  const { skip, ...rest } = options;
+  const key = normalizeCategoryKey(categoryKey);
+  return useQuery({
+    queryKey: qk.chungTuQuyetToan.bkmhHeaderSettings(key),
+    queryFn: () =>
+      apiRequest({
+        url: "/chungtuquyettoan/bkmh-header-settings",
+        method: "get",
+        params: { categoryKey: key },
+      }),
+    enabled: Boolean(skip !== true && key.length > 0),
+    ...rest,
+  });
+}
+
+export function useUpsertChungTuBkmhHeaderSettingsMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ categoryKey, hoTenNguoiMua, boPhan }) =>
+      apiRequest({
+        url: "/chungtuquyettoan/bkmh-header-settings",
+        method: "put",
+        data: {
+          categoryKey: normalizeCategoryKey(categoryKey),
+          hoTenNguoiMua,
+          boPhan,
+        },
+      }),
+    onSuccess: (data, variables) => {
+      invalidateChungTuBkmhHeaderSettings(qc, data?.categoryKey ?? variables?.categoryKey);
     },
   });
 }

@@ -18,6 +18,18 @@ const mappingSource = readFileSync(
   new URL("./ChungTuTemplateMappingPanel.jsx", import.meta.url),
   "utf8",
 );
+const signatureSettingsSource = readFileSync(
+  new URL("./ChungTuSignatureSettingsWorkspace.jsx", import.meta.url),
+  "utf8",
+);
+const apiSource = readFileSync(
+  new URL("../../features/chung-tu-quyet-toan/api/chungTuPdfApi.js", import.meta.url),
+  "utf8",
+);
+const queryKeysSource = readFileSync(
+  new URL("../../app/query/queryKeys.js", import.meta.url),
+  "utf8",
+);
 
 test("decision documents use a compact two-level sticky stack", () => {
   assert.doesNotMatch(
@@ -33,4 +45,14 @@ test("decision documents use a compact two-level sticky stack", () => {
     `${historySource}\n${mappingSource}`,
     /stickyLevel=\{3\}/,
   );
+});
+
+test("BKMH signature workspace wires header settings hooks and BKMH-only form", () => {
+  assert.match(apiSource, /useChungTuBkmhHeaderSettingsQuery/);
+  assert.match(apiSource, /useUpsertChungTuBkmhHeaderSettingsMutation/);
+  assert.match(apiSource, /\/chungtuquyettoan\/bkmh-header-settings/);
+  assert.match(queryKeysSource, /bkmhHeaderSettings:\s*\(categoryKey\)/);
+  assert.match(signatureSettingsSource, /categoryKey === "bang-ke-mua-hang"/);
+  assert.match(signatureSettingsSource, /Họ tên người mua/);
+  assert.match(signatureSettingsSource, /Bộ phận/);
 });

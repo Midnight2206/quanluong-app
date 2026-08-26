@@ -130,6 +130,11 @@ export const qk = {
       "signatureSettings",
       categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
     ],
+    bkmhHeaderSettings: (categoryKey) => [
+      "chungTuQuyetToan",
+      "bkmhHeaderSettings",
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
     pdfFieldCatalog: () => ["chungTuQuyetToan", "pdfFieldCatalog"],
     templateCatalog: (categoryKey) => [
       "chungTuQuyetToan",

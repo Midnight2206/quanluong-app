@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/Button";
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import {
+  useChungTuBkmhHeaderSettingsQuery,
   useChungTuSignatureSettingsQuery,
+  useUpsertChungTuBkmhHeaderSettingsMutation,
   useUpsertChungTuSignatureSettingsMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { notifyError, notifySuccess } from "@/services/notify";
@@ -38,6 +40,11 @@ const signatureBlockSchema = z.object({
 
 const formSchema = z.object({
   signatureBlock: signatureBlockSchema,
+});
+
+const bkmhHeaderSettingsSchema = z.object({
+  hoTenNguoiMua: z.string().trim().max(191, "Tối đa 191 ký tự."),
+  boPhan: z.string().trim().max(255, "Tối đa 255 ký tự."),
 });
 
 const DEFAULT_SIGNATURE_BLOCK = Object.freeze({
@@ -117,17 +124,39 @@ function buildEmptySlot(nextIndex) {
   };
 }
 
+function normalizeBkmhHeaderSettings(input) {
+  return {
+    hoTenNguoiMua: String(input?.hoTenNguoiMua ?? ""),
+    boPhan: String(input?.boPhan ?? ""),
+  };
+}
+
+function normalizeOptionalTextInput(value) {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
 /**
  * @param {{ categoryKey: string }} props
  */
 export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
   const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
+  const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
   const {
     data: savedSettings,
     isLoading,
     isFetching,
   } = useChungTuSignatureSettingsQuery(categoryKey, { skip: !categoryKey });
   const [saveSettings, { isLoading: saving }] = useUpsertChungTuSignatureSettingsMutation();
+  const {
+    data: savedBkmhHeaderSettings,
+    isLoading: isBkmhHeaderLoading,
+    isFetching: isBkmhHeaderFetching,
+  } = useChungTuBkmhHeaderSettingsQuery(categoryKey, {
+    skip: !categoryKey || !isBkmhCategory,
+  });
+  const [saveBkmhHeaderSettings, { isLoading: savingBkmhHeader }] =
+    useUpsertChungTuBkmhHeaderSettingsMutation();
 
   const {
     control,
@@ -135,12 +164,21 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
     handleSubmit,
     reset,
     watch,
-    formState: { errors, isDirty },
+    formState: { errors: signatureErrors, isDirty: isSignatureDirty },
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       signatureBlock: cloneDefaultSignatureBlock(),
     },
+  });
+  const {
+    register: registerBkmhHeader,
+    handleSubmit: handleSubmitBkmhHeader,
+    reset: resetBkmhHeader,
+    formState: { errors: bkmhHeaderErrors, isDirty: isBkmhHeaderDirty },
+  } = useForm({
+    resolver: zodResolver(bkmhHeaderSettingsSchema),
+    defaultValues: normalizeBkmhHeaderSettings(),
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -153,6 +191,13 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
       signatureBlock: normalizeSignatureBlock(savedSettings?.signatureBlock),
     });
   }, [reset, savedSettings]);
+
+  useEffect(() => {
+    if (!isBkmhCategory) {
+      return;
+    }
+    resetBkmhHeader(normalizeBkmhHeaderSettings(savedBkmhHeaderSettings));
+  }, [isBkmhCategory, resetBkmhHeader, savedBkmhHeaderSettings]);
 
   const slotValues = watch("signatureBlock.slots");
 
@@ -174,8 +219,104 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
     }
   };
 
+  const onSubmitBkmhHeader = async ({ hoTenNguoiMua, boPhan }) => {
+    try {
+      const payload = {
+        hoTenNguoiMua: normalizeOptionalTextInput(hoTenNguoiMua),
+        boPhan: normalizeOptionalTextInput(boPhan),
+      };
+      await saveBkmhHeaderSettings({
+        categoryKey,
+        ...payload,
+      }).unwrap();
+      resetBkmhHeader(normalizeBkmhHeaderSettings(payload));
+      notifySuccess("Đã lưu header BKMH.");
+    } catch (error) {
+      notifyError(error?.data?.message || error?.message || "Không lưu được header BKMH.");
+    }
+  };
+
   return (
     <div className="space-y-3 p-3 sm:p-4">
+      {isBkmhCategory ? (
+        <ChungTuExportWizardCard
+          title="Header BKMH"
+          description="Dùng khi bảng kê mua hàng chưa có sẵn tên người mua hoặc bộ phận trong dữ liệu nguồn."
+        >
+          <form className="space-y-4" onSubmit={handleSubmitBkmhHeader(onSubmitBkmhHeader)}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                  Họ tên người mua
+                </span>
+                <input
+                  className={fieldClass}
+                  disabled={!canWrite || isBkmhHeaderLoading || savingBkmhHeader}
+                  placeholder="Ví dụ: Nguyễn Văn A"
+                  {...registerBkmhHeader("hoTenNguoiMua")}
+                />
+                {bkmhHeaderErrors.hoTenNguoiMua ? (
+                  <p className="text-xs text-destructive">{bkmhHeaderErrors.hoTenNguoiMua.message}</p>
+                ) : null}
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                  Bộ phận
+                </span>
+                <input
+                  className={fieldClass}
+                  disabled={!canWrite || isBkmhHeaderLoading || savingBkmhHeader}
+                  placeholder="Ví dụ: Phòng Hậu cần"
+                  {...registerBkmhHeader("boPhan")}
+                />
+                {bkmhHeaderErrors.boPhan ? (
+                  <p className="text-xs text-destructive">{bkmhHeaderErrors.boPhan.message}</p>
+                ) : null}
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-t border-border/70 pt-3">
+              {canWrite ? (
+                <>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-10 gap-1.5 text-xs"
+                    disabled={isBkmhHeaderLoading || savingBkmhHeader || !isBkmhHeaderDirty}
+                  >
+                    {savingBkmhHeader ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Save className="size-3.5" />
+                    )}
+                    Lưu header
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 gap-1.5 text-xs"
+                    disabled={savingBkmhHeader}
+                    onClick={() => resetBkmhHeader(normalizeBkmhHeaderSettings(savedBkmhHeaderSettings))}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    Khôi phục đã lưu
+                  </Button>
+                </>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                {isBkmhHeaderLoading || isBkmhHeaderFetching
+                  ? "Đang tải header BKMH…"
+                  : savedBkmhHeaderSettings?.updatedAt
+                    ? `Đã lưu gần nhất: ${new Date(savedBkmhHeaderSettings.updatedAt).toLocaleString("vi-VN")}.`
+                    : "Chưa có header lưu riêng, hệ thống sẽ dùng dữ liệu chứng từ nếu có."}
+              </p>
+            </div>
+          </form>
+        </ChungTuExportWizardCard>
+      ) : null}
+
       <ChungTuExportWizardCard
         title="Khối chữ ký"
         description="Cấu hình số cột, khoảng cách và các vị trí ký dùng chung cho loại chứng từ này."
@@ -195,8 +336,8 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                 disabled={!canWrite || isLoading || saving}
                 {...register("signatureBlock.columns")}
               />
-              {errors.signatureBlock?.columns ? (
-                <p className="text-xs text-destructive">{errors.signatureBlock.columns.message}</p>
+              {signatureErrors.signatureBlock?.columns ? (
+                <p className="text-xs text-destructive">{signatureErrors.signatureBlock.columns.message}</p>
               ) : null}
             </label>
 
@@ -212,8 +353,8 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                 disabled={!canWrite || isLoading || saving}
                 {...register("signatureBlock.gap_pt")}
               />
-              {errors.signatureBlock?.gap_pt ? (
-                <p className="text-xs text-destructive">{errors.signatureBlock.gap_pt.message}</p>
+              {signatureErrors.signatureBlock?.gap_pt ? (
+                <p className="text-xs text-destructive">{signatureErrors.signatureBlock.gap_pt.message}</p>
               ) : null}
             </label>
 
@@ -229,9 +370,9 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                 disabled={!canWrite || isLoading || saving}
                 {...register("signatureBlock.date_line_gap_pt")}
               />
-              {errors.signatureBlock?.date_line_gap_pt ? (
+              {signatureErrors.signatureBlock?.date_line_gap_pt ? (
                 <p className="text-xs text-destructive">
-                  {errors.signatureBlock.date_line_gap_pt.message}
+                  {signatureErrors.signatureBlock.date_line_gap_pt.message}
                 </p>
               ) : null}
             </label>
@@ -262,13 +403,13 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
               ) : null}
             </div>
 
-            {errors.signatureBlock?.slots?.message ? (
-              <p className="text-xs text-destructive">{errors.signatureBlock.slots.message}</p>
+            {signatureErrors.signatureBlock?.slots?.message ? (
+              <p className="text-xs text-destructive">{signatureErrors.signatureBlock.slots.message}</p>
             ) : null}
 
             <div className="space-y-3">
               {fields.map((field, index) => {
-                const slotError = errors.signatureBlock?.slots?.[index];
+                const slotError = signatureErrors.signatureBlock?.slots?.[index];
                 const slotValue = slotValues?.[index];
                 return (
                   <section
@@ -413,7 +554,7 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                   type="submit"
                   size="sm"
                   className="h-10 gap-1.5 text-xs"
-                  disabled={isLoading || saving || !isDirty}
+                  disabled={isLoading || saving || !isSignatureDirty}
                 >
                   {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
                   Lưu cấu hình
