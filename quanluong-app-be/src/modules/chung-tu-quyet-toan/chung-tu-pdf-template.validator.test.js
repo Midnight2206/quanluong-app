@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  chungTuBkmhHeaderSettingsPutBodySchema,
   chungTuPdfExportCreateBodySchema,
   chungTuPdfTemplateIdParamSchema,
   chungTuPdfTemplateListQuerySchema,
@@ -84,5 +85,23 @@ test("chungTuPdfExportCreateBodySchema uses the PDF category allowlist", () => {
       periodDate: "2026-08-23",
       pdfTemplateId: 2,
     }),
+  );
+});
+
+test("chungTuBkmhHeaderSettingsPutBodySchema rejects non-string hoTenNguoiMua", () => {
+  const base = { categoryKey: "bang-ke-mua-hang" };
+  assert.throws(() =>
+    chungTuBkmhHeaderSettingsPutBodySchema.parse({ ...base, hoTenNguoiMua: {} }),
+  );
+  assert.throws(() =>
+    chungTuBkmhHeaderSettingsPutBodySchema.parse({ ...base, hoTenNguoiMua: ["x"] }),
+  );
+  assert.deepEqual(
+    chungTuBkmhHeaderSettingsPutBodySchema.parse({ ...base, hoTenNguoiMua: "  " }),
+    { ...base, hoTenNguoiMua: null },
+  );
+  assert.deepEqual(
+    chungTuBkmhHeaderSettingsPutBodySchema.parse({ ...base, hoTenNguoiMua: " Nguyen Van A " }),
+    { ...base, hoTenNguoiMua: "Nguyen Van A" },
   );
 });

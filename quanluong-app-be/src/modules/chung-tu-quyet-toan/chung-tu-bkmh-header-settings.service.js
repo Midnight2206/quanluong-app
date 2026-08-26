@@ -16,7 +16,14 @@ function assertBkmhCategoryKey(categoryKey) {
 
 function normalizeOptionalText(value) {
   if (value == null) return null;
-  const text = String(value).trim();
+  if (typeof value !== "string") {
+    throw new AppError({
+      message: "Giá trị phải là chuỗi văn bản hoặc null.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  const text = value.trim();
   return text || null;
 }
 

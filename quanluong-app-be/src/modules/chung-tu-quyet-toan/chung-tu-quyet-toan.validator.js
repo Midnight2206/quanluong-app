@@ -35,14 +35,16 @@ const chungTuBkmhCategoryKeySchema = z.preprocess(
   z.literal(CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG),
 );
 
-const nullableTrimmedString = (max) =>
+/** string | null | undefined only — empty trim → null; rejects objects/arrays/numbers */
+const optionalNullableTrimmedString = (max) =>
   z.preprocess(
     (v) => {
-      if (v == null) return null;
-      const text = String(v).trim();
+      if (v == null) return v;
+      if (typeof v !== "string") return v;
+      const text = v.trim();
       return text || null;
     },
-    z.string().max(max).nullable(),
+    z.union([z.string().max(max), z.null()]).optional(),
   );
 
 const chungTuBooleanQueryFlagSchema = z
@@ -348,8 +350,8 @@ const chungTuBkmhHeaderSettingsQuerySchema = z.object({
 
 const chungTuBkmhHeaderSettingsPutBodySchema = z.object({
   categoryKey: chungTuBkmhCategoryKeySchema,
-  hoTenNguoiMua: nullableTrimmedString(191).optional(),
-  boPhan: nullableTrimmedString(255).optional(),
+  hoTenNguoiMua: optionalNullableTrimmedString(191),
+  boPhan: optionalNullableTrimmedString(255),
 });
 
 const templateTreeQuerySchema = z.object({
