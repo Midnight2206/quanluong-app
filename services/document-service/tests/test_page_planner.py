@@ -48,6 +48,27 @@ def test_regular_page_defers_minimum_rows_for_signature_page():
     assert len(result.pages[-1].row_indices) >= 2
 
 
+def test_continuation_page_uses_taller_budget():
+    """Trang 2+ không trừ static header → nhét được nhiều dòng hơn trang 1."""
+    page1 = 100.0
+    continuation = 180.0
+    result = plan_pages(
+        n_rows=20,
+        page_content_height=page1,
+        continuation_content_height=continuation,
+        header_height=10,
+        carry_row_height=10,
+        signature_block_height=20,
+        row_height_min=18,
+        row_height_max=18,
+        min_rows_last_page=2,
+    )
+    assert len(result.pages) >= 2
+    # Trang 1: (100-10-10)/18 = 4 dòng; trang giữa: (180-10-10-10)/18 = 8
+    assert len(result.pages[0].row_indices) == 4
+    assert len(result.pages[1].row_indices) == 8
+
+
 def test_infeasible_raises_vietnamese_error():
     # Header and signature exceed the 40pt page before any 18pt row can fit.
     with pytest.raises(ValueError, match="không"):
