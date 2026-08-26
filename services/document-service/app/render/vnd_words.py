@@ -48,11 +48,29 @@ def _cap(s: str) -> str:
     return s[:1].upper() + s[1:] if s else s
 
 
+def _parse_input_number(value: float | int | str | None) -> float | None:
+    """Coerce to float; None if invalid. str paths mirror JS Number()."""
+    if isinstance(value, str):
+        s = value.strip()
+        if not s or "_" in s:
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            try:
+                return float(int(s, 0))
+            except ValueError:
+                return None
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
 def vnd_to_vietnamese_document_line(value: float | int | str | None) -> str:
     """Đọc số tiền VND thành chữ (một dòng, viết hoa chữ đầu)."""
-    try:
-        n = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    n = _parse_input_number(value)
+    if n is None:
         return ""
     if not math.isfinite(n) or n < 0:
         return ""

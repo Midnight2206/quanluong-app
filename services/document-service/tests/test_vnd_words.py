@@ -29,3 +29,12 @@ def test_rounding_matches_js_math_round():
 def test_non_finite_returns_empty():
     assert vnd_to_vietnamese_document_line(float("inf")) == ""
     assert vnd_to_vietnamese_document_line("inf") == ""
+
+
+def test_hex_string_matches_js_number():
+    assert vnd_to_vietnamese_document_line("0x10") == vnd_to_vietnamese_document_line(16)
+    assert vnd_to_vietnamese_document_line("0x10") == "Mười sáu đồng"
+
+
+def test_numeric_separator_string_invalid():
+    assert vnd_to_vietnamese_document_line("1_000") == ""
