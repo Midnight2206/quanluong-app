@@ -63,7 +63,7 @@ def resolve_document_amount(fields, rows, columns) -> float | None:
         if raw is None or str(raw).strip() == "":
             continue
         parsed = try_parse_amount(raw)
-        if parsed is not None:
+        if parsed is not None and parsed >= 0:
             return parsed
     amount_key = find_amount_column_key(columns)
     if not amount_key:

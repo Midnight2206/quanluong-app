@@ -40,6 +40,12 @@ def test_resolve_falls_back_to_row_sum_when_field_unparseable():
     assert resolve_document_amount({"tong_tien": "abc"}, rows, columns) == 15000.0
 
 
+def test_resolve_falls_back_to_row_sum_when_field_negative():
+    columns = [ColumnMeta("thanh_tien", "Thành tiền", 80, "right")]
+    rows = [{"thanh_tien": "10.000"}, {"thanh_tien": "5.000"}]
+    assert resolve_document_amount({"tong_tien": "-1000"}, rows, columns) == 15000.0
+
+
 def test_resolve_accepts_explicit_zero_scalar():
     columns = [ColumnMeta("thanh_tien", "Thành tiền", 80, "right")]
     rows = [{"thanh_tien": "10.000"}]
