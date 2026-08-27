@@ -5,9 +5,12 @@ import {
 import { camelToSnake } from "./chung-tu-pdf-map.util.js";
 
 const STATIC_ALIASES = Object.freeze({
+  tt: "stt",
+  so_tt: "stt",
   ten_mat_hang: "tenHang",
   ten_hang: "tenHang",
   ten_hang_hoa: "tenHang",
+  ten_nguoi_ban_hoac_dia_chi_mua_hang: "nguoiBan",
   thanh_tien_vnd: "thanhTien",
   tong_tien_bang_chu: "tongTienBangChu",
   ngay_thang_nam: "ngayThangNam",

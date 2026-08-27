@@ -10,6 +10,15 @@ test("resolveColumnFieldKey maps ten_hang to tenHang", () => {
   assert.equal(resolveColumnFieldKey("ten_hang"), "tenHang");
 });
 
+test("resolveColumnFieldKey maps Excel TT slug and seller slug", () => {
+  assert.equal(resolveColumnFieldKey("tt"), "stt");
+  assert.equal(resolveColumnFieldKey("so_tt"), "stt");
+  assert.equal(
+    resolveColumnFieldKey("ten_nguoi_ban_hoac_dia_chi_mua_hang"),
+    "nguoiBan",
+  );
+});
+
 test("resolveScalarFieldKey maps tong_tien_bang_chu to tongTienBangChu", () => {
   assert.equal(resolveScalarFieldKey("tong_tien_bang_chu"), "tongTienBangChu");
 });

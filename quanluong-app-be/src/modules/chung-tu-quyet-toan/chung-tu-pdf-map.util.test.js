@@ -68,6 +68,17 @@ test("mapDetailRowsForTemplate writes ten_mat_hang column", () => {
   assert.equal(rows[0].ten_mat_hang, "Gạo");
 });
 
+test("mapDetailRowsForTemplate maps tt and long seller column keys", () => {
+  const rows = mapDetailRowsForTemplate(
+    [{ stt: 2, tenHang: "Gạo", nguoiBan: "HTX An Phú" }],
+    ["tt", "ten_nguoi_ban_hoac_dia_chi_mua_hang"],
+  );
+  assert.deepEqual(rows[0], {
+    tt: "2",
+    ten_nguoi_ban_hoac_dia_chi_mua_hang: "HTX An Phú",
+  });
+});
+
 const payload = buildDocumentServicePayload({
   context: { donVi: "Bếp A", detailRows: [{ stt: "1", tenHang: "Gạo" }] },
   fieldKeys: ["don_vi"],

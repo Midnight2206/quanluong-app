@@ -30,14 +30,19 @@ export function guessDetailFieldKeyFromLabel(label) {
   const text = String(label ?? "")
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
+    .replace(/[đĐ]/g, "d")
     .toLowerCase()
     .trim();
   if (!text) return "";
-  if (/\bstt\b|so thu tu/.test(text)) return "stt";
-  if (/ten.*hang|mat hang|hang hoa|thuc pham|noi dung/.test(text)) return "tenHang";
+  // STT trước; "tt" là tiêu đề mẫu BKMH (Excel slug → key `tt`).
+  if (/\bstt\b|\btt\b|so thu tu|so tt/.test(text)) return "stt";
+  // Người bán / NCC trước tenHang — tránh "…mua hàng" khớp ten.*hang.
+  if (/nguoi.*ban|ben ban|nha cung cap|\bncc\b|doi tac|dia chi mua hang/.test(text)) {
+    return "nguoiBan";
+  }
+  if (/ten.*hang|mat hang|hang hoa|thuc pham|noi dung|quy cach/.test(text)) return "tenHang";
   if (/\bma\b|ma so|ma hang|sku/.test(text)) return "maSo";
   if (/dvt|don vi tinh/.test(text)) return "dvt";
-  if (/nguoi.*ban|ben ban|nha cung cap|ncc/.test(text)) return "nguoiBan";
   if (/yeu cau|theo nhu cau|dat hang/.test(text)) return "yeuCau";
   if (/thuc nhap|nhap thuc te/.test(text)) return "thucNhap";
   if (/thuc xuat|xuat thuc te/.test(text)) return "thucXuat";

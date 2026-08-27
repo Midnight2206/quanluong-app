@@ -13,6 +13,13 @@ test("guessDetailFieldKeyFromLabel maps Vietnamese headers", () => {
   assert.equal(guessDetailFieldKeyFromLabel("Thành tiền"), "thanhTien");
   assert.equal(guessDetailFieldKeyFromLabel("Thực nhập"), "thucNhap");
   assert.equal(guessDetailFieldKeyFromLabel("Số lượng yêu cầu"), "yeuCau");
+  assert.equal(guessDetailFieldKeyFromLabel("TT"), "stt");
+  assert.equal(guessDetailFieldKeyFromLabel("Số TT"), "stt");
+  assert.equal(
+    guessDetailFieldKeyFromLabel("Tên người bán hoặc địa chỉ mua hàng"),
+    "nguoiBan",
+  );
+  assert.equal(guessDetailFieldKeyFromLabel("Đối tác"), "nguoiBan");
 });
 
 test("resolveDetailColumnMappings prefers columnMappings over legacy columns", () => {
