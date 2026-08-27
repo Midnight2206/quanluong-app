@@ -19,6 +19,11 @@ test("formatDerivedNamedRangeValue adds Vietnamese labels for single-cell ranges
   );
 });
 
+test("formatDerivedNamedRangeValue does not double Số prefix", () => {
+  assert.equal(formatDerivedNamedRangeValue("soChungTu", "Số: 062615"), "Số: 062615");
+  assert.equal(formatDerivedNamedRangeValue("so", "Số: 1"), "Số: 1");
+});
+
 test("resolveLegacyNamedRangeFieldKey maps tongTienBanChu typo", () => {
   assert.equal(resolveLegacyNamedRangeFieldKey("tongtienbanchu"), "tongTienBangChu");
   assert.equal(resolveLegacyNamedRangeFieldKey("tongtienbangchu"), "tongTienBangChu");

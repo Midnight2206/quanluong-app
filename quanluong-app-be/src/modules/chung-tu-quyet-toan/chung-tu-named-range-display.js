@@ -11,12 +11,12 @@ const NAMED_RANGE_LEGACY_FIELD_KEYS = Object.freeze({
   dia_chi: "donVi",
 });
 
-const LABELED_FIELD_FORMATTERS = Object.freeze({
-  quyenSo: (value) => `Quyển số: ${value}`,
-  so: (value) => `Số: ${value}`,
-  soChungTu: (value) => `Số: ${value}`,
-  soPhieu: (value) => `Số: ${value}`,
-  tongTienBangChu: (value) => `Tổng số tiền (Viết bằng chữ): ${value}`,
+const LABELED_FIELD_PREFIXES = Object.freeze({
+  quyenSo: "Quyển số: ",
+  so: "Số: ",
+  soChungTu: "Số: ",
+  soPhieu: "Số: ",
+  tongTienBangChu: "Tổng số tiền (Viết bằng chữ): ",
 });
 
 export function resolveLegacyNamedRangeFieldKey(normalizedName) {
@@ -27,6 +27,8 @@ export function resolveLegacyNamedRangeFieldKey(normalizedName) {
 export function formatDerivedNamedRangeValue(fieldKey, rawValue) {
   const value = String(rawValue ?? "").trim();
   if (!value) return "";
-  const format = LABELED_FIELD_FORMATTERS[fieldKey];
-  return format ? format(value) : value;
+  const prefix = LABELED_FIELD_PREFIXES[fieldKey];
+  if (!prefix) return value;
+  if (value.startsWith(prefix.trimEnd()) || value.startsWith(prefix)) return value;
+  return `${prefix}${value}`;
 }

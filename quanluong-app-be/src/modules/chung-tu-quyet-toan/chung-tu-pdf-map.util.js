@@ -2,6 +2,7 @@ import {
   resolveColumnFieldKey,
   resolveScalarFieldKey,
 } from "./chung-tu-pdf-column-alias.util.js";
+import { formatDerivedNamedRangeValue } from "./chung-tu-named-range-display.js";
 
 export function camelToSnake(key) {
   return String(key ?? "")
@@ -33,7 +34,9 @@ export function pickMappedFields(context, fieldKeys) {
     const raw = fieldKey
       ? lookupContextValue(context, fieldKey) ?? lookupContextValue(context, camelToSnake(fieldKey))
       : lookupContextValue(context, key);
-    if (raw !== undefined) out[key] = valueToCell(raw);
+    if (raw === undefined) continue;
+    const cell = valueToCell(raw);
+    out[key] = fieldKey ? formatDerivedNamedRangeValue(fieldKey, cell) : cell;
   }
   return out;
 }

@@ -16,8 +16,28 @@ assert.deepEqual(
     { thanhTien: "1.000", soChungTu: "A1", extra: "x" },
     ["thanh_tien", "so_chung_tu"],
   ),
-  { thanh_tien: "1.000", so_chung_tu: "A1" },
+  { thanh_tien: "1.000", so_chung_tu: "Số: A1" },
 );
+
+test("pickMappedFields prefixes so_chung_tu with Số:", () => {
+  assert.deepEqual(
+    pickMappedFields(
+      { soChungTu: "062615", so: "062615", soPhieu: "062615" },
+      ["so_chung_tu", "so", "so_phieu"],
+    ),
+    {
+      so_chung_tu: "Số: 062615",
+      so: "Số: 062615",
+      so_phieu: "Số: 062615",
+    },
+  );
+});
+
+test("pickMappedFields leaves empty soChungTu empty", () => {
+  assert.deepEqual(pickMappedFields({ soChungTu: "  " }, ["so_chung_tu"]), {
+    so_chung_tu: "",
+  });
+});
 
 test("pickMappedFields resolves scalar legacy aliases", () => {
   assert.deepEqual(
@@ -26,7 +46,7 @@ test("pickMappedFields resolves scalar legacy aliases", () => {
       ["tong_tien_bang_chu", "ngay_thang_nam"],
     ),
     {
-      tong_tien_bang_chu: "Một triệu",
+      tong_tien_bang_chu: "Tổng số tiền (Viết bằng chữ): Một triệu",
       ngay_thang_nam: "ngày 15 tháng 8 năm 2026",
     },
   );
