@@ -47,6 +47,42 @@ test("aggregateLinesToDetailRows sums quantity and amount for same commodity", (
   assert.equal(rows[1].soLuong, 1);
 });
 
+test("aggregateLinesToDetailRows keeps separate rows when same commodity has different unitPrice", () => {
+  const rows = aggregateLinesToDetailRows([
+    {
+      commodity: { id: 1, name: "Gạo", measureUnit: "Kg" },
+      lttpSupplier: { name: "A" },
+      quantity: 2,
+      unitPrice: 10000,
+      amount: 20000,
+    },
+    {
+      commodity: { id: 1, name: "Gạo", measureUnit: "Kg" },
+      lttpSupplier: { name: "A" },
+      quantity: 3,
+      unitPrice: 12000,
+      amount: 36000,
+    },
+  ]);
+
+  assert.equal(rows.length, 2);
+  assert.deepEqual(
+    rows.map((row) => row.donGia),
+    ["10.000", "12.000"],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.soLuong),
+    [2, 3],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.stt),
+    [1, 2],
+  );
+  // Must not be average 11000 → "11.000"
+  assert.notEqual(rows[0].donGia, "11.000");
+  assert.notEqual(rows[1].donGia, "11.000");
+});
+
 test("aggregateLinesToDetailRows renumbers stt after merge", () => {
   const rows = aggregateLinesToDetailRows([
     {

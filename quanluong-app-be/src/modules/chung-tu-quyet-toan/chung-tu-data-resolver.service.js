@@ -272,11 +272,13 @@ function commodityGroupKey(line) {
   return `fallback:${code}|${name}|${unit}`;
 }
 
-/** Gộp các dòng cùng hàng hóa trong một ngày: cộng số lượng và thành tiền. */
+/** Gộp dòng cùng hàng hóa + cùng unitPrice; khác giá → dòng mới (không trung bình). */
 function aggregateLinesToDetailRows(rawLines) {
   const groups = new Map();
   for (const line of rawLines ?? []) {
-    const key = commodityGroupKey(line);
+    const unitPrice = Number(line.unitPrice);
+    const priceKey = Number.isFinite(unitPrice) ? String(unitPrice) : "__no_price__";
+    const key = `${commodityGroupKey(line)}|${priceKey}`;
     let group = groups.get(key);
     if (!group) {
       group = {
@@ -287,7 +289,7 @@ function aggregateLinesToDetailRows(rawLines) {
         requiredQuantity: 0,
         hasRequiredQuantity: false,
         amount: 0,
-        unitPrices: new Set(),
+        unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
         lineNotes: new Set(),
       };
       groups.set(key, group);
@@ -301,8 +303,6 @@ function aggregateLinesToDetailRows(rawLines) {
       group.requiredQuantity += requiredQty;
       group.hasRequiredQuantity = true;
     }
-    const unitPrice = Number(line.unitPrice);
-    if (Number.isFinite(unitPrice)) group.unitPrices.add(unitPrice);
     const supplierName = String(line.lttpSupplier?.name ?? "").trim();
     if (supplierName) group.supplierNames.add(supplierName);
     const lineNote = String(line.lineNote ?? "").trim();
@@ -310,14 +310,6 @@ function aggregateLinesToDetailRows(rawLines) {
   }
 
   return [...groups.values()].map((group, index) => {
-    const qty = group.quantity;
-    const amount = group.amount;
-    let unitPrice = null;
-    if (qty > 0 && amount > 0) {
-      unitPrice = amount / qty;
-    } else if (group.unitPrices.size === 1) {
-      unitPrice = [...group.unitPrices][0];
-    }
     const supplierNames = [...group.supplierNames];
     const lttpSupplier =
       supplierNames.length === 1
@@ -329,10 +321,10 @@ function aggregateLinesToDetailRows(rawLines) {
       {
         commodity: group.commodity,
         lttpSupplier,
-        quantity: qty,
+        quantity: group.quantity,
         requiredQuantity: group.hasRequiredQuantity ? group.requiredQuantity : null,
-        unitPrice,
-        amount,
+        unitPrice: group.unitPrice,
+        amount: group.amount,
         lineNote: [...group.lineNotes].join("; "),
       },
       index,
