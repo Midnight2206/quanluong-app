@@ -50,6 +50,15 @@ import {
   streamChungTuPdfExportBatchMergedPdf,
   streamChungTuPdfExportBatchZip,
 } from "./chung-tu-pdf-export-batch.service.js";
+import {
+  createChungTuBkmhMonthlyExport,
+  deleteChungTuBkmhMonthly,
+  getChungTuBkmhMonthly,
+  listChungTuBkmhMonthly,
+  streamChungTuBkmhMonthlyMergedPdf,
+  streamChungTuBkmhMonthlySliceFile,
+  streamChungTuBkmhMonthlyZip,
+} from "./chung-tu-bkmh-monthly.service.js";
 import { getChungTuUnitProfile, putChungTuUnitProfile } from "./chung-tu-unit-profile.service.js";
 import {
   getCategoryTemplateFillMapping,
@@ -345,6 +354,87 @@ async function deleteChungTuPdfExportBatchController(req, res) {
   });
   return respondSuccess(res, {
     message: "Đã xóa lô xuất PDF.",
+    data,
+  });
+}
+
+async function listChungTuBkmhMonthlyController(req, res) {
+  const items = await listChungTuBkmhMonthly({
+    storageUnitId: req.validatedQuery.storageUnitId,
+    periodMonth: req.validatedQuery.periodMonth,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Danh sách BKMH tháng.",
+    data: { items },
+  });
+}
+
+async function createChungTuBkmhMonthlyController(req, res) {
+  const body = req.validatedBody;
+  const data = await createChungTuBkmhMonthlyExport({
+    storageUnitId: body.unitId,
+    periodMonth: body.periodMonth,
+    unitIds: body.unitIds,
+    aggregationMode: body.aggregationMode,
+    pdfTemplateId: body.pdfTemplateId,
+    signatures: body.signatures,
+    signatureDates: body.signatureDates,
+    signatureBlock: body.signatureBlock,
+    settings: req.chungTuSettings ?? body.settings ?? {},
+    exportingUserProfile: req.userProfile ?? req.user?.profile ?? null,
+    createdById: req.user.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondCreated(res, {
+    message: "Đã xuất BKMH tháng.",
+    data,
+  });
+}
+
+async function getChungTuBkmhMonthlyController(req, res) {
+  const data = await getChungTuBkmhMonthly({
+    id: req.validatedParams.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Chi tiết BKMH tháng.",
+    data,
+  });
+}
+
+async function streamChungTuBkmhMonthlyZipController(req, res) {
+  const upstream = await streamChungTuBkmhMonthlyZip({
+    id: req.validatedParams.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  await pipeDocumentServiceResponse(res, upstream, "application/zip");
+}
+
+async function streamChungTuBkmhMonthlyMergedPdfController(req, res) {
+  const upstream = await streamChungTuBkmhMonthlyMergedPdf({
+    id: req.validatedParams.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  await pipeDocumentServiceResponse(res, upstream, "application/pdf");
+}
+
+async function streamChungTuBkmhMonthlySliceFileController(req, res) {
+  const upstream = await streamChungTuBkmhMonthlySliceFile({
+    id: req.validatedParams.id,
+    sliceId: req.validatedParams.sliceId,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  await pipeDocumentServiceResponse(res, upstream, "application/pdf");
+}
+
+async function deleteChungTuBkmhMonthlyController(req, res) {
+  const data = await deleteChungTuBkmhMonthly({
+    id: req.validatedParams.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Đã xóa BKMH tháng.",
     data,
   });
 }
@@ -757,14 +847,17 @@ export {
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
   createChungTuPdfTemplateController,
+  createChungTuBkmhMonthlyController,
   createChungTuPdfExportBatchController,
   createChungTuPdfExportController,
   createChungTuDocumentController,
+  deleteChungTuBkmhMonthlyController,
   deleteChungTuDocumentController,
   deleteChungTuPdfExportBatchController,
   deleteChungTuPdfExportController,
   createTemplateCatalogController,
   deleteTemplateCatalogController,
+  getChungTuBkmhMonthlyController,
   getChungTuDocumentController,
   getChungTuPdfExportBatchController,
   getChungTuPdfExportFileController,
@@ -776,6 +869,7 @@ export {
   getChungTuUnitProfileController,
   getTemplateFillRulesController,
   importDriveFileController,
+  listChungTuBkmhMonthlyController,
   listChungTuPdfExportBatchesController,
   listChungTuPdfExportsController,
   listCategoryTemplatesController,
@@ -799,6 +893,9 @@ export {
   putChungTuUnitProfileController,
   putTemplateFillRulesController,
   retireChungTuPdfTemplateController,
+  streamChungTuBkmhMonthlyMergedPdfController,
+  streamChungTuBkmhMonthlySliceFileController,
+  streamChungTuBkmhMonthlyZipController,
   streamChungTuPdfExportBatchFileController,
   streamChungTuPdfExportBatchMergedPdfController,
   streamChungTuPdfExportBatchZipController,

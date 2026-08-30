@@ -17,14 +17,17 @@ import {
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
   createChungTuPdfExportBatchController,
+  createChungTuBkmhMonthlyController,
   createChungTuPdfTemplateController,
   createChungTuPdfExportController,
   createChungTuDocumentController,
   createTemplateCatalogController,
+  deleteChungTuBkmhMonthlyController,
   deleteChungTuDocumentController,
   deleteChungTuPdfExportBatchController,
   deleteChungTuPdfExportController,
   deleteTemplateCatalogController,
+  getChungTuBkmhMonthlyController,
   getChungTuDocumentController,
   getChungTuPdfExportBatchController,
   getChungTuPdfExportFileController,
@@ -36,6 +39,7 @@ import {
   getCategoryTemplateFillMappingController,
   getTemplateFillRulesController,
   importDriveFileController,
+  listChungTuBkmhMonthlyController,
   listCategoryTemplatesController,
   listChungTuPdfExportBatchesController,
   listChungTuPdfExportsController,
@@ -59,6 +63,9 @@ import {
   putChungTuUnitProfileController,
   putTemplateFillRulesController,
   retireChungTuPdfTemplateController,
+  streamChungTuBkmhMonthlyMergedPdfController,
+  streamChungTuBkmhMonthlySliceFileController,
+  streamChungTuBkmhMonthlyZipController,
   streamChungTuPdfExportBatchFileController,
   streamChungTuPdfExportBatchMergedPdfController,
   streamChungTuPdfExportBatchZipController,
@@ -73,6 +80,10 @@ import {
   chungTuPdfExportBatchFileParamsSchema,
   chungTuPdfExportBatchKeyParamSchema,
   chungTuPdfExportBatchListQuerySchema,
+  chungTuBkmhMonthlyCreateBodySchema,
+  chungTuBkmhMonthlyIdParamSchema,
+  chungTuBkmhMonthlyListQuerySchema,
+  chungTuBkmhMonthlySliceFileParamsSchema,
   chungTuPdfTemplateIdParamSchema,
   chungTuPdfExportCreateBodySchema,
   chungTuPdfExportKeyParamSchema,
@@ -362,6 +373,57 @@ chungTuQuyetToanRouter.delete(
   permissionMiddleware([routePermissions.pdfExportBatchDelete]),
   validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
   asyncHandler(deleteChungTuPdfExportBatchController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly",
+  permissionMiddleware([routePermissions.bkmhMonthlyList]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  validateRequest({ query: chungTuBkmhMonthlyListQuerySchema }),
+  asyncHandler(listChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/bkmh-monthly-exports",
+  permissionMiddleware([routePermissions.bkmhMonthlyCreate]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  validateRequest({ body: chungTuBkmhMonthlyCreateBodySchema }),
+  asyncHandler(createChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id",
+  permissionMiddleware([routePermissions.bkmhMonthlyDetail]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(getChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id/zip",
+  permissionMiddleware([routePermissions.bkmhMonthlyZip]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(streamChungTuBkmhMonthlyZipController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id/merged.pdf",
+  permissionMiddleware([routePermissions.bkmhMonthlyMergedPdf]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(streamChungTuBkmhMonthlyMergedPdfController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id/slices/:sliceId/file",
+  permissionMiddleware([routePermissions.bkmhMonthlySliceFile]),
+  validateRequest({ params: chungTuBkmhMonthlySliceFileParamsSchema }),
+  asyncHandler(streamChungTuBkmhMonthlySliceFileController),
+);
+
+chungTuQuyetToanRouter.delete(
+  "/bkmh-monthly/:id",
+  permissionMiddleware([routePermissions.bkmhMonthlyDelete]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(deleteChungTuBkmhMonthlyController),
 );
 
 chungTuQuyetToanRouter.get(

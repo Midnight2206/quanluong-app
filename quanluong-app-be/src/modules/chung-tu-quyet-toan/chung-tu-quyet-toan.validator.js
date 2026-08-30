@@ -326,6 +326,14 @@ const chungTuPdfExportBatchListQuerySchema = z.object({
   categoryKey: chungTuPdfCategoryKeySchema.optional(),
 });
 
+const chungTuBkmhMonthlyListQuerySchema = z.object({
+  storageUnitId: z.coerce.number().int().positive(),
+  periodMonth: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .optional(),
+});
+
 const chungTuPdfExportBatchKeyParamSchema = z.object({
   batchKey: z.string().min(8).max(200),
 });
@@ -334,6 +342,34 @@ const chungTuPdfExportBatchFileParamsSchema = z.object({
   batchKey: z.string().min(8).max(200),
   fileId: z.coerce.number().int().positive(),
 });
+
+const chungTuBkmhMonthlyIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const chungTuBkmhMonthlySliceFileParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  sliceId: z.coerce.number().int().positive(),
+});
+
+const chungTuBkmhMonthlyCreateBodySchema = chungTuPdfExportBatchCreateBodySchema.superRefine(
+  (body, ctx) => {
+    if (body.categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Chỉ áp dụng cho bảng kê mua hàng.",
+        path: ["categoryKey"],
+      });
+    }
+    if (!body.periodMonth) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "BKMH monthly yêu cầu periodMonth.",
+        path: ["periodMonth"],
+      });
+    }
+  },
+);
 
 const chungTuSignatureSettingsQuerySchema = z.object({
   categoryKey: chungTuPdfCategoryKeySchema,
@@ -397,6 +433,10 @@ export {
   chungTuPdfExportBatchListQuerySchema,
   chungTuPdfExportBatchKeyParamSchema,
   chungTuPdfExportBatchFileParamsSchema,
+  chungTuBkmhMonthlyListQuerySchema,
+  chungTuBkmhMonthlyIdParamSchema,
+  chungTuBkmhMonthlySliceFileParamsSchema,
+  chungTuBkmhMonthlyCreateBodySchema,
   chungTuSignatureSettingsQuerySchema,
   chungTuSignatureSettingsPutBodySchema,
   chungTuBkmhHeaderSettingsQuerySchema,
