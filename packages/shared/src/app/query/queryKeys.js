@@ -162,6 +162,13 @@ export const qk = {
       categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
     ],
     document: (documentKey) => ["chungTuQuyetToan", "document", String(documentKey)],
+    bkmhMonthly: (storageUnitId, periodMonth) => [
+      "chungTuQuyetToan",
+      "bkmhMonthly",
+      String(storageUnitId ?? ""),
+      periodMonth ?? "_all",
+    ],
+    bkmhMonthlyDetail: (id) => ["chungTuQuyetToan", "bkmhMonthlyDetail", String(id ?? "")],
   },
 };
 
