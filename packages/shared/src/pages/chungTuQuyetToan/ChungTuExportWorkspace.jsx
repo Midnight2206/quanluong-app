@@ -21,6 +21,7 @@ import {
   useChungTuPdfTemplatesQuery,
   useCreateChungTuPdfExportBatchMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
+import { useCreateChungTuBkmhMonthlyExportMutation } from "@/features/chung-tu-quyet-toan/api/chungTuBkmhMonthlyApi";
 import { CHUNG_TU_EXPORT_KIND } from "@/pages/chungTuQuyetToan/chungTuCategoryConfig";
 import {
   formatPeriodMonth,
@@ -155,6 +156,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
   const isMonthly = exportKind === CHUNG_TU_EXPORT_KIND.MONTHLY;
   const isBySlip = exportKind === CHUNG_TU_EXPORT_KIND.BY_SLIP;
+  const isBkmhMonthly = categoryKey === "bang-ke-mua-hang" && isMonthly;
 
   const [periodMonth, setPeriodMonth] = useState(() => todayYmd().slice(0, 7));
   const [periodDate, setPeriodDate] = useState(todayYmd);
@@ -305,7 +307,9 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   );
   const slips = slipsPayload?.items ?? [];
 
-  const [createPdfExportBatch, { isLoading: creating }] = useCreateChungTuPdfExportBatchMutation();
+  const [createBkmhMonthlyExport, { isLoading: creatingBkmhMonthly }] =
+    useCreateChungTuBkmhMonthlyExportMutation();
+  const [createPdfExportBatch, { isLoading: creatingBatch }] = useCreateChungTuPdfExportBatchMutation();
   const [previewCtx, { isLoading: previewing }] = useChungTuContextPreviewMutation();
 
   const buildPayloadBase = useCallback(() => {
@@ -387,13 +391,28 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     }
     setActionError(null);
     try {
-      const result = await createPdfExportBatch({
+      const mutate = isBkmhMonthly ? createBkmhMonthlyExport : createPdfExportBatch;
+      const result = await mutate({
         ...buildPayloadBase(),
         pdfTemplateId: Number(selectedTemplate.id),
         signatures,
         signatureDates,
         ...(activeSignatureBlock ? { signatureBlock: activeSignatureBlock } : {}),
       }).unwrap();
+      if (isBkmhMonthly) {
+        const monthlyId = result?.id ?? result?.monthlyId ?? "";
+        const sliceCount = Number(result?.sliceCount ?? 0);
+        setLastBatchInfo({
+          monthlyId,
+          sliceCount,
+          displayName: result?.displayName ?? "",
+          periodMonth: result?.periodMonth ?? periodMonth,
+        });
+        notifySuccess(
+          `Đã lưu BKMH tháng ${formatPeriodMonth(result?.periodMonth ?? periodMonth)} (monthlyId: ${monthlyId || "—"}, sliceCount: ${sliceCount}).`,
+        );
+        return;
+      }
       const fileCount = Number(result?.fileCount ?? 0);
       setLastBatchInfo({
         batchKey: result?.batchKey ?? "",
@@ -412,7 +431,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     }
   };
 
-  const busy = creating || previewing;
+  const busy = creatingBkmhMonthly || creatingBatch || previewing;
   const canRun =
     Boolean(selectedTemplate) &&
     (isMonthly
@@ -847,12 +866,14 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           type="button"
           size="sm"
           className="h-10 w-full gap-1.5 text-xs sm:w-auto"
-            disabled={
-              !effectiveUnitId || !canRun || busy || templateFieldsLoading || signatureSettingsLoading
-            }
+          disabled={
+            !effectiveUnitId || !canRun || busy || templateFieldsLoading || signatureSettingsLoading
+          }
           onClick={handleCreate}
         >
-          {creating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          {creatingBkmhMonthly || creatingBatch ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : null}
           Xuất PDF
         </Button>
       ) : null}
@@ -983,9 +1004,20 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
       {lastBatchInfo ? (
         <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground">
-          Đã tạo {lastBatchInfo.fileCount} file trong folder lịch sử
-          {lastBatchInfo.displayName ? ` "${lastBatchInfo.displayName}"` : ""}. Mở tab Lịch sử để tải
-          zip, tải từng file hoặc in gộp.
+          {lastBatchInfo.monthlyId ? (
+            <>
+              Đã lưu BKMH tháng {formatPeriodMonth(lastBatchInfo.periodMonth)} (monthlyId:{" "}
+              {lastBatchInfo.monthlyId}, sliceCount: {lastBatchInfo.sliceCount})
+              {lastBatchInfo.displayName ? ` "${lastBatchInfo.displayName}"` : ""}. Mở tab Lịch sử để
+              in tất cả, tải zip hoặc xem tổng hợp slice.
+            </>
+          ) : (
+            <>
+              Đã tạo {lastBatchInfo.fileCount} file trong folder lịch sử
+              {lastBatchInfo.displayName ? ` "${lastBatchInfo.displayName}"` : ""}. Mở tab Lịch sử để
+              tải zip, tải từng file hoặc in gộp.
+            </>
+          )}
         </p>
       ) : null}
 

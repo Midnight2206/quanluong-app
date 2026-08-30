@@ -10,6 +10,14 @@ const summaryWorkspaceSource = readFileSync(
   new URL("./ChungTuSummaryWorkspace.jsx", import.meta.url),
   "utf8",
 );
+const exportWorkspaceSource = readFileSync(
+  new URL("./ChungTuExportWorkspace.jsx", import.meta.url),
+  "utf8",
+);
+const historyWorkspaceSource = readFileSync(
+  new URL("./ChungTuHistoryWorkspace.jsx", import.meta.url),
+  "utf8",
+);
 const slicePanelSource = readFileSync(
   new URL("./ChungTuBkmhSliceSummaryPanel.jsx", import.meta.url),
   "utf8",
@@ -44,4 +52,23 @@ test("slice summary panel loads detail data and exposes view download print acti
   assert.match(slicePanelSource, /Xem/);
   assert.match(slicePanelSource, /Tải/);
   assert.match(slicePanelSource, /In/);
+});
+
+test("export workspace routes monthly BKMH exports to monthly mutation", () => {
+  assert.match(exportWorkspaceSource, /categoryKey === "bang-ke-mua-hang" && isMonthly/);
+  assert.match(exportWorkspaceSource, /useCreateChungTuBkmhMonthlyExportMutation/);
+  assert.match(exportWorkspaceSource, /const mutate = isBkmhMonthly \? createBkmhMonthlyExport : createPdfExportBatch/);
+  assert.match(exportWorkspaceSource, /monthlyId:/);
+  assert.match(exportWorkspaceSource, /sliceCount:/);
+});
+
+test("history workspace switches BKMH to monthly cards and summary panel", () => {
+  assert.match(historyWorkspaceSource, /categoryKey === "bang-ke-mua-hang"/);
+  assert.match(historyWorkspaceSource, /useChungTuBkmhMonthlyListQuery/);
+  assert.match(historyWorkspaceSource, /downloadChungTuBkmhMonthlyZip/);
+  assert.match(historyWorkspaceSource, /openChungTuBkmhMonthlyMergedPdf/);
+  assert.match(historyWorkspaceSource, /useDeleteChungTuBkmhMonthlyMutation/);
+  assert.match(historyWorkspaceSource, /Xem tổng hợp/);
+  assert.match(historyWorkspaceSource, /ChungTuBkmhSliceSummaryPanel/);
+  assert.match(historyWorkspaceSource, /Xóa batch/);
 });

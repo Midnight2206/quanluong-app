@@ -10,8 +10,8 @@ const categorySource = readFileSync(
   new URL("./ChungTuCategoryWorkspace.jsx", import.meta.url),
   "utf8",
 );
-const historySource = readFileSync(
-  new URL("./ChungTuHistoryWorkspace.jsx", import.meta.url),
+const summarySource = readFileSync(
+  new URL("./ChungTuSummaryWorkspace.jsx", import.meta.url),
   "utf8",
 );
 const mappingSource = readFileSync(
@@ -39,10 +39,10 @@ test("decision documents use a compact two-level sticky stack", () => {
   assert.match(pageSource, /stickyTabListLevel=\{0\}/);
   assert.doesNotMatch(pageSource, /shadow-soft overflow-hidden/);
   assert.match(categorySource, /stickyTabListLevel=\{1\}/);
-  assert.match(historySource, /stickyLevel=\{2\}/);
+  assert.match(summarySource, /stickyLevel=\{2\}/);
   assert.match(mappingSource, /stickyLevel=\{2\}/);
   assert.doesNotMatch(
-    `${historySource}\n${mappingSource}`,
+    `${summarySource}\n${mappingSource}`,
     /stickyLevel=\{3\}/,
   );
 });
