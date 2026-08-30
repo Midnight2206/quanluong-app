@@ -159,6 +159,8 @@ model User {
   chungTuPdfTemplatesUploaded            ChungTuPdfTemplate[] @relation("ChungTuPdfTemplateUploadedBy")
   chungTuPdfExportsCreated               ChungTuPdfExport[] @relation("ChungTuPdfExportCreatedBy")
   chungTuPdfExportBatchesCreated         ChungTuPdfExportBatch[] @relation("ChungTuPdfExportBatchCreatedBy")
+  chungTuBkmhMonthlyCreated              ChungTuBkmhMonthly[] @relation("ChungTuBkmhMonthlyCreatedBy")
+  chungTuBkmhMonthlyUpdated              ChungTuBkmhMonthly[] @relation("ChungTuBkmhMonthlyUpdatedBy")
   chungTuBkmhHeaderSettingsUpdated       ChungTuBkmhHeaderSettings[] @relation("ChungTuBkmhHeaderSettingsUpdatedBy")
   chungTuSignatureSettingsUpdated        ChungTuSignatureSettings[] @relation("ChungTuSignatureSettingsUpdatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
@@ -400,6 +402,53 @@ model ChungTuBkmhSnapshot {
   @@index([periodMonth, periodDate])
 }
 
+model ChungTuBkmhMonthly {
+  id                        Int                  @id @default(autoincrement())
+  storageUnitId             Int
+  periodMonth               String               @db.VarChar(7)
+  aggregationMode           String               @db.VarChar(32)
+  unitIdsJson               Json
+  pdfTemplateId             Int
+  documentServiceTemplateId Int
+  documentServiceFolderId   Int
+  displayName               String               @db.VarChar(255)
+  tongTienThang             Decimal?             @db.Decimal(18, 2)
+  sliceCount                Int
+  sourceDataHash            String?              @db.VarChar(64)
+  signaturesJson            Json?
+  createdById               Int
+  updatedById               Int
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+  storageUnit               Unit                 @relation(fields: [storageUnitId], references: [id], onDelete: Cascade)
+  createdBy                 User                 @relation("ChungTuBkmhMonthlyCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy                 User                 @relation("ChungTuBkmhMonthlyUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  slices                    ChungTuBkmhSlice[]
+
+  @@unique([storageUnitId, periodMonth])
+  @@index([storageUnitId, updatedAt])
+}
+
+model ChungTuBkmhSlice {
+  id                    Int                @id @default(autoincrement())
+  monthlyId             Int
+  sortKey               String             @db.VarChar(128)
+  soChungTu             String?            @db.VarChar(64)
+  periodDate            DateTime?          @db.Date
+  recipientUnitId       Int?
+  recipientUnitName     String?            @db.VarChar(255)
+  ngayThangNam          String?            @db.VarChar(128)
+  tongTien              Decimal?           @db.Decimal(18, 2)
+  documentServiceFileId Int
+  fileName              String             @db.VarChar(255)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  monthly               ChungTuBkmhMonthly @relation(fields: [monthlyId], references: [id], onDelete: Cascade)
+
+  @@unique([monthlyId, sortKey])
+  @@index([monthlyId])
+}
+
 /// Tin nhắn 1–1 realtime (Socket.io); lưu DB để tải lại lịch sử.
 model ChatMessage {
   id          Int      @id @default(autoincrement())
@@ -563,6 +612,7 @@ model Unit {
   chungTuDocuments          ChungTuDocument[]
   chungTuPdfExports         ChungTuPdfExport[]
   chungTuPdfExportBatches   ChungTuPdfExportBatch[]
+  bkmhMonthlyExports        ChungTuBkmhMonthly[]
   kitchenDishCatalogs       KitchenDishCatalog[]
   kitchenMenuDays           KitchenMenuDay[]
   kitchenReceiptSlips       KitchenReceiptSlip[]
