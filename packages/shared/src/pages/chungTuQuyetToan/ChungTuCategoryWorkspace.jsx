@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { TabPanel } from "@/components/common/TabPanel";
 import { ChungTuExportWorkspace } from "./ChungTuExportWorkspace.jsx";
 import { ChungTuHistoryWorkspace } from "./ChungTuHistoryWorkspace.jsx";
+import { ChungTuSummaryWorkspace } from "./ChungTuSummaryWorkspace.jsx";
 import { ChungTuSignatureSettingsWorkspace } from "./ChungTuSignatureSettingsWorkspace.jsx";
 import { getChungTuCategoryConfig } from "./chungTuCategoryConfig";
 
@@ -13,6 +14,7 @@ import { getChungTuCategoryConfig } from "./chungTuCategoryConfig";
  */
 export function ChungTuCategoryWorkspace({ categoryKey }) {
   const config = getChungTuCategoryConfig(categoryKey);
+  const isBkmh = categoryKey === "bang-ke-mua-hang";
 
   const tabs = useMemo(
     () => [
@@ -26,6 +28,15 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
           />
         ),
       },
+      ...(isBkmh
+        ? [
+            {
+              id: "summary",
+              label: "Tổng hợp",
+              panel: <ChungTuSummaryWorkspace categoryKey={categoryKey} />,
+            },
+          ]
+        : []),
       {
         id: "history",
         label: "Lịch sử",
@@ -37,7 +48,7 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
         panel: <ChungTuSignatureSettingsWorkspace categoryKey={categoryKey} />,
       },
     ],
-    [categoryKey, config?.exportKind],
+    [categoryKey, config?.exportKind, isBkmh],
   );
 
   return (
