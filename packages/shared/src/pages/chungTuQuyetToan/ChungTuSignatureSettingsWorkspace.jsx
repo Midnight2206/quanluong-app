@@ -26,8 +26,9 @@ const slotSchema = z.object({
   label: z.string().trim().min(1, "Nhập nhãn hiển thị."),
   col: z.coerce.number().int().min(0, "Cột bắt đầu từ 0."),
   col_span: z.coerce.number().int().min(1, "Độ rộng tối thiểu là 1."),
-  source: z.enum(["dynamic", "static"]),
+  source: z.enum(["dynamic", "static", "system"]),
   static_name: z.string().optional().default(""),
+  catalogNodeId: z.string().optional().default(""),
   show_date_line: z.boolean().default(false),
 });
 
@@ -82,14 +83,22 @@ function cloneDefaultSignatureBlock() {
   };
 }
 
+function normalizeSlotSource(source) {
+  if (source === "static") return "static";
+  if (source === "system") return "system";
+  return "dynamic";
+}
+
 function normalizeSlot(slot, index) {
+  const source = normalizeSlotSource(slot?.source);
   return {
     key: String(slot?.key ?? "").trim(),
     label: String(slot?.label ?? "").trim(),
     col: Number.isFinite(Number(slot?.col)) ? Number(slot.col) : index,
     col_span: Number.isFinite(Number(slot?.col_span)) ? Number(slot.col_span) : 1,
-    source: slot?.source === "static" ? "static" : "dynamic",
-    static_name: String(slot?.static_name ?? "").trim(),
+    source,
+    static_name: source === "static" ? String(slot?.static_name ?? "").trim() : "",
+    catalogNodeId: source === "system" ? String(slot?.catalogNodeId ?? "").trim() : "",
     show_date_line: Boolean(slot?.show_date_line),
   };
 }
@@ -120,8 +129,15 @@ function buildEmptySlot(nextIndex) {
     col_span: 1,
     source: "dynamic",
     static_name: "",
+    catalogNodeId: "",
     show_date_line: false,
   };
+}
+
+function formatSlotSourceHint(source) {
+  if (source === "static") return "tên cố định";
+  if (source === "system") return "lấy từ hệ thống";
+  return "nhập tên khi xuất";
 }
 
 function normalizeBkmhHeaderSettings(input) {
@@ -164,6 +180,7 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors: signatureErrors, isDirty: isSignatureDirty },
   } = useForm({
     resolver: zodResolver(formSchema),
@@ -200,6 +217,7 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
   }, [isBkmhCategory, resetBkmhHeader, savedBkmhHeaderSettings]);
 
   const slotValues = watch("signatureBlock.slots");
+  const availableCatalogNodes = savedSettings?.availableCatalogNodes ?? [];
 
   const handleResetDefault = () => {
     reset({ signatureBlock: cloneDefaultSignatureBlock() });
@@ -422,7 +440,7 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                           Vị trí {index + 1}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          Slot {slotValue?.source === "static" ? "tên cố định" : "nhập tên khi xuất"}.
+                          Slot {formatSlotSourceHint(slotValue?.source)}.
                         </p>
                       </div>
                       {canWrite && fields.length > 1 ? (
@@ -479,10 +497,34 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                         <select
                           className={fieldClass}
                           disabled={!canWrite || saving}
-                          {...register(`signatureBlock.slots.${index}.source`)}
+                          value={slotValue?.source ?? "dynamic"}
+                          onChange={(event) => {
+                            const nextSource = event.target.value;
+                            setValue(`signatureBlock.slots.${index}.source`, nextSource, {
+                              shouldDirty: true,
+                            });
+                            if (nextSource === "system") {
+                              setValue(`signatureBlock.slots.${index}.static_name`, "", {
+                                shouldDirty: true,
+                              });
+                              setValue(`signatureBlock.slots.${index}.catalogNodeId`, "", {
+                                shouldDirty: true,
+                              });
+                              return;
+                            }
+                            setValue(`signatureBlock.slots.${index}.catalogNodeId`, "", {
+                              shouldDirty: true,
+                            });
+                            if (nextSource !== "static") {
+                              setValue(`signatureBlock.slots.${index}.static_name`, "", {
+                                shouldDirty: true,
+                              });
+                            }
+                          }}
                         >
                           <option value="dynamic">Nhập khi xuất</option>
                           <option value="static">Tên cố định</option>
+                          <option value="system">Lấy từ hệ thống</option>
                         </select>
                       </label>
 
@@ -520,17 +562,44 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                         ) : null}
                       </label>
 
-                      <label className="space-y-1 sm:col-span-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-                          Tên ký cố định
-                        </span>
-                        <input
-                          className={fieldClass}
-                          disabled={!canWrite || saving || slotValue?.source !== "static"}
-                          placeholder="Chỉ dùng khi chọn Tên cố định"
-                          {...register(`signatureBlock.slots.${index}.static_name`)}
-                        />
-                      </label>
+                      {slotValue?.source === "system" ? (
+                        <label className="space-y-1 sm:col-span-2">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                            Nguồn hệ thống
+                          </span>
+                          <select
+                            className={fieldClass}
+                            disabled={!canWrite || saving}
+                            value={slotValue?.catalogNodeId ?? ""}
+                            onChange={(event) =>
+                              setValue(
+                                `signatureBlock.slots.${index}.catalogNodeId`,
+                                event.target.value,
+                                { shouldDirty: true },
+                              )
+                            }
+                          >
+                            <option value="">-- Chọn nguồn --</option>
+                            {availableCatalogNodes.map((node) => (
+                              <option key={node.id} value={node.id}>
+                                {node.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : (
+                        <label className="space-y-1 sm:col-span-2">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                            Tên ký cố định
+                          </span>
+                          <input
+                            className={fieldClass}
+                            disabled={!canWrite || saving || slotValue?.source !== "static"}
+                            placeholder="Chỉ dùng khi chọn Tên cố định"
+                            {...register(`signatureBlock.slots.${index}.static_name`)}
+                          />
+                        </label>
+                      )}
 
                       <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 py-2 text-sm sm:col-span-2">
                         <input
