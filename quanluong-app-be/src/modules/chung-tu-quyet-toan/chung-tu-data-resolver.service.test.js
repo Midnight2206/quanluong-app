@@ -9,6 +9,7 @@ const {
   aggregateLinesToDetailRows,
   resolveDocumentNumberFields,
   resolvePdfHeaderSettings,
+  resolveSystemSignatureSlots,
 } = await import("./chung-tu-data-resolver.service.js");
 import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 
@@ -232,6 +233,52 @@ test("resolvePdfHeaderSettings prefers unit-profile boPhan over BKMH settings", 
 
   assert.equal(result.hoTenNguoiMua, "Buyer from settings");
   assert.equal(result.boPhan, "Bo phan from unit profile");
+});
+
+test("resolveSystemSignatureSlots resolves system slots via catalog, passes through static/prompt unchanged", async () => {
+  let resolveCalled = false;
+  const mockCatalog = {
+    "bkmh.nguoiMua": {
+      resolve: async () => {
+        resolveCalled = true;
+        return { name: "Th/tá A", title: "Tài vụ" };
+      },
+    },
+  };
+  const slots = [
+    { label: "Người mua", source: "system", catalogNodeId: "bkmh.nguoiMua" },
+    { label: "Thủ trưởng", source: "static", staticName: "B", staticTitle: "Chỉ huy" },
+    { label: "Người nhận", source: "prompt" },
+  ];
+  const result = await resolveSystemSignatureSlots(slots, { storageUnitId: 1 }, mockCatalog);
+  assert.equal(resolveCalled, true);
+  assert.equal(result[0].resolvedName, "Th/tá A");
+  assert.equal(result[0].resolvedTitle, "Tài vụ");
+  assert.equal(result[1].resolvedName, null);
+  assert.equal(result[2].resolvedName, null);
+});
+
+test("resolveSystemSignatureSlots returns null resolvedName when catalog node missing", async () => {
+  const slots = [{ label: "X", source: "system", catalogNodeId: "nonexistent.node" }];
+  const result = await resolveSystemSignatureSlots(slots, {}, {});
+  assert.equal(result[0].resolvedName, null);
+});
+
+test("resolvePdfHeaderSettings prefers resolvedBkmhBuyer over slip buyer", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {},
+    rawSettings: {},
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    bkmhHeaderSettings: {
+      hoTenNguoiMua: "Buyer from settings",
+      boPhan: "Bo phan from settings",
+    },
+    slips: [{ slipNo: 1, buyerDisplayName: "Buyer from slip" }],
+    resolvedBkmhBuyer: { name: "Th/tá Catalog Buyer", title: "Tài vụ" },
+  });
+
+  assert.equal(result.hoTenNguoiMua, "Th/tá Catalog Buyer");
+  assert.equal(result.boPhan, "Tài vụ");
 });
 
 test("resolvePdfHeaderSettings falls back to BKMH settings when slip buyer and boPhan empty", () => {

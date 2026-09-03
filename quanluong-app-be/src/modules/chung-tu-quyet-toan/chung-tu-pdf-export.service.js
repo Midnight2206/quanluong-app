@@ -4,10 +4,15 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
   assertKnownCategoryKey,
+  CHUNG_TU_CATEGORY_KEYS,
   normalizeAggregationMode,
 } from "./chung-tu-category.constants.js";
 import { normalizeMonthUnitIds, normalizePeriodMonth } from "./chung-tu-monthly-sheets.js";
-import { resolveChungTuContext } from "./chung-tu-data-resolver.service.js";
+import {
+  resolveChungTuContext,
+  resolveSystemSignatureSlots,
+} from "./chung-tu-data-resolver.service.js";
+import { SIGNATURE_CATALOG } from "./chung-tu-signature-catalog.js";
 import { buildDocumentServicePayload } from "./chung-tu-pdf-map.util.js";
 import {
   buildChungTuPdfRelativePath,
@@ -192,6 +197,22 @@ async function createChungTuPdfExport({
   const safeAggregationMode = safePeriodMonth
     ? normalizeAggregationMode(aggregationMode)
     : undefined;
+
+  const resolveCtx = { storageUnitId: unitId, currentUserId: createdById };
+  const resolvedSlots = signatureBlock?.slots
+    ? await resolveSystemSignatureSlots(signatureBlock.slots, resolveCtx)
+    : null;
+  const resolvedSignatureBlock = resolvedSlots
+    ? { ...signatureBlock, slots: resolvedSlots }
+    : signatureBlock;
+
+  const resolvedBkmhBuyer =
+    categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
+      ? await SIGNATURE_CATALOG["bkmh.nguoiMua"]
+          .resolve({ storageUnitId: unitId })
+          .catch(() => null)
+      : null;
+
   const { context, sourceDataHash } = await resolveChungTuContext({
     categoryKey,
     unitId,
@@ -202,6 +223,7 @@ async function createChungTuPdfExport({
     aggregationMode: safeAggregationMode,
     settings,
     exportingUserProfile,
+    resolvedBkmhBuyer,
   });
 
   const fieldsPayload = await getTemplateFields(template.documentServiceTemplateId);
@@ -212,7 +234,7 @@ async function createChungTuPdfExport({
     columnKeys,
     signatures,
     signatureDates,
-    signatureBlock,
+    signatureBlock: resolvedSignatureBlock,
   });
   const buffer = await renderDocumentPdf(template.documentServiceTemplateId, payload);
 

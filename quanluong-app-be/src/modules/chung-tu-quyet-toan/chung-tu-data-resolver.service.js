@@ -23,6 +23,7 @@ import {
   attachRecipientUnitFillToMonthlyContexts,
   resolveRecipientUnitFillForSlip,
 } from "./chung-tu-recipient-unit-fill.service.js";
+import { SIGNATURE_CATALOG } from "./chung-tu-signature-catalog.js";
 
 const lineInclude = {
   commodity: { select: { id: true, code: true, name: true, measureUnit: true } },
@@ -70,6 +71,27 @@ function normalizePlainObject(value) {
   return value && typeof value === "object" ? value : {};
 }
 
+/**
+ * Resolve system slots via catalog. Static/prompt slots pass through with resolvedName=null.
+ * @param {object[]} slots
+ * @param {{ storageUnitId?: number, currentUserId?: number, prisma?: object }} ctx
+ * @param {object} [catalog] - injectable for testing
+ */
+export async function resolveSystemSignatureSlots(slots, ctx, catalog = SIGNATURE_CATALOG) {
+  if (!Array.isArray(slots)) return [];
+  return Promise.all(
+    slots.map(async (slot) => {
+      if (slot?.source !== "system") {
+        return { ...slot, resolvedName: null, resolvedTitle: null };
+      }
+      const node = catalog[slot.catalogNodeId];
+      if (!node) return { ...slot, resolvedName: null, resolvedTitle: null };
+      const result = await node.resolve(ctx).catch(() => null);
+      return { ...slot, resolvedName: result?.name ?? null, resolvedTitle: result?.title ?? null };
+    }),
+  );
+}
+
 export function resolvePdfHeaderSettings({
   mergedSettings,
   rawSettings,
@@ -77,6 +99,7 @@ export function resolvePdfHeaderSettings({
   categoryKey,
   bkmhHeaderSettings,
   slips,
+  resolvedBkmhBuyer = null,
 }) {
   const resolved = {
     ...normalizePlainObject(mergedSettings),
@@ -94,8 +117,12 @@ export function resolvePdfHeaderSettings({
     return resolved;
   }
   const settings = normalizePlainObject(rawSettings);
-  const buyerName = resolveNguoiMuaFromSlips(slips) || normalizeText(bkmhHeaderSettings?.hoTenNguoiMua);
+  const buyerName =
+    resolvedBkmhBuyer?.name ||
+    resolveNguoiMuaFromSlips(slips) ||
+    normalizeText(bkmhHeaderSettings?.hoTenNguoiMua);
   const boPhan =
+    resolvedBkmhBuyer?.title ||
     normalizeText(settings.boPhan) ||
     normalizeText(resolved.boPhan) ||
     normalizeText(bkmhHeaderSettings?.boPhan);
@@ -546,6 +573,7 @@ export async function resolveChungTuContext({
   aggregationMode,
   settings,
   exportingUserProfile,
+  resolvedBkmhBuyer = null,
 }) {
   const meta = assertKnownCategoryKey(categoryKey);
   const [profile, bkmhHeaderSettings] = await Promise.all([
@@ -566,6 +594,7 @@ export async function resolveChungTuContext({
       categoryKey: meta.key,
       bkmhHeaderSettings,
       slips,
+      resolvedBkmhBuyer,
     });
 
   if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO && issueSlipId && !periodMonth) {
