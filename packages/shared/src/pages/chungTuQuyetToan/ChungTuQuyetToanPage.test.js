@@ -47,12 +47,16 @@ test("decision documents use a compact two-level sticky stack", () => {
   );
 });
 
-test("BKMH signature workspace wires header settings hooks and BKMH-only form", () => {
+test("BKMH signature workspace shows auto-resolved header info instead of manual inputs", () => {
   assert.match(apiSource, /useChungTuBkmhHeaderSettingsQuery/);
   assert.match(apiSource, /useUpsertChungTuBkmhHeaderSettingsMutation/);
   assert.match(apiSource, /\/chungtuquyettoan\/bkmh-header-settings/);
   assert.match(queryKeysSource, /bkmhHeaderSettings:\s*\(categoryKey\)/);
   assert.match(signatureSettingsSource, /categoryKey === "bang-ke-mua-hang"/);
-  assert.match(signatureSettingsSource, /Họ tên người mua/);
-  assert.match(signatureSettingsSource, /Bộ phận/);
+  assert.match(
+    signatureSettingsSource,
+    /Họ tên và bộ phận người mua sẽ được lấy tự động từ cài đặt người mua của đơn vị khi xuất PDF/,
+  );
+  assert.doesNotMatch(signatureSettingsSource, /registerBkmhHeader\("hoTenNguoiMua"\)/);
+  assert.doesNotMatch(signatureSettingsSource, /registerBkmhHeader\("boPhan"\)/);
 });

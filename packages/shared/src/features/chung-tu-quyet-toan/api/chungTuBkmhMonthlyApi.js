@@ -134,6 +134,26 @@ export async function downloadChungTuBkmhMonthlyZip(id) {
   downloadBlobAsFile(zipBlob, fileName);
 }
 
+export async function downloadChungTuBkmhMonthlySummaryExcel(id) {
+  const monthlyId = id != null ? String(id).trim() : "";
+  const { data: blob, headers } = await apiRequest({
+    url: `/chungtuquyettoan/bkmh-monthly/${encodeURIComponent(monthlyId)}/excel`,
+    method: "get",
+    responseType: "blob",
+    returnHeaders: true,
+  });
+  const excelBlob =
+    blob instanceof Blob
+      ? blob
+      : new Blob([blob], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+  const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
+  const fileName =
+    filenameFromContentDisposition(cd) ?? `bkmh-tong-hop-${monthlyId}.xlsx`;
+  downloadBlobAsFile(excelBlob, fileName);
+}
+
 export async function openChungTuBkmhMonthlyMergedPdf(id, options = {}) {
   const monthlyId = id != null ? String(id).trim() : "";
   const { targetWindow = null } = options ?? {};

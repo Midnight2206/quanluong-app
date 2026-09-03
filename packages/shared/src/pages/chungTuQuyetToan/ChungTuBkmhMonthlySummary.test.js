@@ -46,6 +46,8 @@ test("slice summary panel loads detail data and exposes view download print acti
   assert.match(slicePanelSource, /useChungTuBkmhMonthlyDetailQuery/);
   assert.match(slicePanelSource, /openChungTuBkmhMonthlySliceFile/);
   assert.match(slicePanelSource, /downloadChungTuBkmhMonthlySliceFile/);
+  assert.match(slicePanelSource, /downloadChungTuBkmhMonthlySummaryExcel/);
+  assert.match(slicePanelSource, /Xuất Excel/);
   assert.match(slicePanelSource, /aggregationMode === "by-unit"/);
   assert.match(slicePanelSource, /Số CT/);
   assert.match(slicePanelSource, /Tên đơn vị/);

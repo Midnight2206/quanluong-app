@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, Loader2, Printer, X } from "lucide-react";
+import { Download, Eye, FileSpreadsheet, Loader2, Printer, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import {
 } from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
 import {
   downloadChungTuBkmhMonthlySliceFile,
+  downloadChungTuBkmhMonthlySummaryExcel,
   downloadChungTuBkmhMonthlyZip,
   openChungTuBkmhMonthlyMergedPdf,
   openChungTuBkmhMonthlySliceFile,
@@ -156,6 +157,21 @@ export function ChungTuBkmhSliceSummaryPanel({
     }
   };
 
+  const handleExportExcel = async () => {
+    setActionError(null);
+    setBusyActionKey("excel");
+    try {
+      await downloadChungTuBkmhMonthlySummaryExcel(monthlyIdValue);
+      notifySuccess("Đã xuất Excel tổng hợp slice tháng này.");
+    } catch (e) {
+      const message = e?.data?.message || e?.message || "Không xuất được file Excel.";
+      setActionError(message);
+      notifyError(message);
+    } finally {
+      setBusyActionKey("");
+    }
+  };
+
   const handlePrintMerged = async () => {
     setActionError(null);
     const tab = window.open("about:blank", "_blank");
@@ -250,6 +266,20 @@ export function ChungTuBkmhSliceSummaryPanel({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-10 gap-1.5 text-xs"
+              disabled={busyActionKey !== "" || isLoading || !monthlyIdValue || slices.length === 0}
+              onClick={handleExportExcel}
+            >
+              {busyActionKey === "excel" ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <FileSpreadsheet className="size-3.5" aria-hidden />
+              )}
+              Xuất Excel
+            </Button>
             <Button
               type="button"
               variant="secondary"
