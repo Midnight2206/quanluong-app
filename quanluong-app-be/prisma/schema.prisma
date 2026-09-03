@@ -520,7 +520,9 @@ model Profile {
   avatarUrl   String?
   description String?   @db.Text
   jobTitle    String?
-  rank        String?
+  rankFull     String?  @db.VarChar(128)
+  rankAbbr     String?  @db.VarChar(32)
+  department   String?  @db.VarChar(255)
   phoneNumber String?
   address     String?   @db.Text
   donViCapTren String?  @db.VarChar(255)
