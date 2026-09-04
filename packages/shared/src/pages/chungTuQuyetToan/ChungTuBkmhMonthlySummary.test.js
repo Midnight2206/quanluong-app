@@ -64,6 +64,17 @@ test("export workspace routes monthly BKMH exports to monthly mutation", () => {
   assert.match(exportWorkspaceSource, /sliceCount:/);
 });
 
+test("PNK monthly export hides aggregation picker and forces by-day", () => {
+  assert.match(exportWorkspaceSource, /categoryKey === "phieu-nhap-kho" && isMonthly/);
+  assert.match(exportWorkspaceSource, /showAggregationPicker = isMonthly && !isPnkMonthly/);
+  assert.match(
+    exportWorkspaceSource,
+    /effectiveAggregationMode = isPnkMonthly\s*\?\s*CHUNG_TU_AGGREGATION_MODES\.BY_DAY\s*:\s*aggregationMode/,
+  );
+  assert.match(exportWorkspaceSource, /aggregationMode:\s*effectiveAggregationMode/);
+  assert.match(exportWorkspaceSource, /\{showAggregationPicker \? \(/);
+});
+
 test("history workspace switches BKMH to monthly cards and summary panel", () => {
   assert.match(historyWorkspaceSource, /categoryKey === "bang-ke-mua-hang"/);
   assert.match(historyWorkspaceSource, /useChungTuBkmhMonthlyListQuery/);

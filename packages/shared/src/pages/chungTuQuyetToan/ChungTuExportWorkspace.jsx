@@ -83,6 +83,12 @@ function extractSignatureBlock(payload) {
   );
 }
 
+function normalizeSignatureSource(source) {
+  if (source === "static") return "static";
+  if (source === "system") return "system";
+  return "dynamic";
+}
+
 function normalizeSignatureSlots(signatureBlock) {
   if (!Array.isArray(signatureBlock?.slots) || signatureBlock.slots.length === 0) {
     return DEFAULT_SIGNATURE_SLOTS;
@@ -94,9 +100,10 @@ function normalizeSignatureSlots(signatureBlock) {
       return {
         key,
         label: formatSignatureSlotLabel(slot.label || key),
-        source: slot?.source === "static" ? "static" : "dynamic",
+        source: normalizeSignatureSource(slot?.source),
         showDateLine: Boolean(slot?.show_date_line),
         staticName: typeof slot?.static_name === "string" ? slot.static_name.trim() : "",
+        catalogNodeId: typeof slot?.catalogNodeId === "string" ? slot.catalogNodeId.trim() : "",
       };
     })
     .filter(Boolean);
@@ -114,13 +121,15 @@ function normalizeSignatureBlockConfig(signatureBlock) {
       if (!key || !label) {
         return null;
       }
+      const source = normalizeSignatureSource(slot?.source);
       return {
         key,
         label,
         col: Number.isFinite(Number(slot?.col)) ? Number(slot.col) : index,
         col_span: Number.isFinite(Number(slot?.col_span)) ? Number(slot.col_span) : 1,
-        source: slot?.source === "static" ? "static" : "dynamic",
+        source,
         static_name: typeof slot?.static_name === "string" ? slot.static_name.trim() : "",
+        catalogNodeId: source === "system" ? String(slot?.catalogNodeId ?? "").trim() : "",
         show_date_line: Boolean(slot?.show_date_line),
       };
     })
@@ -157,12 +166,18 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const isMonthly = exportKind === CHUNG_TU_EXPORT_KIND.MONTHLY;
   const isBySlip = exportKind === CHUNG_TU_EXPORT_KIND.BY_SLIP;
   const isBkmhMonthly = categoryKey === "bang-ke-mua-hang" && isMonthly;
+  // ponytail: PNK always by-day (spec §4.1); no aggregation picker until multi-source modes exist
+  const isPnkMonthly = categoryKey === "phieu-nhap-kho" && isMonthly;
+  const showAggregationPicker = isMonthly && !isPnkMonthly;
 
   const [periodMonth, setPeriodMonth] = useState(() => todayYmd().slice(0, 7));
   const [periodDate, setPeriodDate] = useState(todayYmd);
   const [issueSlipId, setIssueSlipId] = useState("");
   const [selectedDataUnitIds, setSelectedDataUnitIds] = useState([]);
   const [aggregationMode, setAggregationMode] = useState(CHUNG_TU_AGGREGATION_MODES.BY_DAY);
+  const effectiveAggregationMode = isPnkMonthly
+    ? CHUNG_TU_AGGREGATION_MODES.BY_DAY
+    : aggregationMode;
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [signatures, setSignatures] = useState({});
   const [signatureDates, setSignatureDates] = useState({});
@@ -184,9 +199,9 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
   const aggregationLabel = useMemo(
     () =>
-      CHUNG_TU_AGGREGATION_MODE_OPTIONS.find((o) => o.value === aggregationMode)?.label ??
-      aggregationMode,
-    [aggregationMode],
+      CHUNG_TU_AGGREGATION_MODE_OPTIONS.find((o) => o.value === effectiveAggregationMode)?.label ??
+      effectiveAggregationMode,
+    [effectiveAggregationMode],
   );
 
   useEffect(() => {
@@ -259,7 +274,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     [activeSignatureBlock],
   );
   const editableSignatureSlots = useMemo(
-    () => signatureSlots.filter((slot) => slot.source !== "static"),
+    () => signatureSlots.filter((slot) => slot.source !== "static" && slot.source !== "system"),
     [signatureSlots],
   );
   const hasSavedSignatureConfig = Array.isArray(savedSignatureBlock?.slots);
@@ -319,7 +334,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         ...base,
         periodMonth,
         unitIds: selectedDataUnitIds,
-        aggregationMode,
+        aggregationMode: effectiveAggregationMode,
       };
     }
     if (isBySlip) {
@@ -341,7 +356,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     isBySlip,
     periodMonth,
     selectedDataUnitIds,
-    aggregationMode,
+    effectiveAggregationMode,
     periodDate,
     issueSlipId,
   ]);
@@ -577,7 +592,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         </label>
       ) : null}
 
-      {isMonthly ? (
+      {showAggregationPicker ? (
         <fieldset className="space-y-2 sm:col-span-2">
           <legend className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
             Chế độ gộp dữ liệu
