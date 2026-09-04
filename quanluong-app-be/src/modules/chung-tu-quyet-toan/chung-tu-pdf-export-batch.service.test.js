@@ -57,6 +57,7 @@ const resolveChungTuContext = mock.fn(async () => ({
   },
   sourceDataHash: "batch-hash-123",
 }));
+const prepareSignatureBlockForRender = mock.fn(async (block) => block);
 const getTemplateFields = mock.fn(async () => ({
   fields: [{ field_name: "don_vi", cell_ref: "B2" }, { field_name: "tong_tien", cell_ref: "B3" }],
   columns: [{ key: "stt", title: "STT" }, { key: "ten_mat_hang", title: "Tên mặt hàng" }],
@@ -95,6 +96,7 @@ mock.module("../../infra/database/prisma/prisma.client.js", {
 mock.module("./chung-tu-data-resolver.service.js", {
   exports: {
     resolveChungTuContext,
+    prepareSignatureBlockForRender,
   },
 });
 
@@ -123,6 +125,7 @@ test.beforeEach(() => {
   prismaBatchDelete.mock.resetCalls();
   prismaSignatureSettingsFindUnique.mock.resetCalls();
   resolveChungTuContext.mock.resetCalls();
+  prepareSignatureBlockForRender.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
   createDocumentFolder.mock.resetCalls();
   renderToDocumentFolder.mock.resetCalls();
@@ -275,6 +278,46 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
       result.files[0].downloadPath,
       `/chungtuquyettoan/pdf-export-batches/${result.batchKey}/files/10`,
     );
+  } finally {
+    randomBytesMock.mock.restore();
+  }
+});
+
+test("createChungTuPdfExportBatch forces monthly PNK to by-day", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 16,
+    categoryKey: "phieu-nhap-kho",
+    displayName: "PNK A",
+    documentServiceTemplateId: 902,
+    status: "published",
+  }));
+
+  const randomBytesMock = mock.method(crypto, "randomBytes", () =>
+    Buffer.from("abcdef123456", "hex"),
+  );
+  try {
+    const result = await createChungTuPdfExportBatch({
+      categoryKey: "phieu-nhap-kho",
+      unitId: 9,
+      periodMonth: "2026-06",
+      unitIds: [10, 11],
+      aggregationMode: "full",
+      pdfTemplateId: 16,
+      exportingUserProfile: { donVi: "Kho A" },
+      signatures: {},
+      signatureDates: {},
+      settings: {},
+      createdById: 88,
+      effectiveUnitIds: [9, 10, 11],
+    });
+
+    assert.equal(resolveChungTuContext.mock.calls[0].arguments[0].aggregationMode, "by-day");
+    assert.equal(prismaBatchCreate.mock.calls[0].arguments[0].data.aggregationMode, "by-day");
+    assert.deepEqual(
+      renderToDocumentFolder.mock.calls.map((call) => call.arguments[1].fileName),
+      ["2026-06-01.pdf", "2026-06-03.pdf"],
+    );
+    assert.equal(result.fileCount, 2);
   } finally {
     randomBytesMock.mock.restore();
   }

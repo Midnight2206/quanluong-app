@@ -4,10 +4,12 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
   assertKnownCategoryKey,
+  CHUNG_TU_CATEGORY_KEYS,
+  CHUNG_TU_AGGREGATION_MODES,
   getAggregationModeLabel,
   normalizeAggregationMode,
 } from "./chung-tu-category.constants.js";
-import { normalizeMonthUnitIds, normalizePeriodMonth } from "./chung-tu-monthly-sheets.js";
+import { normalizeMonthUnitIds, normalizePeriodMonth, lastDayOfMonth } from "./chung-tu-monthly-sheets.js";
 import { resolveChungTuContext } from "./chung-tu-data-resolver.service.js";
 import { buildDocumentServicePayload } from "./chung-tu-pdf-map.util.js";
 import {
@@ -23,6 +25,7 @@ import {
 import { extractTemplateKeys } from "./chung-tu-pdf-export.service.js";
 import { getChungTuSignatureSettings } from "./chung-tu-signature-settings.service.js";
 import { pickExportSlices } from "./chung-tu-pdf-batch-slices.util.js";
+import { fillSignatureDatesFromPeriod } from "./chung-tu-signature-dates.util.js";
 
 function assertUnitInEffectiveBranch(unitId, effectiveUnitIds) {
   const uid = Number(unitId);
@@ -188,7 +191,9 @@ async function createChungTuPdfExportBatch({
 
   const safePeriodMonth = periodMonth ? normalizePeriodMonth(periodMonth) : undefined;
   const safeAggregationMode = safePeriodMonth
-    ? normalizeAggregationMode(aggregationMode)
+    ? categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO
+      ? CHUNG_TU_AGGREGATION_MODES.BY_DAY
+      : normalizeAggregationMode(aggregationMode)
     : undefined;
   const [{ context, sourceDataHash }, fieldsPayload, savedSignatureSettings] = await Promise.all([
     resolveChungTuContext({
@@ -227,12 +232,20 @@ async function createChungTuPdfExportBatch({
     folder = await createDocumentFolder({ name: batchKey });
 
     for (const slice of slices) {
+      const sliceSignatureDates = fillSignatureDatesFromPeriod({
+        signatureBlock: finalSignatureBlock,
+        signatureDates,
+        context: slice.context,
+        aggregationMode: safeAggregationMode,
+        periodMonth: safePeriodMonth,
+        lastDayOfMonthFn: lastDayOfMonth,
+      });
       const payload = buildDocumentServicePayload({
         context: slice.context,
         fieldKeys,
         columnKeys,
         signatures,
-        signatureDates,
+        signatureDates: sliceSignatureDates,
         signatureBlock: finalSignatureBlock,
       });
       const file = await renderToDocumentFolder(folder.id, {
@@ -242,7 +255,7 @@ async function createChungTuPdfExportBatch({
         fields: payload.fields,
         rows: payload.rows,
         signatures: payload.signatures,
-        signatureDates,
+        signatureDates: sliceSignatureDates,
         signatureBlock: finalSignatureBlock,
       });
       createdFiles.push({
