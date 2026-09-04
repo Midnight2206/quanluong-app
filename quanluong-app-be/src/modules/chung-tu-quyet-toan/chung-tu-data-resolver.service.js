@@ -87,9 +87,48 @@ export async function resolveSystemSignatureSlots(slots, ctx, catalog = SIGNATUR
       const node = catalog[slot.catalogNodeId];
       if (!node) return { ...slot, resolvedName: null, resolvedTitle: null };
       const result = await node.resolve(ctx).catch(() => null);
-      return { ...slot, resolvedName: result?.name ?? null, resolvedTitle: result?.title ?? null };
+      return {
+        ...slot,
+        resolvedName: result?.signatureName ?? result?.name ?? null,
+        resolvedTitle: result?.title ?? null,
+      };
     }),
   );
+}
+
+/**
+ * Document-service chỉ chấp nhận source static|dynamic.
+ * System slot đã resolve → static + static_name; chưa resolve → dynamic trống.
+ */
+export function materializeSignatureBlockForRender(signatureBlock) {
+  if (!signatureBlock || typeof signatureBlock !== "object") return signatureBlock;
+  if (!Array.isArray(signatureBlock.slots)) return signatureBlock;
+  return {
+    ...signatureBlock,
+    slots: signatureBlock.slots.map((slot) => {
+      if (!slot || typeof slot !== "object") return slot;
+      if (slot.source !== "system") {
+        const { resolvedName: _n, resolvedTitle: _t, catalogNodeId: _c, ...rest } = slot;
+        return rest;
+      }
+      const name = String(slot.resolvedName ?? "").trim();
+      const base = {
+        key: slot.key,
+        label: slot.label,
+        col: slot.col,
+        col_span: slot.col_span ?? 1,
+        show_date_line: Boolean(slot.show_date_line),
+      };
+      if (name) return { ...base, source: "static", static_name: name };
+      return { ...base, source: "dynamic" };
+    }),
+  };
+}
+
+export async function prepareSignatureBlockForRender(signatureBlock, ctx, catalog = SIGNATURE_CATALOG) {
+  if (!signatureBlock?.slots) return signatureBlock;
+  const resolved = await resolveSystemSignatureSlots(signatureBlock.slots, ctx, catalog);
+  return materializeSignatureBlockForRender({ ...signatureBlock, slots: resolved });
 }
 
 export function resolvePdfHeaderSettings({
@@ -187,6 +226,10 @@ function mapLineRow(line, index) {
     donGia: Number.isFinite(unitPrice) ? formatVndNumber(unitPrice) : "",
     thanhTien: Number.isFinite(amount) ? formatVndNumber(amount) : "",
     ghiChu: String(line.lineNote ?? "").trim(),
+    commodityId: line.commodity?.id != null ? Number(line.commodity.id) : null,
+    quantity: Number.isFinite(qty) ? qty : null,
+    unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
+    amount: Number.isFinite(amount) ? amount : null,
   };
 }
 
@@ -576,12 +619,16 @@ export async function resolveChungTuContext({
   resolvedBkmhBuyer = null,
 }) {
   const meta = assertKnownCategoryKey(categoryKey);
-  const [profile, bkmhHeaderSettings] = await Promise.all([
+  const [profile, bkmhHeaderSettings, catalogBuyer] = await Promise.all([
     getChungTuUnitProfile({ unitId }),
     meta.key === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
       ? getChungTuBkmhHeaderSettings({ categoryKey: meta.key })
       : null,
+    meta.key === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG && !resolvedBkmhBuyer
+      ? SIGNATURE_CATALOG["bkmh.nguoiMua"].resolve({ storageUnitId: unitId }).catch(() => null)
+      : Promise.resolve(null),
   ]);
+  const buyerForHeader = resolvedBkmhBuyer ?? catalogBuyer;
   const merged = mergeSettings(profile, settings);
   const resolveSettingsForSlips = (slips = [], overrides = {}) =>
     resolvePdfHeaderSettings({
@@ -594,7 +641,7 @@ export async function resolveChungTuContext({
       categoryKey: meta.key,
       bkmhHeaderSettings,
       slips,
-      resolvedBkmhBuyer,
+      resolvedBkmhBuyer: buyerForHeader,
     });
 
   if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO && issueSlipId && !periodMonth) {

@@ -32,4 +32,44 @@ function sumSliceTongTien(items) {
   return items.reduce((sum, item) => sum + (Number(item?.tongTien) || 0), 0);
 }
 
-export { buildBkmhSliceMetadata, parseTongTien, sumSliceTongTien };
+function toFiniteNumber(value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildBkmhSliceDetailRowsSnapshot(context = {}) {
+  const rows = Array.isArray(context.detailRows) ? context.detailRows : [];
+  return rows.map((row, index) => {
+    const quantity =
+      toFiniteNumber(row?.quantity) ??
+      toFiniteNumber(row?.soLuong) ??
+      toFiniteNumber(row?.thucNhap);
+    const unitPrice =
+      toFiniteNumber(row?.unitPrice) ?? parseTongTien(row?.donGia);
+    const amount =
+      toFiniteNumber(row?.amount) ?? parseTongTien(row?.thanhTien);
+    const commodityId = toFiniteNumber(row?.commodityId);
+    return {
+      ...row,
+      stt: row?.stt ?? index + 1,
+      commodityId: commodityId != null && commodityId > 0 ? commodityId : null,
+      quantity,
+      unitPrice,
+      amount,
+    };
+  });
+}
+
+function parseBkmhSliceDetailRowsJson(json) {
+  return Array.isArray(json) ? json : [];
+}
+
+export {
+  buildBkmhSliceMetadata,
+  buildBkmhSliceDetailRowsSnapshot,
+  parseBkmhSliceDetailRowsJson,
+  parseTongTien,
+  sumSliceTongTien,
+};
