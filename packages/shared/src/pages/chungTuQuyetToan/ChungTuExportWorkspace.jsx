@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
@@ -15,7 +15,6 @@ import {
   useChungTuContextPreviewMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
 import {
-  useChungTuPdfFieldCatalogQuery,
   useChungTuSignatureSettingsQuery,
   useChungTuPdfTemplateFieldsQuery,
   useChungTuPdfTemplatesQuery,
@@ -255,7 +254,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     });
   const { data: savedSignatureSettings, isLoading: signatureSettingsLoading } =
     useChungTuSignatureSettingsQuery(categoryKey, { skip: !categoryKey });
-  const { data: fieldCatalog, isLoading: fieldCatalogLoading } = useChungTuPdfFieldCatalogQuery();
 
   const templateSignatureBlock = useMemo(
     () => extractSignatureBlock(templateFieldsPayload),
@@ -808,58 +806,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         </div>
       ) : null}
 
-      <details className="rounded-xl border border-border/70 bg-muted/10">
-        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground">
-          <BookOpen className="size-4 text-muted-foreground" />
-          Catalog Named Range cho mẫu PDF
-        </summary>
-        <div className="space-y-3 border-t border-border/60 px-3 py-3">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Dùng các Named Range `FIELD_*` cho dữ liệu đơn và `TABLE_HEADER`/`TABLE_DATA_ROW`
-            cho phần bảng dòng hàng. Panel này chỉ để tra cứu nhanh khi làm mẫu Excel.
-          </p>
-          {fieldCatalogLoading ? (
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3.5 animate-spin" />
-              Đang tải catalog field…
-            </p>
-          ) : (
-            <div className="grid gap-3 lg:grid-cols-2">
-              <div className="space-y-2 rounded-lg border border-border/60 bg-background p-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
-                  Scalar fields
-                </p>
-                <div className="space-y-2 text-xs">
-                  {(fieldCatalog?.scalarFields ?? []).map((field) => (
-                    <div key={field.namedRange} className="rounded-md bg-muted/25 px-2.5 py-2">
-                      <p className="font-mono text-[11px] text-foreground">{field.namedRange}</p>
-                      <p className="mt-0.5 text-muted-foreground">
-                        {field.fieldKey} · {field.label}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2 rounded-lg border border-border/60 bg-background p-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
-                  Gợi ý tiêu đề cột bảng
-                </p>
-                <div className="space-y-2 text-xs">
-                  {(fieldCatalog?.tableColumns ?? []).map((column, index) => (
-                    <div
-                      key={`${column.label}-${column.fieldKey}-${index}`}
-                      className="rounded-md bg-muted/25 px-2.5 py-2"
-                    >
-                      <p className="font-medium text-foreground">{column.label}</p>
-                      <p className="mt-0.5 text-muted-foreground">fieldKey: {column.fieldKey}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </details>
     </div>
   );
 
