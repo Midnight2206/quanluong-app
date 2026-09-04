@@ -85,6 +85,7 @@ const resolveChungTuContext = mock.fn(async () => ({
   },
   sourceDataHash: "monthly-hash-123",
 }));
+const prepareSignatureBlockForRender = mock.fn(async (block) => block);
 
 const getTemplateFields = mock.fn(async () => ({
   fields: [{ field_name: "don_vi", cell_ref: "B2" }, { field_name: "tong_tien", cell_ref: "B3" }],
@@ -136,6 +137,7 @@ mock.module("../../infra/database/prisma/prisma.client.js", {
 mock.module("./chung-tu-data-resolver.service.js", {
   exports: {
     resolveChungTuContext,
+    prepareSignatureBlockForRender,
   },
 });
 
@@ -173,6 +175,7 @@ test.beforeEach(() => {
   prismaSliceDeleteMany.mock.resetCalls();
   prismaSignatureSettingsFindUnique.mock.resetCalls();
   resolveChungTuContext.mock.resetCalls();
+  prepareSignatureBlockForRender.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
   createDocumentFolder.mock.resetCalls();
   renderToDocumentFolder.mock.resetCalls();
@@ -291,9 +294,29 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
       recipientUnitName: "Bep A",
       ngayThangNam: "Ngay 01 thang 06 nam 2026",
       tongTien: 1000,
+      detailRowsJson: [
+        {
+          stt: 1,
+          tenHang: "Gao",
+          commodityId: null,
+          quantity: null,
+          unitPrice: null,
+          amount: null,
+        },
+      ],
       documentServiceFileId: 10,
       fileName: "2026-06-01.pdf",
     });
+    assert.deepEqual(createdPayload.slices.create[1].detailRowsJson, [
+      {
+        stt: 1,
+        tenHang: "Muoi",
+        commodityId: null,
+        quantity: null,
+        unitPrice: null,
+        amount: null,
+      },
+    ]);
 
     assert.equal(result.id, 91);
     assert.equal(result.storageUnitId, 9);
@@ -304,6 +327,16 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
     assert.equal(result.mergedPdfPath, "/chungtuquyettoan/bkmh-monthly/91/merged.pdf");
     assert.equal(result.slices.length, 2);
     assert.equal(result.slices[0].filePath, "/chungtuquyettoan/bkmh-monthly/91/slices/1/file");
+    assert.deepEqual(result.slices[0].detailRows, [
+      {
+        stt: 1,
+        tenHang: "Gao",
+        commodityId: null,
+        quantity: null,
+        unitPrice: null,
+        amount: null,
+      },
+    ]);
   } finally {
     randomBytesMock.mock.restore();
   }
@@ -396,6 +429,16 @@ test("list/get/delete and stream helpers map rows and proxy document-service cal
         recipientUnitName: "Bep A",
         ngayThangNam: "Ngay 01 thang 06 nam 2026",
         tongTien: 1000,
+        detailRowsJson: [
+          {
+            stt: 1,
+            tenHang: "Gao",
+            commodityId: 7,
+            quantity: 2,
+            unitPrice: 10000,
+            amount: 20000,
+          },
+        ],
         documentServiceFileId: 10,
         fileName: "2026-06-01.pdf",
         createdAt: now,
@@ -417,12 +460,23 @@ test("list/get/delete and stream helpers map rows and proxy document-service cal
   });
   assert.equal(items.length, 1);
   assert.equal(items[0].slices[0].filePath, "/chungtuquyettoan/bkmh-monthly/55/slices/1/file");
+  assert.deepEqual(items[0].slices[0].detailRows, [
+    {
+      stt: 1,
+      tenHang: "Gao",
+      commodityId: 7,
+      quantity: 2,
+      unitPrice: 10000,
+      amount: 20000,
+    },
+  ]);
 
   const detail = await getChungTuBkmhMonthly({
     id: 55,
     effectiveUnitIds: [9],
   });
   assert.equal(detail.id, 55);
+  assert.deepEqual(detail.slices[0].detailRows, items[0].slices[0].detailRows);
 
   const zip = await streamChungTuBkmhMonthlyZip({
     id: 55,

@@ -18,7 +18,12 @@ import {
 import { extractTemplateKeys } from "./chung-tu-pdf-export.service.js";
 import { getChungTuSignatureSettings } from "./chung-tu-signature-settings.service.js";
 import { pickExportSlices } from "./chung-tu-pdf-batch-slices.util.js";
-import { buildBkmhSliceMetadata, sumSliceTongTien } from "./chung-tu-bkmh-slice-metadata.util.js";
+import {
+  buildBkmhSliceMetadata,
+  buildBkmhSliceDetailRowsSnapshot,
+  parseBkmhSliceDetailRowsJson,
+  sumSliceTongTien,
+} from "./chung-tu-bkmh-slice-metadata.util.js";
 
 const CATEGORY_KEY = CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG;
 
@@ -88,6 +93,7 @@ function mapSliceRow(monthlyId, row) {
     recipientUnitName: row.recipientUnitName ?? null,
     ngayThangNam: row.ngayThangNam ?? null,
     tongTien: row.tongTien == null ? null : Number(row.tongTien),
+    detailRows: parseBkmhSliceDetailRowsJson(row.detailRowsJson),
     fileId: row.documentServiceFileId,
     fileName: row.fileName,
     filePath: `/chungtuquyettoan/bkmh-monthly/${monthlyId}/slices/${row.id}/file`,
@@ -125,6 +131,7 @@ function buildSliceCreateInput({ renderedFile, slice }) {
     recipientUnitName: meta.recipientUnitName,
     ngayThangNam: meta.ngayThangNam,
     tongTien: meta.tongTien,
+    detailRowsJson: buildBkmhSliceDetailRowsSnapshot(slice.context),
     documentServiceFileId: Number(renderedFile.file_id),
     fileName: renderedFile.file_name,
   };
