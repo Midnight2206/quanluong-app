@@ -439,6 +439,8 @@ model ChungTuBkmhSlice {
   recipientUnitName     String?            @db.VarChar(255)
   ngayThangNam          String?            @db.VarChar(128)
   tongTien              Decimal?           @db.Decimal(18, 2)
+  /// Snapshot detailRows lúc xuất PDF (display + raw numeric).
+  detailRowsJson        Json?
   documentServiceFileId Int
   fileName              String             @db.VarChar(255)
   createdAt             DateTime           @default(now())
