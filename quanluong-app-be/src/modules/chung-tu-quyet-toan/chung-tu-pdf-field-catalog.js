@@ -29,6 +29,12 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
       label: "Họ và tên người mua",
     },
     { namedRange: "FIELD_bo_phan", fieldKey: "boPhan", label: "Bộ phận" },
+    {
+      namedRange: "FIELD_can_cu_bkmh",
+      fieldKey: "canCuBkmh",
+      label:
+        "Căn cứ theo BKMH (số, ngày…) — chủ yếu PNK; legacy Named Range `canCuBkmh` vẫn được nhận",
+    },
     { namedRange: "FIELD_ghi_chu", fieldKey: "ghiChu", label: "Ghi chú" },
   ]),
   tableColumns: Object.freeze([

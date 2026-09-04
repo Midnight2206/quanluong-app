@@ -15,7 +15,10 @@ const STATIC_ALIASES = Object.freeze({
   tong_tien_bang_chu: "tongTienBangChu",
   ngay_thang_nam: "ngayThangNam",
   ho_ten_nguoi_mua: "hoTenNguoiMua",
+  ho_va_ten_nguoi_mua: "hoTenNguoiMua",
+  hoten_nguoi_mua: "hoTenNguoiMua",
   nguoi_mua: "hoTenNguoiMua",
+  can_cu_bkmh: "canCuBkmh",
 });
 
 function snakeToCamel(key) {
