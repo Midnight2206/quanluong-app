@@ -129,15 +129,14 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
       const fieldKey = resolvePdfScalarFieldKey(rawName, { categoryKey });
       if (!fieldKey || seen.has(fieldKey)) continue;
       seen.add(fieldKey);
-      const catalog = catalogByFieldKey.get(fieldKey);
       rows.push({
         fieldKey,
-        namedRange: catalog?.namedRange ?? (rawName.startsWith("FIELD_") ? rawName : `FIELD_${rawName}`),
-        description: catalog?.description ?? catalog?.label ?? rawName,
+        namedRange: rawName.startsWith("FIELD_") ? rawName : `FIELD_${rawName}`,
+        description: rawName,
       });
     }
     return rows;
-  }, [catalogByFieldKey, categoryKey, templateSchema.scalarFields]);
+  }, [categoryKey, templateSchema.scalarFields]);
 
   useEffect(() => {
     const templateFieldLabels = normalizeTemplateFieldLabels(selectedTemplate);
@@ -466,15 +465,20 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                 <p className="text-xs text-muted-foreground">Mẫu không có Named Range FIELD_*.</p>
               ) : (
                 <div className="space-y-3">
-                  {templateLabelFields.map((field) => (
+                  {templateLabelFields.map((field) => {
+                    const catalog = catalogByFieldKey.get(field.fieldKey);
+                    const namedRange = catalog?.namedRange ?? field.namedRange;
+                    const description =
+                      catalog?.description ?? catalog?.label ?? field.description;
+                    return (
                     <label
-                      key={field.namedRange}
+                      key={field.fieldKey}
                       className="grid gap-2 rounded-md bg-background px-3 py-2 text-xs lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
                     >
                       <div className="space-y-1">
-                        <p className="font-mono text-[11px] text-foreground">{field.namedRange}</p>
+                        <p className="font-mono text-[11px] text-foreground">{namedRange}</p>
                         <p className="text-muted-foreground">
-                          {field.fieldKey} · {field.description ?? field.label}
+                          {field.fieldKey} · {description}
                         </p>
                       </div>
                       <input
@@ -490,7 +494,8 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                         disabled={fieldLabelsReadOnly || savingFieldLabels}
                       />
                     </label>
-                  ))}
+                    );
+                  })}
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <Button
                       type="button"
