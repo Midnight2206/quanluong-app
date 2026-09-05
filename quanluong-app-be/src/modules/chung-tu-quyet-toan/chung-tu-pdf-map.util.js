@@ -27,7 +27,7 @@ function lookupContextValue(context, templateKey) {
   return undefined;
 }
 
-export function pickMappedFields(context, fieldKeys, { categoryKey } = {}) {
+export function pickMappedFields(context, fieldKeys, { categoryKey, fieldLabels } = {}) {
   const out = {};
   for (const key of fieldKeys) {
     const fieldKey = resolveScalarFieldKey(key, { categoryKey });
@@ -36,7 +36,8 @@ export function pickMappedFields(context, fieldKeys, { categoryKey } = {}) {
       : lookupContextValue(context, key);
     if (raw === undefined) continue;
     const cell = valueToCell(raw);
-    out[key] = fieldKey ? formatDerivedNamedRangeValue(fieldKey, cell) : cell;
+    const label = fieldLabels?.[fieldKey] ?? fieldLabels?.[key] ?? "";
+    out[key] = fieldKey ? formatDerivedNamedRangeValue(fieldKey, cell, { label }) : cell;
   }
   return out;
 }
@@ -63,6 +64,7 @@ export function buildDocumentServicePayload({
   context,
   fieldKeys,
   columnKeys,
+  fieldLabels,
   signatures = {},
   signatureDates = {},
   signatureBlock,
@@ -70,6 +72,7 @@ export function buildDocumentServicePayload({
   const payload = {
     fields: pickMappedFields(context ?? {}, fieldKeys ?? [], {
       categoryKey: categoryKey ?? context?.categoryKey,
+      fieldLabels,
     }),
     rows: mapDetailRowsForTemplate(context?.detailRows, columnKeys ?? []),
     signatures: signatures ?? {},

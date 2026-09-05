@@ -17,14 +17,21 @@ assert.deepEqual(
     { thanhTien: "1.000", soChungTu: "A1", extra: "x" },
     ["thanh_tien", "so_chung_tu"],
   ),
-  { thanh_tien: "1.000", so_chung_tu: "Số: A1" },
+  { thanh_tien: "1.000", so_chung_tu: "A1" },
 );
 
-test("pickMappedFields prefixes so_chung_tu with Số:", () => {
+test("pickMappedFields applies provided field labels", () => {
   assert.deepEqual(
     pickMappedFields(
       { soChungTu: "062615", so: "062615", soPhieu: "062615" },
       ["so_chung_tu", "so", "so_phieu"],
+      {
+        fieldLabels: {
+          soChungTu: "Số: ",
+          so: "Số: ",
+          soPhieu: "Số: ",
+        },
+      },
     ),
     {
       so_chung_tu: "Số: 062615",
@@ -40,16 +47,56 @@ test("pickMappedFields leaves empty soChungTu empty", () => {
   });
 });
 
-test("pickMappedFields resolves scalar legacy aliases", () => {
+test("pickMappedFields leaves raw values when label missing", () => {
+  assert.deepEqual(
+    pickMappedFields(
+      { tongTienBangChu: "Một triệu", soChungTu: "CT-01" },
+      ["tong_tien_bang_chu", "so_chung_tu"],
+    ),
+    {
+      tong_tien_bang_chu: "Một triệu",
+      so_chung_tu: "CT-01",
+    },
+  );
+});
+
+test("pickMappedFields resolves scalar legacy aliases with provided labels", () => {
   assert.deepEqual(
     pickMappedFields(
       { tongTienBangChu: "Một triệu", ngayThangNam: "ngày 15 tháng 8 năm 2026" },
       ["tong_tien_bang_chu", "ngay_thang_nam"],
+      {
+        fieldLabels: {
+          tongTienBangChu: "Tổng số tiền (Viết bằng chữ): ",
+        },
+      },
     ),
     {
       tong_tien_bang_chu: "Tổng số tiền (Viết bằng chữ): Một triệu",
       ngay_thang_nam: "ngày 15 tháng 8 năm 2026",
     },
+  );
+});
+
+test("pickMappedFields avoids double prefix when label already present", () => {
+  assert.deepEqual(
+    pickMappedFields(
+      { soChungTu: "Số: CT-01" },
+      ["so_chung_tu"],
+      { fieldLabels: { soChungTu: "Số: " } },
+    ),
+    { so_chung_tu: "Số: CT-01" },
+  );
+});
+
+test("pickMappedFields accepts raw template key lookup for labels", () => {
+  assert.deepEqual(
+    pickMappedFields(
+      { soChungTu: "CT-01" },
+      ["so_chung_tu"],
+      { fieldLabels: { so_chung_tu: "Số: " } },
+    ),
+    { so_chung_tu: "Số: CT-01" },
   );
 });
 
@@ -128,4 +175,14 @@ test("buildDocumentServicePayload forwards categoryKey to scalar mapping", () =>
     columnKeys: [],
   });
   assert.deepEqual(p.fields, { FIELD_dia_chi: "Tài vụ" });
+});
+
+test("buildDocumentServicePayload forwards fieldLabels into scalar formatting", () => {
+  const p = buildDocumentServicePayload({
+    context: { soChungTu: "CT-01" },
+    fieldKeys: ["so_chung_tu"],
+    columnKeys: [],
+    fieldLabels: { soChungTu: "Số: " },
+  });
+  assert.deepEqual(p.fields, { so_chung_tu: "Số: CT-01" });
 });

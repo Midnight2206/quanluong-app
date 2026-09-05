@@ -2,15 +2,34 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getChungTuPdfFieldCatalog } from "./chung-tu-pdf-field-catalog.js";
 
-test("catalog includes FIELD_can_cu_bkmh → canCuBkmh", () => {
+test("catalog exposes descriptions and label alias for scalar rows", () => {
   const { scalarFields } = getChungTuPdfFieldCatalog();
   const row = scalarFields.find((f) => f.namedRange === "FIELD_can_cu_bkmh");
   assert.ok(row);
   assert.equal(row.fieldKey, "canCuBkmh");
-  assert.match(String(row.label), /căn cứ|BKMH/i);
+  assert.match(String(row.description), /căn cứ|BKMH/i);
+  assert.equal(row.label, row.description);
 });
 
-test("catalog includes PNK người giao scalar fields", () => {
+test("catalog marks supported template label fields", () => {
+  const { scalarFields } = getChungTuPdfFieldCatalog();
+  const supportedKeys = new Map(
+    scalarFields.map((row) => [row.fieldKey, Boolean(row.supportsLabel)]),
+  );
+  assert.equal(supportedKeys.get("quyenSo"), true);
+  assert.equal(supportedKeys.get("soChungTu"), true);
+  assert.equal(supportedKeys.get("tongTienBangChu"), true);
+  assert.equal(supportedKeys.get("hoTenNguoiMua"), true);
+  assert.equal(supportedKeys.get("boPhan"), true);
+  assert.equal(supportedKeys.get("nguoiGiaoHang"), true);
+  assert.equal(supportedKeys.get("diaChi"), true);
+  assert.equal(supportedKeys.get("canCuBkmh"), true);
+  assert.equal(supportedKeys.get("nhapTaiKho"), true);
+  assert.equal(supportedKeys.get("tongTien"), false);
+  assert.equal(supportedKeys.get("donVi"), false);
+});
+
+test("catalog includes PNK người giao scalar descriptions", () => {
   const { scalarFields } = getChungTuPdfFieldCatalog();
   const nguoiGiao = scalarFields.find((f) => f.namedRange === "FIELD_nguoi_giao_hang");
   const diaChi = scalarFields.find((f) => f.namedRange === "FIELD_dia_chi");
@@ -18,13 +37,13 @@ test("catalog includes PNK người giao scalar fields", () => {
 
   assert.ok(nguoiGiao);
   assert.equal(nguoiGiao.fieldKey, "nguoiGiaoHang");
-  assert.match(String(nguoiGiao.label), /người giao/i);
+  assert.match(String(nguoiGiao.description), /người giao/i);
 
   assert.ok(diaChi);
   assert.equal(diaChi.fieldKey, "diaChi");
-  assert.match(String(diaChi.label), /PNK|bộ phận/i);
+  assert.match(String(diaChi.description), /PNK|bộ phận/i);
 
   assert.ok(nhapTaiKho);
   assert.equal(nhapTaiKho.fieldKey, "nhapTaiKho");
-  assert.match(String(nhapTaiKho.label), /nhập tại kho/i);
+  assert.match(String(nhapTaiKho.description), /nhập tại kho/i);
 });
