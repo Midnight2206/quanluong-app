@@ -119,10 +119,17 @@ def _all_defined_names(workbook):
         )
 
 
-def _merge_groups(sheet, bounds: tuple[int, int, int, int], name: str):
+def _merge_groups(
+    sheet,
+    bounds: tuple[int, int, int, int],
+    name: str,
+    *,
+    allow_multi_row: bool = False,
+):
     min_col, min_row, max_col, max_row = bounds
-    if min_row != max_row:
+    if not allow_multi_row and min_row != max_row:
         raise TemplateValidationError(f"Named Range {name} phải nằm trên một dòng")
+    scan_row = max_row if allow_multi_row else min_row
 
     groups = []
     col = min_col
@@ -131,7 +138,7 @@ def _merge_groups(sheet, bounds: tuple[int, int, int, int], name: str):
             (
                 cell_range
                 for cell_range in sheet.merged_cells.ranges
-                if cell_range.min_row <= min_row <= cell_range.max_row
+                if cell_range.min_row <= scan_row <= cell_range.max_row
                 and cell_range.min_col <= col <= cell_range.max_col
             ),
             None,
@@ -147,6 +154,22 @@ def _merge_groups(sheet, bounds: tuple[int, int, int, int], name: str):
         groups.append((merged.min_col, merged.max_col))
         col = merged.max_col + 1
     return groups
+
+
+def _header_title_source_cell(sheet, row: int, col: int):
+    cell = sheet.cell(row, col)
+    raw = "" if cell.value is None else str(cell.value).strip()
+    if raw:
+        return cell
+    merge_bounds = enclosing_merge_bounds(sheet, row, col)
+    if merge_bounds is None:
+        return cell
+    return sheet.cell(merge_bounds[1], merge_bounds[0])
+
+
+def _header_cell_title(sheet, row: int, col: int) -> str:
+    cell = _header_title_source_cell(sheet, row, col)
+    return "" if cell.value is None else str(cell.value).strip()
 
 
 def _slug(text: str) -> str:
@@ -320,7 +343,9 @@ def parse_template(
             "TABLE_HEADER và TABLE_DATA_ROW phải cùng sheet"
         )
 
-    header_groups = _merge_groups(header_sheet, header_bounds, "TABLE_HEADER")
+    header_groups = _merge_groups(
+        header_sheet, header_bounds, "TABLE_HEADER", allow_multi_row=True
+    )
     data_groups = _merge_groups(data_sheet, data_bounds, "TABLE_DATA_ROW")
     if len(header_groups) != len(data_groups):
         raise TemplateValidationError(
@@ -334,10 +359,11 @@ def parse_template(
 
     used_keys: dict[str, int] = {}
     columns = []
-    header_row = header_bounds[1]
+    header_top_row = header_bounds[1]
+    header_bottom_row = header_bounds[3]
     for min_col, max_col in header_groups:
-        cell = header_sheet.cell(header_row, min_col)
-        title = "" if cell.value is None else str(cell.value).strip()
+        cell = _header_title_source_cell(header_sheet, header_bottom_row, min_col)
+        title = _header_cell_title(header_sheet, header_bottom_row, min_col)
         base_key = _slug(title)
         if not _FIELD_NAME_RE.fullmatch(base_key):
             raise TemplateValidationError(
@@ -404,9 +430,14 @@ def parse_template(
         if computed_signature_height > 0:
             signature_height = computed_signature_height
 
-    header_height = header_sheet.row_dimensions[header_row].height
+    header_height = sum(
+        float(_row_height_pt(header_sheet, row) or DEFAULT_ROW_HEIGHT_PT)
+        for row in range(header_top_row, header_bottom_row + 1)
+    )
     data_cell = data_sheet.cell(data_bounds[1], data_bounds[0])
-    header_cell = header_sheet.cell(header_row, header_bounds[0])
+    header_cell = _header_title_source_cell(
+        header_sheet, header_bottom_row, header_bounds[0]
+    )
     header_font, header_align, header_border = _style_dict(header_cell)
     row_font, row_align, row_border = _style_dict(data_cell)
     data_row_height = float(
@@ -414,7 +445,7 @@ def parse_template(
     )
     table_left_x, _ = cell_top_left_pt(
         header_sheet,
-        header_row,
+        header_top_row,
         header_bounds[0],
         page_height=page_height,
         margin_top=page.margin_top,

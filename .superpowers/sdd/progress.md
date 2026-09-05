@@ -62,3 +62,12 @@ Spec: docs/superpowers/specs/2026-09-05-pnk-nguoi-giao-and-date-range-design.md
 - Task 7: complete (commit a9156db, tests green) — PNK export UI uses date range, by-day/full picker, and sends locked nguoi_giao first
 - Final review: clean after f183c01 (dateFrom/dateTo controller seam); ready to merge
 
+# SDD Progress — multi-row-table-header (2026-09-05)
+
+Plan: docs/superpowers/plans/2026-09-05-multi-row-table-header.md
+Spec: docs/superpowers/specs/2026-09-05-multi-row-table-header-design.md
+
+## Tasks
+
+- Task 1: complete (tests green) — document-service importer supports multi-row `TABLE_HEADER`; bottom-row keys, vertical-merge title fallback, summed header height; `TABLE_DATA_ROW` remains single-row
+

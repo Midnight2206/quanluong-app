@@ -28,6 +28,53 @@ def _change_name(xlsx_bytes: bytes, name: str, target: str) -> bytes:
     return output.getvalue()
 
 
+def _save_workbook(workbook) -> bytes:
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
+
+
+def _make_two_row_header_template(*, vertical_merge_first_column: bool = False) -> bytes:
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    sheet = workbook["ChungTu"]
+
+    sheet.unmerge_cells("B5:C5")
+    sheet.unmerge_cells("E5:F5")
+    sheet.unmerge_cells("B6:C6")
+    sheet.unmerge_cells("E6:F6")
+
+    if vertical_merge_first_column:
+        sheet.merge_cells("A5:A6")
+        sheet["A5"] = "STT"
+    else:
+        sheet["A5"] = "Nhóm"
+        sheet["A6"] = "STT"
+
+    sheet["B5"] = "Hàng hóa"
+    sheet["D5"] = "Định lượng"
+    sheet["E5"] = "Ghi nhận"
+    sheet["B6"] = "Tên hàng"
+    sheet["D6"] = "ĐVT"
+    sheet["E6"] = "Số lượng"
+    sheet["G6"] = "Ghi chú"
+    sheet.merge_cells("B6:C6")
+    sheet.merge_cells("E6:F6")
+    sheet.merge_cells("B7:C7")
+    sheet.merge_cells("E7:F7")
+    sheet.row_dimensions[5].height = 20
+    sheet.row_dimensions[6].height = 24
+
+    del workbook.defined_names["TABLE_HEADER"]
+    del workbook.defined_names["TABLE_DATA_ROW"]
+    workbook.defined_names.add(
+        DefinedName("TABLE_HEADER", attr_text="'ChungTu'!$A$5:$G$6")
+    )
+    workbook.defined_names.add(
+        DefinedName("TABLE_DATA_ROW", attr_text="'ChungTu'!$A$7:$G$7")
+    )
+    return _save_workbook(workbook)
+
+
 def test_parse_minimal_template():
     metadata = _parse_template(make_minimal_template())
 
@@ -58,6 +105,28 @@ def test_parse_minimal_template():
     assert metadata.table.row_style["font"]["size"] == 11.0
     assert metadata.table.header_height_pt == 24
     assert metadata.table.signature_block_height_pt == 80
+
+
+def test_table_header_two_rows_imports_keys_from_bottom_row():
+    metadata = _parse_template(_make_two_row_header_template())
+
+    assert metadata.table.header_row_range == "A5:G6"
+    assert metadata.table.data_row_template == "A7:G7"
+    assert [column.key for column in metadata.table.columns] == [
+        "stt",
+        "ten_hang",
+        "dvt",
+        "so_luong",
+        "ghi_chu",
+    ]
+    assert metadata.table.header_height_pt == 44
+
+
+def test_table_header_vertical_merge_reads_title_from_merge_origin():
+    metadata = _parse_template(_make_two_row_header_template(vertical_merge_first_column=True))
+
+    assert metadata.table.columns[0].title == "STT"
+    assert metadata.table.columns[0].key == "stt"
 
 
 def test_parse_sheet_scoped_named_ranges():
@@ -172,6 +241,16 @@ def test_rejects_full_row_named_range():
     changed = _change_name(make_minimal_template(), "TABLE_HEADER", "'ChungTu'!$5:$5")
 
     with pytest.raises(errors.TemplateValidationError, match="TABLE_HEADER"):
+        _parse_template(changed)
+
+
+def test_table_data_row_still_rejects_multi_row():
+    errors = importlib.import_module("app.import.errors")
+    changed = _change_name(
+        make_minimal_template(), "TABLE_DATA_ROW", "'ChungTu'!$A$6:$G$7"
+    )
+
+    with pytest.raises(errors.TemplateValidationError, match="một dòng"):
         _parse_template(changed)
 
 

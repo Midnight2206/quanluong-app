@@ -26,8 +26,8 @@ Run PDF tests: `pytest tests/test_pdf_renderer.py -v` (pypdf page count + Vietna
 | Named Range | Role |
 |-------------|------|
 | `FIELD_<name>` | Single field cell; `<name>` → snake_case `field_name` |
-| `TABLE_HEADER` | Header row → column defs (required) |
-| `TABLE_DATA_ROW` | Sample data row → row style (required; same sheet + column layout as header) |
+| `TABLE_HEADER` | Header rows → column defs from the bottom header row (required; may span multiple rows) |
+| `TABLE_DATA_ROW` | Sample data row → row style (required; same sheet + column layout as header, single row only) |
 | `TABLE_SIGNATURE` | Signature block start (optional; default 80pt height) |
 
 **Out:** HTTP template upload, MinIO, `required_fields` enforcement — no new routes in `main.py`.
