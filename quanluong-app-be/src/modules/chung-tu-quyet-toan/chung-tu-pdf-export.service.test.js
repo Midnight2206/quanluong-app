@@ -21,6 +21,7 @@ const resolveChungTuContext = mock.fn(async () => ({
   },
   sourceDataHash: "hash-123",
 }));
+const prepareSignatureBlockForRender = mock.fn(async (block) => block);
 const getTemplateFields = mock.fn(async () => ({
   fields: [{ field_name: "don_vi", cell_ref: "B2" }, { field_name: "tong_tien", cell_ref: "B3" }],
   columns: [{ key: "stt", title: "STT" }, { key: "ten_hang", title: "Ten hang" }],
@@ -44,6 +45,7 @@ mock.module("../../infra/database/prisma/prisma.client.js", {
 
 mock.module("./chung-tu-data-resolver.service.js", {
   exports: {
+    prepareSignatureBlockForRender,
     resolveChungTuContext,
   },
 });
@@ -86,6 +88,7 @@ test.beforeEach(() => {
   prismaTemplateFindFirst.mock.resetCalls();
   prismaExportCreate.mock.resetCalls();
   resolveChungTuContext.mock.resetCalls();
+  prepareSignatureBlockForRender.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
   renderDocumentPdf.mock.resetCalls();
   writeChungTuPdfFile.mock.resetCalls();
@@ -143,6 +146,7 @@ test("createChungTuPdfExport renders document-service PDF, stores file, and retu
         donVi: "Tieu doan 1",
       },
       settings: { ghiChu: "ghi chu" },
+      resolvedBkmhBuyer: null,
     });
 
     assert.equal(getTemplateFields.mock.callCount(), 1);
@@ -187,6 +191,49 @@ test("createChungTuPdfExport renders document-service PDF, stores file, and retu
     assert.equal(result.exportKey, createdPayload.exportKey);
     assert.equal(result.downloadPath, `/chungtuquyettoan/pdf-exports/${createdPayload.exportKey}/file`);
     assert.equal(result.fileName, createdPayload.fileName);
+  } finally {
+    randomBytesMock.mock.restore();
+  }
+});
+
+test("createChungTuPdfExport forwards PNK date range and full aggregation to resolver", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 16,
+    categoryKey: "phieu-nhap-kho",
+    displayName: "PNK A",
+    documentServiceTemplateId: 902,
+    status: "published",
+  }));
+
+  const randomBytesMock = mock.method(crypto, "randomBytes", () => Buffer.from("001122334455", "hex"));
+  try {
+    await createChungTuPdfExport({
+      categoryKey: "phieu-nhap-kho",
+      unitId: 9,
+      dateFrom: "2026-06-01",
+      dateTo: "2026-06-03",
+      aggregationMode: "full",
+      pdfTemplateId: 16,
+      exportingUserProfile: { donVi: "Kho A" },
+      settings: { ghiChu: "PNK" },
+      createdById: 88,
+      effectiveUnitIds: [9, 10],
+    });
+
+    assert.deepEqual(resolveChungTuContext.mock.calls[0].arguments[0], {
+      categoryKey: "phieu-nhap-kho",
+      unitId: 9,
+      periodDate: undefined,
+      periodMonth: undefined,
+      dateFrom: "2026-06-01",
+      dateTo: "2026-06-03",
+      issueSlipId: undefined,
+      unitIds: undefined,
+      aggregationMode: "full",
+      settings: { ghiChu: "PNK" },
+      exportingUserProfile: { donVi: "Kho A" },
+      resolvedBkmhBuyer: null,
+    });
   } finally {
     randomBytesMock.mock.restore();
   }

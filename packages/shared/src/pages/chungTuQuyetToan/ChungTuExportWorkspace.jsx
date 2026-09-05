@@ -65,6 +65,19 @@ const DEFAULT_PNK_NGUOI_GIAO_SLOT = {
   locked: true,
 };
 
+const PNK_AGGREGATION_MODE_OPTIONS = Object.freeze([
+  {
+    value: CHUNG_TU_AGGREGATION_MODES.BY_DAY,
+    label: "Theo ngày",
+    hint: "1 PDF / buyer x ngày theo dữ liệu BKMH trong khoảng đã chọn.",
+  },
+  {
+    value: CHUNG_TU_AGGREGATION_MODES.FULL,
+    label: "Nhiều ngày",
+    hint: "1 PDF / buyer, gộp nhiều ngày trong khoảng đã chọn.",
+  },
+]);
+
 function getTemplateLabel(template) {
   if (!template) return "";
   const base = template.displayName || template.name || `Mẫu #${template.id}`;
@@ -238,22 +251,13 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     [unitsForDropdown, effectiveUnitId],
   );
 
-  const aggregationLabel = useMemo(
-    () =>
-      CHUNG_TU_AGGREGATION_MODE_OPTIONS.find((o) => o.value === effectiveAggregationMode)?.label ??
-      effectiveAggregationMode,
-    [effectiveAggregationMode],
-  );
   const aggregationOptions = useMemo(
-    () =>
-      isPnkMonthly
-        ? CHUNG_TU_AGGREGATION_MODE_OPTIONS.filter(
-            (opt) =>
-              opt.value === CHUNG_TU_AGGREGATION_MODES.BY_DAY ||
-              opt.value === CHUNG_TU_AGGREGATION_MODES.FULL,
-          )
-        : CHUNG_TU_AGGREGATION_MODE_OPTIONS,
+    () => (isPnkMonthly ? PNK_AGGREGATION_MODE_OPTIONS : CHUNG_TU_AGGREGATION_MODE_OPTIONS),
     [isPnkMonthly],
+  );
+  const aggregationLabel = useMemo(
+    () => aggregationOptions.find((o) => o.value === effectiveAggregationMode)?.label ?? effectiveAggregationMode,
+    [aggregationOptions, effectiveAggregationMode],
   );
 
   useEffect(() => {

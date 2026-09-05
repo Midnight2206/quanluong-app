@@ -7,13 +7,14 @@ import {
   CHUNG_TU_CATEGORY_KEYS,
   normalizeAggregationMode,
 } from "./chung-tu-category.constants.js";
-import { normalizeMonthUnitIds, normalizePeriodMonth } from "./chung-tu-monthly-sheets.js";
+import { normalizeMonthUnitIds, normalizePeriodMonth, lastDayOfMonth } from "./chung-tu-monthly-sheets.js";
 import {
+  prepareSignatureBlockForRender,
   resolveChungTuContext,
-  resolveSystemSignatureSlots,
 } from "./chung-tu-data-resolver.service.js";
 import { SIGNATURE_CATALOG } from "./chung-tu-signature-catalog.js";
 import { buildDocumentServicePayload } from "./chung-tu-pdf-map.util.js";
+import { fillSignatureDatesFromPeriod } from "./chung-tu-signature-dates.util.js";
 import {
   buildChungTuPdfRelativePath,
   deleteChungTuPdfFile,
@@ -161,6 +162,8 @@ async function createChungTuPdfExport({
   unitId,
   periodDate,
   periodMonth,
+  dateFrom,
+  dateTo,
   issueSlipId,
   unitIds,
   aggregationMode,
@@ -175,7 +178,8 @@ async function createChungTuPdfExport({
 }) {
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
   const meta = assertKnownCategoryKey(categoryKey);
-  const selectedUnitIds = periodMonth
+  const isPnk = categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO;
+  const selectedUnitIds = periodMonth && !isPnk
     ? resolveSelectedUnitIds({ unitIds, unitId, effectiveUnitIds })
     : undefined;
   if (selectedUnitIds) {
@@ -194,17 +198,18 @@ async function createChungTuPdfExport({
   }
 
   const safePeriodMonth = periodMonth ? normalizePeriodMonth(periodMonth) : undefined;
-  const safeAggregationMode = safePeriodMonth
-    ? normalizeAggregationMode(aggregationMode)
-    : undefined;
+  const safeDateFrom = isPnk ? String(dateFrom ?? "").trim() : "";
+  const safeDateTo = isPnk ? String(dateTo ?? "").trim() : "";
+  const safeAggregationMode = isPnk
+    ? aggregationMode === "full"
+      ? "full"
+      : "by-day"
+    : safePeriodMonth
+      ? normalizeAggregationMode(aggregationMode)
+      : undefined;
 
   const resolveCtx = { storageUnitId: unitId, currentUserId: createdById };
-  const resolvedSlots = signatureBlock?.slots
-    ? await resolveSystemSignatureSlots(signatureBlock.slots, resolveCtx)
-    : null;
-  const resolvedSignatureBlock = resolvedSlots
-    ? { ...signatureBlock, slots: resolvedSlots }
-    : signatureBlock;
+  const resolvedSignatureBlock = await prepareSignatureBlockForRender(signatureBlock, resolveCtx);
 
   const resolvedBkmhBuyer =
     categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
@@ -213,7 +218,7 @@ async function createChungTuPdfExport({
           .catch(() => null)
       : null;
 
-  const { context, sourceDataHash } = await resolveChungTuContext({
+  const resolveArgs = {
     categoryKey,
     unitId,
     periodDate,
@@ -224,16 +229,29 @@ async function createChungTuPdfExport({
     settings,
     exportingUserProfile,
     resolvedBkmhBuyer,
-  });
+  };
+  if (isPnk) {
+    resolveArgs.dateFrom = safeDateFrom || undefined;
+    resolveArgs.dateTo = safeDateTo || undefined;
+  }
+  const { context, sourceDataHash } = await resolveChungTuContext(resolveArgs);
 
   const fieldsPayload = await getTemplateFields(template.documentServiceTemplateId);
   const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
+  const resolvedSignatureDates = fillSignatureDatesFromPeriod({
+    signatureBlock: resolvedSignatureBlock,
+    signatureDates,
+    context,
+    aggregationMode: safeAggregationMode,
+    periodMonth: safePeriodMonth,
+    lastDayOfMonthFn: lastDayOfMonth,
+  });
   const payload = buildDocumentServicePayload({
     context,
     fieldKeys,
     columnKeys,
     signatures,
-    signatureDates,
+    signatureDates: resolvedSignatureDates,
     signatureBlock: resolvedSignatureBlock,
   });
   const buffer = await renderDocumentPdf(template.documentServiceTemplateId, payload);

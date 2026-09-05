@@ -71,9 +71,12 @@ test("PNK monthly export uses date range and only allows by-day or full aggregat
     exportWorkspaceSource,
     /effectiveAggregationMode = isPnkMonthly[\s\S]*CHUNG_TU_AGGREGATION_MODES\.FULL[\s\S]*CHUNG_TU_AGGREGATION_MODES\.BY_DAY/,
   );
-  assert.match(exportWorkspaceSource, /aggregationOptions = useMemo/);
-  assert.match(exportWorkspaceSource, /opt\.value === CHUNG_TU_AGGREGATION_MODES\.BY_DAY/);
-  assert.match(exportWorkspaceSource, /opt\.value === CHUNG_TU_AGGREGATION_MODES\.FULL/);
+  assert.match(exportWorkspaceSource, /const PNK_AGGREGATION_MODE_OPTIONS = Object\.freeze/);
+  assert.match(exportWorkspaceSource, /label: "Theo ngày"/);
+  assert.match(exportWorkspaceSource, /label: "Nhiều ngày"/);
+  assert.match(exportWorkspaceSource, /1 PDF \/ buyer x ngày/);
+  assert.match(exportWorkspaceSource, /1 PDF \/ buyer, gộp nhiều ngày/);
+  assert.match(exportWorkspaceSource, /aggregationOptions = useMemo\(\s*\(\) => \(isPnkMonthly \? PNK_AGGREGATION_MODE_OPTIONS : CHUNG_TU_AGGREGATION_MODE_OPTIONS\)/);
   assert.match(exportWorkspaceSource, /dateFrom/);
   assert.match(exportWorkspaceSource, /dateTo/);
 });
