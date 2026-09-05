@@ -1,17 +1,19 @@
 "use client";
 
 import { FileUp, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import {
+  useChungTuPdfFieldCatalogQuery,
   useChungTuPdfTemplateFieldsQuery,
   useChungTuPdfTemplatesQuery,
   openChungTuPdfTemplatePreview,
   usePublishChungTuPdfTemplateMutation,
   useRetireChungTuPdfTemplateMutation,
+  useUpdateChungTuPdfTemplateFieldLabelsMutation,
   useUploadChungTuPdfTemplateMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { notifyError, notifySuccess } from "@/services/notify";
@@ -68,6 +70,14 @@ function normalizeTemplateSchema(payload) {
   return { scalarFields, columns, signatureBlock };
 }
 
+function normalizeTemplateFieldLabels(template) {
+  const fieldLabels = template?.fieldLabels;
+  if (!fieldLabels || typeof fieldLabels !== "object" || Array.isArray(fieldLabels)) {
+    return {};
+  }
+  return fieldLabels;
+}
+
 /**
  * @param {{ categoryKey: string }} props
  */
@@ -78,6 +88,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
   const [uploadDisplayName, setUploadDisplayName] = useState("");
   const [uploadVersion, setUploadVersion] = useState("1");
   const [previewingId, setPreviewingId] = useState("");
+  const [fieldLabelsDraft, setFieldLabelsDraft] = useState({});
 
   const { data: templates = [], isLoading: templatesLoading } = useChungTuPdfTemplatesQuery(
     categoryKey,
@@ -87,15 +98,38 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
     selectedId,
     { skip: !selectedId },
   );
+  const { data: fieldCatalog, isLoading: fieldCatalogLoading } = useChungTuPdfFieldCatalogQuery();
   const [uploadTemplate, { isLoading: uploading }] = useUploadChungTuPdfTemplateMutation();
   const [publishTemplate, { isLoading: publishing }] = usePublishChungTuPdfTemplateMutation();
   const [retireTemplate, { isLoading: retiring }] = useRetireChungTuPdfTemplateMutation();
+  const [updateFieldLabels, { isLoading: savingFieldLabels }] =
+    useUpdateChungTuPdfTemplateFieldLabelsMutation();
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => String(t.id) === String(selectedId)) ?? null,
     [selectedId, templates],
   );
   const templateSchema = useMemo(() => normalizeTemplateSchema(fieldsPayload), [fieldsPayload]);
+  const labelableFields = useMemo(
+    () => (fieldCatalog?.scalarFields ?? []).filter((field) => field?.supportsLabel),
+    [fieldCatalog],
+  );
+
+  useEffect(() => {
+    const templateFieldLabels = normalizeTemplateFieldLabels(selectedTemplate);
+    const nextDraft = Object.fromEntries(
+      labelableFields.map((field) => [field.fieldKey, templateFieldLabels[field.fieldKey] ?? ""]),
+    );
+    setFieldLabelsDraft(nextDraft);
+  }, [labelableFields, selectedTemplate?.id, selectedTemplate?.updatedAt]);
+
+  const hasFieldLabelChanges = useMemo(() => {
+    const templateFieldLabels = normalizeTemplateFieldLabels(selectedTemplate);
+    return labelableFields.some(
+      (field) => (fieldLabelsDraft[field.fieldKey] ?? "") !== (templateFieldLabels[field.fieldKey] ?? ""),
+    );
+  }, [fieldLabelsDraft, labelableFields, selectedTemplate]);
+  const fieldLabelsReadOnly = selectedTemplate?.status === "retired";
 
   const handleUpload = async () => {
     if (!uploadFile) {
@@ -170,6 +204,26 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
       notifySuccess("Đã ngừng dùng mẫu PDF.");
     } catch (e) {
       notifyError(e?.data?.message || e?.message || "Không ngừng được mẫu PDF.");
+    }
+  };
+
+  const handleSaveFieldLabels = async () => {
+    if (!selectedTemplate || fieldLabelsReadOnly) {
+      return;
+    }
+    if (!hasFieldLabelChanges) {
+      notifySuccess("Không có thay đổi nhãn field.");
+      return;
+    }
+    try {
+      await updateFieldLabels({
+        id: selectedTemplate.id,
+        categoryKey,
+        fieldLabels: fieldLabelsDraft,
+      }).unwrap();
+      notifySuccess("Đã lưu nhãn field.");
+    } catch (e) {
+      notifyError(e?.data?.message || e?.message || "Không lưu được nhãn field.");
     }
   };
 
@@ -360,6 +414,73 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
               <p className="text-xs text-muted-foreground">
                 Mẫu đang chọn: {getTemplateLabel(selectedTemplate)}
               </p>
+            </div>
+            <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-3">
+              <div className="space-y-1">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
+                  Nhãn field
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Chỉ các field hỗ trợ nhãn mới hiện ở đây. Nếu muốn tiền tố có dấu cách, hãy nhập
+                  luôn `: ` hoặc khoảng trắng cuối chuỗi.
+                </p>
+                {fieldLabelsReadOnly ? (
+                  <p className="text-xs text-muted-foreground">
+                    Mẫu đã ngừng dùng chỉ xem được nhãn đã lưu.
+                  </p>
+                ) : null}
+              </div>
+              {fieldCatalogLoading ? (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Đang tải field có thể gắn nhãn…
+                </p>
+              ) : labelableFields.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Không có field nào hỗ trợ nhãn.</p>
+              ) : (
+                <div className="space-y-3">
+                  {labelableFields.map((field) => (
+                    <label
+                      key={field.namedRange}
+                      className="grid gap-2 rounded-md bg-background px-3 py-2 text-xs lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-mono text-[11px] text-foreground">{field.namedRange}</p>
+                        <p className="text-muted-foreground">
+                          {field.fieldKey} · {field.description ?? field.label}
+                        </p>
+                      </div>
+                      <input
+                        className={fieldClass}
+                        value={fieldLabelsDraft[field.fieldKey] ?? ""}
+                        onChange={(e) =>
+                          setFieldLabelsDraft((prev) => ({
+                            ...prev,
+                            [field.fieldKey]: e.target.value,
+                          }))
+                        }
+                        placeholder="Ví dụ: Số: "
+                        disabled={fieldLabelsReadOnly || savingFieldLabels}
+                      />
+                    </label>
+                  ))}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      disabled={fieldLabelsReadOnly || savingFieldLabels || !hasFieldLabelChanges}
+                      onClick={handleSaveFieldLabels}
+                    >
+                      {savingFieldLabels ? (
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      Lưu nhãn field
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             {fieldsLoading ? (
               <p className="flex items-center gap-2 text-xs text-muted-foreground">
