@@ -69,9 +69,13 @@ Không bắt buộc mirror toàn bộ formatter Node sang Python — Python ch�
 - Thêm NL field mới: thêm formatter + catalog row trong `chung-tu-nl-field.js` (+ test file cạnh).
 - Thêm FIELD labelable: catalog + alias trong nhánh label-field / catalog hiện có.
 
+---
+
+## 3. Document-service
+
 ### 3.1 Import
 
-Trong `_build_fields` (và skip coords `FIELD_` trong static_cells):
+Trong `_build_fields` (và skip coords cho cả `FIELD_` / `NL_FIELD_` trong static_cells):
 
 - Nhận tên bắt đầu bằng `FIELD_` **hoặc** `NL_FIELD_`.
 - `field_name` = phần sau prefix (`can_cu_pnk` cho `NL_FIELD_can_cu_pnk`).
