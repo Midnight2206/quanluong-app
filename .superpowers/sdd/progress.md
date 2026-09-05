@@ -1,3 +1,13 @@
+# SDD Progress — template-field-labels-from-excel-fields (2026-09-05)
+
+Plan: docs/superpowers/plans/2026-09-05-template-field-labels-from-excel-fields.md
+Spec: docs/superpowers/specs/2026-09-05-template-field-labels-from-excel-fields-design.md
+
+## Tasks
+
+- Task 1: complete (commit d3d6865) — backend `normalizeFieldLabels` accepts any string keys (no `supportsLabel` whitelist)
+- Task 2: complete (tests green) — FE template-scoped `FIELD_*` label list, prune-save payload, shared scalar key resolver
+
 # SDD Progress — template-field-labels-and-catalog-lookup (2026-09-05)
 
 Plan: docs/superpowers/plans/2026-09-05-template-field-labels-and-catalog-lookup.md
@@ -5,6 +15,11 @@ Spec: docs/superpowers/specs/2026-09-05-template-field-labels-and-catalog-lookup
 ## Tasks
 
 - Task 1: complete (commit 5c7c5b2) — fieldLabelsJson schema + migration
+- Task 2: complete (commit 0cbf70a) — catalog metadata + label-driven scalar formatting
+- Task 3: complete (commit 5edb2f3) — export paths pass template fieldLabelsJson
+- Task 4: complete (commit c3c55d2, tests green) — API save/filter field labels on PDF templates
+- Task 5: complete (commit df6492a, source tests green) — Superadmin per-template field-label editor
+- Task 6: complete (commit 41d6fca, source tests green) — searchable scalar-only field catalog table
 
 # SDD Progress — bkmh-slice-lines-pnk-sources (2026-09-04)
 

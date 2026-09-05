@@ -16,6 +16,7 @@ import {
   useUpdateChungTuPdfTemplateFieldLabelsMutation,
   useUploadChungTuPdfTemplateMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
+import { resolvePdfScalarFieldKey } from "@/pages/chungTuQuyetToan/chungTuPdfScalarFieldKey";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 
@@ -110,25 +111,48 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
     [selectedId, templates],
   );
   const templateSchema = useMemo(() => normalizeTemplateSchema(fieldsPayload), [fieldsPayload]);
-  const labelableFields = useMemo(
-    () => (fieldCatalog?.scalarFields ?? []).filter((field) => field?.supportsLabel),
-    [fieldCatalog],
-  );
+  const catalogByFieldKey = useMemo(() => {
+    const map = new Map();
+    for (const field of fieldCatalog?.scalarFields ?? []) {
+      if (field?.fieldKey) {
+        map.set(String(field.fieldKey), field);
+      }
+    }
+    return map;
+  }, [fieldCatalog]);
+  const templateLabelFields = useMemo(() => {
+    const seen = new Set();
+    const rows = [];
+    for (const field of templateSchema.scalarFields) {
+      const rawName = String(field?.field_name ?? field?.key ?? "").trim();
+      if (!rawName) continue;
+      const fieldKey = resolvePdfScalarFieldKey(rawName, { categoryKey });
+      if (!fieldKey || seen.has(fieldKey)) continue;
+      seen.add(fieldKey);
+      const catalog = catalogByFieldKey.get(fieldKey);
+      rows.push({
+        fieldKey,
+        namedRange: catalog?.namedRange ?? (rawName.startsWith("FIELD_") ? rawName : `FIELD_${rawName}`),
+        description: catalog?.description ?? catalog?.label ?? rawName,
+      });
+    }
+    return rows;
+  }, [catalogByFieldKey, categoryKey, templateSchema.scalarFields]);
 
   useEffect(() => {
     const templateFieldLabels = normalizeTemplateFieldLabels(selectedTemplate);
     const nextDraft = Object.fromEntries(
-      labelableFields.map((field) => [field.fieldKey, templateFieldLabels[field.fieldKey] ?? ""]),
+      templateLabelFields.map((field) => [field.fieldKey, templateFieldLabels[field.fieldKey] ?? ""]),
     );
     setFieldLabelsDraft(nextDraft);
-  }, [labelableFields, selectedTemplate?.id, selectedTemplate?.updatedAt]);
+  }, [selectedTemplate?.id, selectedTemplate?.updatedAt, templateLabelFields]);
 
   const hasFieldLabelChanges = useMemo(() => {
     const templateFieldLabels = normalizeTemplateFieldLabels(selectedTemplate);
-    return labelableFields.some(
+    return templateLabelFields.some(
       (field) => (fieldLabelsDraft[field.fieldKey] ?? "") !== (templateFieldLabels[field.fieldKey] ?? ""),
     );
-  }, [fieldLabelsDraft, labelableFields, selectedTemplate]);
+  }, [fieldLabelsDraft, selectedTemplate, templateLabelFields]);
   const fieldLabelsReadOnly = selectedTemplate?.status === "retired";
 
   const handleUpload = async () => {
@@ -216,10 +240,13 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
       return;
     }
     try {
+      const fieldLabels = Object.fromEntries(
+        templateLabelFields.map((field) => [field.fieldKey, fieldLabelsDraft[field.fieldKey] ?? ""]),
+      );
       await updateFieldLabels({
         id: selectedTemplate.id,
         categoryKey,
-        fieldLabels: fieldLabelsDraft,
+        fieldLabels,
       }).unwrap();
       notifySuccess("Đã lưu nhãn field.");
     } catch (e) {
@@ -421,8 +448,8 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                   Nhãn field
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Chỉ các field hỗ trợ nhãn mới hiện ở đây. Nếu muốn tiền tố có dấu cách, hãy nhập
-                  luôn `: ` hoặc khoảng trắng cuối chuỗi.
+                  Danh sách này lấy từ scalar field trên mẫu đang chọn. Nếu muốn tiền tố có dấu
+                  cách, hãy nhập luôn `: ` hoặc khoảng trắng cuối chuỗi.
                 </p>
                 {fieldLabelsReadOnly ? (
                   <p className="text-xs text-muted-foreground">
@@ -430,16 +457,16 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                   </p>
                 ) : null}
               </div>
-              {fieldCatalogLoading ? (
+              {fieldsLoading || fieldCatalogLoading ? (
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="size-3.5 animate-spin" />
-                  Đang tải field có thể gắn nhãn…
+                  Đang đọc field trên mẫu…
                 </p>
-              ) : labelableFields.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Không có field nào hỗ trợ nhãn.</p>
+              ) : templateLabelFields.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Mẫu không có Named Range FIELD_*.</p>
               ) : (
                 <div className="space-y-3">
-                  {labelableFields.map((field) => (
+                  {templateLabelFields.map((field) => (
                     <label
                       key={field.namedRange}
                       className="grid gap-2 rounded-md bg-background px-3 py-2 text-xs lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
