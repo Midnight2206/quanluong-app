@@ -238,6 +238,12 @@ async function createChungTuPdfExport({
 
   const fieldsPayload = await getTemplateFields(template.documentServiceTemplateId);
   const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
+  const fieldLabels =
+    template.fieldLabelsJson && typeof template.fieldLabelsJson === "object" && !Array.isArray(template.fieldLabelsJson)
+      ? Object.fromEntries(
+          Object.entries(template.fieldLabelsJson).map(([key, value]) => [String(key), String(value ?? "")]),
+        )
+      : {};
   const resolvedSignatureDates = fillSignatureDatesFromPeriod({
     signatureBlock: resolvedSignatureBlock,
     signatureDates,
@@ -250,6 +256,7 @@ async function createChungTuPdfExport({
     context,
     fieldKeys,
     columnKeys,
+    fieldLabels,
     signatures,
     signatureDates: resolvedSignatureDates,
     signatureBlock: resolvedSignatureBlock,

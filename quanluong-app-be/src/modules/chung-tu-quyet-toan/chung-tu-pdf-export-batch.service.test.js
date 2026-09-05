@@ -376,3 +376,51 @@ test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + 
     randomBytesMock.mock.restore();
   }
 });
+
+test("createChungTuPdfExportBatch passes template fieldLabelsJson into rendered payload", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 17,
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "BKMH labels",
+    documentServiceTemplateId: 903,
+    status: "published",
+    fieldLabelsJson: { soChungTu: "Số: " },
+  }));
+  prismaSignatureSettingsFindUnique.mock.mockImplementation(async () => null);
+  resolveChungTuContext.mock.mockImplementationOnce(async () => ({
+    context: {
+      sheetContexts: [{ periodDate: "2026-06-01", soChungTu: "CT-01", detailRows: [{ stt: 1 }] }],
+      detailRows: [{ stt: 1 }],
+    },
+    sourceDataHash: "batch-labels",
+  }));
+  getTemplateFields.mock.mockImplementationOnce(async () => ({
+    fields: [{ field_name: "so_chung_tu", cell_ref: "B2" }],
+    columns: [],
+  }));
+
+  const randomValues = ["abcdef123456", "111111111111"];
+  const randomBytesMock = mock.method(crypto, "randomBytes", () =>
+    Buffer.from(randomValues.shift() ?? "222222222222", "hex"),
+  );
+  try {
+    await createChungTuPdfExportBatch({
+      categoryKey: "bang-ke-mua-hang",
+      unitId: 9,
+      periodMonth: "2026-06",
+      unitIds: [10],
+      aggregationMode: "by-day",
+      pdfTemplateId: 17,
+      exportingUserProfile: { donVi: "Kho A" },
+      settings: {},
+      createdById: 88,
+      effectiveUnitIds: [9, 10],
+    });
+
+    assert.deepEqual(renderToDocumentFolder.mock.calls.at(-1).arguments[1].fields, {
+      so_chung_tu: "Số: CT-01",
+    });
+  } finally {
+    randomBytesMock.mock.restore();
+  }
+});

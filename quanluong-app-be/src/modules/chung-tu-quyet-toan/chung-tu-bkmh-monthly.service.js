@@ -245,6 +245,12 @@ async function createChungTuBkmhMonthlyExport({
   ]);
 
   const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
+  const fieldLabels =
+    template.fieldLabelsJson && typeof template.fieldLabelsJson === "object" && !Array.isArray(template.fieldLabelsJson)
+      ? Object.fromEntries(
+          Object.entries(template.fieldLabelsJson).map(([key, value]) => [String(key), String(value ?? "")]),
+        )
+      : {};
   const settingsBlock = savedSignatureSettings?.signatureBlock;
   // Prefer DB settings when FE strips system→dynamic (legacy normalize).
   const blockForResolve =
@@ -280,6 +286,7 @@ async function createChungTuBkmhMonthlyExport({
         context: slice.context,
         fieldKeys,
         columnKeys,
+        fieldLabels,
         signatures,
         signatureDates: sliceSignatureDates,
         signatureBlock: finalSignatureBlock,

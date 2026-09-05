@@ -258,6 +258,12 @@ async function createChungTuPdfExportBatch({
   const { context, sourceDataHash } = await resolveChungTuContext(resolveArgs);
 
   const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
+  const fieldLabels =
+    template.fieldLabelsJson && typeof template.fieldLabelsJson === "object" && !Array.isArray(template.fieldLabelsJson)
+      ? Object.fromEntries(
+          Object.entries(template.fieldLabelsJson).map(([key, value]) => [String(key), String(value ?? "")]),
+        )
+      : {};
   const finalSignatureBlock = signatureBlock ?? savedSignatureSettings?.signatureBlock ?? undefined;
   const batchContext = { ...(context ?? {}), categoryKey };
   const slices = pickExportSlices({
@@ -297,6 +303,7 @@ async function createChungTuPdfExportBatch({
         context: slice.context,
         fieldKeys,
         columnKeys,
+        fieldLabels,
         signatures,
         signatureDates: sliceSignatureDates,
         signatureBlock: sliceSignatureBlock,

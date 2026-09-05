@@ -517,3 +517,51 @@ test("list/get/delete and stream helpers map rows and proxy document-service cal
     where: { id: 55 },
   });
 });
+
+test("createChungTuBkmhMonthlyExport falls back to raw value when template fieldLabelsJson is empty", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 16,
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "BKMH raw",
+    documentServiceTemplateId: 902,
+    status: "published",
+    fieldLabelsJson: {},
+  }));
+  prismaSignatureSettingsFindUnique.mock.mockImplementation(async () => null);
+  prismaMonthlyFindUnique.mock.mockImplementation(async () => null);
+  resolveChungTuContext.mock.mockImplementationOnce(async () => ({
+    context: {
+      periodMonth: "2026-06",
+      donVi: "Kho A",
+      sheetContexts: [{ periodDate: "2026-06-01", soChungTu: "CT-01", detailRows: [{ stt: 1 }] }],
+    },
+    sourceDataHash: "monthly-raw",
+  }));
+  getTemplateFields.mock.mockImplementationOnce(async () => ({
+    fields: [{ field_name: "so_chung_tu", cell_ref: "B2" }],
+    columns: [],
+  }));
+
+  const randomBytesMock = mock.method(crypto, "randomBytes", () => Buffer.from("abcdef123456", "hex"));
+  try {
+    await createChungTuBkmhMonthlyExport({
+      storageUnitId: 9,
+      periodMonth: "2026-06",
+      unitIds: [10],
+      aggregationMode: "by-day",
+      pdfTemplateId: 16,
+      signatures: {},
+      signatureDates: {},
+      settings: {},
+      exportingUserProfile: { donVi: "Kho A" },
+      createdById: 88,
+      effectiveUnitIds: [9, 10],
+    });
+
+    assert.deepEqual(renderToDocumentFolder.mock.calls.at(-1).arguments[1].fields, {
+      so_chung_tu: "CT-01",
+    });
+  } finally {
+    randomBytesMock.mock.restore();
+  }
+});

@@ -238,3 +238,51 @@ test("createChungTuPdfExport forwards PNK date range and full aggregation to res
     randomBytesMock.mock.restore();
   }
 });
+
+test("createChungTuPdfExport applies template fieldLabelsJson to scalar fields", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 17,
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "BKMH labels",
+    documentServiceTemplateId: 903,
+    status: "published",
+    fieldLabelsJson: { soChungTu: "Số: " },
+  }));
+  resolveChungTuContext.mock.mockImplementationOnce(async () => ({
+    context: {
+      soChungTu: "CT-01",
+      detailRows: [],
+    },
+    sourceDataHash: "hash-labels",
+  }));
+  getTemplateFields.mock.mockImplementationOnce(async () => ({
+    fields: [{ field_name: "so_chung_tu", cell_ref: "B2" }],
+    columns: [],
+  }));
+
+  const randomBytesMock = mock.method(crypto, "randomBytes", () => Buffer.from("778899aabbcc", "hex"));
+  try {
+    await createChungTuPdfExport({
+      categoryKey: "bang-ke-mua-hang",
+      unitId: 9,
+      periodDate: "2026-08-23",
+      pdfTemplateId: 17,
+      exportingUserProfile: { donVi: "Kho A" },
+      settings: {},
+      createdById: 88,
+      effectiveUnitIds: [9],
+    });
+
+    assert.deepEqual(renderDocumentPdf.mock.calls.at(-1).arguments, [
+      903,
+      {
+        fields: { so_chung_tu: "Số: CT-01" },
+        rows: [],
+        signatures: {},
+        signature_dates: {},
+      },
+    ]);
+  } finally {
+    randomBytesMock.mock.restore();
+  }
+});
