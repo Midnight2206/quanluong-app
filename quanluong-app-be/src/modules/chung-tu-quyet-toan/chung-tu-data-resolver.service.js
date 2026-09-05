@@ -533,91 +533,205 @@ function noBkmhMonthlySourceError(periodMonth) {
   });
 }
 
-async function resolvePnkMonthlyFromBkmhSlices({
-  storageUnitId,
-  periodMonth,
+function noBkmhRangeSourceError(dateFrom, dateTo) {
+  return new AppError({
+    message: `Không có dữ liệu BKMH từ ngày ${dateFrom} đến ${dateTo}. Vui lòng xuất BKMH trước khi xuất PNK.`,
+    statusCode: 400,
+    code: ERROR_CODES.VALIDATION_ERROR,
+  });
+}
+
+function missingBkmhBuyerKeyError() {
+  return new AppError({
+    message: "BKMH thiếu thông tin người mua trên slice. Vui lòng xuất lại BKMH trước khi xuất PNK.",
+    statusCode: 400,
+    code: ERROR_CODES.VALIDATION_ERROR,
+  });
+}
+
+function normalizePnkAggregationMode(mode) {
+  return String(mode ?? "").trim() === CHUNG_TU_AGGREGATION_MODES.FULL
+    ? CHUNG_TU_AGGREGATION_MODES.FULL
+    : CHUNG_TU_AGGREGATION_MODES.BY_DAY;
+}
+
+function pickFirstNonEmptySliceField(slices, fieldKey) {
+  for (const slice of slices ?? []) {
+    const value = String(slice?.[fieldKey] ?? "").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function getLastPeriodDateFromSlices(slices) {
+  let last = "";
+  for (const slice of slices ?? []) {
+    const periodDate = toIsoDateOnly(slice?.periodDate);
+    if (periodDate && (!last || periodDate > last)) last = periodDate;
+  }
+  return last;
+}
+
+function buildPnkSheetContext({
+  slices,
+  periodDate,
+  dateFrom,
+  dateTo,
+  aggregationMode,
   resolveSettingsForSlips,
+  nhapTaiKho,
 }) {
-  const safeMonth = normalizePeriodMonth(periodMonth);
-  const monthly = await prisma.chungTuBkmhMonthly.findUnique({
+  const detailRows = aggregateSnapshotDetailRows((slices ?? []).flatMap((slice) => slice.detailRows ?? []));
+  if (!detailRows.length) return null;
+  const buyerKey = pickFirstNonEmptySliceField(slices, "buyerKey");
+  const buyerName = pickFirstNonEmptySliceField(slices, "buyerName");
+  const buyerSignatureName = pickFirstNonEmptySliceField(slices, "buyerSignatureName");
+  const buyerTitle = pickFirstNonEmptySliceField(slices, "buyerTitle");
+  const totalAmount = sumAmount(detailRows);
+  return buildContextBase({
+    settings: resolveSettingsForSlips(),
+    periodDate,
+    detailRows,
+    totalAmount,
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+    extra: {
+      dateFrom,
+      dateTo,
+      aggregationMode,
+      buyerKey,
+      buyerSignatureName,
+      nguoiGiaoHang: buyerName,
+      diaChi: buyerTitle,
+      nhapTaiKho,
+      sliceCount: slices.length,
+      lineCount: detailRows.length,
+      canCuBkmh: formatCanCuBkmhTextFromSlices(slices),
+    },
+  });
+}
+
+async function resolvePnkFromBkmhSlices({
+  storageUnitId,
+  dateFrom,
+  dateTo,
+  aggregationMode,
+  resolveSettingsForSlips,
+  nhapTaiKho,
+}) {
+  const safeDateFrom = toIsoDateOnly(dateFrom);
+  const safeDateTo = toIsoDateOnly(dateTo);
+  const mode = normalizePnkAggregationMode(aggregationMode);
+  const safeNhapTaiKho = String(nhapTaiKho ?? "").trim();
+  const rawSlices = await prisma.chungTuBkmhSlice.findMany({
     where: {
-      storageUnitId_periodMonth: {
-        storageUnitId: Number(storageUnitId),
-        periodMonth: safeMonth,
+      monthly: {
+        is: {
+          storageUnitId: Number(storageUnitId),
+        },
+      },
+      periodDate: {
+        gte: new Date(`${safeDateFrom}T00:00:00.000Z`),
+        lte: new Date(`${safeDateTo}T23:59:59.999Z`),
       },
     },
     select: {
       id: true,
-      unitIdsJson: true,
-      slices: {
-        select: {
-          id: true,
-          sortKey: true,
-          soChungTu: true,
-          periodDate: true,
-          recipientUnitId: true,
-          recipientUnitName: true,
-          ngayThangNam: true,
-          detailRowsJson: true,
-        },
-        orderBy: [{ sortKey: "asc" }, { id: "asc" }],
-      },
+      sortKey: true,
+      soChungTu: true,
+      periodDate: true,
+      recipientUnitId: true,
+      recipientUnitName: true,
+      ngayThangNam: true,
+      detailRowsJson: true,
+      buyerKey: true,
+      buyerName: true,
+      buyerSignatureName: true,
+      buyerTitle: true,
     },
+    orderBy: [{ periodDate: "asc" }, { sortKey: "asc" }, { id: "asc" }],
   });
 
-  if (!monthly?.slices?.length) {
-    throw noBkmhMonthlySourceError(safeMonth);
+  if (!rawSlices.length) {
+    throw noBkmhRangeSourceError(safeDateFrom, safeDateTo);
   }
 
-  const slicesByDate = new Map();
   const sourceSlices = [];
-  const selectedUnitIds = normalizeMonthUnitIds(monthly.unitIdsJson);
-
-  for (const slice of monthly.slices) {
+  for (const slice of rawSlices) {
     const periodDate = toIsoDateOnly(slice.periodDate);
     const detailRows = parseBkmhSliceDetailRowsJson(slice.detailRowsJson);
     if (!periodDate || !detailRows.length) continue;
-    if (!slicesByDate.has(periodDate)) slicesByDate.set(periodDate, []);
-    const item = { ...slice, periodDate, detailRows };
-    slicesByDate.get(periodDate).push(item);
-    sourceSlices.push(item);
+    const buyerKey = String(slice.buyerKey ?? "").trim();
+    if (!buyerKey) throw missingBkmhBuyerKeyError();
+    sourceSlices.push({
+      ...slice,
+      periodDate,
+      buyerKey,
+      buyerName: String(slice.buyerName ?? "").trim(),
+      buyerSignatureName: String(slice.buyerSignatureName ?? "").trim(),
+      buyerTitle: String(slice.buyerTitle ?? "").trim(),
+      detailRows,
+    });
   }
 
   if (!sourceSlices.length) {
-    throw noBkmhMonthlySourceError(safeMonth);
+    throw noBkmhRangeSourceError(safeDateFrom, safeDateTo);
+  }
+
+  const slicesByBuyer = new Map();
+  for (const slice of sourceSlices) {
+    if (!slicesByBuyer.has(slice.buyerKey)) slicesByBuyer.set(slice.buyerKey, []);
+    slicesByBuyer.get(slice.buyerKey).push(slice);
   }
 
   const sheetContexts = [];
   let monthlyTotal = 0;
-  for (const periodDate of [...slicesByDate.keys()].sort()) {
-    const daySlices = slicesByDate.get(periodDate) ?? [];
-    const detailRows = aggregateSnapshotDetailRows(daySlices.flatMap((slice) => slice.detailRows));
-    if (!detailRows.length) continue;
-    const totalAmount = sumAmount(detailRows);
-    monthlyTotal += totalAmount;
-    sheetContexts.push(
-      buildContextBase({
-        settings: resolveSettingsForSlips(),
+  for (const buyerSlices of slicesByBuyer.values()) {
+    if (mode === CHUNG_TU_AGGREGATION_MODES.FULL) {
+      const periodDate = getLastPeriodDateFromSlices(buyerSlices) || safeDateTo;
+      const context = buildPnkSheetContext({
+        slices: buyerSlices,
         periodDate,
-        detailRows,
-        totalAmount,
-        categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
-        extra: {
-          sheetName: periodDate.slice(-2),
-          periodMonth: safeMonth,
-          selectedUnitIds,
-          aggregationMode: CHUNG_TU_AGGREGATION_MODES.BY_DAY,
-          sliceCount: daySlices.length,
-          lineCount: detailRows.length,
-          canCuBkmh: formatCanCuBkmhTextFromSlices(daySlices),
-        },
-      }),
-    );
+        dateFrom: safeDateFrom,
+        dateTo: safeDateTo,
+        aggregationMode: mode,
+        resolveSettingsForSlips,
+        nhapTaiKho: safeNhapTaiKho,
+      });
+      if (!context) continue;
+      monthlyTotal += context.tongTienSo ?? 0;
+      sheetContexts.push(context);
+      continue;
+    }
+
+    const slicesByDate = new Map();
+    for (const slice of buyerSlices) {
+      if (!slicesByDate.has(slice.periodDate)) slicesByDate.set(slice.periodDate, []);
+      slicesByDate.get(slice.periodDate).push(slice);
+    }
+    for (const periodDate of [...slicesByDate.keys()].sort()) {
+      const context = buildPnkSheetContext({
+        slices: slicesByDate.get(periodDate) ?? [],
+        periodDate,
+        dateFrom: safeDateFrom,
+        dateTo: safeDateTo,
+        aggregationMode: mode,
+        resolveSettingsForSlips,
+        nhapTaiKho: safeNhapTaiKho,
+      });
+      if (!context) continue;
+      monthlyTotal += context.tongTienSo ?? 0;
+      sheetContexts.push(context);
+    }
   }
 
   if (!sheetContexts.length) {
-    throw noBkmhMonthlySourceError(safeMonth);
+    throw noBkmhRangeSourceError(safeDateFrom, safeDateTo);
   }
+
+  const rootPeriodDate =
+    mode === CHUNG_TU_AGGREGATION_MODES.FULL
+      ? getLastPeriodDateFromSlices(sourceSlices) || safeDateTo
+      : safeDateFrom;
 
   return {
     sheetContexts,
@@ -628,15 +742,17 @@ async function resolvePnkMonthlyFromBkmhSlices({
     monthlySlipCount: sourceSlices.length,
     rootContext: buildContextBase({
       settings: resolveSettingsForSlips(),
-      periodDate: `${safeMonth}-01`,
+      periodDate: rootPeriodDate,
       detailRows: sheetContexts.flatMap((ctx) => ctx.detailRows ?? []),
       totalAmount: monthlyTotal,
       categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
       extra: {
-        periodMonth: safeMonth,
-        selectedUnitIds,
-        aggregationMode: CHUNG_TU_AGGREGATION_MODES.BY_DAY,
+        dateFrom: safeDateFrom,
+        dateTo: safeDateTo,
+        aggregationMode: mode,
         sheetContexts,
+        nhapTaiKho: safeNhapTaiKho,
+        buyerCount: sheetContexts.length,
         sliceCount: sourceSlices.length,
         lineCount: sheetContexts.reduce((sum, ctx) => sum + (ctx.detailRows?.length ?? 0), 0),
         canCuBkmh: formatCanCuBkmhTextFromSlices(sourceSlices),
@@ -836,12 +952,15 @@ export async function resolveChungTuContext({
   unitId,
   periodDate,
   periodMonth,
+  dateFrom,
+  dateTo,
   issueSlipId,
   unitIds,
   aggregationMode,
   settings,
   exportingUserProfile,
   resolvedBkmhBuyer = null,
+  nhapTaiKho,
 }) {
   const meta = assertKnownCategoryKey(categoryKey);
   const [profile, bkmhHeaderSettings, catalogBuyer] = await Promise.all([
@@ -929,63 +1048,84 @@ export async function resolveChungTuContext({
     return { context, sourceDataHash: computeSourceDataHash(hashPayload) };
   }
 
+  const safePeriodMonth = periodMonth ? normalizePeriodMonth(periodMonth) : undefined;
+  const safePnkDateFrom =
+    meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO
+      ? toIsoDateOnly(dateFrom) || (safePeriodMonth ? `${safePeriodMonth}-01` : "")
+      : "";
+  const safePnkDateTo =
+    meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO
+      ? toIsoDateOnly(dateTo) || (safePeriodMonth ? lastDayOfMonth(safePeriodMonth) : "")
+      : "";
+
+  if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO && safePnkDateFrom && safePnkDateTo) {
+    const monthly = await resolvePnkFromBkmhSlices({
+      storageUnitId: unitId,
+      dateFrom: safePnkDateFrom,
+      dateTo: safePnkDateTo,
+      aggregationMode,
+      resolveSettingsForSlips,
+      nhapTaiKho,
+    });
+    const hashPayload = {
+      categoryKey,
+      unitId,
+      dateFrom: safePnkDateFrom,
+      dateTo: safePnkDateTo,
+      aggregationMode: normalizePnkAggregationMode(aggregationMode),
+      sourceSlices: (monthly.sourceSlices ?? []).map((slice) => ({
+        id: slice.id,
+        sortKey: slice.sortKey,
+        soChungTu: slice.soChungTu ?? "",
+        periodDate: slice.periodDate,
+        buyerKey: slice.buyerKey ?? "",
+        buyerName: slice.buyerName ?? "",
+        buyerSignatureName: slice.buyerSignatureName ?? "",
+        buyerTitle: slice.buyerTitle ?? "",
+        recipientUnitId: slice.recipientUnitId ?? null,
+        detailRows: (slice.detailRows ?? []).map((row) => ({
+          commodityId: row.commodityId ?? null,
+          tenHang: row.tenHang ?? "",
+          maSo: row.maSo ?? "",
+          dvt: row.dvt ?? "",
+          quantity: row.quantity ?? row.soLuong ?? null,
+          unitPrice: row.unitPrice ?? row.donGia ?? null,
+          amount: row.amount ?? row.thanhTien ?? null,
+        })),
+      })),
+      settings: resolveSettingsForSlips(),
+      nhapTaiKho: String(nhapTaiKho ?? "").trim(),
+    };
+    return {
+      context: monthly.rootContext,
+      sourceDataHash: computeSourceDataHash(hashPayload),
+    };
+  }
+
   if (periodMonth) {
-    const monthly =
-      meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO
-        ? await resolvePnkMonthlyFromBkmhSlices({
-            storageUnitId: unitId,
-            periodMonth,
-            resolveSettingsForSlips,
-          })
-        : await resolveMonthlySheetContexts({
-            periodMonth,
-            unitIds,
-            aggregationMode,
-            categoryKey: meta.key,
-            resolveSettingsForSlips,
-          });
+    const monthly = await resolveMonthlySheetContexts({
+      periodMonth,
+      unitIds,
+      aggregationMode,
+      categoryKey: meta.key,
+      resolveSettingsForSlips,
+    });
     await attachRecipientUnitFillToMonthlyContexts(monthly, { aggregationMode });
     const safeMonth = normalizePeriodMonth(periodMonth);
-    const hashPayload =
-      meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO
-        ? {
-            categoryKey,
-            unitId,
-            periodMonth: safeMonth,
-            aggregationMode: CHUNG_TU_AGGREGATION_MODES.BY_DAY,
-            selectedUnitIds: monthly.rootContext?.selectedUnitIds ?? [],
-            sourceSlices: (monthly.sourceSlices ?? []).map((slice) => ({
-              id: slice.id,
-              sortKey: slice.sortKey,
-              soChungTu: slice.soChungTu ?? "",
-              periodDate: slice.periodDate,
-              recipientUnitId: slice.recipientUnitId ?? null,
-              detailRows: (slice.detailRows ?? []).map((row) => ({
-                commodityId: row.commodityId ?? null,
-                tenHang: row.tenHang ?? "",
-                maSo: row.maSo ?? "",
-                dvt: row.dvt ?? "",
-                quantity: row.quantity ?? row.soLuong ?? null,
-                unitPrice: row.unitPrice ?? row.donGia ?? null,
-                amount: row.amount ?? row.thanhTien ?? null,
-              })),
-            })),
-            settings: resolveSettingsForSlips(),
-          }
-        : {
-            categoryKey,
-            unitId,
-            periodMonth: safeMonth,
-            aggregationMode: normalizeAggregationMode(aggregationMode),
-            selectedUnitIds: normalizeMonthUnitIds(unitIds),
-            lineIds: monthly.allLines.map((l) => ({
-              id: l.id,
-              qty: String(l.quantity),
-              price: String(l.unitPrice),
-              amount: String(l.amount),
-            })),
-            settings: resolveSettingsForSlips(monthly.allSlips),
-          };
+    const hashPayload = {
+      categoryKey,
+      unitId,
+      periodMonth: safeMonth,
+      aggregationMode: normalizeAggregationMode(aggregationMode),
+      selectedUnitIds: normalizeMonthUnitIds(unitIds),
+      lineIds: monthly.allLines.map((l) => ({
+        id: l.id,
+        qty: String(l.quantity),
+        price: String(l.unitPrice),
+        amount: String(l.amount),
+      })),
+      settings: resolveSettingsForSlips(monthly.allSlips),
+    };
     return {
       context: monthly.rootContext,
       sourceDataHash: computeSourceDataHash(hashPayload),
@@ -1035,5 +1175,6 @@ export {
   aggregateSnapshotDetailRows,
   resolveDocumentNumberFields,
   resolveMonthlySheetContexts,
-  resolvePnkMonthlyFromBkmhSlices,
+  resolvePnkFromBkmhSlices,
+  resolvePnkFromBkmhSlices as resolvePnkMonthlyFromBkmhSlices,
 };
