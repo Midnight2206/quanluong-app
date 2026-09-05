@@ -5,6 +5,10 @@ import {
   normalizeAggregationMode,
 } from "./chung-tu-category.constants.js";
 import { normalizeMonthUnitIds, normalizePeriodMonth } from "./chung-tu-monthly-sheets.js";
+import {
+  formatCanCuPnkLine as formatCanCuPnkLineBase,
+  formatCanCuPnkText as formatCanCuPnkTextBase,
+} from "./chung-tu-nl-field.js";
 
 function resolvePeriodDateFromContext(ctx) {
   const fromExtra = String(ctx?.periodDate ?? "").trim();
@@ -25,30 +29,23 @@ function readSelectedUnitIdsFromSettings(settingsJson) {
   return normalizeMonthUnitIds(settings.__selectedUnitIds ?? settings.__bkmhUnitIds);
 }
 
-function formatBasisDatePart(snapshot) {
-  const dd = String(snapshot?.ngay ?? "").padStart(2, "0");
-  const mm = String(snapshot?.thang ?? "").padStart(2, "0");
-  const yyyy = String(snapshot?.nam ?? "").trim();
-  if (!dd || !mm || !yyyy) return "";
-  return ` ngày ${dd} tháng ${mm} năm ${yyyy}`;
+function toCanCuPnkSnapshot(snapshot) {
+  return {
+    soChungTu: snapshot?.soChungTu,
+    buyerName: snapshot?.buyerName ?? snapshot?.nguoiMua,
+    periodDate: snapshot?.periodDate,
+    ngay: snapshot?.ngay,
+    thang: snapshot?.thang,
+    nam: snapshot?.nam,
+  };
 }
 
-export function formatCanCuBkmhLine(snapshot) {
-  const so = String(snapshot?.soChungTu ?? "").trim() || "—";
-  const nguoiMua = String(snapshot?.nguoiMua ?? "").trim() || "—";
-  return `Theo BKMH số: ${so} của đ/c ${nguoiMua}${formatBasisDatePart(snapshot)}`;
+export function formatCanCuPnkLine(snapshot) {
+  return formatCanCuPnkLineBase(toCanCuPnkSnapshot(snapshot));
 }
 
-export function formatCanCuBkmhText(snapshots) {
-  const lines = [];
-  const seen = new Set();
-  for (const row of snapshots ?? []) {
-    const line = formatCanCuBkmhLine(row);
-    if (!line || seen.has(line)) continue;
-    seen.add(line);
-    lines.push(line);
-  }
-  return lines.join("; ");
+export function formatCanCuPnkText(snapshots) {
+  return formatCanCuPnkTextBase((snapshots ?? []).map(toCanCuPnkSnapshot));
 }
 
 async function loadBkmhDocumentsForStorageUnit(storageUnitId) {
@@ -105,7 +102,7 @@ async function fetchLatestSnapshots({ documentIds, periodMonth, periodDate }) {
 /**
  * Lấy snapshot BKMH làm căn cứ PNK — xử lý khác nhau theo chế độ gộp PNK.
  */
-export async function resolveCanCuBkmhForSheetContext({
+export async function resolveCanCuPnkForSheetContext({
   storageUnitId,
   periodMonth,
   sheetContext,
@@ -127,7 +124,7 @@ export async function resolveCanCuBkmhForSheetContext({
       periodMonth: month,
       periodDate,
     });
-    return formatCanCuBkmhText(snapshots);
+    return formatCanCuPnkText(snapshots);
   }
 
   if (mode === CHUNG_TU_AGGREGATION_MODES.BY_UNIT) {
@@ -137,22 +134,22 @@ export async function resolveCanCuBkmhForSheetContext({
       documentIds: scopedDocs.map((d) => d.id),
       periodMonth: month,
     });
-    return formatCanCuBkmhText(snapshots);
+    return formatCanCuPnkText(snapshots);
   }
 
   const snapshots = await fetchLatestSnapshots({
     documentIds: docs.map((d) => d.id),
     periodMonth: month,
   });
-  return formatCanCuBkmhText(snapshots);
+  return formatCanCuPnkText(snapshots);
 }
 
-export async function attachCanCuBkmhToMonthlyContexts(monthly, { storageUnitId, periodMonth, aggregationMode }) {
+export async function attachCanCuPnkToMonthlyContexts(monthly, { storageUnitId, periodMonth, aggregationMode }) {
   if (!monthly?.rootContext) return monthly;
   const mode = normalizeAggregationMode(aggregationMode);
 
   for (const ctx of monthly.sheetContexts ?? []) {
-    ctx.canCuBkmh = await resolveCanCuBkmhForSheetContext({
+    ctx.canCuPnk = await resolveCanCuPnkForSheetContext({
       storageUnitId,
       periodMonth,
       sheetContext: ctx,
@@ -160,7 +157,7 @@ export async function attachCanCuBkmhToMonthlyContexts(monthly, { storageUnitId,
     });
   }
 
-  monthly.rootContext.canCuBkmh = await resolveCanCuBkmhForSheetContext({
+  monthly.rootContext.canCuPnk = await resolveCanCuPnkForSheetContext({
     storageUnitId,
     periodMonth,
     sheetContext: monthly.rootContext,

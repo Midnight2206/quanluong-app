@@ -27,33 +27,36 @@ import {
   formatDerivedNamedRangeValue,
   resolveLegacyNamedRangeFieldKey,
 } from "./chung-tu-named-range-display.js";
+import { resolveNlFieldKey } from "./chung-tu-nl-field.js";
 
 const GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
 
+const CONTEXT_DERIVED_FIELD_LABELS = Object.freeze({
+  ngay: "Ngày (dd)",
+  thang: "Tháng (mm)",
+  nam: "Năm (yyyy)",
+  ngayThangNam: "Ngày tháng năm (Ngày dd tháng mm năm yyyy)",
+  so: "Số (quyenSo + ngày dd)",
+  soChungTu: "Số chứng từ (quyenSo + ngày dd)",
+  soPhieu: "Số phiếu (quyenSo + ngày dd)",
+  quyenSo: "Quyển số (mmyy)",
+  tongTienBangChu: "Tổng tiền bằng chữ",
+  canCuPnk: "Căn cứ PNK hardcoded từ BKMH (số, ngày, người mua)",
+  nguoiNhanHang: "Người nhận hàng",
+  donVi: "Đơn vị nhận",
+});
+
 const CONTEXT_DERIVED_FIELDS = Object.freeze(
-  CHUNG_TU_DERIVED_NAMED_RANGE_NAMES.map((fieldKey) => {
-    const labels = {
-      ngay: "Ngày (dd)",
-      thang: "Tháng (mm)",
-      nam: "Năm (yyyy)",
-      ngayThangNam: "Ngày tháng năm (Ngày dd tháng mm năm yyyy)",
-      so: "Số (quyenSo + ngày dd)",
-      soChungTu: "Số chứng từ (quyenSo + ngày dd)",
-      soPhieu: "Số phiếu (quyenSo + ngày dd)",
-      quyenSo: "Quyển số (mmyy)",
-      tongTienBangChu: "Tổng tiền bằng chữ",
-      canCuBkmh: "Căn cứ theo BKMH (số, người mua, ngày)",
-      nguoiNhanHang: "Người nhận hàng",
-      donVi: "Đơn vị nhận",
-    };
-    return { fieldKey, label: labels[fieldKey] ?? fieldKey };
-  }),
+  CHUNG_TU_DERIVED_NAMED_RANGE_NAMES.map((fieldKey) => ({
+    fieldKey,
+    label: CONTEXT_DERIVED_FIELD_LABELS[fieldKey] ?? fieldKey,
+  })),
 );
 
 function buildContextDerivedFieldsForCategory(categoryKey) {
   return getDerivedNamedRangeNamesForCategory(categoryKey).map((fieldKey) => {
     const base = CONTEXT_DERIVED_FIELDS.find((item) => item.fieldKey === fieldKey);
-    return base ?? { fieldKey, label: fieldKey };
+    return base ?? { fieldKey, label: CONTEXT_DERIVED_FIELD_LABELS[fieldKey] ?? fieldKey };
   });
 }
 
@@ -105,6 +108,8 @@ function buildKnownFieldKeys(registry, categoryKey) {
 
 function matchFieldKeyForRangeName(name, fieldKeys) {
   const list = Array.isArray(fieldKeys) ? fieldKeys : [...(fieldKeys ?? [])];
+  const nlFieldKey = resolveNlFieldKey(name);
+  if (nlFieldKey && list.includes(nlFieldKey)) return nlFieldKey;
   const normalized = normalizeRangeNameForMatch(name);
   if (!normalized) return "";
   const legacy = resolveLegacyNamedRangeFieldKey(normalized);

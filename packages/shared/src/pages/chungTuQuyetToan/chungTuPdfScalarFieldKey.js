@@ -3,7 +3,7 @@ const STATIC_ALIASES = Object.freeze({
   ngay_thang_nam: "ngayThangNam",
   ho_ten_nguoi_mua: "hoTenNguoiMua",
   nguoi_mua: "hoTenNguoiMua",
-  can_cu_bkmh: "canCuBkmh",
+  can_cu_pnk: "canCuPnk",
 });
 
 const SCALAR_ALIASES = Object.freeze({
@@ -23,8 +23,13 @@ function camelToSnake(key) {
 /** Mirror BE resolveScalarFieldKey for PDF template label keys. */
 export function resolvePdfScalarFieldKey(templateFieldKey, { categoryKey } = {}) {
   const raw = String(templateFieldKey ?? "").trim();
-  const key = raw.startsWith("FIELD_") ? raw.slice("FIELD_".length) : raw;
+  const key = raw.startsWith("NL_FIELD_")
+    ? raw.slice("NL_FIELD_".length)
+    : raw.startsWith("FIELD_")
+      ? raw.slice("FIELD_".length)
+      : raw;
   if (!key) return "";
+  if (key === "can_cu_bkmh" || key === "canCuBkmh") return "";
   if (
     String(categoryKey ?? "").trim() === "phieu-nhap-kho" &&
     (key === "dia_chi" || key === "diaChi")

@@ -23,6 +23,7 @@ import {
   attachRecipientUnitFillToMonthlyContexts,
   resolveRecipientUnitFillForSlip,
 } from "./chung-tu-recipient-unit-fill.service.js";
+import { formatCanCuPnkText } from "./chung-tu-nl-field.js";
 import { SIGNATURE_CATALOG } from "./chung-tu-signature-catalog.js";
 
 const lineInclude = {
@@ -504,25 +505,14 @@ function toIsoDateOnly(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
 }
 
-function formatCanCuBkmhLineFromSlice(slice) {
-  const so = String(slice?.soChungTu ?? "").trim() || "—";
-  const periodDate = toIsoDateOnly(slice?.periodDate);
-  if (!periodDate) return `Theo BKMH số: ${so}`;
-  const { ngay, thang, nam } = ymdParts(periodDate);
-  if (!ngay || !thang || !nam) return `Theo BKMH số: ${so}`;
-  return `Theo BKMH số: ${so} ngày ${ngay} tháng ${thang} năm ${nam}`;
-}
-
-function formatCanCuBkmhTextFromSlices(slices) {
-  const lines = [];
-  const seen = new Set();
-  for (const slice of slices ?? []) {
-    const line = formatCanCuBkmhLineFromSlice(slice);
-    if (!line || seen.has(line)) continue;
-    seen.add(line);
-    lines.push(line);
-  }
-  return lines.join("; ");
+function formatCanCuPnkTextFromSlices(slices) {
+  return formatCanCuPnkText(
+    (slices ?? []).map((slice) => ({
+      soChungTu: slice?.soChungTu,
+      periodDate: toIsoDateOnly(slice?.periodDate),
+      buyerName: String(slice?.buyerName ?? "").trim(),
+    })),
+  );
 }
 
 function noBkmhMonthlySourceError(periodMonth) {
@@ -605,7 +595,7 @@ function buildPnkSheetContext({
       nhapTaiKho,
       sliceCount: slices.length,
       lineCount: detailRows.length,
-      canCuBkmh: formatCanCuBkmhTextFromSlices(slices),
+      canCuPnk: formatCanCuPnkTextFromSlices(slices),
     },
   });
 }
@@ -755,7 +745,7 @@ async function resolvePnkFromBkmhSlices({
         buyerCount: sheetContexts.length,
         sliceCount: sourceSlices.length,
         lineCount: sheetContexts.reduce((sum, ctx) => sum + (ctx.detailRows?.length ?? 0), 0),
-        canCuBkmh: formatCanCuBkmhTextFromSlices(sourceSlices),
+        canCuPnk: formatCanCuPnkTextFromSlices(sourceSlices),
       },
     }),
   };

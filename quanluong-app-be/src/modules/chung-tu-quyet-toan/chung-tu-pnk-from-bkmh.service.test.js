@@ -213,8 +213,8 @@ test("resolvePnkFromBkmhSlices groups by buyerKey and day in by-day mode", async
     ],
   );
   assert.equal(
-    result.sheetContexts[0].canCuBkmh,
-    "Theo BKMH số: 062601 ngày 01 tháng 06 năm 2026; Theo BKMH số: 062601B ngày 01 tháng 06 năm 2026",
+    result.sheetContexts[0].canCuPnk,
+    "Căn cứ vào BKMH số 062601 ngày 01 tháng 06 năm 2026 của đ/c Nguyen Van A, Căn cứ vào BKMH số 062601B ngày 01 tháng 06 năm 2026 của đ/c Nguyen Van A",
   );
   assert.equal(result.sheetContexts[0].detailRows.length, 2);
   assert.deepEqual(
@@ -303,8 +303,8 @@ test("resolvePnkFromBkmhSlices groups one buyer across days in full mode", async
   assert.equal(result.sheetContexts[0].diaChi, "Tai vu");
   assert.equal(result.sheetContexts[0].nhapTaiKho, "Kho tong");
   assert.equal(
-    result.sheetContexts[0].canCuBkmh,
-    "Theo BKMH số: 062601 ngày 01 tháng 06 năm 2026; Theo BKMH số: 062602 ngày 02 tháng 06 năm 2026",
+    result.sheetContexts[0].canCuPnk,
+    "Căn cứ vào BKMH số 062601 ngày 01 tháng 06 năm 2026 của đ/c Nguyen Van A, Căn cứ vào BKMH số 062602 ngày 02 tháng 06 năm 2026 của đ/c Nguyen Van A",
   );
   assert.deepEqual(
     result.sheetContexts[0].detailRows.map((row) => ({

@@ -4,11 +4,12 @@ import { getChungTuPdfFieldCatalog } from "./chung-tu-pdf-field-catalog.js";
 
 test("catalog exposes descriptions and label alias for scalar rows", () => {
   const { scalarFields } = getChungTuPdfFieldCatalog();
-  const row = scalarFields.find((f) => f.namedRange === "FIELD_can_cu_bkmh");
+  const row = scalarFields.find((f) => f.namedRange === "NL_FIELD_can_cu_pnk");
   assert.ok(row);
-  assert.equal(row.fieldKey, "canCuBkmh");
+  assert.equal(row.fieldKey, "canCuPnk");
   assert.match(String(row.description), /căn cứ|BKMH/i);
   assert.equal(row.label, row.description);
+  assert.equal(row.supportsLabel, false);
 });
 
 test("catalog marks supported template label fields", () => {
@@ -23,7 +24,7 @@ test("catalog marks supported template label fields", () => {
   assert.equal(supportedKeys.get("boPhan"), true);
   assert.equal(supportedKeys.get("nguoiGiaoHang"), true);
   assert.equal(supportedKeys.get("diaChi"), true);
-  assert.equal(supportedKeys.get("canCuBkmh"), true);
+  assert.equal(supportedKeys.get("canCuPnk"), false);
   assert.equal(supportedKeys.get("nhapTaiKho"), true);
   assert.equal(supportedKeys.get("tongTien"), false);
   assert.equal(supportedKeys.get("donVi"), false);

@@ -3,6 +3,8 @@ import {
   CHUNG_TU_DETAIL_FIELD_KEYS,
 } from "./chung-tu-detail-field-catalog.js";
 import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
+import { resolveNlFieldKey } from "./chung-tu-nl-field.js";
+import { splitNamedRangePrefix } from "./chung-tu-named-range-prefix.js";
 import { camelToSnake } from "./chung-tu-pdf-map.util.js";
 
 const STATIC_ALIASES = Object.freeze({
@@ -17,7 +19,6 @@ const STATIC_ALIASES = Object.freeze({
   ngay_thang_nam: "ngayThangNam",
   ho_ten_nguoi_mua: "hoTenNguoiMua",
   nguoi_mua: "hoTenNguoiMua",
-  can_cu_bkmh: "canCuBkmh",
 });
 
 /** Scalar-only: so/soPhieu template keys share soChungTu value + fieldLabels. */
@@ -49,8 +50,11 @@ export function resolveColumnFieldKey(templateColumnKey) {
 
 export function resolveScalarFieldKey(templateFieldKey, { categoryKey } = {}) {
   const raw = String(templateFieldKey ?? "").trim();
-  const key = raw.startsWith("FIELD_") ? raw.slice("FIELD_".length) : raw;
+  const nlFieldKey = resolveNlFieldKey(raw);
+  if (nlFieldKey) return nlFieldKey;
+  const { fieldName: key } = splitNamedRangePrefix(raw);
   if (!key) return "";
+  if (key === "can_cu_bkmh" || key === "canCuBkmh") return "";
   if (isPnkCategory(categoryKey) && (key === "dia_chi" || key === "diaChi")) {
     return "diaChi";
   }

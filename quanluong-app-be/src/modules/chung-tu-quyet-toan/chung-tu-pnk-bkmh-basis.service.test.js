@@ -1,33 +1,33 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  formatCanCuBkmhLine,
-  formatCanCuBkmhText,
+  formatCanCuPnkLine,
+  formatCanCuPnkText,
 } from "./chung-tu-pnk-bkmh-basis.service.js";
 
-test("formatCanCuBkmhLine builds Vietnamese basis text", () => {
-  const line = formatCanCuBkmhLine({
+test("formatCanCuPnkLine builds Vietnamese basis text", () => {
+  const line = formatCanCuPnkLine({
     soChungTu: "062515",
-    nguoiMua: "Nguyễn Văn A",
+    buyerName: "Nguyễn Văn A",
     ngay: "15",
     thang: "06",
     nam: "2026",
   });
-  assert.equal(line, "Theo BKMH số: 062515 của đ/c Nguyễn Văn A ngày 15 tháng 06 năm 2026");
+  assert.equal(line, "Căn cứ vào BKMH số 062515 ngày 15 tháng 06 năm 2026 của đ/c Nguyễn Văn A");
 });
 
-test("formatCanCuBkmhText joins unique lines", () => {
-  const text = formatCanCuBkmhText([
+test("formatCanCuPnkText joins unique lines", () => {
+  const text = formatCanCuPnkText([
     {
       soChungTu: "062515",
-      nguoiMua: "A",
+      buyerName: "A",
       ngay: "15",
       thang: "06",
       nam: "2026",
     },
     {
       soChungTu: "062515",
-      nguoiMua: "B",
+      buyerName: "B",
       ngay: "15",
       thang: "06",
       nam: "2026",
@@ -35,5 +35,5 @@ test("formatCanCuBkmhText joins unique lines", () => {
   ]);
   assert.match(text, /062515.*A/);
   assert.match(text, /062515.*B/);
-  assert.ok(text.includes("; "));
+  assert.ok(text.includes(", "));
 });

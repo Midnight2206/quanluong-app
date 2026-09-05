@@ -38,7 +38,7 @@ const CATEGORY_DERIVED_NAMED_RANGES = Object.freeze({
     "soChungTu",
     "quyenSo",
     "tongTienBangChu",
-    "canCuBkmh",
+    "canCuPnk",
     "nguoiNhanHang",
     "donVi",
   ]),

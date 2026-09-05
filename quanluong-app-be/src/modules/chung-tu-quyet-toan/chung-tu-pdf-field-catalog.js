@@ -1,3 +1,5 @@
+import { NL_FIELD_CATALOG_SCALARS } from "./chung-tu-nl-field.js";
+
 const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
   scalarFields: Object.freeze([
     buildScalarField("FIELD_ngay_thang_nam", "ngayThangNam", "Ngày DD tháng MM năm YYYY"),
@@ -28,12 +30,7 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
     buildScalarField("FIELD_nhap_tai_kho", "nhapTaiKho", "Nhập tại kho", {
       supportsLabel: true,
     }),
-    buildScalarField(
-      "FIELD_can_cu_bkmh",
-      "canCuBkmh",
-      "Căn cứ theo BKMH (số, ngày…) — chủ yếu PNK; legacy Named Range `canCuBkmh` vẫn được nhận",
-      { supportsLabel: true },
-    ),
+    ...NL_FIELD_CATALOG_SCALARS.map((field) => ({ ...field, label: field.description })),
     buildScalarField("FIELD_ghi_chu", "ghiChu", "Ghi chú"),
   ]),
   tableColumns: Object.freeze([

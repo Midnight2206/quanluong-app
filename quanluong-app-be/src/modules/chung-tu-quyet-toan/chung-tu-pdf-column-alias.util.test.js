@@ -37,10 +37,11 @@ test("resolveScalarFieldKey maps ho_ten_nguoi_mua aliases to hoTenNguoiMua", () 
   assert.equal(resolveScalarFieldKey("ho_ten_nguoi_mua"), "hoTenNguoiMua");
 });
 
-test("resolveScalarFieldKey maps can_cu_bkmh to canCuBkmh", () => {
-  assert.equal(resolveScalarFieldKey("FIELD_can_cu_bkmh"), "canCuBkmh");
-  assert.equal(resolveScalarFieldKey("can_cu_bkmh"), "canCuBkmh");
-  assert.equal(resolveScalarFieldKey("canCuBkmh"), "canCuBkmh");
+test("resolveScalarFieldKey maps can_cu_pnk to canCuPnk only", () => {
+  assert.equal(resolveScalarFieldKey("NL_FIELD_can_cu_pnk"), "canCuPnk");
+  assert.equal(resolveScalarFieldKey("can_cu_pnk"), "canCuPnk");
+  assert.equal(resolveScalarFieldKey("canCuPnk"), "canCuPnk");
+  assert.equal(resolveScalarFieldKey("FIELD_can_cu_bkmh"), "");
 });
 
 test("resolveScalarFieldKey maps nguoi_giao_hang and nhap_tai_kho", () => {

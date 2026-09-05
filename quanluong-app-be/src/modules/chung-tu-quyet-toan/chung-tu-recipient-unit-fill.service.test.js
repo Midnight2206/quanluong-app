@@ -31,5 +31,5 @@ test("PXK and PNK include recipient named ranges", () => {
   assert.ok(pxk.has("donVi"));
   assert.ok(pnk.has("nguoiNhanHang"));
   assert.ok(pnk.has("donVi"));
-  assert.ok(pnk.has("canCuBkmh"));
+  assert.ok(pnk.has("canCuPnk"));
 });
