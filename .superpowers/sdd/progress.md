@@ -49,5 +49,7 @@ Spec: docs/superpowers/specs/2026-09-05-pnk-nguoi-giao-and-date-range-design.md
 - Task 3: complete (commit aa87914, review clean, tests green) — PNK catalog fields + category-aware scalar mapping
 - Task 4: complete (commit fbdea5a, tests green) — PNK resolve by date range and buyer split
 - Task 4 review: clean (fbdea5a) — no blocker found before Task 5
-- Task 5: complete (this branch) — PNK validator date range/full mode + batch passes dates and nhapTaiKho without forcing by-day
+- Task 5: complete (commit f9f6b59, review clean) — PNK validator date range/full mode + batch passes dates and nhapTaiKho without forcing by-day
+- Task 6: complete (commit 4585e79, tests green) — PNK signature settings save nhapTaiKho and lock nguoi_giao; batch materializes buyer signature name
+- Task 7: complete (commit a9156db, tests green) — PNK export UI uses date range, by-day/full picker, and sends locked nguoi_giao first
 
