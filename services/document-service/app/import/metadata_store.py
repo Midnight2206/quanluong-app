@@ -22,7 +22,9 @@ def _sheet_name(fields: list[TemplateField], header_row_range: str) -> str:
     return ""
 
 
-_ALIGN_META_KEYS = frozenset({"below_table", "cell_width_pt", "cell_height_pt"})
+_ALIGN_META_KEYS = frozenset(
+    {"below_table", "cell_width_pt", "cell_height_pt", "named_range"}
+)
 
 
 def _align_without_meta(align: dict | None) -> dict | None:
@@ -113,6 +115,11 @@ def load_metadata_from_db(
                     float(field.align["cell_height_pt"])
                     if isinstance(field.align, dict) and field.align.get("cell_height_pt") is not None
                     else None
+                ),
+                named_range=(
+                    str(field.align.get("named_range") or "")
+                    if isinstance(field.align, dict)
+                    else ""
                 ),
             )
             for field in fields

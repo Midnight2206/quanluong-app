@@ -26,6 +26,7 @@ Run PDF tests: `pytest tests/test_pdf_renderer.py -v` (pypdf page count + Vietna
 | Named Range | Role |
 |-------------|------|
 | `FIELD_<name>` | Single field cell; `<name>` → snake_case `field_name` |
+| `NL_FIELD_<name>` | Single non-label field cell; imported like `FIELD_*` and exposed with original `named_range` |
 | `TABLE_HEADER` | Header rows → column defs from the bottom header row (required; may span multiple rows) |
 | `TABLE_DATA_ROW` | Sample data row → row style (required; same sheet + column layout as header, single row only) |
 | `TABLE_SIGNATURE` | Signature block start (optional; default 80pt height) |

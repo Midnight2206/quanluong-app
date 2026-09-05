@@ -238,6 +238,22 @@ def test_rejects_invalid_field_name():
         _parse_template(output.getvalue())
 
 
+def test_parse_accepts_nl_field_named_ranges():
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    workbook.defined_names.add(
+        DefinedName("NL_FIELD_can_cu_pnk", attr_text="'ChungTu'!$F$2")
+    )
+    output = BytesIO()
+    workbook.save(output)
+
+    metadata = _parse_template(output.getvalue())
+
+    nl_field = next(field for field in metadata.fields if field.field_name == "can_cu_pnk")
+    assert nl_field.sheet_name == "ChungTu"
+    assert nl_field.cell_ref == "F2"
+    assert nl_field.named_range == "NL_FIELD_can_cu_pnk"
+
+
 def test_page_meta_reads_margin_and_orientation_from_file():
     """_page_meta phải đọc giá trị thật từ ws.page_margins/page_setup, không rơi về default."""
     MARGIN_TOP_IN = 1.0   # inch
@@ -360,6 +376,51 @@ def test_interior_field_merge_skips_static_cell():
     scale = usable / raw_table_total
 
     assert field.width_pt == pytest.approx(raw_merge_width * scale)
+
+    field_right = field.x + field.width_pt
+    overlapping = [
+        cell
+        for cell in metadata.static_cells
+        if cell.row == 2
+        and cell.x < field_right
+        and cell.x + cell.width_pt > field.x
+    ]
+    assert overlapping == []
+
+
+def test_interior_nl_field_merge_skips_static_cell():
+    """NL_FIELD_* on interior merge cell skips full merge in static_cells."""
+    from app.template.page_size import page_dimensions
+
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    sheet = workbook["ChungTu"]
+    sheet.merge_cells("E2:G2")
+    sheet["E2"] = "Căn cứ"
+    sheet["E2"].alignment = Alignment(horizontal="center", vertical="center")
+    workbook.defined_names.add(
+        DefinedName("NL_FIELD_can_cu_pnk", attr_text="'ChungTu'!$F$2")
+    )
+    output = BytesIO()
+    workbook.save(output)
+    xlsx_bytes = output.getvalue()
+
+    metadata = _parse_template(xlsx_bytes)
+    field = next(f for f in metadata.fields if f.field_name == "can_cu_pnk")
+
+    parsed_wb = load_workbook(BytesIO(xlsx_bytes))
+    parsed_sheet = parsed_wb["ChungTu"]
+    raw_merge_width = merged_range_width_pt(parsed_sheet, 5, 7)
+    header_groups = [(1, 1), (2, 3), (4, 4), (5, 6), (7, 7)]
+    raw_table_total = sum(
+        merged_range_width_pt(parsed_sheet, min_col, max_col)
+        for min_col, max_col in header_groups
+    )
+    page_width, _ = page_dimensions(metadata.page)
+    usable = page_width - metadata.page.margin_left - metadata.page.margin_right
+    scale = usable / raw_table_total
+
+    assert field.width_pt == pytest.approx(raw_merge_width * scale)
+    assert field.named_range == "NL_FIELD_can_cu_pnk"
 
     field_right = field.x + field.width_pt
     overlapping = [

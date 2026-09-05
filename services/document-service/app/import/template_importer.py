@@ -31,6 +31,7 @@ from .excel_coords import (
     merged_range_width_pt,
     signature_block_height_pt,
 )
+from .field_named_ranges import split_field_named_range
 from .layout_fit import fit_layout_to_page
 from .layout_validate import validate_template_layout
 from .static_cells import collect_static_cells, static_block_height_pt
@@ -268,9 +269,9 @@ def _page_height(page: PageMeta) -> float:
 def _build_fields(workbook, page: PageMeta) -> list[FieldMeta]:
     fields = []
     for defined_name, owner_sheet in _all_defined_names(workbook):
-        if not defined_name.name.startswith("FIELD_"):
+        _, field_name = split_field_named_range(defined_name.name)
+        if field_name is None:
             continue
-        field_name = defined_name.name[len("FIELD_") :]
         if not _FIELD_NAME_RE.fullmatch(field_name):
             raise TemplateValidationError(
                 f"Named Range {defined_name.name} có field_name không hợp lệ"
@@ -323,6 +324,7 @@ def _build_fields(workbook, page: PageMeta) -> list[FieldMeta]:
                 border=border,
                 width_pt=width,
                 height_pt=height,
+                named_range=defined_name.name,
             )
         )
     return fields

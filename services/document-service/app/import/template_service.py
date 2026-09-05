@@ -85,6 +85,8 @@ def import_template(
             align["cell_width_pt"] = float(field.width_pt)
         if field.height_pt is not None:
             align["cell_height_pt"] = float(field.height_pt)
+        if field.named_range:
+            align["named_range"] = field.named_range
         session.add(
             TemplateField(
                 template_id=template.id,

@@ -195,7 +195,11 @@ def get_template_fields(template_id: int, _: None = Depends(require_service_key)
 
     return {
         "fields": [
-            {"field_name": field.field_name, "cell_ref": field.cell_ref}
+            {
+                "field_name": field.field_name,
+                "cell_ref": field.cell_ref,
+                "named_range": field.named_range,
+            }
             for field in metadata.fields
         ],
         "columns": [

@@ -11,6 +11,7 @@ from .excel_coords import (
     cell_top_left_pt,
     merged_range_width_pt,
 )
+from .field_named_ranges import is_field_named_range
 
 
 def _cell_value(cell) -> str:
@@ -71,7 +72,7 @@ def field_coords_from_workbook(
 ) -> set[tuple[int, int]]:
     coords: set[tuple[int, int]] = set()
     for defined_name, owner_sheet in all_defined_names(workbook):
-        if not defined_name.name.startswith("FIELD_"):
+        if not is_field_named_range(defined_name.name):
             continue
         _, _, bounds = resolve_defined_range(workbook, defined_name, owner_sheet)
         min_col, min_row, max_col, max_row = bounds

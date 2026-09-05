@@ -201,7 +201,14 @@ def test_get_template_fields_returns_form_schema(monkeypatch):
         "don_vi",
         "ngay_thang",
     ]
-    assert all(set(field) == {"field_name", "cell_ref"} for field in body["fields"])
+    assert all(
+        set(field) == {"field_name", "cell_ref", "named_range"}
+        for field in body["fields"]
+    )
+    assert [field["named_range"] for field in body["fields"]] == [
+        "FIELD_don_vi",
+        "FIELD_ngay_thang",
+    ]
     assert [column["key"] for column in body["columns"]] == [
         "stt",
         "ten_hang",
