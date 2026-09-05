@@ -1,3 +1,11 @@
+# SDD Progress — template-field-labels-and-catalog-lookup (2026-09-05)
+
+Plan: docs/superpowers/plans/2026-09-05-template-field-labels-and-catalog-lookup.md
+Spec: docs/superpowers/specs/2026-09-05-template-field-labels-and-catalog-lookup-design.md
+## Tasks
+
+- Task 1: complete (commit ef90336) — fieldLabelsJson schema + migration
+
 # SDD Progress — bkmh-slice-lines-pnk-sources (2026-09-04)
 
 Plan: docs/superpowers/plans/2026-09-04-bkmh-slice-lines-pnk-sources.md
@@ -52,4 +60,5 @@ Spec: docs/superpowers/specs/2026-09-05-pnk-nguoi-giao-and-date-range-design.md
 - Task 5: complete (commit f9f6b59, review clean) — PNK validator date range/full mode + batch passes dates and nhapTaiKho without forcing by-day
 - Task 6: complete (commit 4585e79, tests green) — PNK signature settings save nhapTaiKho and lock nguoi_giao; batch materializes buyer signature name
 - Task 7: complete (commit a9156db, tests green) — PNK export UI uses date range, by-day/full picker, and sends locked nguoi_giao first
+- Final review: clean after f183c01 (dateFrom/dateTo controller seam); ready to merge
 
