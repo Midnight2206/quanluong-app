@@ -64,27 +64,32 @@ test("export workspace routes monthly BKMH exports to monthly mutation", () => {
   assert.match(exportWorkspaceSource, /sliceCount:/);
 });
 
-test("PNK monthly export hides aggregation picker and forces by-day", () => {
+test("PNK monthly export uses date range and only allows by-day or full aggregation", () => {
   assert.match(exportWorkspaceSource, /categoryKey === "phieu-nhap-kho" && isMonthly/);
-  assert.match(exportWorkspaceSource, /showAggregationPicker = isMonthly && !isPnkMonthly/);
+  assert.match(exportWorkspaceSource, /showAggregationPicker = isMonthly/);
   assert.match(
     exportWorkspaceSource,
-    /effectiveAggregationMode = isPnkMonthly\s*\?\s*CHUNG_TU_AGGREGATION_MODES\.BY_DAY\s*:\s*aggregationMode/,
+    /effectiveAggregationMode = isPnkMonthly[\s\S]*CHUNG_TU_AGGREGATION_MODES\.FULL[\s\S]*CHUNG_TU_AGGREGATION_MODES\.BY_DAY/,
   );
-  assert.match(exportWorkspaceSource, /aggregationMode:\s*effectiveAggregationMode/);
-  assert.match(exportWorkspaceSource, /\{showAggregationPicker \? \(/);
+  assert.match(exportWorkspaceSource, /aggregationOptions = useMemo/);
+  assert.match(exportWorkspaceSource, /opt\.value === CHUNG_TU_AGGREGATION_MODES\.BY_DAY/);
+  assert.match(exportWorkspaceSource, /opt\.value === CHUNG_TU_AGGREGATION_MODES\.FULL/);
+  assert.match(exportWorkspaceSource, /dateFrom/);
+  assert.match(exportWorkspaceSource, /dateTo/);
 });
 
-test("monthly export validateWizardStep0 requires periodMonth", () => {
+test("monthly export validateWizardStep0 requires periodMonth only outside PNK and validates PNK range", () => {
   assert.match(exportWorkspaceSource, /Chọn tháng chứng từ\./);
   assert.match(
     exportWorkspaceSource,
-    /isMonthly && !String\(periodMonth \?\? ""\)\.trim\(\)/,
+    /isMonthly && !isPnkMonthly && !String\(periodMonth \?\? ""\)\.trim\(\)/,
   );
   assert.match(
     exportWorkspaceSource,
-    /nextDisabled=\{!effectiveUnitId \|\| \(isMonthly && !String\(periodMonth \?\? ""\)\.trim\(\)\)\}/,
+    /Chọn ngày bắt đầu\./,
   );
+  assert.match(exportWorkspaceSource, /Chọn ngày kết thúc\./);
+  assert.match(exportWorkspaceSource, /Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc\./);
 });
 
 test("PNK monthly export hides data-unit picker and omits unitIds from payload", () => {
@@ -94,7 +99,7 @@ test("PNK monthly export hides data-unit picker and omits unitIds from payload",
   );
   assert.match(
     exportWorkspaceSource,
-    /\.\.\.\(isPnkMonthly \? \{\} : \{ unitIds: selectedDataUnitIds \}\)/,
+    /if \(isPnkMonthly\) \{[\s\S]*dateFrom,[\s\S]*dateTo,[\s\S]*aggregationMode: effectiveAggregationMode/,
   );
   assert.match(
     exportWorkspaceSource,
@@ -102,9 +107,9 @@ test("PNK monthly export hides data-unit picker and omits unitIds from payload",
   );
   assert.match(
     exportWorkspaceSource,
-    /isPnkMonthly\s*\?\s*Boolean\(periodMonth\)\s*:\s*selectedDataUnitIds\.length > 0/,
+    /isPnkMonthly\s*\?\s*Boolean\(dateFrom\) && Boolean\(dateTo\)\s*:\s*selectedDataUnitIds\.length > 0/,
   );
-  assert.match(exportWorkspaceSource, /nguồn BKMH/);
+  assert.match(exportWorkspaceSource, /buyer từ BKMH/);
 });
 
 test("history workspace switches BKMH to monthly cards and summary panel", () => {

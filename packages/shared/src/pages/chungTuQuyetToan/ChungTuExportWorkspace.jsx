@@ -54,6 +54,17 @@ const DEFAULT_SIGNATURE_SLOTS = [
   },
 ];
 
+const DEFAULT_PNK_NGUOI_GIAO_SLOT = {
+  key: "nguoi_giao",
+  label: "NGƯỜI GIAO",
+  col: 0,
+  col_span: 1,
+  source: "static",
+  static_name: "",
+  show_date_line: false,
+  locked: true,
+};
+
 function getTemplateLabel(template) {
   if (!template) return "";
   const base = template.displayName || template.name || `Mẫu #${template.id}`;
@@ -130,6 +141,7 @@ function normalizeSignatureBlockConfig(signatureBlock) {
         static_name: typeof slot?.static_name === "string" ? slot.static_name.trim() : "",
         catalogNodeId: source === "system" ? String(slot?.catalogNodeId ?? "").trim() : "",
         show_date_line: Boolean(slot?.show_date_line),
+        locked: Boolean(slot?.locked),
       };
     })
     .filter(Boolean);
@@ -143,6 +155,33 @@ function normalizeSignatureBlockConfig(signatureBlock) {
       ? Number(signatureBlock.date_line_gap_pt)
       : 14,
     slots,
+  };
+}
+
+function ensurePnkNguoiGiaoSlotFirst(signatureBlock) {
+  if (!signatureBlock || typeof signatureBlock !== "object") {
+    return {
+      columns: 1,
+      gap_pt: 40,
+      date_line_gap_pt: 14,
+      slots: [{ ...DEFAULT_PNK_NGUOI_GIAO_SLOT }],
+    };
+  }
+  const rawSlots = Array.isArray(signatureBlock.slots) ? signatureBlock.slots : [];
+  const existingSlot = rawSlots.find((slot) => slot?.key === DEFAULT_PNK_NGUOI_GIAO_SLOT.key);
+  const lockedSlot = {
+    ...DEFAULT_PNK_NGUOI_GIAO_SLOT,
+    col: Number.isFinite(Number(existingSlot?.col)) ? Number(existingSlot.col) : 0,
+    col_span: Number.isFinite(Number(existingSlot?.col_span)) ? Number(existingSlot.col_span) : 1,
+    show_date_line:
+      existingSlot?.show_date_line == null
+        ? DEFAULT_PNK_NGUOI_GIAO_SLOT.show_date_line
+        : Boolean(existingSlot.show_date_line),
+  };
+  const otherSlots = rawSlots.filter((slot) => slot?.key !== DEFAULT_PNK_NGUOI_GIAO_SLOT.key);
+  return {
+    ...signatureBlock,
+    slots: [lockedSlot, ...otherSlots],
   };
 }
 
@@ -165,17 +204,20 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const isMonthly = exportKind === CHUNG_TU_EXPORT_KIND.MONTHLY;
   const isBySlip = exportKind === CHUNG_TU_EXPORT_KIND.BY_SLIP;
   const isBkmhMonthly = categoryKey === "bang-ke-mua-hang" && isMonthly;
-  // ponytail: PNK always by-day (spec §4.1); no aggregation picker until multi-source modes exist
   const isPnkMonthly = categoryKey === "phieu-nhap-kho" && isMonthly;
-  const showAggregationPicker = isMonthly && !isPnkMonthly;
+  const showAggregationPicker = isMonthly;
 
   const [periodMonth, setPeriodMonth] = useState(() => todayYmd().slice(0, 7));
   const [periodDate, setPeriodDate] = useState(todayYmd);
+  const [dateFrom, setDateFrom] = useState(todayYmd);
+  const [dateTo, setDateTo] = useState(todayYmd);
   const [issueSlipId, setIssueSlipId] = useState("");
   const [selectedDataUnitIds, setSelectedDataUnitIds] = useState([]);
   const [aggregationMode, setAggregationMode] = useState(CHUNG_TU_AGGREGATION_MODES.BY_DAY);
   const effectiveAggregationMode = isPnkMonthly
-    ? CHUNG_TU_AGGREGATION_MODES.BY_DAY
+    ? aggregationMode === CHUNG_TU_AGGREGATION_MODES.FULL
+      ? CHUNG_TU_AGGREGATION_MODES.FULL
+      : CHUNG_TU_AGGREGATION_MODES.BY_DAY
     : aggregationMode;
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [signatures, setSignatures] = useState({});
@@ -201,6 +243,17 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       CHUNG_TU_AGGREGATION_MODE_OPTIONS.find((o) => o.value === effectiveAggregationMode)?.label ??
       effectiveAggregationMode,
     [effectiveAggregationMode],
+  );
+  const aggregationOptions = useMemo(
+    () =>
+      isPnkMonthly
+        ? CHUNG_TU_AGGREGATION_MODE_OPTIONS.filter(
+            (opt) =>
+              opt.value === CHUNG_TU_AGGREGATION_MODES.BY_DAY ||
+              opt.value === CHUNG_TU_AGGREGATION_MODES.FULL,
+          )
+        : CHUNG_TU_AGGREGATION_MODE_OPTIONS,
+    [isPnkMonthly],
   );
 
   useEffect(() => {
@@ -231,6 +284,8 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     setLastBatchInfo(null);
     setActionError(null);
     setIssueSlipId("");
+    setDateFrom(todayYmd());
+    setDateTo(todayYmd());
   }, [categoryKey]);
 
   const { data: templates = [], isLoading: templatesLoading } = useChungTuPdfTemplatesQuery(categoryKey, {
@@ -264,8 +319,11 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     [savedSignatureSettings?.signatureBlock],
   );
   const activeSignatureBlock = useMemo(
-    () => savedSignatureBlock ?? templateSignatureBlock ?? null,
-    [savedSignatureBlock, templateSignatureBlock],
+    () =>
+      isPnkMonthly
+        ? ensurePnkNguoiGiaoSlotFirst(savedSignatureBlock ?? templateSignatureBlock ?? null)
+        : (savedSignatureBlock ?? templateSignatureBlock ?? null),
+    [isPnkMonthly, savedSignatureBlock, templateSignatureBlock],
   );
   const signatureSlots = useMemo(
     () => normalizeSignatureSlots(activeSignatureBlock),
@@ -328,11 +386,19 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const buildPayloadBase = useCallback(() => {
     const base = { categoryKey, unitId: effectiveUnitId };
     if (isMonthly) {
+      if (isPnkMonthly) {
+        return {
+          ...base,
+          dateFrom,
+          dateTo,
+          aggregationMode: effectiveAggregationMode,
+        };
+      }
       return {
         ...base,
         periodMonth,
         aggregationMode: effectiveAggregationMode,
-        ...(isPnkMonthly ? {} : { unitIds: selectedDataUnitIds }),
+        unitIds: selectedDataUnitIds,
       };
     }
     if (isBySlip) {
@@ -354,6 +420,8 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     isPnkMonthly,
     isBySlip,
     periodMonth,
+    dateFrom,
+    dateTo,
     selectedDataUnitIds,
     effectiveAggregationMode,
     periodDate,
@@ -367,6 +435,18 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     }
     if (isBySlip && !issueSlipId) {
       setActionError("Chọn phiếu xuất LTTP.");
+      return;
+    }
+    if (isPnkMonthly && !dateFrom) {
+      setActionError("Chọn ngày bắt đầu.");
+      return;
+    }
+    if (isPnkMonthly && !dateTo) {
+      setActionError("Chọn ngày kết thúc.");
+      return;
+    }
+    if (isPnkMonthly && dateFrom > dateTo) {
+      setActionError("Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.");
       return;
     }
     setActionError(null);
@@ -389,6 +469,18 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     }
     if (isMonthly && !isPnkMonthly && selectedDataUnitIds.length === 0) {
       setActionError("Chọn ít nhất một đơn vị để đưa dữ liệu vào chứng từ.");
+      return;
+    }
+    if (isPnkMonthly && !dateFrom) {
+      setActionError("Chọn ngày bắt đầu.");
+      return;
+    }
+    if (isPnkMonthly && !dateTo) {
+      setActionError("Chọn ngày kết thúc.");
+      return;
+    }
+    if (isPnkMonthly && dateFrom > dateTo) {
+      setActionError("Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.");
       return;
     }
     if (isBySlip && !issueSlipId) {
@@ -450,7 +542,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     Boolean(selectedTemplate) &&
     (isMonthly
       ? isPnkMonthly
-        ? Boolean(periodMonth)
+        ? Boolean(dateFrom) && Boolean(dateTo)
         : selectedDataUnitIds.length > 0
       : isBySlip
         ? Boolean(issueSlipId)
@@ -461,7 +553,19 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       setActionError("Chọn đơn vị kho LTTP.");
       return false;
     }
-    if (isMonthly && !String(periodMonth ?? "").trim()) {
+    if (isPnkMonthly && !String(dateFrom ?? "").trim()) {
+      setActionError("Chọn ngày bắt đầu.");
+      return false;
+    }
+    if (isPnkMonthly && !String(dateTo ?? "").trim()) {
+      setActionError("Chọn ngày kết thúc.");
+      return false;
+    }
+    if (isPnkMonthly && dateFrom > dateTo) {
+      setActionError("Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.");
+      return false;
+    }
+    if (isMonthly && !isPnkMonthly && !String(periodMonth ?? "").trim()) {
       setActionError("Chọn tháng chứng từ.");
       return false;
     }
@@ -488,6 +592,8 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     isMonthly,
     isPnkMonthly,
     isBySlip,
+    dateFrom,
+    dateTo,
     periodMonth,
     selectedDataUnitIds.length,
     issueSlipId,
@@ -540,7 +646,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         </label>
       ) : null}
 
-      {isMonthly ? (
+      {isMonthly && !isPnkMonthly ? (
         <label className="space-y-1" htmlFor={`ct-export-month-${categoryKey}`}>
           <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
             Tháng chứng từ
@@ -553,6 +659,36 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             onChange={(e) => setPeriodMonth(e.target.value)}
           />
         </label>
+      ) : null}
+
+      {isPnkMonthly ? (
+        <>
+          <label className="space-y-1" htmlFor={`ct-export-date-from-${categoryKey}`}>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+              Từ ngày
+            </span>
+            <input
+              id={`ct-export-date-from-${categoryKey}`}
+              type="date"
+              className={fieldClass}
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+          </label>
+
+          <label className="space-y-1" htmlFor={`ct-export-date-to-${categoryKey}`}>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+              Đến ngày
+            </span>
+            <input
+              id={`ct-export-date-to-${categoryKey}`}
+              type="date"
+              className={fieldClass}
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+          </label>
+        </>
       ) : (
         <label className="space-y-1" htmlFor={`ct-export-date-${categoryKey}`}>
           <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
@@ -605,7 +741,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             Chế độ gộp dữ liệu
           </legend>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {CHUNG_TU_AGGREGATION_MODE_OPTIONS.map((opt) => (
+            {aggregationOptions.map((opt) => (
               <label
                 key={opt.value}
                 className={cn(
@@ -858,10 +994,10 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       </div>
       <div className="rounded-lg bg-muted/25 px-3 py-2">
         <dt className="text-[10px] uppercase text-muted-foreground">
-          {isMonthly ? "Tháng" : "Ngày"}
+          {isPnkMonthly ? "Khoảng ngày" : isMonthly ? "Tháng" : "Ngày"}
         </dt>
         <dd className="mt-0.5 font-medium">
-          {isMonthly ? formatPeriodMonth(periodMonth) : periodDate}
+          {isPnkMonthly ? `${dateFrom || "—"} -> ${dateTo || "—"}` : isMonthly ? formatPeriodMonth(periodMonth) : periodDate}
         </dd>
       </div>
       {isMonthly ? (
@@ -869,7 +1005,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           <dt className="text-[10px] uppercase text-muted-foreground">Gộp dữ liệu</dt>
           <dd className="mt-0.5 font-medium">
             {isPnkMonthly
-              ? `${aggregationLabel} · nguồn BKMH`
+              ? `${aggregationLabel} · buyer từ BKMH`
               : `${aggregationLabel} · ${selectedDataUnitIds.length} đơn vị`}
           </dd>
         </div>
@@ -911,7 +1047,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             title="Tham số chứng từ"
             description={
               isPnkMonthly
-                ? "Chọn kho và tháng — dữ liệu lấy từ BKMH đã xuất (và hóa đơn khi có)."
+                ? "Chọn kho, khoảng ngày và cách gộp PNK theo dữ liệu BKMH đã xuất."
                 : "Chọn kho, kỳ dữ liệu và đơn vị nguồn LTTP."
             }
           >
@@ -933,7 +1069,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             title="Tham số chứng từ"
             description={
               isPnkMonthly
-                ? "Chọn kho và tháng — dữ liệu lấy từ BKMH đã xuất (và hóa đơn khi có)."
+                ? "Chọn kho, khoảng ngày và cách gộp PNK theo dữ liệu BKMH đã xuất."
                 : "Chọn kho, kỳ dữ liệu và đơn vị nguồn LTTP."
             }
             expanded={expandedCards}
@@ -1010,7 +1146,12 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           stepIndex={wizardStep}
           onBack={goWizardBack}
           onNext={goWizardNext}
-          nextDisabled={!effectiveUnitId || (isMonthly && !String(periodMonth ?? "").trim())}
+          nextDisabled={
+            !effectiveUnitId ||
+            (isPnkMonthly
+              ? !String(dateFrom ?? "").trim() || !String(dateTo ?? "").trim()
+              : isMonthly && !String(periodMonth ?? "").trim())
+          }
         />
       ) : null}
 
