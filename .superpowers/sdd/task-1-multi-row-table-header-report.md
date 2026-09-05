@@ -29,6 +29,10 @@ Result: `25 passed`.
 1. This task verifies importer and PDF renderer coverage only; no Docker/container runtime validation was run in this session.
 2. Existing templates remain compatible, but multi-row headers still assume the bottom header row defines the effective column layout by design.
 
+## Review follow-up
+
+Follow-up fixes for review findings: the static-cell importer now marks the full `TABLE_HEADER` row band as `layer="header"`, and template import now rejects merged ranges that extend outside multi-row header bounds. Regression coverage was extended in `test_template_importer.py` and `test_pdf_renderer.py`, with the targeted pytest slice now passing `27 passed`.
+
 ## Ops note
 
 Document-service Docker image rebuild/restart is still needed after merge/deploy for this change to take effect in containerized environments. It was intentionally not rebuilt in this task.

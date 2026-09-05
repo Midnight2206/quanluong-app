@@ -101,7 +101,7 @@ def collect_static_cells(
     field_coords: set[tuple[int, int]] | None = None,
 ) -> list[StaticCellMeta]:
     sheet = workbook[sheet_name]
-    header_min_col, header_row, header_max_col, _ = header_bounds
+    header_min_col, header_min_row, header_max_col, header_max_row = header_bounds
     data_row = data_bounds[1]
     skip_coords = field_coords or set()
     static_cells: list[StaticCellMeta] = []
@@ -109,11 +109,11 @@ def collect_static_cells(
     for row in range(1, sheet.max_row + 1):
         if row == data_row:
             continue
-        if row == header_row:
+        if header_min_row <= row <= header_max_row:
             layer = "header"
         elif row > data_row:
             layer = "signature"
-        elif row < header_row:
+        elif row < header_min_row:
             layer = "body"
         else:
             # Hàng giữa TABLE_HEADER và TABLE_DATA_ROW (tiêu đề phụ / khoảng trống).

@@ -68,6 +68,35 @@ def test_imported_minimal_template_renders_pdf():
     assert pdf.startswith(b"%PDF")
 
 
+def test_multi_row_header_repeats_on_continuation_pages():
+    from test_template_importer import _make_two_row_header_template
+
+    importer = importlib.import_module("app.import.template_importer")
+    metadata = importer.parse_template(
+        _make_two_row_header_template(), name="chung-tu", version="1"
+    )
+    rows = [
+        {
+            "stt": str(i + 1),
+            "ten_hang": f"Hang {i + 1}",
+            "dvt": "kg",
+            "so_luong": "10",
+            "ghi_chu": "",
+        }
+        for i in range(80)
+    ]
+
+    pdf = render_pdf(metadata=metadata, fields={"don_vi": "Bep A"}, rows=rows)
+    pages = PdfReader(BytesIO(pdf)).pages
+
+    assert len(pages) >= 2
+    for page in pages:
+        text = page.extract_text() or ""
+        assert "Hàng hóa" in text
+        assert "STT" in text
+        assert "Tên hàng" in text
+
+
 def test_vietnamese_text_extracted():
     pdf = render_demo_pdf(fields=_sample_fields(), rows=_sample_rows(1))
 

@@ -120,6 +120,12 @@ def test_table_header_two_rows_imports_keys_from_bottom_row():
         "ghi_chu",
     ]
     assert metadata.table.header_height_pt == 44
+    header_rows = {cell.row for cell in metadata.static_cells if cell.layer == "header"}
+    assert header_rows == {5, 6}
+    assert any(
+        cell.layer == "header" and cell.value == "Hàng hóa"
+        for cell in metadata.static_cells
+    )
 
 
 def test_table_header_vertical_merge_reads_title_from_merge_origin():
@@ -127,6 +133,16 @@ def test_table_header_vertical_merge_reads_title_from_merge_origin():
 
     assert metadata.table.columns[0].title == "STT"
     assert metadata.table.columns[0].key == "stt"
+
+
+def test_table_header_rejects_upper_row_merge_outside_bounds():
+    errors = importlib.import_module("app.import.errors")
+    workbook = load_workbook(BytesIO(_make_two_row_header_template()))
+    sheet = workbook["ChungTu"]
+    sheet.merge_cells("G5:H5")
+
+    with pytest.raises(errors.TemplateValidationError, match="vượt ngoài biên"):
+        _parse_template(_save_workbook(workbook))
 
 
 def test_parse_sheet_scoped_named_ranges():

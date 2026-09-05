@@ -119,6 +119,33 @@ def _all_defined_names(workbook):
         )
 
 
+def _assert_merges_within_bounds(
+    sheet,
+    bounds: tuple[int, int, int, int],
+    name: str,
+) -> None:
+    min_col, min_row, max_col, max_row = bounds
+    for cell_range in sheet.merged_cells.ranges:
+        intersects = (
+            cell_range.min_row <= max_row
+            and cell_range.max_row >= min_row
+            and cell_range.min_col <= max_col
+            and cell_range.max_col >= min_col
+        )
+        if not intersects:
+            continue
+        contained = (
+            cell_range.min_col >= min_col
+            and cell_range.max_col <= max_col
+            and cell_range.min_row >= min_row
+            and cell_range.max_row <= max_row
+        )
+        if not contained:
+            raise TemplateValidationError(
+                f"Ô merge của {name} vượt ngoài biên Named Range"
+            )
+
+
 def _merge_groups(
     sheet,
     bounds: tuple[int, int, int, int],
@@ -129,6 +156,8 @@ def _merge_groups(
     min_col, min_row, max_col, max_row = bounds
     if not allow_multi_row and min_row != max_row:
         raise TemplateValidationError(f"Named Range {name} phải nằm trên một dòng")
+    if allow_multi_row:
+        _assert_merges_within_bounds(sheet, bounds, name)
     scan_row = max_row if allow_multi_row else min_row
 
     groups = []
