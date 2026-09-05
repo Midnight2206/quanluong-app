@@ -258,13 +258,14 @@ export function useChungTuSignatureSettingsQuery(categoryKey, options = {}) {
 export function useUpsertChungTuSignatureSettingsMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
-    mutationFn: ({ categoryKey, signatureBlock }) =>
+    mutationFn: ({ categoryKey, signatureBlock, extraFields }) =>
       apiRequest({
         url: "/chungtuquyettoan/signature-settings",
         method: "put",
         data: {
           categoryKey: normalizeCategoryKey(categoryKey),
           signatureBlock,
+          extraFields,
         },
       }),
     onSuccess: (data, variables) => {

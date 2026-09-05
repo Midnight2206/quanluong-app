@@ -53,6 +53,7 @@ import {
 import {
   createChungTuBkmhMonthlyExport,
   deleteChungTuBkmhMonthly,
+  exportChungTuBkmhMonthlySummaryExcel,
   getChungTuBkmhMonthly,
   listChungTuBkmhMonthly,
   streamChungTuBkmhMonthlyMergedPdf,
@@ -370,6 +371,22 @@ async function listChungTuBkmhMonthlyController(req, res) {
   });
 }
 
+async function exportChungTuBkmhMonthlyExcelController(req, res) {
+  const { buffer, fileName } = await exportChungTuBkmhMonthlySummaryExcel({
+    id: req.validatedParams.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${String(fileName).replaceAll('"', "")}"`,
+  );
+  return res.send(buffer);
+}
+
 async function createChungTuBkmhMonthlyController(req, res) {
   const body = req.validatedBody;
   const data = await createChungTuBkmhMonthlyExport({
@@ -649,6 +666,7 @@ async function putChungTuSignatureSettingsController(req, res) {
   const data = await upsertChungTuSignatureSettings({
     categoryKey: req.validatedBody.categoryKey,
     signatureBlock: req.validatedBody.signatureBlock,
+    extraFields: req.validatedBody.extraFields,
     updatedById: req.user.id,
   });
   return respondSuccess(res, {
@@ -857,6 +875,7 @@ export {
   deleteChungTuPdfExportController,
   createTemplateCatalogController,
   deleteTemplateCatalogController,
+  exportChungTuBkmhMonthlyExcelController,
   getChungTuBkmhMonthlyController,
   getChungTuDocumentController,
   getChungTuPdfExportBatchController,

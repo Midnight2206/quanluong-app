@@ -28,6 +28,7 @@ const slotSchema = z.object({
   static_name: z.string().optional().default(""),
   catalogNodeId: z.string().optional().default(""),
   show_date_line: z.boolean().default(false),
+  locked: z.boolean().default(false),
 });
 
 const signatureBlockSchema = z.object({
@@ -39,12 +40,15 @@ const signatureBlockSchema = z.object({
 
 const formSchema = z.object({
   signatureBlock: signatureBlockSchema,
+  extraFields: z.object({
+    nhapTaiKho: z.string().optional().default(""),
+  }),
 });
 
 const DEFAULT_SIGNATURE_BLOCK = Object.freeze({
   columns: 2,
   gap_pt: 40,
-  date_line_gap_pt: 14,
+  date_line_gap_pt: 0,
   slots: [
     {
       key: "nguoi_lap",
@@ -67,12 +71,42 @@ const DEFAULT_SIGNATURE_BLOCK = Object.freeze({
   ],
 });
 
-function cloneDefaultSignatureBlock() {
+const DEFAULT_PNK_NGUOI_GIAO_SLOT = Object.freeze({
+  key: "nguoi_giao",
+  label: "NGƯỜI GIAO",
+  col: 0,
+  col_span: 1,
+  source: "static",
+  static_name: "",
+  catalogNodeId: "",
+  locked: true,
+  show_date_line: false,
+});
+
+function cloneDefaultSignatureBlock({ isPnkCategory = false } = {}) {
+  if (isPnkCategory) {
+    return {
+      columns: 3,
+      gap_pt: DEFAULT_SIGNATURE_BLOCK.gap_pt,
+      date_line_gap_pt: DEFAULT_SIGNATURE_BLOCK.date_line_gap_pt,
+      slots: [
+        { ...DEFAULT_PNK_NGUOI_GIAO_SLOT },
+        { ...DEFAULT_SIGNATURE_BLOCK.slots[0], col: 1 },
+        { ...DEFAULT_SIGNATURE_BLOCK.slots[1], col: 2 },
+      ],
+    };
+  }
   return {
     columns: DEFAULT_SIGNATURE_BLOCK.columns,
     gap_pt: DEFAULT_SIGNATURE_BLOCK.gap_pt,
     date_line_gap_pt: DEFAULT_SIGNATURE_BLOCK.date_line_gap_pt,
     slots: DEFAULT_SIGNATURE_BLOCK.slots.map((slot) => ({ ...slot })),
+  };
+}
+
+function normalizeExtraFields(input) {
+  return {
+    nhapTaiKho: String(input?.nhapTaiKho ?? "").trim(),
   };
 }
 
@@ -93,6 +127,47 @@ function normalizeSlot(slot, index) {
     static_name: source === "static" ? String(slot?.static_name ?? "").trim() : "",
     catalogNodeId: source === "system" ? String(slot?.catalogNodeId ?? "").trim() : "",
     show_date_line: Boolean(slot?.show_date_line),
+    locked: Boolean(slot?.locked),
+  };
+}
+
+function buildLockedNguoiGiaoSlot(slot = null) {
+  return {
+    ...DEFAULT_PNK_NGUOI_GIAO_SLOT,
+    col: Number.isFinite(Number(slot?.col)) ? Number(slot.col) : DEFAULT_PNK_NGUOI_GIAO_SLOT.col,
+    col_span:
+      Number.isFinite(Number(slot?.col_span)) ? Number(slot.col_span) : DEFAULT_PNK_NGUOI_GIAO_SLOT.col_span,
+    show_date_line:
+      slot?.show_date_line == null
+        ? DEFAULT_PNK_NGUOI_GIAO_SLOT.show_date_line
+        : Boolean(slot.show_date_line),
+  };
+}
+
+function ensurePnkSignatureBlock(input) {
+  const base = normalizeSignatureBlock(input);
+  const rawSlots = Array.isArray(base.slots) ? base.slots : [];
+  const existingLockedSlot = rawSlots.find((slot) => slot?.key === DEFAULT_PNK_NGUOI_GIAO_SLOT.key);
+  const otherSlots = rawSlots
+    .filter((slot) => slot?.key && slot.key !== DEFAULT_PNK_NGUOI_GIAO_SLOT.key)
+    .map((slot, index) =>
+      existingLockedSlot
+        ? slot
+        : {
+            ...slot,
+            col: Number.isFinite(Number(slot?.col)) ? Number(slot.col) + 1 : index + 1,
+          },
+    );
+  const slots = [buildLockedNguoiGiaoSlot(existingLockedSlot), ...otherSlots];
+  const columnCount = slots.reduce((max, slot) => {
+    const col = Number.isFinite(Number(slot?.col)) ? Number(slot.col) : 0;
+    const span = Number.isFinite(Number(slot?.col_span)) ? Number(slot.col_span) : 1;
+    return Math.max(max, col + span);
+  }, existingLockedSlot ? Number(base.columns) || 2 : (Number(base.columns) || 2) + 1);
+  return {
+    ...base,
+    columns: Math.max(1, columnCount),
+    slots,
   };
 }
 
@@ -139,6 +214,7 @@ function formatSlotSourceHint(source) {
 export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
   const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
   const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
+  const isPnkCategory = categoryKey === "phieu-nhap-kho";
   const {
     data: savedSettings,
     isLoading,
@@ -157,7 +233,8 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
   } = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      signatureBlock: cloneDefaultSignatureBlock(),
+      signatureBlock: cloneDefaultSignatureBlock({ isPnkCategory }),
+      extraFields: normalizeExtraFields(),
     },
   });
   const { fields, append, remove } = useFieldArray({
@@ -167,25 +244,35 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
 
   useEffect(() => {
     reset({
-      signatureBlock: normalizeSignatureBlock(savedSettings?.signatureBlock),
+      signatureBlock: isPnkCategory
+        ? ensurePnkSignatureBlock(savedSettings?.signatureBlock)
+        : normalizeSignatureBlock(savedSettings?.signatureBlock),
+      extraFields: normalizeExtraFields(savedSettings?.extraFields),
     });
-  }, [reset, savedSettings]);
+  }, [isPnkCategory, reset, savedSettings]);
 
   const slotValues = watch("signatureBlock.slots");
   const availableCatalogNodes = savedSettings?.availableCatalogNodes ?? [];
 
   const handleResetDefault = () => {
-    reset({ signatureBlock: cloneDefaultSignatureBlock() });
+    reset({
+      signatureBlock: cloneDefaultSignatureBlock({ isPnkCategory }),
+      extraFields: normalizeExtraFields(),
+    });
   };
 
-  const onSubmit = async ({ signatureBlock }) => {
+  const onSubmit = async ({ signatureBlock, extraFields }) => {
     try {
-      const payload = normalizeSignatureBlock(signatureBlock);
+      const payload = isPnkCategory
+        ? ensurePnkSignatureBlock(signatureBlock)
+        : normalizeSignatureBlock(signatureBlock);
+      const nextExtraFields = normalizeExtraFields(extraFields);
       await saveSettings({
         categoryKey,
         signatureBlock: payload,
+        extraFields: nextExtraFields,
       }).unwrap();
-      reset({ signatureBlock: payload });
+      reset({ signatureBlock: payload, extraFields: nextExtraFields });
       notifySuccess("Đã lưu cài đặt chữ ký.");
     } catch (error) {
       notifyError(error?.data?.message || error?.message || "Không lưu được cài đặt chữ ký.");
@@ -210,6 +297,23 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
         description="Cấu hình số cột, khoảng cách và các vị trí ký dùng chung cho loại chứng từ này."
       >
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+          {isPnkCategory ? (
+            <label className="block space-y-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                Nhập tại kho
+              </span>
+              <input
+                className={fieldClass}
+                disabled={!canWrite || isLoading || saving}
+                placeholder="Ví dụ: Kho trung tâm"
+                {...register("extraFields.nhapTaiKho")}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Giá trị này sẽ đi vào `FIELD_nhap_tai_kho` khi xuất PNK.
+              </p>
+            </label>
+          ) : null}
+
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="space-y-1">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
@@ -310,10 +414,12 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                           Vị trí {index + 1}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          Slot {formatSlotSourceHint(slotValue?.source)}.
+                          {slotValue?.locked
+                            ? "Slot khóa: tên người giao lấy tự động từ người mua BKMH."
+                            : `Slot ${formatSlotSourceHint(slotValue?.source)}.`}
                         </p>
                       </div>
-                      {canWrite && fields.length > 1 ? (
+                      {canWrite && fields.length > 1 && !slotValue?.locked ? (
                         <Button
                           type="button"
                           variant="dangerGhost"
@@ -335,7 +441,7 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                         </span>
                         <input
                           className={fieldClass}
-                          disabled={!canWrite || saving}
+                          disabled={!canWrite || saving || slotValue?.locked}
                           placeholder="vi_du: ke_toan"
                           {...register(`signatureBlock.slots.${index}.key`)}
                         />
@@ -351,7 +457,7 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                         <textarea
                           rows={2}
                           className={cn(fieldClass, "min-h-20 resize-y py-2")}
-                          disabled={!canWrite || saving}
+                          disabled={!canWrite || saving || slotValue?.locked}
                           placeholder={"Ví dụ:\nKế toán trưởng"}
                           {...register(`signatureBlock.slots.${index}.label`)}
                         />
@@ -366,7 +472,7 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                         </span>
                         <select
                           className={fieldClass}
-                          disabled={!canWrite || saving}
+                          disabled={!canWrite || saving || slotValue?.locked}
                           value={slotValue?.source ?? "dynamic"}
                           onChange={(event) => {
                             const nextSource = event.target.value;
@@ -464,8 +570,12 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                           </span>
                           <input
                             className={fieldClass}
-                            disabled={!canWrite || saving || slotValue?.source !== "static"}
-                            placeholder="Chỉ dùng khi chọn Tên cố định"
+                            disabled={!canWrite || saving || slotValue?.source !== "static" || slotValue?.locked}
+                            placeholder={
+                              slotValue?.locked
+                                ? "Tự lấy từ buyerSignatureName của từng nhóm PNK"
+                                : "Chỉ dùng khi chọn Tên cố định"
+                            }
                             {...register(`signatureBlock.slots.${index}.static_name`)}
                           />
                         </label>

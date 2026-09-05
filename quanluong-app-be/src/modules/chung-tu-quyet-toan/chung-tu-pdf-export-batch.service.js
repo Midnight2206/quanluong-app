@@ -68,6 +68,35 @@ function buildBatchKey() {
   return `ctpdf_batch_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`;
 }
 
+const PNK_NGUOI_GIAO_SLOT_KEY = "nguoi_giao";
+
+function materializePnkNguoiGiaoSignatureBlock(signatureBlock, context) {
+  if (!signatureBlock || typeof signatureBlock !== "object") return signatureBlock;
+  const rawSlots = Array.isArray(signatureBlock.slots) ? signatureBlock.slots : [];
+  const existingSlot =
+    rawSlots.find((slot) => slot && typeof slot === "object" && String(slot.key ?? "").trim() === PNK_NGUOI_GIAO_SLOT_KEY) ??
+    null;
+  const buyerSignatureName = String(context?.buyerSignatureName ?? "").trim();
+  const lockedSlot = {
+    ...(existingSlot && typeof existingSlot === "object" ? existingSlot : {}),
+    key: PNK_NGUOI_GIAO_SLOT_KEY,
+    label: "NGƯỜI GIAO",
+    col: Number.isFinite(Number(existingSlot?.col)) ? Number(existingSlot.col) : 0,
+    col_span: Number.isFinite(Number(existingSlot?.col_span)) ? Number(existingSlot.col_span) : 1,
+    source: "static",
+    static_name: buyerSignatureName,
+    locked: true,
+    show_date_line: Boolean(existingSlot?.show_date_line),
+  };
+  const otherSlots = rawSlots.filter(
+    (slot) => !(slot && typeof slot === "object" && String(slot.key ?? "").trim() === PNK_NGUOI_GIAO_SLOT_KEY),
+  );
+  return {
+    ...signatureBlock,
+    slots: [lockedSlot, ...otherSlots],
+  };
+}
+
 function toIsoDateOnly(value) {
   return value instanceof Date ? value.toISOString().slice(0, 10) : null;
 }
@@ -253,8 +282,11 @@ async function createChungTuPdfExportBatch({
     folder = await createDocumentFolder({ name: batchKey });
 
     for (const slice of slices) {
+      const sliceSignatureBlock = isPnk
+        ? materializePnkNguoiGiaoSignatureBlock(finalSignatureBlock, slice.context)
+        : finalSignatureBlock;
       const sliceSignatureDates = fillSignatureDatesFromPeriod({
-        signatureBlock: finalSignatureBlock,
+        signatureBlock: sliceSignatureBlock,
         signatureDates,
         context: slice.context,
         aggregationMode: safeAggregationMode,
@@ -267,7 +299,7 @@ async function createChungTuPdfExportBatch({
         columnKeys,
         signatures,
         signatureDates: sliceSignatureDates,
-        signatureBlock: finalSignatureBlock,
+        signatureBlock: sliceSignatureBlock,
       });
       const file = await renderToDocumentFolder(folder.id, {
         templateId: template.documentServiceTemplateId,
@@ -277,7 +309,7 @@ async function createChungTuPdfExportBatch({
         rows: payload.rows,
         signatures: payload.signatures,
         signatureDates: sliceSignatureDates,
-        signatureBlock: finalSignatureBlock,
+        signatureBlock: sliceSignatureBlock,
       });
       createdFiles.push({
         exportKey: `ctpdf_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`,

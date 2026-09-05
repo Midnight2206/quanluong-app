@@ -29,25 +29,32 @@ async function getChungTuSignatureSettings({ categoryKey }) {
   if (mapped) return mapped;
   return {
     categoryKey,
+    extraFields: {},
     availableCatalogNodes: getCatalogNodesForCategory(categoryKey),
   };
 }
 
-async function upsertChungTuSignatureSettings({ categoryKey, signatureBlock, updatedById }) {
+async function upsertChungTuSignatureSettings({ categoryKey, signatureBlock, extraFields, updatedById }) {
   assertKnownCategoryKey(categoryKey);
   const payload =
     signatureBlock && typeof signatureBlock === "object" && !Array.isArray(signatureBlock)
       ? signatureBlock
+      : {};
+  const extraPayload =
+    extraFields && typeof extraFields === "object" && !Array.isArray(extraFields)
+      ? extraFields
       : {};
   const row = await prisma.chungTuSignatureSettings.upsert({
     where: { categoryKey },
     create: {
       categoryKey,
       signatureBlockJson: payload,
+      extraFieldsJson: extraPayload,
       updatedById,
     },
     update: {
       signatureBlockJson: payload,
+      extraFieldsJson: extraPayload,
       updatedById,
     },
   });

@@ -431,6 +431,7 @@ const chungTuSignatureSettingsQuerySchema = z.object({
 const chungTuSignatureSettingsPutBodySchema = z.object({
   categoryKey: chungTuPdfCategoryKeySchema,
   signatureBlock: z.record(z.unknown()),
+  extraFields: z.record(z.unknown()).optional(),
 });
 
 const chungTuBkmhHeaderSettingsQuerySchema = z.object({

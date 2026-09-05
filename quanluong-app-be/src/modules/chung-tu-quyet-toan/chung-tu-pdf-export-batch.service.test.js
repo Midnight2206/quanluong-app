@@ -291,6 +291,21 @@ test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + 
     documentServiceTemplateId: 902,
     status: "published",
   }));
+  resolveChungTuContext.mock.mockImplementationOnce(async () => ({
+    context: {
+      periodDate: "2026-06-01",
+      buyerSignatureName: "Th/tá Nguyen Van A",
+      detailRows: [{ stt: 1, tenHang: "Gạo" }],
+      sheetContexts: [
+        {
+          periodDate: "2026-06-01",
+          buyerSignatureName: "Th/tá Nguyen Van A",
+          detailRows: [{ stt: 1, tenHang: "Gạo" }],
+        },
+      ],
+    },
+    sourceDataHash: "pnk-hash-123",
+  }));
   prismaSignatureSettingsFindUnique.mock.mockImplementation(async () => ({
     id: 6,
     categoryKey: "phieu-nhap-kho",
@@ -341,6 +356,21 @@ test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + 
       "2026-06-01T00:00:00.000Z",
     );
     assert.equal(renderToDocumentFolder.mock.callCount(), 1);
+    assert.deepEqual(renderToDocumentFolder.mock.calls[0].arguments[1].signatureBlock, {
+      columns: 1,
+      slots: [
+        {
+          key: "nguoi_giao",
+          label: "NGƯỜI GIAO",
+          col: 0,
+          col_span: 1,
+          source: "static",
+          static_name: "Th/tá Nguyen Van A",
+          locked: true,
+          show_date_line: false,
+        },
+      ],
+    });
     assert.equal(result.fileCount, 1);
   } finally {
     randomBytesMock.mock.restore();
