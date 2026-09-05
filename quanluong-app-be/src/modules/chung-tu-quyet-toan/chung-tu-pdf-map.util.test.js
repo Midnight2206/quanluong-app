@@ -41,6 +41,22 @@ test("pickMappedFields applies provided field labels", () => {
   );
 });
 
+test("pickMappedFields applies soChungTu label to so/soPhieu aliases", () => {
+  assert.deepEqual(
+    pickMappedFields(
+      { soChungTu: "062615", so: "062615", soPhieu: "062615" },
+      ["so_chung_tu", "so", "so_phieu", "FIELD_so"],
+      { fieldLabels: { soChungTu: "Số: " } },
+    ),
+    {
+      so_chung_tu: "Số: 062615",
+      so: "Số: 062615",
+      so_phieu: "Số: 062615",
+      FIELD_so: "Số: 062615",
+    },
+  );
+});
+
 test("pickMappedFields leaves empty soChungTu empty", () => {
   assert.deepEqual(pickMappedFields({ soChungTu: "  " }, ["so_chung_tu"]), {
     so_chung_tu: "",

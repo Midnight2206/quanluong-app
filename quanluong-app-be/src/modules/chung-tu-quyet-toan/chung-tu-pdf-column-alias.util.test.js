@@ -57,3 +57,10 @@ test("resolveScalarFieldKey maps PNK dia_chi to diaChi", () => {
   );
   assert.equal(resolveScalarFieldKey("diaChi", { categoryKey: "phieu-nhap-kho" }), "diaChi");
 });
+
+test("resolveScalarFieldKey maps so/soPhieu aliases to soChungTu", () => {
+  assert.equal(resolveScalarFieldKey("so"), "soChungTu");
+  assert.equal(resolveScalarFieldKey("so_phieu"), "soChungTu");
+  assert.equal(resolveScalarFieldKey("soPhieu"), "soChungTu");
+  assert.equal(resolveScalarFieldKey("FIELD_so"), "soChungTu");
+});

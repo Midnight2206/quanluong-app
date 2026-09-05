@@ -20,6 +20,13 @@ const STATIC_ALIASES = Object.freeze({
   can_cu_bkmh: "canCuBkmh",
 });
 
+/** Scalar-only: so/soPhieu template keys share soChungTu value + fieldLabels. */
+const SCALAR_ALIASES = Object.freeze({
+  so: "soChungTu",
+  so_phieu: "soChungTu",
+  soPhieu: "soChungTu",
+});
+
 function snakeToCamel(key) {
   return String(key ?? "").replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
@@ -47,6 +54,7 @@ export function resolveScalarFieldKey(templateFieldKey, { categoryKey } = {}) {
   if (isPnkCategory(categoryKey) && (key === "dia_chi" || key === "diaChi")) {
     return "diaChi";
   }
+  if (SCALAR_ALIASES[key]) return SCALAR_ALIASES[key];
   if (STATIC_ALIASES[key]) return STATIC_ALIASES[key];
   if (camelToSnake(key) === key) return snakeToCamel(key);
   return key;
