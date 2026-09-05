@@ -99,7 +99,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
     selectedId,
     { skip: !selectedId },
   );
-  const { data: fieldCatalog, isLoading: fieldCatalogLoading } = useChungTuPdfFieldCatalogQuery();
+  const { data: fieldCatalog } = useChungTuPdfFieldCatalogQuery();
   const [uploadTemplate, { isLoading: uploading }] = useUploadChungTuPdfTemplateMutation();
   const [publishTemplate, { isLoading: publishing }] = usePublishChungTuPdfTemplateMutation();
   const [retireTemplate, { isLoading: retiring }] = useRetireChungTuPdfTemplateMutation();
@@ -457,7 +457,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                   </p>
                 ) : null}
               </div>
-              {fieldsLoading || fieldCatalogLoading ? (
+              {fieldsLoading ? (
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="size-3.5 animate-spin" />
                   Đang đọc field trên mẫu…

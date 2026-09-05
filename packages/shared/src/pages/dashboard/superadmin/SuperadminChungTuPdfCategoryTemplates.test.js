@@ -24,4 +24,8 @@ test("superadmin PDF templates screen saves per-template field labels", () => {
   assert.match(superadminTemplatesSource, /Mẫu không có Named Range FIELD_/);
   assert.match(superadminTemplatesSource, /Mẫu đã ngừng dùng chỉ xem được nhãn đã lưu/);
   assert.doesNotMatch(superadminTemplatesSource, /supportsLabel/);
+  assert.doesNotMatch(
+    superadminTemplatesSource,
+    /fieldsLoading \|\| fieldCatalogLoading/,
+  );
 });
