@@ -67,13 +67,15 @@ test("chungTuPdfExportCreateBodySchema uses the PDF category allowlist", () => {
     chungTuPdfExportCreateBodySchema.parse({
       categoryKey: " phieu-nhap-kho ",
       unitId: "1",
-      periodDate: "2026-08-23",
+      dateFrom: "2026-08-23",
+      dateTo: "2026-08-23",
       pdfTemplateId: "2",
     }),
     {
       categoryKey: "phieu-nhap-kho",
       unitId: 1,
-      periodDate: "2026-08-23",
+      dateFrom: "2026-08-23",
+      dateTo: "2026-08-23",
       pdfTemplateId: 2,
       signatures: {},
       signatureDates: {},
@@ -83,28 +85,70 @@ test("chungTuPdfExportCreateBodySchema uses the PDF category allowlist", () => {
     chungTuPdfExportCreateBodySchema.parse({
       categoryKey: "unsupported-category",
       unitId: 1,
-      periodDate: "2026-08-23",
+      dateFrom: "2026-08-23",
+      dateTo: "2026-08-23",
       pdfTemplateId: 2,
     }),
   );
 });
 
-test("chungTuPdfExportCreateBodySchema allows monthly PNK without unitIds", () => {
+test("chungTuPdfExportCreateBodySchema requires date range for PNK", () => {
   assert.deepEqual(
+    chungTuPdfExportCreateBodySchema.parse({
+      categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+      unitId: "1",
+      dateFrom: "2026-09-01",
+      dateTo: "2026-09-03",
+      aggregationMode: "full",
+      pdfTemplateId: "2",
+    }),
+    {
+      categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+      unitId: 1,
+      dateFrom: "2026-09-01",
+      dateTo: "2026-09-03",
+      aggregationMode: "full",
+      pdfTemplateId: 2,
+      signatures: {},
+      signatureDates: {},
+    },
+  );
+});
+
+test("chungTuPdfExportCreateBodySchema rejects PNK without date range", () => {
+  assert.throws(() =>
     chungTuPdfExportCreateBodySchema.parse({
       categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
       unitId: "1",
       periodMonth: "2026-09",
       pdfTemplateId: "2",
     }),
-    {
+  );
+});
+
+test("chungTuPdfExportCreateBodySchema rejects unitIds and by-unit for PNK", () => {
+  assert.throws(() =>
+    chungTuPdfExportCreateBodySchema.parse({
       categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
-      unitId: 1,
-      periodMonth: "2026-09",
-      pdfTemplateId: 2,
-      signatures: {},
-      signatureDates: {},
-    },
+      unitId: "1",
+      dateFrom: "2026-09-01",
+      dateTo: "2026-09-03",
+      aggregationMode: "by-unit",
+      unitIds: [2, 3],
+      pdfTemplateId: "2",
+    }),
+  );
+});
+
+test("chungTuPdfExportCreateBodySchema rejects reversed PNK date range", () => {
+  assert.throws(() =>
+    chungTuPdfExportCreateBodySchema.parse({
+      categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+      unitId: "1",
+      dateFrom: "2026-09-03",
+      dateTo: "2026-09-01",
+      pdfTemplateId: "2",
+    }),
   );
 });
 

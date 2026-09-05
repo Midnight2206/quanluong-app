@@ -1,37 +1,39 @@
-# Task 4 Report — DS guard create-document + folder documents
+# Task 4 Report — Resolve system signature slots at PDF export
 
 **Status:** completed
 
-## Delivered
+## Summary
 
-- Added a shared published-template guard in `services/document-service/app/folders/folder_service.py`.
-- Enforced `409 TEMPLATE_NOT_PUBLISHED` for:
-  - `POST /v1/templates/{id}/documents`
-  - `POST /v1/folders/{folder_id}/documents`
-- Kept `preview` unguarded as required.
-- Updated render-success tests to publish templates first so they reflect the intended contract.
-- **Important finding fix:** In `add_folder_document`, `require_published_template` now runs before the duplicate-filename check so draft templates always return `409 TEMPLATE_NOT_PUBLISHED` even when the filename already exists in the folder.
+Wired system signature slot resolution into the PDF export flow. System slots are resolved at export time via `SIGNATURE_CATALOG`; static/prompt slots pass through unchanged with `resolvedName`/`resolvedTitle` set to `null`. BKMH header buyer name/department now prefer catalog-resolved values over slip/header fallbacks.
 
-## TDD Notes
+## Commit
 
-- Added failing HTTP test: draft template cannot render via `/v1/templates/{id}/documents`.
-- Added failing HTTP test: draft template cannot be added to a folder via `/v1/folders/{folder_id}/documents`.
-- Verified both failed before the code change:
-  - create-document returned `200` instead of `409`
-  - folder add returned `201` instead of `409`
-- Implemented the minimal guard, then reran the affected suites to green.
-- Added regression test: folder with existing file + draft template + duplicate filename → `409` (not `400` duplicate-name).
+- `c950932` — `feat(chung-tu): resolve system signature slots at PDF export time`
 
-## Verification
+## Call sites modified
 
-- `./.venv/bin/pytest -c services/document-service/pytest.ini services/document-service/tests/test_templates_http.py -k not_published`
-- `./.venv/bin/pytest -c services/document-service/pytest.ini services/document-service/tests/test_folder_service.py -k not_published`
-- `./.venv/bin/pytest -c services/document-service/pytest.ini services/document-service/tests/test_templates_http.py services/document-service/tests/test_folder_service.py`
-- Result: `30 passed`
-- IDE lints: none on edited files
-- **Follow-up:** `./.venv/bin/pytest tests/test_folder_service.py tests/test_templates_http.py -q` → `31 passed`
+| File | Change |
+|------|--------|
+| `chung-tu-data-resolver.service.js` | Added `resolveSystemSignatureSlots()`; `resolvePdfHeaderSettings()` accepts `resolvedBkmhBuyer`; `resolveChungTuContext()` accepts and forwards `resolvedBkmhBuyer` to `resolveSettingsForSlips` → `resolvePdfHeaderSettings` |
+| `chung-tu-pdf-export.service.js` | `createChungTuPdfExport()`: resolves system slots + BKMH buyer before `resolveChungTuContext()`; passes `resolvedBkmhBuyer` into context; passes `resolvedSignatureBlock` to `buildDocumentServicePayload()` |
+| `chung-tu-data-resolver.service.test.js` | 3 new tests: system slot resolve, missing catalog node, `resolvedBkmhBuyer` priority |
 
-## Commits
+## Test results
 
-- `592907d` — `fix(document): block PDF render unless template published`
-- Planned message: `fix(document): check published before folder filename conflict`
+```bash
+cd quanluong-app-be && node --test src/modules/chung-tu-quyet-toan/chung-tu-data-resolver.service.test.js
+```
+
+**14 passed, 0 failed**
+
+Note: Task brief specified `npx vitest run` but the test file uses `node:test` (consistent with existing suite). Vitest is not in `package.json` devDependencies.
+
+## Concerns
+
+1. **Batch export not wired yet** — `chung-tu-pdf-export-batch.service.js` and `chung-tu-bkmh-monthly.service.js` still call `resolveChungTuContext` / `buildDocumentServicePayload` without system slot resolution. Single PDF export path is covered; batch paths may need the same wiring in a follow-up.
+2. **DB stores unresolved signatureBlock** — `signaturesJson.signatureBlock` in the export row still saves the original (unresolved) block; only the document-service payload gets resolved slots. This is intentional (resolved values are ephemeral) but worth noting for re-render flows.
+3. **BKMH buyer resolved twice for BKMH exports** — once for header (`resolvedBkmhBuyer`) and again per system slot if a slot uses `bkmh.nguoiMua`. Acceptable for now; could dedupe with a shared cache if it becomes hot.
+
+## Progress
+
+- Reviewed commit `fbdea5a` for Task 4 follow-up readiness: no critical or important blocker found before Task 5.

@@ -72,9 +72,12 @@ function toIsoDateOnly(value) {
   return value instanceof Date ? value.toISOString().slice(0, 10) : null;
 }
 
-function buildBatchPeriodDateValue({ meta, periodDate, periodMonth }) {
+function buildBatchPeriodDateValue({ meta, periodDate, periodMonth, dateFrom }) {
   if (periodMonth) {
     return new Date(`${periodMonth}-01T00:00:00.000Z`);
+  }
+  if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO && dateFrom) {
+    return new Date(`${dateFrom}T00:00:00.000Z`);
   }
   if (meta.mode === "by-date" && periodDate) {
     return new Date(`${periodDate}T00:00:00.000Z`);
@@ -82,9 +85,10 @@ function buildBatchPeriodDateValue({ meta, periodDate, periodMonth }) {
   return null;
 }
 
-function buildBatchDisplayName({ meta, aggregationMode, periodDate, periodMonth }) {
+function buildBatchDisplayName({ meta, aggregationMode, periodDate, periodMonth, dateFrom, dateTo }) {
   const modeLabel = getAggregationModeLabel(aggregationMode);
-  const periodLabel = periodMonth || periodDate || "không kỳ";
+  const periodLabel =
+    dateFrom && dateTo ? `${dateFrom} - ${dateTo}` : periodMonth || periodDate || "không kỳ";
   return `${meta.label} - ${modeLabel} - ${periodLabel}`;
 }
 
@@ -157,6 +161,8 @@ async function createChungTuPdfExportBatch({
   unitId,
   periodDate,
   periodMonth,
+  dateFrom,
+  dateTo,
   issueSlipId,
   unitIds,
   aggregationMode,
@@ -171,7 +177,8 @@ async function createChungTuPdfExportBatch({
 }) {
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
   const meta = assertKnownCategoryKey(categoryKey);
-  const selectedUnitIds = periodMonth
+  const isPnk = categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO;
+  const selectedUnitIds = periodMonth && !isPnk
     ? resolveSelectedUnitIds({ unitIds, unitId, effectiveUnitIds })
     : undefined;
   if (selectedUnitIds) {
@@ -190,26 +197,36 @@ async function createChungTuPdfExportBatch({
   }
 
   const safePeriodMonth = periodMonth ? normalizePeriodMonth(periodMonth) : undefined;
-  const safeAggregationMode = safePeriodMonth
-    ? categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO
-      ? CHUNG_TU_AGGREGATION_MODES.BY_DAY
-      : normalizeAggregationMode(aggregationMode)
-    : undefined;
-  const [{ context, sourceDataHash }, fieldsPayload, savedSignatureSettings] = await Promise.all([
-    resolveChungTuContext({
-      categoryKey,
-      unitId,
-      periodDate,
-      periodMonth: safePeriodMonth,
-      issueSlipId,
-      unitIds: selectedUnitIds,
-      aggregationMode: safeAggregationMode,
-      settings,
-      exportingUserProfile,
-    }),
+  const safeDateFrom = isPnk ? String(dateFrom ?? "").trim() : "";
+  const safeDateTo = isPnk ? String(dateTo ?? "").trim() : "";
+  const safeAggregationMode = isPnk
+    ? aggregationMode === CHUNG_TU_AGGREGATION_MODES.FULL
+      ? CHUNG_TU_AGGREGATION_MODES.FULL
+      : CHUNG_TU_AGGREGATION_MODES.BY_DAY
+    : safePeriodMonth
+      ? normalizeAggregationMode(aggregationMode)
+      : undefined;
+  const [fieldsPayload, savedSignatureSettings] = await Promise.all([
     getTemplateFields(template.documentServiceTemplateId),
     getChungTuSignatureSettings({ categoryKey }),
   ]);
+  const resolveArgs = {
+    categoryKey,
+    unitId,
+    periodDate,
+    periodMonth: safePeriodMonth,
+    issueSlipId,
+    unitIds: selectedUnitIds,
+    aggregationMode: safeAggregationMode,
+    settings,
+    exportingUserProfile,
+  };
+  if (isPnk) {
+    resolveArgs.dateFrom = safeDateFrom || undefined;
+    resolveArgs.dateTo = safeDateTo || undefined;
+    resolveArgs.nhapTaiKho = String(savedSignatureSettings?.extraFields?.nhapTaiKho ?? "").trim();
+  }
+  const { context, sourceDataHash } = await resolveChungTuContext(resolveArgs);
 
   const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
   const finalSignatureBlock = signatureBlock ?? savedSignatureSettings?.signatureBlock ?? undefined;
@@ -224,7 +241,11 @@ async function createChungTuPdfExportBatch({
     aggregationMode: safeAggregationMode,
     periodDate,
     periodMonth: safePeriodMonth,
+    dateFrom: safeDateFrom,
+    dateTo: safeDateTo,
   });
+  const historyPeriodMonth =
+    safePeriodMonth ?? (isPnk && safeDateFrom ? safeDateFrom.slice(0, 7) : null);
 
   let folder = null;
   const createdFiles = [];
@@ -271,11 +292,12 @@ async function createChungTuPdfExportBatch({
         batchKey,
         categoryKey,
         unitId: Number(unitId),
-        periodMonth: safePeriodMonth ?? null,
+        periodMonth: historyPeriodMonth,
         periodDate: buildBatchPeriodDateValue({
           meta,
           periodDate,
           periodMonth: safePeriodMonth,
+          dateFrom: safeDateFrom,
         }),
         issueSlipId: meta.mode === "by-slip" && !safePeriodMonth ? Number(issueSlipId) : null,
         unitIdsJson: selectedUnitIds ?? [],
@@ -297,11 +319,12 @@ async function createChungTuPdfExportBatch({
             exportKey: file.exportKey,
             categoryKey,
             unitId: Number(unitId),
-            periodMonth: safePeriodMonth ?? null,
+            periodMonth: historyPeriodMonth,
             periodDate: buildBatchPeriodDateValue({
               meta,
               periodDate,
               periodMonth: safePeriodMonth,
+              dateFrom: safeDateFrom,
             }),
             issueSlipId: meta.mode === "by-slip" && !safePeriodMonth ? Number(issueSlipId) : null,
             unitIdsJson: selectedUnitIds ?? [],

@@ -11,6 +11,8 @@ function mapSignatureSettingsRow(row, categoryKey) {
       row.signatureBlockJson && typeof row.signatureBlockJson === "object"
         ? row.signatureBlockJson
         : {},
+    extraFields:
+      row.extraFieldsJson && typeof row.extraFieldsJson === "object" ? row.extraFieldsJson : {},
     availableCatalogNodes: getCatalogNodesForCategory(categoryKey ?? row.categoryKey),
     updatedById: row.updatedById,
     createdAt: row.createdAt.toISOString(),

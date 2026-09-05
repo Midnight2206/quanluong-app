@@ -249,6 +249,14 @@ const chungTuDocumentBaseBodySchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  dateFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  dateTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   periodMonth: z
     .string()
     .regex(/^\d{4}-\d{2}$/)
@@ -262,6 +270,48 @@ const chungTuDocumentBaseBodySchema = z.object({
 });
 
 function refineChungTuDocumentBody(data, ctx) {
+  if (data.categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO) {
+    if (!data.dateFrom) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu nhập kho cần dateFrom (YYYY-MM-DD).",
+        path: ["dateFrom"],
+      });
+    }
+    if (!data.dateTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu nhập kho cần dateTo (YYYY-MM-DD).",
+        path: ["dateTo"],
+      });
+    }
+    if (data.dateFrom && data.dateTo && data.dateFrom > data.dateTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "dateFrom phải nhỏ hơn hoặc bằng dateTo.",
+        path: ["dateTo"],
+      });
+    }
+    if (data.unitIds?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu nhập kho không hỗ trợ unitIds.",
+        path: ["unitIds"],
+      });
+    }
+    if (
+      data.aggregationMode &&
+      data.aggregationMode !== "by-day" &&
+      data.aggregationMode !== "full"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu nhập kho chỉ hỗ trợ aggregationMode by-day hoặc full.",
+        path: ["aggregationMode"],
+      });
+    }
+    return;
+  }
   if (data.periodMonth) {
     if (
       data.categoryKey !== CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO &&

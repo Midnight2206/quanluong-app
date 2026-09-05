@@ -283,13 +283,22 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
   }
 });
 
-test("createChungTuPdfExportBatch forces monthly PNK to by-day", async () => {
+test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + nhapTaiKho", async () => {
   prismaTemplateFindFirst.mock.mockImplementation(async () => ({
     id: 16,
     categoryKey: "phieu-nhap-kho",
     displayName: "PNK A",
     documentServiceTemplateId: 902,
     status: "published",
+  }));
+  prismaSignatureSettingsFindUnique.mock.mockImplementation(async () => ({
+    id: 6,
+    categoryKey: "phieu-nhap-kho",
+    signatureBlockJson: { columns: 1, slots: [{ key: "nguoi_giao", label: "Nguoi giao" }] },
+    extraFieldsJson: { nhapTaiKho: "Kho trung tam" },
+    updatedById: 88,
+    createdAt: new Date("2026-08-22T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-22T00:00:00.000Z"),
   }));
 
   const randomBytesMock = mock.method(crypto, "randomBytes", () =>
@@ -299,8 +308,8 @@ test("createChungTuPdfExportBatch forces monthly PNK to by-day", async () => {
     const result = await createChungTuPdfExportBatch({
       categoryKey: "phieu-nhap-kho",
       unitId: 9,
-      periodMonth: "2026-06",
-      unitIds: [10, 11],
+      dateFrom: "2026-06-01",
+      dateTo: "2026-06-03",
       aggregationMode: "full",
       pdfTemplateId: 16,
       exportingUserProfile: { donVi: "Kho A" },
@@ -311,13 +320,28 @@ test("createChungTuPdfExportBatch forces monthly PNK to by-day", async () => {
       effectiveUnitIds: [9, 10, 11],
     });
 
-    assert.equal(resolveChungTuContext.mock.calls[0].arguments[0].aggregationMode, "by-day");
-    assert.equal(prismaBatchCreate.mock.calls[0].arguments[0].data.aggregationMode, "by-day");
-    assert.deepEqual(
-      renderToDocumentFolder.mock.calls.map((call) => call.arguments[1].fileName),
-      ["2026-06-01.pdf", "2026-06-03.pdf"],
+    assert.deepEqual(resolveChungTuContext.mock.calls[0].arguments[0], {
+      categoryKey: "phieu-nhap-kho",
+      unitId: 9,
+      periodDate: undefined,
+      periodMonth: undefined,
+      dateFrom: "2026-06-01",
+      dateTo: "2026-06-03",
+      issueSlipId: undefined,
+      unitIds: undefined,
+      aggregationMode: "full",
+      nhapTaiKho: "Kho trung tam",
+      exportingUserProfile: { donVi: "Kho A" },
+      settings: {},
+    });
+    assert.equal(prismaBatchCreate.mock.calls[0].arguments[0].data.aggregationMode, "full");
+    assert.equal(prismaBatchCreate.mock.calls[0].arguments[0].data.periodMonth, "2026-06");
+    assert.equal(
+      prismaBatchCreate.mock.calls[0].arguments[0].data.periodDate.toISOString(),
+      "2026-06-01T00:00:00.000Z",
     );
-    assert.equal(result.fileCount, 2);
+    assert.equal(renderToDocumentFolder.mock.callCount(), 1);
+    assert.equal(result.fileCount, 1);
   } finally {
     randomBytesMock.mock.restore();
   }
