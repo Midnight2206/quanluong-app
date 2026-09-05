@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 import {
   chungTuBkmhHeaderSettingsPutBodySchema,
   chungTuPdfExportCreateBodySchema,
@@ -84,6 +85,36 @@ test("chungTuPdfExportCreateBodySchema uses the PDF category allowlist", () => {
       unitId: 1,
       periodDate: "2026-08-23",
       pdfTemplateId: 2,
+    }),
+  );
+});
+
+test("chungTuPdfExportCreateBodySchema allows monthly PNK without unitIds", () => {
+  assert.deepEqual(
+    chungTuPdfExportCreateBodySchema.parse({
+      categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+      unitId: "1",
+      periodMonth: "2026-09",
+      pdfTemplateId: "2",
+    }),
+    {
+      categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+      unitId: 1,
+      periodMonth: "2026-09",
+      pdfTemplateId: 2,
+      signatures: {},
+      signatureDates: {},
+    },
+  );
+});
+
+test("chungTuPdfExportCreateBodySchema still requires unitIds for other monthly categories", () => {
+  assert.throws(() =>
+    chungTuPdfExportCreateBodySchema.parse({
+      categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+      unitId: "1",
+      periodMonth: "2026-09",
+      pdfTemplateId: "2",
     }),
   );
 });

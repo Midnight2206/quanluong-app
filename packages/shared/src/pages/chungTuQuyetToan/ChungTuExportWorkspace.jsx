@@ -204,7 +204,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   );
 
   useEffect(() => {
-    if (!isMonthly) return;
+    if (!isMonthly || isPnkMonthly) return;
     if (!allowedUnitIds.length) {
       if (effectiveUnitId != null) {
         const fallbackIds = [Number(effectiveUnitId)];
@@ -220,7 +220,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       const next = kept.length ? kept : allowedUnitIds;
       return sameNumberArray(prev, next) ? prev : next;
     });
-  }, [allowedUnitIds, effectiveUnitId, isMonthly]);
+  }, [allowedUnitIds, effectiveUnitId, isMonthly, isPnkMonthly]);
 
   useEffect(() => {
     setWizardStep(0);

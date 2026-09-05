@@ -263,7 +263,10 @@ const chungTuDocumentBaseBodySchema = z.object({
 
 function refineChungTuDocumentBody(data, ctx) {
   if (data.periodMonth) {
-    if (!data.unitIds?.length) {
+    if (
+      data.categoryKey !== CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO &&
+      !data.unitIds?.length
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Chứng từ theo tháng cần chọn ít nhất một đơn vị (unitIds).",
