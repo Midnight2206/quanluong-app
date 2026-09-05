@@ -27,10 +27,10 @@ function lookupContextValue(context, templateKey) {
   return undefined;
 }
 
-export function pickMappedFields(context, fieldKeys) {
+export function pickMappedFields(context, fieldKeys, { categoryKey } = {}) {
   const out = {};
   for (const key of fieldKeys) {
-    const fieldKey = resolveScalarFieldKey(key);
+    const fieldKey = resolveScalarFieldKey(key, { categoryKey });
     const raw = fieldKey
       ? lookupContextValue(context, fieldKey) ?? lookupContextValue(context, camelToSnake(fieldKey))
       : lookupContextValue(context, key);
@@ -59,6 +59,7 @@ export function mapDetailRowsForTemplate(detailRows, templateColumnKeys) {
 export const mapDetailRows = mapDetailRowsForTemplate;
 
 export function buildDocumentServicePayload({
+  categoryKey,
   context,
   fieldKeys,
   columnKeys,
@@ -67,7 +68,9 @@ export function buildDocumentServicePayload({
   signatureBlock,
 }) {
   const payload = {
-    fields: pickMappedFields(context ?? {}, fieldKeys ?? []),
+    fields: pickMappedFields(context ?? {}, fieldKeys ?? [], {
+      categoryKey: categoryKey ?? context?.categoryKey,
+    }),
     rows: mapDetailRowsForTemplate(context?.detailRows, columnKeys ?? []),
     signatures: signatures ?? {},
     signature_dates: signatureDates ?? {},

@@ -30,6 +30,21 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
     },
     { namedRange: "FIELD_bo_phan", fieldKey: "boPhan", label: "Bộ phận" },
     {
+      namedRange: "FIELD_nguoi_giao_hang",
+      fieldKey: "nguoiGiaoHang",
+      label: "Họ tên người giao (từ người mua BKMH)",
+    },
+    {
+      namedRange: "FIELD_dia_chi",
+      fieldKey: "diaChi",
+      label: "Bộ phận người giao (PNK); không dùng cho đơn vị",
+    },
+    {
+      namedRange: "FIELD_nhap_tai_kho",
+      fieldKey: "nhapTaiKho",
+      label: "Nhập tại kho",
+    },
+    {
       namedRange: "FIELD_can_cu_bkmh",
       fieldKey: "canCuBkmh",
       label:

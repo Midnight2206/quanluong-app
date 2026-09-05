@@ -2,6 +2,7 @@ import {
   guessDetailFieldKeyFromLabel,
   CHUNG_TU_DETAIL_FIELD_KEYS,
 } from "./chung-tu-detail-field-catalog.js";
+import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 import { camelToSnake } from "./chung-tu-pdf-map.util.js";
 
 const STATIC_ALIASES = Object.freeze({
@@ -23,6 +24,10 @@ function snakeToCamel(key) {
   return String(key ?? "").replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
 
+function isPnkCategory(categoryKey) {
+  return String(categoryKey ?? "").trim() === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO;
+}
+
 export function resolveColumnFieldKey(templateColumnKey) {
   const key = String(templateColumnKey ?? "").trim();
   if (!key) return "";
@@ -35,10 +40,13 @@ export function resolveColumnFieldKey(templateColumnKey) {
   return camelToSnake(key) === key ? snakeAsCamel : "";
 }
 
-export function resolveScalarFieldKey(templateFieldKey) {
+export function resolveScalarFieldKey(templateFieldKey, { categoryKey } = {}) {
   const raw = String(templateFieldKey ?? "").trim();
   const key = raw.startsWith("FIELD_") ? raw.slice("FIELD_".length) : raw;
   if (!key) return "";
+  if (isPnkCategory(categoryKey) && (key === "dia_chi" || key === "diaChi")) {
+    return "diaChi";
+  }
   if (STATIC_ALIASES[key]) return STATIC_ALIASES[key];
   if (camelToSnake(key) === key) return snakeToCamel(key);
   return key;

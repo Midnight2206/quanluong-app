@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 import {
   camelToSnake,
   pickMappedFields,
@@ -52,6 +53,25 @@ test("pickMappedFields resolves scalar legacy aliases", () => {
   );
 });
 
+test("pickMappedFields maps PNK người giao scalar fields", () => {
+  assert.deepEqual(
+    pickMappedFields(
+      {
+        nguoiGiaoHang: "Nguyễn Văn A",
+        diaChi: "Tài vụ",
+        nhapTaiKho: "Kho tổng",
+      },
+      ["FIELD_nguoi_giao_hang", "FIELD_dia_chi", "FIELD_nhap_tai_kho"],
+      { categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO },
+    ),
+    {
+      FIELD_nguoi_giao_hang: "Nguyễn Văn A",
+      FIELD_dia_chi: "Tài vụ",
+      FIELD_nhap_tai_kho: "Kho tổng",
+    },
+  );
+});
+
 assert.deepEqual(
   mapDetailRows(
     [{ stt: "1", tenHang: "Gạo", thanhTien: "10.000", ignoreMe: true }],
@@ -98,4 +118,14 @@ test("buildDocumentServicePayload maps ten_mat_hang template column", () => {
     columnKeys: ["stt", "ten_mat_hang"],
   });
   assert.deepEqual(p.rows, [{ stt: "1", ten_mat_hang: "Gạo" }]);
+});
+
+test("buildDocumentServicePayload forwards categoryKey to scalar mapping", () => {
+  const p = buildDocumentServicePayload({
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+    context: { diaChi: "Tài vụ" },
+    fieldKeys: ["FIELD_dia_chi"],
+    columnKeys: [],
+  });
+  assert.deepEqual(p.fields, { FIELD_dia_chi: "Tài vụ" });
 });

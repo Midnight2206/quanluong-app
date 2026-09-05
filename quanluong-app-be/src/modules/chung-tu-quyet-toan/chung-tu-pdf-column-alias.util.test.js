@@ -42,3 +42,18 @@ test("resolveScalarFieldKey maps can_cu_bkmh to canCuBkmh", () => {
   assert.equal(resolveScalarFieldKey("can_cu_bkmh"), "canCuBkmh");
   assert.equal(resolveScalarFieldKey("canCuBkmh"), "canCuBkmh");
 });
+
+test("resolveScalarFieldKey maps nguoi_giao_hang and nhap_tai_kho", () => {
+  assert.equal(resolveScalarFieldKey("FIELD_nguoi_giao_hang"), "nguoiGiaoHang");
+  assert.equal(resolveScalarFieldKey("nguoi_giao_hang"), "nguoiGiaoHang");
+  assert.equal(resolveScalarFieldKey("FIELD_nhap_tai_kho"), "nhapTaiKho");
+  assert.equal(resolveScalarFieldKey("nhap_tai_kho"), "nhapTaiKho");
+});
+
+test("resolveScalarFieldKey maps PNK dia_chi to diaChi", () => {
+  assert.equal(
+    resolveScalarFieldKey("FIELD_dia_chi", { categoryKey: "phieu-nhap-kho" }),
+    "diaChi",
+  );
+  assert.equal(resolveScalarFieldKey("diaChi", { categoryKey: "phieu-nhap-kho" }), "diaChi");
+});
