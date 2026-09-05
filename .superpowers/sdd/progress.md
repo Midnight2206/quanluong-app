@@ -4,7 +4,7 @@ Plan: docs/superpowers/plans/2026-09-05-template-field-labels-and-catalog-lookup
 Spec: docs/superpowers/specs/2026-09-05-template-field-labels-and-catalog-lookup-design.md
 ## Tasks
 
-- Task 1: complete (commit ef90336) — fieldLabelsJson schema + migration
+- Task 1: complete (commit 5c7c5b2) — fieldLabelsJson schema + migration
 
 # SDD Progress — bkmh-slice-lines-pnk-sources (2026-09-04)
 

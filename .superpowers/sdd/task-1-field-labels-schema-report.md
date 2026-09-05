@@ -4,7 +4,7 @@
 
 ## Commit
 
-- `ef90336` — `feat(chung-tu): add fieldLabelsJson on PDF templates`
+- `5c7c5b2` — `feat(chung-tu): add fieldLabelsJson on PDF templates`
 
 ## Schema
 
