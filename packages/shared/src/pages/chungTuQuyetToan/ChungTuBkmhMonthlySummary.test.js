@@ -75,6 +75,26 @@ test("PNK monthly export hides aggregation picker and forces by-day", () => {
   assert.match(exportWorkspaceSource, /\{showAggregationPicker \? \(/);
 });
 
+test("PNK monthly export hides data-unit picker and omits unitIds from payload", () => {
+  assert.match(
+    exportWorkspaceSource,
+    /isMonthly && !isPnkMonthly && unitsForDropdown\.length > 0/,
+  );
+  assert.match(
+    exportWorkspaceSource,
+    /\.\.\.\(isPnkMonthly \? \{\} : \{ unitIds: selectedDataUnitIds \}\)/,
+  );
+  assert.match(
+    exportWorkspaceSource,
+    /isMonthly && !isPnkMonthly && selectedDataUnitIds\.length === 0/,
+  );
+  assert.match(
+    exportWorkspaceSource,
+    /isPnkMonthly\s*\?\s*Boolean\(periodMonth\)\s*:\s*selectedDataUnitIds\.length > 0/,
+  );
+  assert.match(exportWorkspaceSource, /nguồn BKMH/);
+});
+
 test("history workspace switches BKMH to monthly cards and summary panel", () => {
   assert.match(historyWorkspaceSource, /categoryKey === "bang-ke-mua-hang"/);
   assert.match(historyWorkspaceSource, /useChungTuBkmhMonthlyListQuery/);

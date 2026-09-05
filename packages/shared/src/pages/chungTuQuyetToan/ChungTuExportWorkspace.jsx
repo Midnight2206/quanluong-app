@@ -331,8 +331,8 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       return {
         ...base,
         periodMonth,
-        unitIds: selectedDataUnitIds,
         aggregationMode: effectiveAggregationMode,
+        ...(isPnkMonthly ? {} : { unitIds: selectedDataUnitIds }),
       };
     }
     if (isBySlip) {
@@ -351,6 +351,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     effectiveUnitId,
     selectedTemplate,
     isMonthly,
+    isPnkMonthly,
     isBySlip,
     periodMonth,
     selectedDataUnitIds,
@@ -386,7 +387,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       setActionError("Chọn mẫu PDF.");
       return;
     }
-    if (isMonthly && selectedDataUnitIds.length === 0) {
+    if (isMonthly && !isPnkMonthly && selectedDataUnitIds.length === 0) {
       setActionError("Chọn ít nhất một đơn vị để đưa dữ liệu vào chứng từ.");
       return;
     }
@@ -448,7 +449,9 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const canRun =
     Boolean(selectedTemplate) &&
     (isMonthly
-      ? selectedDataUnitIds.length > 0
+      ? isPnkMonthly
+        ? Boolean(periodMonth)
+        : selectedDataUnitIds.length > 0
       : isBySlip
         ? Boolean(issueSlipId)
         : Boolean(periodDate));
@@ -458,7 +461,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       setActionError("Chọn đơn vị kho LTTP.");
       return false;
     }
-    if (isMonthly && selectedDataUnitIds.length === 0) {
+    if (isMonthly && !isPnkMonthly && selectedDataUnitIds.length === 0) {
       setActionError("Chọn ít nhất một đơn vị đưa dữ liệu.");
       return false;
     }
@@ -479,6 +482,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   }, [
     effectiveUnitId,
     isMonthly,
+    isPnkMonthly,
     isBySlip,
     selectedDataUnitIds.length,
     issueSlipId,
@@ -622,7 +626,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         </fieldset>
       ) : null}
 
-      {isMonthly && unitsForDropdown.length > 0 ? (
+      {isMonthly && !isPnkMonthly && unitsForDropdown.length > 0 ? (
         <div className="space-y-2 sm:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
@@ -859,7 +863,9 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         <div className="rounded-lg bg-muted/25 px-3 py-2 sm:col-span-2">
           <dt className="text-[10px] uppercase text-muted-foreground">Gộp dữ liệu</dt>
           <dd className="mt-0.5 font-medium">
-            {aggregationLabel} · {selectedDataUnitIds.length} đơn vị
+            {isPnkMonthly
+              ? `${aggregationLabel} · nguồn BKMH`
+              : `${aggregationLabel} · ${selectedDataUnitIds.length} đơn vị`}
           </dd>
         </div>
       ) : null}
@@ -898,7 +904,11 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         <>
           <ChungTuExportWizardCard
             title="Tham số chứng từ"
-            description="Chọn kho, kỳ dữ liệu và đơn vị nguồn LTTP."
+            description={
+              isPnkMonthly
+                ? "Chọn kho và tháng — dữ liệu lấy từ BKMH đã xuất (và hóa đơn khi có)."
+                : "Chọn kho, kỳ dữ liệu và đơn vị nguồn LTTP."
+            }
           >
             {paramsFields}
           </ChungTuExportWizardCard>
@@ -916,7 +926,11 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         <>
           <ChungTuExportWizardCard
             title="Tham số chứng từ"
-            description="Chọn kho, kỳ dữ liệu và đơn vị nguồn LTTP."
+            description={
+              isPnkMonthly
+                ? "Chọn kho và tháng — dữ liệu lấy từ BKMH đã xuất (và hóa đơn khi có)."
+                : "Chọn kho, kỳ dữ liệu và đơn vị nguồn LTTP."
+            }
             expanded={expandedCards}
           >
             {paramsFields}
