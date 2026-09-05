@@ -9,14 +9,8 @@ import {
   uploadTemplate,
 } from "../../services/document-service.client.js";
 import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
-import { CHUNG_TU_PDF_FIELD_CATALOG } from "./chung-tu-pdf-field-catalog.js";
 
 const ALLOWED_CHUNG_TU_PDF_CATEGORIES = new Set(Object.values(CHUNG_TU_CATEGORY_KEYS));
-const LABELABLE_FIELD_KEYS = new Set(
-  CHUNG_TU_PDF_FIELD_CATALOG.scalarFields
-    .filter((field) => field?.supportsLabel)
-    .map((field) => String(field.fieldKey)),
-);
 
 function normalizeCategoryKey(value) {
   return String(value ?? "").trim();
@@ -62,11 +56,10 @@ function normalizeFieldLabels(fieldLabels) {
     return {};
   }
   return Object.fromEntries(
-    Object.entries(fieldLabels).flatMap(([key, value]) =>
-      LABELABLE_FIELD_KEYS.has(String(key))
-        ? [[String(key), typeof value === "string" ? value : String(value ?? "")]]
-        : [],
-    ),
+    Object.entries(fieldLabels).map(([key, value]) => [
+      String(key),
+      typeof value === "string" ? value : String(value ?? ""),
+    ]),
   );
 }
 

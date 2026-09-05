@@ -267,7 +267,7 @@ test("retireChungTuPdfTemplate still updates prisma when document service alread
   assert.deepEqual(result, { ...retired, fieldLabels: {} });
 });
 
-test("updateChungTuPdfTemplateFieldLabels keeps only supported label keys", async () => {
+test("updateChungTuPdfTemplateFieldLabels keeps non-catalog keys and coerces values", async () => {
   const row = {
     id: 23,
     status: "published",
@@ -278,8 +278,10 @@ test("updateChungTuPdfTemplateFieldLabels keeps only supported label keys", asyn
     ...row,
     fieldLabelsJson: {
       soChungTu: "Số: ",
-      boPhan: "- Bộ phận: ",
-      tongTienBangChu: "Bằng chữ: ",
+      donVi: "Đơn vị: ",
+      ghiChu: "Ghi chú: ",
+      unknownKey: "Giữ",
+      bad: "12",
     },
   };
   prismaFindUnique.mock.mockImplementation(async () => row);
@@ -289,10 +291,10 @@ test("updateChungTuPdfTemplateFieldLabels keeps only supported label keys", asyn
     id: "23",
     fieldLabels: {
       soChungTu: "Số: ",
-      boPhan: "- Bộ phận: ",
-      tongTienBangChu: "Bằng chữ: ",
-      tongTien: "Tổng: ",
-      unknownKey: "Bỏ qua",
+      donVi: "Đơn vị: ",
+      ghiChu: "Ghi chú: ",
+      unknownKey: "Giữ",
+      bad: 12,
     },
   });
 
@@ -301,18 +303,19 @@ test("updateChungTuPdfTemplateFieldLabels keeps only supported label keys", asyn
     data: {
       fieldLabelsJson: {
         soChungTu: "Số: ",
-        boPhan: "- Bộ phận: ",
-        tongTienBangChu: "Bằng chữ: ",
+        donVi: "Đơn vị: ",
+        ghiChu: "Ghi chú: ",
+        unknownKey: "Giữ",
+        bad: "12",
       },
     },
   });
-  assert.deepEqual(result, {
-    ...updated,
-    fieldLabels: {
-      soChungTu: "Số: ",
-      boPhan: "- Bộ phận: ",
-      tongTienBangChu: "Bằng chữ: ",
-    },
+  assert.deepEqual(result.fieldLabels, {
+    soChungTu: "Số: ",
+    donVi: "Đơn vị: ",
+    ghiChu: "Ghi chú: ",
+    unknownKey: "Giữ",
+    bad: "12",
   });
 });
 
