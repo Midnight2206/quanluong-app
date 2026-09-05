@@ -20,6 +20,11 @@ test("superadmin PDF templates screen saves per-template field labels", () => {
   assert.match(superadminTemplatesSource, /Nhãn field/);
   assert.match(superadminTemplatesSource, /templateLabelFields/);
   assert.match(superadminTemplatesSource, /resolvePdfScalarFieldKey/);
+  assert.match(superadminTemplatesSource, /chungTuLabelField/);
+  assert.match(superadminTemplatesSource, /chungTuNlField/);
+  assert.match(superadminTemplatesSource, /isNlFieldNamedRange\(namedRange\)/);
+  assert.match(superadminTemplatesSource, /!namedRange && resolveNlFieldKey\(rawName\)/);
+  assert.match(superadminTemplatesSource, /isLabelFieldNamedRange\(namedRange\)/);
   assert.match(superadminTemplatesSource, /Lưu nhãn field/);
   assert.match(superadminTemplatesSource, /Mẫu không có Named Range FIELD_/);
   assert.match(superadminTemplatesSource, /Mẫu đã ngừng dùng chỉ xem được nhãn đã lưu/);

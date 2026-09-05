@@ -16,7 +16,11 @@ import {
   useUpdateChungTuPdfTemplateFieldLabelsMutation,
   useUploadChungTuPdfTemplateMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
-import { resolvePdfScalarFieldKey } from "@/pages/chungTuQuyetToan/chungTuPdfScalarFieldKey";
+import {
+  isLabelFieldNamedRange,
+  resolvePdfScalarFieldKey,
+} from "@/pages/chungTuQuyetToan/chungTuLabelField";
+import { isNlFieldNamedRange, resolveNlFieldKey } from "@/pages/chungTuQuyetToan/chungTuNlField";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 
@@ -125,13 +129,22 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
     const rows = [];
     for (const field of templateSchema.scalarFields) {
       const rawName = String(field?.field_name ?? field?.key ?? "").trim();
+      const namedRange = String(field?.named_range ?? field?.namedRange ?? "").trim();
       if (!rawName) continue;
-      const fieldKey = resolvePdfScalarFieldKey(rawName, { categoryKey });
+      if (namedRange && isNlFieldNamedRange(namedRange)) continue;
+      if (!namedRange && resolveNlFieldKey(rawName)) continue;
+      const labelNamedRange = isLabelFieldNamedRange(namedRange)
+        ? namedRange
+        : namedRange
+          ? ""
+          : `FIELD_${rawName}`;
+      if (!labelNamedRange) continue;
+      const fieldKey = resolvePdfScalarFieldKey(labelNamedRange, { categoryKey });
       if (!fieldKey || seen.has(fieldKey)) continue;
       seen.add(fieldKey);
       rows.push({
         fieldKey,
-        namedRange: rawName.startsWith("FIELD_") ? rawName : `FIELD_${rawName}`,
+        namedRange: labelNamedRange,
         description: rawName,
       });
     }
