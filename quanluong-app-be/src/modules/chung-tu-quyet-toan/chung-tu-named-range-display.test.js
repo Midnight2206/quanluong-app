@@ -5,6 +5,7 @@ import {
   formatDerivedNamedRangeValue,
   resolveLegacyNamedRangeFieldKey,
 } from "./chung-tu-named-range-display.js";
+import { formatDerivedNamedRangeValue as formatFromLabelField } from "./chung-tu-label-field.js";
 
 test("formatDerivedNamedRangeValue returns raw value when label missing", () => {
   assert.equal(formatDerivedNamedRangeValue("quyenSo", "0626"), "0626");
@@ -68,6 +69,10 @@ test("formatDerivedNamedRangeValue does not double a provided prefix", () => {
 test("formatDerivedNamedRangeValue ignores empty provided label", () => {
   assert.equal(formatDerivedNamedRangeValue("soChungTu", "062615", { label: "" }), "062615");
   assert.equal(formatDerivedNamedRangeValue("soChungTu", "062615", { label: "   " }), "062615");
+});
+
+test("named-range-display re-exports label-field formatter", () => {
+  assert.equal(formatDerivedNamedRangeValue, formatFromLabelField);
 });
 
 test("resolveLegacyNamedRangeFieldKey maps tongTienBanChu typo", () => {

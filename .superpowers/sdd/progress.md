@@ -86,3 +86,12 @@ Spec: docs/superpowers/specs/2026-09-05-multi-row-table-header-design.md
 
 - Task 1: complete (tests green) — document-service importer supports multi-row `TABLE_HEADER`; bottom-row keys, vertical-merge title fallback, summed header height; `TABLE_DATA_ROW` remains single-row
 
+# SDD Progress — nl-field-can-cu-pnk (2026-09-05)
+
+Plan: `docs/superpowers/plans/2026-09-05-nl-field-can-cu-pnk.md`
+Spec: `docs/superpowers/specs/2026-09-05-nl-field-can-cu-pnk-design.md`
+
+## Tasks
+
+- Task 1: complete (tests green) — BE shared named-range prefix helper, `NL_FIELD_can_cu_pnk` formatter/catalog module, label-field module, and named-range-display compatibility re-export
+
