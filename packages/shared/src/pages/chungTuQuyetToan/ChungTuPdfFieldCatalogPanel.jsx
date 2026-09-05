@@ -1,11 +1,26 @@
 "use client";
 
-import { BookOpen, Loader2 } from "lucide-react";
+import { BookOpen, Loader2, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useChungTuPdfFieldCatalogQuery } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 
 export function ChungTuPdfFieldCatalogPanel() {
+  const [query, setQuery] = useState("");
   const { data: fieldCatalog, isLoading: fieldCatalogLoading } =
     useChungTuPdfFieldCatalogQuery();
+  const scalarFields = fieldCatalog?.scalarFields ?? [];
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredFields = useMemo(() => {
+    if (!normalizedQuery) {
+      return scalarFields;
+    }
+    return scalarFields.filter((field) =>
+      [field.namedRange, field.fieldKey, field.description ?? field.label]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedQuery)),
+    );
+  }, [normalizedQuery, scalarFields]);
 
   return (
     <div className="space-y-3 p-3 sm:p-4">
@@ -14,11 +29,20 @@ export function ChungTuPdfFieldCatalogPanel() {
         <div className="space-y-1">
           <p className="text-sm font-medium text-foreground">Tra cứu Named Range / field key</p>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Dùng Named Range `FIELD_*` cho dữ liệu đơn và `TABLE_HEADER`/`TABLE_DATA_ROW` cho phần
-            bảng dòng hàng khi thiết kế mẫu Excel.
+            Tra cứu nhanh các Named Range scalar để gắn dữ liệu đơn khi thiết kế mẫu Excel.
           </p>
         </div>
       </div>
+
+      <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+        <Search className="size-4 text-muted-foreground" />
+        <input
+          className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Tìm theo Named Range, field key hoặc mô tả"
+        />
+      </label>
 
       {fieldCatalogLoading ? (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -26,39 +50,37 @@ export function ChungTuPdfFieldCatalogPanel() {
           Đang tải catalog…
         </p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
-              Scalar fields
-            </p>
-            <div className="space-y-2 text-xs">
-              {(fieldCatalog?.scalarFields ?? []).map((field) => (
-                <div key={field.namedRange} className="rounded-md bg-muted/25 px-2.5 py-2">
-                  <p className="font-mono text-[11px] text-foreground">{field.namedRange}</p>
-                  <p className="mt-0.5 text-muted-foreground">
-                    {field.fieldKey} · {field.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
-              Gợi ý tiêu đề cột bảng
-            </p>
-            <div className="space-y-2 text-xs">
-              {(fieldCatalog?.tableColumns ?? []).map((column, index) => (
-                <div
-                  key={`${column.label}-${column.fieldKey}-${index}`}
-                  className="rounded-md bg-muted/25 px-2.5 py-2"
-                >
-                  <p className="font-medium text-foreground">{column.label}</p>
-                  <p className="mt-0.5 text-muted-foreground">fieldKey: {column.fieldKey}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <StickyResponsiveTable stickyLevel={1} className="border-border/60">
+          <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
+            <thead className="bg-secondary/95">
+              <tr className="border-b border-border text-[10px] uppercase text-muted-foreground">
+                <th className="min-w-[20rem] px-3 py-2 font-medium">Tên</th>
+                <th className="px-3 py-2 font-medium">Mô tả</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredFields.length === 0 ? (
+                <tr>
+                  <td className="px-3 py-4 text-muted-foreground" colSpan={2}>
+                    Không tìm thấy field phù hợp.
+                  </td>
+                </tr>
+              ) : (
+                filteredFields.map((field) => (
+                  <tr key={field.namedRange} className="border-b border-border/60 last:border-0">
+                    <td className="space-y-0.5 px-3 py-2 align-top">
+                      <p className="font-mono text-[11px] text-foreground">{field.namedRange}</p>
+                      <p className="text-muted-foreground">{field.fieldKey}</p>
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {field.description ?? field.label ?? "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </StickyResponsiveTable>
       )}
     </div>
   );
