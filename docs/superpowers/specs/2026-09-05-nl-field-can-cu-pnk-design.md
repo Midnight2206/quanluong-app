@@ -28,10 +28,46 @@
 | 8 | `NL_FIELD_*`: document-service import như scalar; **không** hiện form nhãn Superadmin |
 | 9 | `FIELD_*`: vẫn labelable theo flow mẫu (spec field-labels-from-excel) |
 | 10 | Catalog: namedRange `NL_FIELD_can_cu_pnk`, `supportsLabel: false` (hoặc tương đương) |
+| 11 | **Tách module:** code `NL_FIELD_*` (format cố định) một file; code `FIELD_*` (hỗ trợ nhãn) một file — dùng chung nhiều nơi, không nhét vào service dài |
 
 ---
 
-## 3. Document-service
+## 2.1 Module layout (dùng chung)
+
+Mục tiêu: thêm `NL_FIELD_*` mới sau này chỉ sửa file NL; thêm field labelable chỉ sửa file FIELD.
+
+### Backend (Node) — `quanluong-app-be/.../chung-tu-quyet-toan/`
+
+| File | Trách nhiệm |
+|------|-------------|
+| `chung-tu-nl-field.js` | Prefix `NL_FIELD_`; parse/strip; catalog entries NL; **formatters cố định** (vd. `formatCanCuPnkLine` / `formatCanCuPnkText`); `isNlFieldNamedRange(name)`; resolve key NL (`can_cu_pnk` → `canCuPnk`) |
+| `chung-tu-label-field.js` | Prefix `FIELD_`; parse/strip; `isLabelFieldNamedRange(name)`; `formatDerivedNamedRangeValue` (label + value); alias/resolve labelable scalars nếu tách khỏi column-alias (hoặc re-export mỏng từ đây) |
+| `chung-tu-named-range-prefix.js` *(optional nhỏ)* | Hằng `FIELD_` / `NL_FIELD_`; `splitNamedRangePrefix(name) → { prefix, fieldName }` — chỉ nếu hai file trên cần tránh trùng 5 dòng parse |
+
+Callers (`data-resolver`, `pdf-map`, `template labels`, catalog GET) **import** từ hai file trên, không copy câu format.
+
+### Frontend (shared)
+
+| File | Trách nhiệm |
+|------|-------------|
+| `packages/shared/.../chungTuNlField.js` | `isNlFieldNamedRange`, strip `NL_FIELD_`, (optional) mirror resolve `canCuPnk` nếu FE cần |
+| `packages/shared/.../chungTuLabelField.js` | `isLabelFieldNamedRange`, strip `FIELD_`, `resolvePdfScalarFieldKey` (chuyển từ `chungTuPdfScalarFieldKey.js` hoặc re-export) |
+
+Superadmin form nhãn: chỉ giữ named range thỏa `isLabelFieldNamedRange`.
+
+### Document-service (Python)
+
+| File | Trách nhiệm |
+|------|-------------|
+| `app/import/field_named_ranges.py` *(hoặc tương đương)* | Hằng prefix; `iter_field_defined_names`; phân loại `labelable` vs `nl`; `_build_fields` gọi module này |
+
+Không bắt buộc mirror toàn bộ formatter Node sang Python — Python chỉ import geometry/metadata.
+
+### Quy ước
+
+- Một ô Excel: đúng **một** prefix (`FIELD_` hoặc `NL_FIELD_`), không chồng.
+- Thêm NL field mới: thêm formatter + catalog row trong `chung-tu-nl-field.js` (+ test file cạnh).
+- Thêm FIELD labelable: catalog + alias trong nhánh label-field / catalog hiện có.
 
 ### 3.1 Import
 
@@ -50,9 +86,9 @@ Rebuild document image sau merge. Re-upload / re-publish mẫu PNK dùng `NL_FIE
 
 ## 4. Backend (Node)
 
-### 4.1 Format (single source)
+### 4.1 Format (single source — trong `chung-tu-nl-field.js`)
 
-Gộp / thay `formatCanCuBkmhLine*` thành helper mới (vd. `formatCanCuPnkLine` / `formatCanCuPnkText`):
+Gộp / thay `formatCanCuBkmhLine*` thành:
 
 ```text
 line = Căn cứ vào BKMH số {so} [ngày {dd} tháng {mm} năm {yyyy} ]của đ/c {buyerName}
@@ -63,22 +99,20 @@ Nguồn: `soChungTu`, `periodDate` → dd/mm/yyyy, `buyerName` (không dùng `bu
 
 ### 4.2 Resolve / map
 
-- `resolveScalarFieldKey`: `NL_FIELD_can_cu_pnk` / `can_cu_pnk` → `canCuPnk`.
-- Strip prefix: hỗ trợ cả `FIELD_` và `NL_FIELD_` trước alias.
-- Context PNK: đổi property `canCuBkmh` → **`canCuPnk`** (export map, tests, derived named ranges).
-- Xóa alias `can_cu_bkmh` / `cancubkmh` → `canCuBkmh` (breaking theo decision 2).
+- Resolve NL trong `chung-tu-nl-field.js`: `NL_FIELD_can_cu_pnk` / `can_cu_pnk` → `canCuPnk`.
+- Strip prefix: `splitNamedRangePrefix` (hoặc tương đương) hỗ trợ `FIELD_` và `NL_FIELD_`.
+- Context PNK: đổi property `canCuBkmh` → **`canCuPnk`**.
+- Xóa alias `can_cu_bkmh` / `cancubkmh` → `canCuBkmh`.
 
 ### 4.3 Catalog
 
-- Thay entry `FIELD_can_cu_bkmh` bằng `NL_FIELD_can_cu_pnk` / `canCuPnk`.
-- `supportsLabel: false`.
-- Mô tả: câu hardcode căn cứ BKMH cho PNK.
+- Entry NL sống trong `chung-tu-nl-field.js` (hoặc catalog import từ đó).
+- namedRange `NL_FIELD_can_cu_pnk` / `canCuPnk`, `supportsLabel: false`.
 
 ### 4.4 Superadmin labels
 
-- Form nhãn: chỉ scalar từ mẫu có prefix `FIELD_` (hoặc không phải `NL_FIELD_`).  
-  Cách đơn giản: nếu `field_name` đến từ `NL_FIELD_*` (metadata / tên raw) thì bỏ khỏi `templateLabelFields`; hoặc skip keys trong set `fixedFormat` / catalog `supportsLabel: false` **chỉ khi** đã biết là NL — **ưu tiên:** document-service trả `field_name` + optional `named_range` / `prefix`; FE bỏ nếu `named_range` starts with `NL_FIELD_` hoặc catalog `supportsLabel === false` **không** đủ một mình (mọi field supportsLabel false trên mẫu FIELD_ vẫn cho label theo spec trước).  
-  **Locked:** loại khỏi form nhãn khi Named Range gốc bắt đầu bằng `NL_FIELD_`.
+- Chỉ named range `FIELD_*` (`isLabelFieldNamedRange`) — dùng `chungTuLabelField.js`.
+- `NL_FIELD_*` loại khỏi form nhãn.
 
 ---
 
