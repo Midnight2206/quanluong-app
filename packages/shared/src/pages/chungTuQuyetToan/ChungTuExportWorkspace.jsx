@@ -461,6 +461,10 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
       setActionError("Chọn đơn vị kho LTTP.");
       return false;
     }
+    if (isMonthly && !String(periodMonth ?? "").trim()) {
+      setActionError("Chọn tháng chứng từ.");
+      return false;
+    }
     if (isMonthly && !isPnkMonthly && selectedDataUnitIds.length === 0) {
       setActionError("Chọn ít nhất một đơn vị đưa dữ liệu.");
       return false;
@@ -484,6 +488,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     isMonthly,
     isPnkMonthly,
     isBySlip,
+    periodMonth,
     selectedDataUnitIds.length,
     issueSlipId,
     periodDate,
@@ -1005,7 +1010,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
           stepIndex={wizardStep}
           onBack={goWizardBack}
           onNext={goWizardNext}
-          nextDisabled={!effectiveUnitId}
+          nextDisabled={!effectiveUnitId || (isMonthly && !String(periodMonth ?? "").trim())}
         />
       ) : null}
 

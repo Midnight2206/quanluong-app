@@ -75,6 +75,18 @@ test("PNK monthly export hides aggregation picker and forces by-day", () => {
   assert.match(exportWorkspaceSource, /\{showAggregationPicker \? \(/);
 });
 
+test("monthly export validateWizardStep0 requires periodMonth", () => {
+  assert.match(exportWorkspaceSource, /Chọn tháng chứng từ\./);
+  assert.match(
+    exportWorkspaceSource,
+    /isMonthly && !String\(periodMonth \?\? ""\)\.trim\(\)/,
+  );
+  assert.match(
+    exportWorkspaceSource,
+    /nextDisabled=\{!effectiveUnitId \|\| \(isMonthly && !String\(periodMonth \?\? ""\)\.trim\(\)\)\}/,
+  );
+});
+
 test("PNK monthly export hides data-unit picker and omits unitIds from payload", () => {
   assert.match(
     exportWorkspaceSource,
