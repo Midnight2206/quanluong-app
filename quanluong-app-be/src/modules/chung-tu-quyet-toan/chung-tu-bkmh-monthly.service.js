@@ -1,10 +1,17 @@
 import crypto from "node:crypto";
+import ExcelJS from "exceljs";
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
-import { CHUNG_TU_CATEGORY_KEYS, normalizeAggregationMode } from "./chung-tu-category.constants.js";
-import { normalizeMonthUnitIds, normalizePeriodMonth } from "./chung-tu-monthly-sheets.js";
-import { resolveChungTuContext } from "./chung-tu-data-resolver.service.js";
+import {
+  CHUNG_TU_CATEGORY_KEYS,
+  normalizeAggregationMode,
+} from "./chung-tu-category.constants.js";
+import { normalizeMonthUnitIds, normalizePeriodMonth, lastDayOfMonth } from "./chung-tu-monthly-sheets.js";
+import {
+  prepareSignatureBlockForRender,
+  resolveChungTuContext,
+} from "./chung-tu-data-resolver.service.js";
 import { buildDocumentServicePayload } from "./chung-tu-pdf-map.util.js";
 import {
   createDocumentFolder,
@@ -24,6 +31,9 @@ import {
   parseBkmhSliceDetailRowsJson,
   sumSliceTongTien,
 } from "./chung-tu-bkmh-slice-metadata.util.js";
+import { SIGNATURE_CATALOG } from "./chung-tu-signature-catalog.js";
+import { fillSignatureDatesFromPeriod } from "./chung-tu-signature-dates.util.js";
+import { buildBkmhBuyerSnapshotFromPerson } from "./chung-tu-bkmh-buyer-snapshot.util.js";
 
 const CATEGORY_KEY = CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG;
 
@@ -121,7 +131,7 @@ function mapMonthlyRow(row) {
   };
 }
 
-function buildSliceCreateInput({ renderedFile, slice }) {
+function buildSliceCreateInput({ renderedFile, slice, buyerSnapshot }) {
   const meta = buildBkmhSliceMetadata(slice.context);
   return {
     sortKey: slice.sortKey,
@@ -132,6 +142,7 @@ function buildSliceCreateInput({ renderedFile, slice }) {
     ngayThangNam: meta.ngayThangNam,
     tongTien: meta.tongTien,
     detailRowsJson: buildBkmhSliceDetailRowsSnapshot(slice.context),
+    ...buyerSnapshot,
     documentServiceFileId: Number(renderedFile.file_id),
     fileName: renderedFile.file_name,
   };
@@ -201,6 +212,21 @@ async function createChungTuBkmhMonthlyExport({
     throw notFoundError("Không tìm thấy mẫu PDF.");
   }
 
+  const storageUnitIdNum = Number(storageUnitId);
+  const [resolvedBkmhBuyer, buyerDefaults] = await Promise.all([
+    SIGNATURE_CATALOG["bkmh.nguoiMua"]
+      .resolve({ storageUnitId: storageUnitIdNum })
+      .catch(() => null),
+    prisma.lttpUnitIssueFormDefaults.findUnique({
+      where: { unitId: storageUnitIdNum },
+      select: { defaultBuyerUserId: true },
+    }),
+  ]);
+  const buyerSnapshot = buildBkmhBuyerSnapshotFromPerson(
+    resolvedBkmhBuyer,
+    buyerDefaults?.defaultBuyerUserId ?? null,
+  );
+
   const [{ context, sourceDataHash }, fieldsPayload, savedSignatureSettings] = await Promise.all([
     resolveChungTuContext({
       categoryKey: CATEGORY_KEY,
@@ -212,13 +238,24 @@ async function createChungTuBkmhMonthlyExport({
       aggregationMode: safeAggregationMode,
       settings,
       exportingUserProfile,
+      resolvedBkmhBuyer,
     }),
     getTemplateFields(template.documentServiceTemplateId),
     getChungTuSignatureSettings({ categoryKey: CATEGORY_KEY }),
   ]);
 
   const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
-  const finalSignatureBlock = signatureBlock ?? savedSignatureSettings?.signatureBlock ?? undefined;
+  const settingsBlock = savedSignatureSettings?.signatureBlock;
+  // Prefer DB settings when FE strips system→dynamic (legacy normalize).
+  const blockForResolve =
+    Array.isArray(settingsBlock?.slots) &&
+    settingsBlock.slots.some((s) => s?.source === "system")
+      ? settingsBlock
+      : (signatureBlock ?? settingsBlock ?? undefined);
+  const finalSignatureBlock = await prepareSignatureBlockForRender(blockForResolve, {
+    storageUnitId: Number(storageUnitId),
+    currentUserId: Number(createdById),
+  });
   const exportContext = { ...(context ?? {}), categoryKey: CATEGORY_KEY };
   const slices = pickExportSlices({
     aggregationMode: safeAggregationMode,
@@ -231,12 +268,20 @@ async function createChungTuBkmhMonthlyExport({
 
     const persistedSlices = [];
     for (const slice of slices) {
+      const sliceSignatureDates = fillSignatureDatesFromPeriod({
+        signatureBlock: finalSignatureBlock,
+        signatureDates,
+        context: slice.context,
+        aggregationMode: safeAggregationMode,
+        periodMonth: safePeriodMonth,
+        lastDayOfMonthFn: lastDayOfMonth,
+      });
       const payload = buildDocumentServicePayload({
         context: slice.context,
         fieldKeys,
         columnKeys,
         signatures,
-        signatureDates,
+        signatureDates: sliceSignatureDates,
         signatureBlock: finalSignatureBlock,
       });
       const renderedFile = await renderToDocumentFolder(folder.id, {
@@ -246,10 +291,10 @@ async function createChungTuBkmhMonthlyExport({
         fields: payload.fields,
         rows: payload.rows,
         signatures: payload.signatures,
-        signatureDates,
+        signatureDates: sliceSignatureDates,
         signatureBlock: finalSignatureBlock,
       });
-      persistedSlices.push(buildSliceCreateInput({ renderedFile, slice }));
+      persistedSlices.push(buildSliceCreateInput({ renderedFile, slice, buyerSnapshot }));
     }
 
     const data = {
@@ -385,9 +430,68 @@ async function streamChungTuBkmhMonthlySliceFile({ id, sliceId, effectiveUnitIds
   return streamDocumentFolderFile(row.documentServiceFolderId, slice.documentServiceFileId);
 }
 
+function formatPeriodMonthLabel(periodMonth) {
+  const text = String(periodMonth ?? "").trim();
+  if (!/^\d{4}-\d{2}$/.test(text)) return text || "—";
+  return `${text.slice(5, 7)}/${text.slice(0, 4)}`;
+}
+
+function formatSliceDateLabel(slice) {
+  const ngay = String(slice?.ngayThangNam ?? "").trim();
+  if (ngay) return ngay;
+  const periodDate = String(slice?.periodDate ?? "").trim();
+  return periodDate ? periodDate.slice(0, 10) : "—";
+}
+
+/**
+ * Bảng tổng hợp slice trong 1 tháng (theo ngày / đơn vị / full).
+ * @param {{ aggregationMode?: string, periodMonth?: string, displayName?: string, slices?: object[] }} monthly
+ */
+async function buildBkmhMonthlySummaryExcelBuffer(monthly) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("TongHop");
+  const byUnit = String(monthly?.aggregationMode ?? "") === "by-unit";
+  const columns = [
+    { header: "Số chứng từ", key: "soChungTu", width: 18 },
+    { header: "Ngày tháng năm", key: "ngayThangNam", width: 36 },
+  ];
+  if (byUnit) {
+    columns.push({ header: "Tên đơn vị", key: "recipientUnitName", width: 28 });
+  }
+  columns.push({ header: "Tổng tiền", key: "tongTien", width: 16 });
+  sheet.columns = columns;
+  sheet.getRow(1).font = { bold: true };
+
+  const slices = Array.isArray(monthly?.slices) ? monthly.slices : [];
+  for (const slice of slices) {
+    const row = {
+      soChungTu: slice.soChungTu || "—",
+      ngayThangNam: formatSliceDateLabel(slice),
+      tongTien: slice.tongTien == null ? null : Number(slice.tongTien),
+    };
+    if (byUnit) {
+      row.recipientUnitName = slice.recipientUnitName || "—";
+    }
+    sheet.addRow(row);
+  }
+  sheet.getColumn("tongTien").numFmt = "#,##0";
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  return buffer;
+}
+
+async function exportChungTuBkmhMonthlySummaryExcel({ id, effectiveUnitIds }) {
+  const monthly = await getChungTuBkmhMonthly({ id, effectiveUnitIds });
+  const buffer = await buildBkmhMonthlySummaryExcelBuffer(monthly);
+  const monthLabel = formatPeriodMonthLabel(monthly.periodMonth).replace("/", "-");
+  const fileName = `bkmh-tong-hop-${monthLabel}-id${monthly.id}.xlsx`;
+  return { buffer, fileName, rowCount: monthly.slices?.length ?? 0 };
+}
+
 export {
+  buildBkmhMonthlySummaryExcelBuffer,
   createChungTuBkmhMonthlyExport,
   deleteChungTuBkmhMonthly,
+  exportChungTuBkmhMonthlySummaryExcel,
   getChungTuBkmhMonthly,
   listChungTuBkmhMonthly,
   streamChungTuBkmhMonthlyMergedPdf,

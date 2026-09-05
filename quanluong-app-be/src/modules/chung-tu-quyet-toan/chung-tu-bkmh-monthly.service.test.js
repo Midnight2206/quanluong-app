@@ -47,6 +47,7 @@ const prismaMonthlyFindUnique = mock.fn(async () => null);
 const prismaMonthlyDelete = mock.fn(async ({ where }) => ({ id: where.id }));
 const prismaSliceDeleteMany = mock.fn(async () => ({ count: 0 }));
 const prismaSignatureSettingsFindUnique = mock.fn(async () => null);
+const prismaLttpDefaultsFindUnique = mock.fn(async () => null);
 
 const resolveChungTuContext = mock.fn(async () => ({
   context: {
@@ -130,6 +131,9 @@ mock.module("../../infra/database/prisma/prisma.client.js", {
         findUnique: prismaSignatureSettingsFindUnique,
         upsert: mock.fn(),
       },
+      lttpUnitIssueFormDefaults: {
+        findUnique: prismaLttpDefaultsFindUnique,
+      },
     },
   },
 });
@@ -174,6 +178,7 @@ test.beforeEach(() => {
   prismaMonthlyDelete.mock.resetCalls();
   prismaSliceDeleteMany.mock.resetCalls();
   prismaSignatureSettingsFindUnique.mock.resetCalls();
+  prismaLttpDefaultsFindUnique.mock.resetCalls();
   resolveChungTuContext.mock.resetCalls();
   prepareSignatureBlockForRender.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
@@ -259,6 +264,7 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
         donVi: "Tieu doan 1",
       },
       settings: { ghiChu: "ghi chu" },
+      resolvedBkmhBuyer: null,
     });
     assert.equal(createDocumentFolder.mock.callCount(), 1);
     assert.equal(renderToDocumentFolder.mock.callCount(), 2);
@@ -304,6 +310,11 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
           amount: null,
         },
       ],
+      buyerUserId: null,
+      buyerKey: "",
+      buyerName: "",
+      buyerSignatureName: "",
+      buyerTitle: "",
       documentServiceFileId: 10,
       fileName: "2026-06-01.pdf",
     });
