@@ -83,6 +83,10 @@ const chungTuPdfTemplateUploadBodySchema = z.object({
   version: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(64)),
 });
 
+const chungTuPdfTemplateFieldLabelsPutBodySchema = z.object({
+  fieldLabels: z.record(z.string().max(120)),
+});
+
 const putTemplateFillRulesBodySchema = z
   .object({
     fillRules: z.unknown().optional(),
@@ -463,6 +467,7 @@ export {
   driveFileIdParamsSchema,
   chungTuPdfTemplateIdParamSchema,
   chungTuPdfTemplateListQuerySchema,
+  chungTuPdfTemplateFieldLabelsPutBodySchema,
   chungTuPdfTemplateUploadBodySchema,
   templateCatalogCreateBodySchema,
   templateCatalogUploadBodySchema,

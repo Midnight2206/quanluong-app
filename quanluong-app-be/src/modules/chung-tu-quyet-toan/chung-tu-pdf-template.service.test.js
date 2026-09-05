@@ -62,6 +62,7 @@ const {
   previewChungTuPdfTemplate,
   publishChungTuPdfTemplate,
   retireChungTuPdfTemplate,
+  updateChungTuPdfTemplateFieldLabels,
 } = await import("./chung-tu-pdf-template.service.js");
 
 test.beforeEach(() => {
@@ -105,7 +106,7 @@ test("listChungTuPdfTemplates filters by categoryKey and published status", asyn
 
   const result = await listChungTuPdfTemplates({ categoryKey: " phieu-nhap-kho " });
 
-  assert.deepEqual(result, rows);
+  assert.deepEqual(result, [{ ...rows[0], fieldLabels: {} }]);
   assert.equal(prismaFindMany.mock.callCount(), 1);
   assert.deepEqual(prismaFindMany.mock.calls[0].arguments[0], {
     where: { categoryKey: "phieu-nhap-kho", status: "published" },
@@ -153,7 +154,7 @@ test("createChungTuPdfTemplate uploads then persists document-service template i
       uploadedById: 3,
     },
   });
-  assert.deepEqual(result, created);
+  assert.deepEqual(result, { ...created, fieldLabels: {} });
 });
 
 test("publishChungTuPdfTemplate publishes draft row in document service and prisma", async () => {
@@ -178,7 +179,7 @@ test("publishChungTuPdfTemplate publishes draft row in document service and pris
     where: { id: 5 },
     data: { status: "published" },
   });
-  assert.deepEqual(result, published);
+  assert.deepEqual(result, { ...published, fieldLabels: {} });
 });
 
 test("publishChungTuPdfTemplate still updates prisma when document service already published", async () => {
@@ -208,7 +209,7 @@ test("publishChungTuPdfTemplate still updates prisma when document service alrea
     where: { id: 15 },
     data: { status: "published" },
   });
-  assert.deepEqual(result, published);
+  assert.deepEqual(result, { ...published, fieldLabels: {} });
 });
 
 test("retireChungTuPdfTemplate retires published row in document service and prisma", async () => {
@@ -233,7 +234,7 @@ test("retireChungTuPdfTemplate retires published row in document service and pri
     where: { id: 6 },
     data: { status: "retired" },
   });
-  assert.deepEqual(result, retired);
+  assert.deepEqual(result, { ...retired, fieldLabels: {} });
 });
 
 test("retireChungTuPdfTemplate still updates prisma when document service already retired", async () => {
@@ -263,7 +264,78 @@ test("retireChungTuPdfTemplate still updates prisma when document service alread
     where: { id: 16 },
     data: { status: "retired" },
   });
-  assert.deepEqual(result, retired);
+  assert.deepEqual(result, { ...retired, fieldLabels: {} });
+});
+
+test("updateChungTuPdfTemplateFieldLabels keeps only supported label keys", async () => {
+  const row = {
+    id: 23,
+    status: "published",
+    categoryKey: "phieu-nhap-kho",
+    documentServiceTemplateId: 77,
+  };
+  const updated = {
+    ...row,
+    fieldLabelsJson: {
+      soChungTu: "Số: ",
+      boPhan: "- Bộ phận: ",
+      tongTienBangChu: "Bằng chữ: ",
+    },
+  };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  prismaUpdate.mock.mockImplementation(async () => updated);
+
+  const result = await updateChungTuPdfTemplateFieldLabels({
+    id: "23",
+    fieldLabels: {
+      soChungTu: "Số: ",
+      boPhan: "- Bộ phận: ",
+      tongTienBangChu: "Bằng chữ: ",
+      tongTien: "Tổng: ",
+      unknownKey: "Bỏ qua",
+    },
+  });
+
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 23 },
+    data: {
+      fieldLabelsJson: {
+        soChungTu: "Số: ",
+        boPhan: "- Bộ phận: ",
+        tongTienBangChu: "Bằng chữ: ",
+      },
+    },
+  });
+  assert.deepEqual(result, {
+    ...updated,
+    fieldLabels: {
+      soChungTu: "Số: ",
+      boPhan: "- Bộ phận: ",
+      tongTienBangChu: "Bằng chữ: ",
+    },
+  });
+});
+
+test("updateChungTuPdfTemplateFieldLabels rejects retired templates", async () => {
+  prismaFindUnique.mock.mockImplementation(async () => ({
+    id: 24,
+    status: "retired",
+    documentServiceTemplateId: 88,
+  }));
+
+  await assert.rejects(
+    () =>
+      updateChungTuPdfTemplateFieldLabels({
+        id: 24,
+        fieldLabels: { soChungTu: "Số: " },
+      }),
+    (error) =>
+      error instanceof AppError &&
+      error.statusCode === 409 &&
+      error.code === ERROR_CODES.CONFLICT &&
+      /không sửa nhãn field/i.test(error.message),
+  );
+  assert.equal(prismaUpdate.mock.callCount(), 0);
 });
 
 test("getChungTuPdfTemplateFields loads fields from document service", async () => {
@@ -280,7 +352,7 @@ test("getChungTuPdfTemplateFields loads fields from document service", async () 
   assert.equal(getTemplateFields.mock.callCount(), 1);
   assert.deepEqual(getTemplateFields.mock.calls[0].arguments, [99]);
   assert.deepEqual(result, {
-    template: row,
+    template: { ...row, fieldLabels: {} },
     fields: [{ key: "don_vi", label: "Đơn vị", templateId: 99 }],
   });
 });

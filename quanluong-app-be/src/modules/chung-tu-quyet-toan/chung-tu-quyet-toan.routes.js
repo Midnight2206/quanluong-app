@@ -58,6 +58,7 @@ import {
   previewChungTuContextController,
   publishChungTuPdfTemplateController,
   putChungTuBkmhHeaderSettingsController,
+  putChungTuPdfTemplateFieldLabelsController,
   putCategoryTemplateFillMappingController,
   putChungTuSignatureSettingsController,
   putChungTuUnitProfileController,
@@ -85,6 +86,7 @@ import {
   chungTuBkmhMonthlyListQuerySchema,
   chungTuBkmhMonthlySliceFileParamsSchema,
   chungTuPdfTemplateIdParamSchema,
+  chungTuPdfTemplateFieldLabelsPutBodySchema,
   chungTuPdfExportCreateBodySchema,
   chungTuPdfExportKeyParamSchema,
   chungTuPdfTemplateListQuerySchema,
@@ -292,6 +294,16 @@ chungTuQuyetToanRouter.get(
   permissionMiddleware([routePermissions.pdfTemplateFields]),
   validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
   asyncHandler(getChungTuPdfTemplateFieldsController),
+);
+
+chungTuQuyetToanRouter.put(
+  "/pdf-templates/:id/field-labels",
+  superadminMiddleware,
+  validateRequest({
+    params: chungTuPdfTemplateIdParamSchema,
+    body: chungTuPdfTemplateFieldLabelsPutBodySchema,
+  }),
+  asyncHandler(putChungTuPdfTemplateFieldLabelsController),
 );
 
 chungTuQuyetToanRouter.get(

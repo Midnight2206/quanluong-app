@@ -9,8 +9,14 @@ import {
   uploadTemplate,
 } from "../../services/document-service.client.js";
 import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
+import { CHUNG_TU_PDF_FIELD_CATALOG } from "./chung-tu-pdf-field-catalog.js";
 
 const ALLOWED_CHUNG_TU_PDF_CATEGORIES = new Set(Object.values(CHUNG_TU_CATEGORY_KEYS));
+const LABELABLE_FIELD_KEYS = new Set(
+  CHUNG_TU_PDF_FIELD_CATALOG.scalarFields
+    .filter((field) => field?.supportsLabel)
+    .map((field) => String(field.fieldKey)),
+);
 
 function normalizeCategoryKey(value) {
   return String(value ?? "").trim();
@@ -51,16 +57,40 @@ function isConflictError(error) {
   return error instanceof AppError && error.statusCode === 409;
 }
 
+function normalizeFieldLabels(fieldLabels) {
+  if (!fieldLabels || typeof fieldLabels !== "object" || Array.isArray(fieldLabels)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(fieldLabels).flatMap(([key, value]) =>
+      LABELABLE_FIELD_KEYS.has(String(key))
+        ? [[String(key), typeof value === "string" ? value : String(value ?? "")]]
+        : [],
+    ),
+  );
+}
+
+function mapChungTuPdfTemplate(row) {
+  if (!row) {
+    return row;
+  }
+  return {
+    ...row,
+    fieldLabels: normalizeFieldLabels(row.fieldLabelsJson),
+  };
+}
+
 async function listChungTuPdfTemplates({ categoryKey, includeNonPublished = false }) {
   const normalizedCategoryKey = normalizeCategoryKey(categoryKey);
   assertSupportedPdfCategory(normalizedCategoryKey);
-  return prisma.chungTuPdfTemplate.findMany({
+  const rows = await prisma.chungTuPdfTemplate.findMany({
     where: {
       categoryKey: normalizedCategoryKey,
       ...(includeNonPublished ? {} : { status: "published" }),
     },
     orderBy: [{ updatedAt: "desc" }],
   });
+  return rows.map(mapChungTuPdfTemplate);
 }
 
 async function createChungTuPdfTemplate({
@@ -81,7 +111,7 @@ async function createChungTuPdfTemplate({
   });
 
   try {
-    return await prisma.chungTuPdfTemplate.create({
+    const row = await prisma.chungTuPdfTemplate.create({
       data: {
         categoryKey: normalizedCategoryKey,
         displayName: displayName || name,
@@ -91,6 +121,7 @@ async function createChungTuPdfTemplate({
         uploadedById,
       },
     });
+    return mapChungTuPdfTemplate(row);
   } catch (error) {
     if (error?.code === "P2002") {
       throw new AppError({
@@ -124,10 +155,11 @@ async function publishChungTuPdfTemplate({ id }) {
       throw error;
     }
   }
-  return prisma.chungTuPdfTemplate.update({
+  const updatedRow = await prisma.chungTuPdfTemplate.update({
     where: { id: row.id },
     data: { status: "published" },
   });
+  return mapChungTuPdfTemplate(updatedRow);
 }
 
 async function retireChungTuPdfTemplate({ id }) {
@@ -151,10 +183,34 @@ async function retireChungTuPdfTemplate({ id }) {
       throw error;
     }
   }
-  return prisma.chungTuPdfTemplate.update({
+  const updatedRow = await prisma.chungTuPdfTemplate.update({
     where: { id: row.id },
     data: { status: "retired" },
   });
+  return mapChungTuPdfTemplate(updatedRow);
+}
+
+async function updateChungTuPdfTemplateFieldLabels({ id, fieldLabels }) {
+  const row = await prisma.chungTuPdfTemplate.findUnique({
+    where: { id: Number(id) },
+  });
+  if (!row) {
+    throw notFoundError();
+  }
+  if (row.status === "retired") {
+    throw new AppError({
+      message: "Mẫu đã retire thì không sửa nhãn field được.",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  }
+  const updatedRow = await prisma.chungTuPdfTemplate.update({
+    where: { id: row.id },
+    data: {
+      fieldLabelsJson: normalizeFieldLabels(fieldLabels),
+    },
+  });
+  return mapChungTuPdfTemplate(updatedRow);
 }
 
 async function getChungTuPdfTemplateFields({ id, allowNonPublished = false }) {
@@ -166,7 +222,7 @@ async function getChungTuPdfTemplateFields({ id, allowNonPublished = false }) {
   }
   const fields = await getTemplateFields(row.documentServiceTemplateId);
   return {
-    template: row,
+    template: mapChungTuPdfTemplate(row),
     fields,
   };
 }
@@ -191,4 +247,5 @@ export {
   previewChungTuPdfTemplate,
   publishChungTuPdfTemplate,
   retireChungTuPdfTemplate,
+  updateChungTuPdfTemplateFieldLabels,
 };

@@ -5,6 +5,7 @@ import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 import {
   chungTuBkmhHeaderSettingsPutBodySchema,
   chungTuPdfExportCreateBodySchema,
+  chungTuPdfTemplateFieldLabelsPutBodySchema,
   chungTuPdfTemplateIdParamSchema,
   chungTuPdfTemplateListQuerySchema,
   chungTuPdfTemplateUploadBodySchema,
@@ -59,6 +60,28 @@ test("chungTuPdfTemplateUploadBodySchema normalizes multipart fields", () => {
       name: "bien-ban-test",
       version: "v1",
     },
+  );
+});
+
+test("chungTuPdfTemplateFieldLabelsPutBodySchema preserves string labels", () => {
+  assert.deepEqual(
+    chungTuPdfTemplateFieldLabelsPutBodySchema.parse({
+      fieldLabels: {
+        soChungTu: "Số: ",
+        boPhan: "- Bộ phận: ",
+      },
+    }),
+    {
+      fieldLabels: {
+        soChungTu: "Số: ",
+        boPhan: "- Bộ phận: ",
+      },
+    },
+  );
+  assert.throws(() =>
+    chungTuPdfTemplateFieldLabelsPutBodySchema.parse({
+      fieldLabels: [],
+    }),
   );
 });
 

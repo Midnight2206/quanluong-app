@@ -71,6 +71,7 @@ const previewChungTuPdfTemplate = mock.fn(async () => ({
 }));
 const publishChungTuPdfTemplate = mock.fn(async () => ({}));
 const retireChungTuPdfTemplate = mock.fn(async () => ({}));
+const updateChungTuPdfTemplateFieldLabels = mock.fn(async () => ({}));
 
 const getChungTuSignatureSettings = mock.fn(async () => null);
 const upsertChungTuSignatureSettings = mock.fn(async () => ({}));
@@ -179,6 +180,7 @@ mock.module("./chung-tu-pdf-template.service.js", {
     previewChungTuPdfTemplate,
     publishChungTuPdfTemplate,
     retireChungTuPdfTemplate,
+    updateChungTuPdfTemplateFieldLabels,
   },
 });
 
@@ -206,6 +208,7 @@ const {
   createChungTuPdfExportBatchController,
   createChungTuPdfExportController,
   previewChungTuContextController,
+  putChungTuPdfTemplateFieldLabelsController,
 } = await import("./chung-tu-quyet-toan.controller.js");
 
 function makeRes() {
@@ -227,6 +230,7 @@ test.beforeEach(() => {
   createChungTuPdfExport.mock.resetCalls();
   createChungTuPdfExportBatch.mock.resetCalls();
   previewChungTuContext.mock.resetCalls();
+  updateChungTuPdfTemplateFieldLabels.mock.resetCalls();
 });
 
 test("createChungTuPdfExportController forwards PNK date range to service", async () => {
@@ -347,6 +351,34 @@ test("previewChungTuContextController forwards PNK date range to service", async
     settings: { ghiChu: "preview" },
     exportingUserProfile: { donVi: "Kho A" },
     effectiveUnitIds: [9, 10],
+  });
+  assert.equal(res.statusCode, 200);
+});
+
+test("putChungTuPdfTemplateFieldLabelsController forwards id and fieldLabels to service", async () => {
+  updateChungTuPdfTemplateFieldLabels.mock.mockImplementation(async () => ({
+    id: 17,
+    fieldLabels: { soChungTu: "Số: " },
+  }));
+  const req = {
+    validatedParams: { id: 17 },
+    validatedBody: {
+      fieldLabels: {
+        soChungTu: "Số: ",
+        tongTien: "Không lưu",
+      },
+    },
+  };
+  const res = makeRes();
+
+  await putChungTuPdfTemplateFieldLabelsController(req, res);
+
+  assert.deepEqual(updateChungTuPdfTemplateFieldLabels.mock.calls[0].arguments[0], {
+    id: 17,
+    fieldLabels: {
+      soChungTu: "Số: ",
+      tongTien: "Không lưu",
+    },
   });
   assert.equal(res.statusCode, 200);
 });

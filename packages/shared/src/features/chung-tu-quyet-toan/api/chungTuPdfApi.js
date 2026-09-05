@@ -139,6 +139,26 @@ export function useChungTuPdfTemplateFieldsQuery(templateId, options = {}) {
   });
 }
 
+export function useUpdateChungTuPdfTemplateFieldLabelsMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, fieldLabels }) => {
+      const templateId = id != null ? String(id).trim() : "";
+      return apiRequest({
+        url: `/chungtuquyettoan/pdf-templates/${encodeURIComponent(templateId)}/field-labels`,
+        method: "put",
+        data: { fieldLabels: fieldLabels ?? {} },
+      });
+    },
+    onSuccess: (_data, variables) => {
+      invalidateChungTuPdfTemplates(qc, variables?.categoryKey);
+      if (variables?.id != null) {
+        qc.invalidateQueries({ queryKey: qk.chungTuQuyetToan.pdfTemplateFields(variables.id) });
+      }
+    },
+  });
+}
+
 export function useCreateChungTuPdfExportMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({

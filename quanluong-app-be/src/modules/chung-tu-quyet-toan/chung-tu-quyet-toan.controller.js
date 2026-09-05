@@ -72,6 +72,7 @@ import {
   previewChungTuPdfTemplate,
   publishChungTuPdfTemplate,
   retireChungTuPdfTemplate,
+  updateChungTuPdfTemplateFieldLabels,
 } from "./chung-tu-pdf-template.service.js";
 import {
   getChungTuSignatureSettings,
@@ -501,6 +502,17 @@ async function retireChungTuPdfTemplateController(req, res) {
   });
 }
 
+async function putChungTuPdfTemplateFieldLabelsController(req, res) {
+  const data = await updateChungTuPdfTemplateFieldLabels({
+    id: req.validatedParams.id,
+    fieldLabels: req.validatedBody.fieldLabels,
+  });
+  return respondSuccess(res, {
+    message: "Đã lưu nhãn field của mẫu PDF.",
+    data,
+  });
+}
+
 async function getChungTuPdfTemplateFieldsController(req, res) {
   const data = await getChungTuPdfTemplateFields({
     id: req.validatedParams.id,
@@ -912,6 +924,7 @@ export {
   patchTemplateCatalogController,
   previewChungTuContextController,
   publishChungTuPdfTemplateController,
+  putChungTuPdfTemplateFieldLabelsController,
   putChungTuBkmhHeaderSettingsController,
   putCategoryTemplateFillMappingController,
   putChungTuSignatureSettingsController,

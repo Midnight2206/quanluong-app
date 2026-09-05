@@ -172,6 +172,18 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "pdfTemplateFieldLabelsPut",
+    method: "PUT",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/pdf-templates/:id/field-labels",
+    pathRoute: "/api/chungtuquyettoan/pdf-templates/:id/field-labels",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      name: "Chứng từ quyết toán",
+      description: "Superadmin: lưu nhãn field theo từng phiên bản mẫu PDF.",
+    },
+  },
+  {
     key: "pdfExportList",
     method: "GET",
     module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
