@@ -360,6 +360,7 @@ model ChungTuSignatureSettings {
   id                 Int      @id @default(autoincrement())
   categoryKey        String   @unique @db.VarChar(80)
   signatureBlockJson Json
+  extraFieldsJson    Json?
   updatedById        Int
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -441,6 +442,11 @@ model ChungTuBkmhSlice {
   tongTien              Decimal?           @db.Decimal(18, 2)
   /// Snapshot detailRows lúc xuất PDF (display + raw numeric).
   detailRowsJson        Json?
+  buyerUserId           Int?
+  buyerKey              String?  @db.VarChar(191)
+  buyerName             String?  @db.VarChar(191)
+  buyerSignatureName    String?  @db.VarChar(255)
+  buyerTitle            String?  @db.VarChar(255)
   documentServiceFileId Int
   fileName              String             @db.VarChar(255)
   createdAt             DateTime           @default(now())
