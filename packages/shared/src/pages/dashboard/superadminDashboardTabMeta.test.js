@@ -1,23 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { register } from "node:module";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { DASHBOARD_SUPERADMIN_TAB_META } from "./superadminDashboardTabMeta.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-
-function buildPortalNavItems(meta) {
-  return meta.map((t) => ({
-    to: `/dashboard/${t.path}`,
-    label: t.shortLabel,
-    title: t.label,
-    icon: t.icon,
-    section: t.section,
-    requiresAuth: true,
-    routeAccessKey: t.routeAccessKey,
-  }));
-}
+register(pathToFileURL(join(root, "test/atAliasLoader.mjs")), import.meta.url);
+const { superadminPortalNavItems } = await import("../../features/navigation/navConfig.js");
 
 test("superadmin tab meta has section shortLabel icon for 8 paths", () => {
   assert.equal(DASHBOARD_SUPERADMIN_TAB_META.length, 8);
@@ -46,7 +37,6 @@ test("superadmin tab meta has section shortLabel icon for 8 paths", () => {
 });
 
 test("superadminPortalNavItems is dashboard-only from meta", () => {
-  const superadminPortalNavItems = buildPortalNavItems(DASHBOARD_SUPERADMIN_TAB_META);
   assert.equal(superadminPortalNavItems.length, 8);
   for (const item of superadminPortalNavItems) {
     assert.match(item.to, /^\/dashboard\//);
