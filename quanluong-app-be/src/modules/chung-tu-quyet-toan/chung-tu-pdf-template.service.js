@@ -96,6 +96,15 @@ async function createChungTuPdfTemplate({
 }) {
   const normalizedCategoryKey = normalizeCategoryKey(categoryKey);
   assertSupportedPdfCategory(normalizedCategoryKey);
+  const priorTemplate = await prisma.chungTuPdfTemplate.findFirst({
+    where: {
+      categoryKey: normalizedCategoryKey,
+      name,
+    },
+    orderBy: [{ updatedAt: "desc" }],
+    select: { fieldLabelsJson: true },
+  });
+  const fieldLabelsJson = normalizeFieldLabels(priorTemplate?.fieldLabelsJson);
 
   const uploaded = await uploadTemplate({
     buffer,
@@ -112,6 +121,7 @@ async function createChungTuPdfTemplate({
         name,
         version,
         uploadedById,
+        fieldLabelsJson,
       },
     });
     return mapChungTuPdfTemplate(row);

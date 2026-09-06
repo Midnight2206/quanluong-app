@@ -26,6 +26,7 @@ const getTemplateFields = mock.fn(async (templateId) => [
 ]);
 
 const prismaFindMany = mock.fn(async () => []);
+const prismaFindFirst = mock.fn(async () => null);
 const prismaCreate = mock.fn(async ({ data }) => ({ id: 1, status: "draft", ...data }));
 const prismaFindUnique = mock.fn(async () => null);
 const prismaUpdate = mock.fn(async ({ where, data }) => ({ id: where.id, ...data }));
@@ -45,6 +46,7 @@ mock.module("../../infra/database/prisma/prisma.client.js", {
     prisma: {
       chungTuPdfTemplate: {
         findMany: prismaFindMany,
+        findFirst: prismaFindFirst,
         create: prismaCreate,
         findUnique: prismaFindUnique,
         update: prismaUpdate,
@@ -72,6 +74,7 @@ test.beforeEach(() => {
   retireTemplate.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
   prismaFindMany.mock.resetCalls();
+  prismaFindFirst.mock.resetCalls();
   prismaCreate.mock.resetCalls();
   prismaFindUnique.mock.resetCalls();
   prismaUpdate.mock.resetCalls();
@@ -152,9 +155,89 @@ test("createChungTuPdfTemplate uploads then persists document-service template i
       name: "bien-ban-a",
       version: "v1",
       uploadedById: 3,
+      fieldLabelsJson: {},
     },
   });
   assert.deepEqual(result, { ...created, fieldLabels: {} });
+});
+
+test("createChungTuPdfTemplate seeds field labels from latest prior same-name template", async () => {
+  const buffer = Buffer.from("pdf-template");
+  const priorFieldLabels = {
+    soChungTu: "Số chứng từ: ",
+    donVi: "Đơn vị: ",
+  };
+  prismaFindFirst.mock.mockImplementation(async () => ({
+    id: 6,
+    fieldLabelsJson: priorFieldLabels,
+  }));
+  prismaCreate.mock.mockImplementation(async ({ data }) => ({
+    id: 8,
+    status: "draft",
+    ...data,
+  }));
+
+  const result = await createChungTuPdfTemplate({
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "Biên bản A",
+    name: "bien-ban-a",
+    version: "v2",
+    buffer,
+    uploadedById: 3,
+  });
+
+  assert.deepEqual(prismaFindFirst.mock.calls[0].arguments[0], {
+    where: {
+      categoryKey: "bang-ke-mua-hang",
+      name: "bien-ban-a",
+    },
+    orderBy: [{ updatedAt: "desc" }],
+    select: { fieldLabelsJson: true },
+  });
+  assert.deepEqual(prismaCreate.mock.calls[0].arguments[0], {
+    data: {
+      categoryKey: "bang-ke-mua-hang",
+      displayName: "Biên bản A",
+      documentServiceTemplateId: 42,
+      name: "bien-ban-a",
+      version: "v2",
+      uploadedById: 3,
+      fieldLabelsJson: priorFieldLabels,
+    },
+  });
+  assert.deepEqual(result.fieldLabels, priorFieldLabels);
+});
+
+test("createChungTuPdfTemplate uses empty field labels when no prior same-name template exists", async () => {
+  const buffer = Buffer.from("pdf-template");
+  prismaFindFirst.mock.mockImplementation(async () => null);
+  prismaCreate.mock.mockImplementation(async ({ data }) => ({
+    id: 9,
+    status: "draft",
+    ...data,
+  }));
+
+  const result = await createChungTuPdfTemplate({
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "Biên bản B",
+    name: "bien-ban-b",
+    version: "v1",
+    buffer,
+    uploadedById: 4,
+  });
+
+  assert.deepEqual(prismaCreate.mock.calls[0].arguments[0], {
+    data: {
+      categoryKey: "bang-ke-mua-hang",
+      displayName: "Biên bản B",
+      documentServiceTemplateId: 42,
+      name: "bien-ban-b",
+      version: "v1",
+      uploadedById: 4,
+      fieldLabelsJson: {},
+    },
+  });
+  assert.deepEqual(result.fieldLabels, {});
 });
 
 test("publishChungTuPdfTemplate publishes draft row in document service and prisma", async () => {
