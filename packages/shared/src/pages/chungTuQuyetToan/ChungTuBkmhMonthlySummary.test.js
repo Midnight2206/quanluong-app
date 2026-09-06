@@ -23,9 +23,10 @@ const slicePanelSource = readFileSync(
   "utf8",
 );
 
-test("BKMH category workspace adds summary tab between export and history", () => {
-  assert.match(categoryWorkspaceSource, /categoryKey === "bang-ke-mua-hang"/);
+test("category workspace keeps summary in the unified tab order and gates it with hasSummary", () => {
+  assert.match(categoryWorkspaceSource, /config\?\.hasSummary/);
   assert.match(categoryWorkspaceSource, /id:\s*"export"[\s\S]*id:\s*"summary"[\s\S]*id:\s*"history"/);
+  assert.match(categoryWorkspaceSource, /disabled:\s*!config\?\.hasSummary/);
   assert.match(categoryWorkspaceSource, /label:\s*"Tổng hợp"/);
   assert.match(categoryWorkspaceSource, /<ChungTuSummaryWorkspace categoryKey=\{categoryKey\} \/>/);
 });

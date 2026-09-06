@@ -9,12 +9,11 @@ import { ChungTuSignatureSettingsWorkspace } from "./ChungTuSignatureSettingsWor
 import { getChungTuCategoryConfig } from "./chungTuCategoryConfig";
 
 /**
- * Một loại chứng từ: tab con Xuất chứng từ + Lịch sử.
+ * Một loại chứng từ với 4 tab con thống nhất theo category.
  * @param {{ categoryKey: string }} props
  */
 export function ChungTuCategoryWorkspace({ categoryKey }) {
   const config = getChungTuCategoryConfig(categoryKey);
-  const isBkmh = categoryKey === "bang-ke-mua-hang";
 
   const tabs = useMemo(
     () => [
@@ -28,15 +27,12 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
           />
         ),
       },
-      ...(isBkmh
-        ? [
-            {
-              id: "summary",
-              label: "Tổng hợp",
-              panel: <ChungTuSummaryWorkspace categoryKey={categoryKey} />,
-            },
-          ]
-        : []),
+      {
+        id: "summary",
+        label: "Tổng hợp",
+        disabled: !config?.hasSummary,
+        panel: config?.hasSummary ? <ChungTuSummaryWorkspace categoryKey={categoryKey} /> : null,
+      },
       {
         id: "history",
         label: "Lịch sử",
@@ -48,7 +44,7 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
         panel: <ChungTuSignatureSettingsWorkspace categoryKey={categoryKey} />,
       },
     ],
-    [categoryKey, config?.exportKind, isBkmh],
+    [categoryKey, config?.exportKind, config?.hasSummary],
   );
 
   return (

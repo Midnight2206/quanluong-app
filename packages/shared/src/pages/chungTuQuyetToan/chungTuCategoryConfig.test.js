@@ -8,3 +8,7 @@ test("phieu nhap kho category config uses canCuPnk and drops canCuBkmh", () => {
   assert.match(categoryConfigSource, /"canCuPnk"/);
   assert.doesNotMatch(categoryConfigSource, /"canCuBkmh"/);
 });
+
+test("category config exposes hasSummary by category", () => {
+  assert.match(categoryConfigSource, /hasSummary:\s*tab\.id === "bang-ke-mua-hang"/);
+});
