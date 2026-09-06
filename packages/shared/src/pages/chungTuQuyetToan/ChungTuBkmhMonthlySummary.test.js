@@ -65,6 +65,14 @@ test("export workspace routes monthly BKMH exports to monthly mutation", () => {
   assert.match(exportWorkspaceSource, /sliceCount:/);
 });
 
+test("BKMH monthly export hides Ngày chứng từ but keeps Tháng chứng từ", () => {
+  assert.match(exportWorkspaceSource, /Tháng chứng từ/);
+  assert.match(
+    exportWorkspaceSource,
+    /isPnkMonthly \?[\s\S]*: !isBkmhMonthly \?[\s\S]*Ngày chứng từ/,
+  );
+});
+
 test("PNK monthly export uses date range and only allows by-day or full aggregation", () => {
   assert.match(exportWorkspaceSource, /categoryKey === "phieu-nhap-kho" && isMonthly/);
   assert.match(exportWorkspaceSource, /showAggregationPicker = isMonthly/);

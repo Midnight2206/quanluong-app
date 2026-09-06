@@ -693,7 +693,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             />
           </label>
         </>
-      ) : (
+      ) : !isBkmhMonthly ? (
         <label className="space-y-1" htmlFor={`ct-export-date-${categoryKey}`}>
           <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
             Ngày chứng từ
@@ -709,7 +709,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             }}
           />
         </label>
-      )}
+      ) : null}
 
       {isBySlip ? (
         <label className="space-y-1 sm:col-span-2" htmlFor={`ct-export-slip-${categoryKey}`}>
