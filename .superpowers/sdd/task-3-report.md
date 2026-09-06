@@ -1,44 +1,54 @@
-# Task 3 Report
+# Task 3 Report: Strip dashboard tab strip + remove `/users` deep link
 
-Status: completed
-Commits: feat(document): publish and retire template status transitions
-Tests: `services/document-service/.venv/bin/pytest services/document-service/tests/test_template_publish_http.py`; `services/document-service/.venv/bin/pytest services/document-service/tests/test_templates.py services/document-service/tests/test_template_publish_http.py`
-Concerns: broader suite has an unrelated existing failure in `services/document-service/tests/test_templates_http.py::test_create_document_runs_render_in_threadpool`
-Report path: `.superpowers/sdd/task-3-report.md`
-# Task 3 Report: PDF storage helper
+## Status: Complete
 
-**Status:** Done  
-**Branch:** `feat/document-service-p4`  
-**Commit:** `feat(chung-tu): store PDF exports under MEDIA_ROOT`
+## Summary
 
-## Deliverables
+Removed the horizontal tab strip from `SuperadminDashboardLayout` (sidebar now owns navigation per Tasks 1–2). Simplified `DashboardUsersPage` to render only `SuperadminUsersPanel` — no Card link to `/users`.
 
-| File | Purpose |
-|------|---------|
-| `quanluong-app-be/src/modules/chung-tu-quyet-toan/chung-tu-pdf-storage.util.js` | Pure fs helper: build relative path, write/read/delete PDF under `MEDIA_ROOT` |
-| `quanluong-app-be/src/modules/chung-tu-quyet-toan/chung-tu-pdf-storage.util.test.js` | Round-trip test with `os.tmpdir()` via injected `rootDir` |
+### Changes
 
-## API
+**`packages/shared/src/pages/dashboard/SuperadminDashboardLayout.jsx`**
+- Removed `ScrollableHorizontalStrip`, `GuardedNavLink`, `visibleTabs`, tablist/tabpanel ARIA.
+- Kept: superadmin auth guard, sticky header «Quản lý hệ thống», pathname → `writePersistedNavTab("dashboard.primary", …)`, `{children}` wrapper.
 
-- `buildChungTuPdfRelativePath({ categoryKey, exportKey, year })` → `chung-tu-pdf/{categoryKey}/{year}/{exportKey}.pdf`
-- `writeChungTuPdfFile(relativePath, buffer, rootDir?)` → absolute path; creates parent dirs
-- `readChungTuPdfFile(relativePath, rootDir?)` → `Buffer`
-- `deleteChungTuPdfFile(relativePath, rootDir?)` → no-op on missing file (`ENOENT`)
+**`packages/shared/src/pages/dashboard/DashboardTabPages.jsx`**
+- `DashboardUsersPage`: panel-only layout; removed `Link href="/users"` Card and unused `linkCardClass` / `Users` import.
 
-Default `rootDir` is `env.mediaRoot` from `../../config/env.js`.
+**`packages/shared/src/pages/dashboard/SuperadminDashboardLayout.test.js`** (new)
+- Source-assert: no `ScrollableHorizontalStrip` / `role="tablist"`; retains `writePersistedNavTab` and «Quản lý hệ thống».
 
-## Test summary
+**`packages/shared/src/pages/dashboard/DashboardTabPages.test.js`** (new)
+- Source-assert on `DashboardUsersPage` region: no `/users` href or «Mở trang Người dùng»; file still imports `SuperadminUsersPanel`.
+
+## TDD
+
+| Step | Result |
+|------|--------|
+| Write failing tests | FAIL (2/2 — strip and deep link still present) |
+| Implement layout + users page | — |
+| Re-run tests | PASS (2/2) |
+
+```bash
+cd packages/shared && node --test \
+  src/pages/dashboard/SuperadminDashboardLayout.test.js \
+  src/pages/dashboard/DashboardTabPages.test.js
+# ✔ SuperadminDashboardLayout has header and persist without tab strip
+# ✔ DashboardUsersPage renders SuperadminUsersPanel without /users deep link
+```
+
+## Commit
 
 ```
-node --test quanluong-app-be/src/modules/chung-tu-quyet-toan/chung-tu-pdf-storage.util.test.js
-✔ chung-tu PDF storage write/read/delete under injected rootDir
-ℹ pass 1 / fail 0
+refactor(superadmin): remove dashboard horizontal tabs and users deep link
 ```
 
-Test stubs `DATABASE_URL`, `JWT_ACCESS_SECRET`, `SESSION_SECRET` before dynamic import (same pattern as `document-service.client.test.js`) because `env.js` validates required vars at load time.
+## Self-review
 
-## Concerns / follow-ups
+- Did not delete `apps/superadmin` routes (Task 4 scope).
+- `Building2` import in `DashboardTabPages.jsx` was pre-existing unused import — left untouched.
+- Nav persistence unchanged: visiting `/dashboard/units` still writes `dashboard.primary`.
 
-- No path traversal guard on `relativePath`; callers must pass paths from `buildChungTuPdfRelativePath` only.
-- `exportKey` is not sanitized in the builder; upstream should restrict to safe filename characters.
-- No integration with Prisma export records yet (Task 4+).
+## Concerns
+
+None. Sidebar navigation from Tasks 1–2 replaces the removed tab strip.
