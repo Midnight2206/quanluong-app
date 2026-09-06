@@ -122,14 +122,16 @@ test("pickMappedFields maps PNK người giao scalar fields", () => {
       {
         nguoiGiaoHang: "Nguyễn Văn A",
         diaChi: "Tài vụ",
+        lyDoNhapKho: "Nhập hàng bổ sung",
         nhapTaiKho: "Kho tổng",
       },
-      ["FIELD_nguoi_giao_hang", "FIELD_dia_chi", "FIELD_nhap_tai_kho"],
+      ["FIELD_nguoi_giao_hang", "FIELD_dia_chi", "FIELD_ly_do_nhap_kho", "FIELD_nhap_tai_kho"],
       { categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO },
     ),
     {
       FIELD_nguoi_giao_hang: "Nguyễn Văn A",
       FIELD_dia_chi: "Tài vụ",
+      FIELD_ly_do_nhap_kho: "Nhập hàng bổ sung",
       FIELD_nhap_tai_kho: "Kho tổng",
     },
   );

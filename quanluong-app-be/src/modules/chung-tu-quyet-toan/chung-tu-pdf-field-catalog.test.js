@@ -24,6 +24,7 @@ test("catalog marks supported template label fields", () => {
   assert.equal(supportedKeys.get("boPhan"), true);
   assert.equal(supportedKeys.get("nguoiGiaoHang"), true);
   assert.equal(supportedKeys.get("diaChi"), true);
+  assert.equal(supportedKeys.get("lyDoNhapKho"), true);
   assert.equal(supportedKeys.get("canCuPnk"), false);
   assert.equal(supportedKeys.get("nhapTaiKho"), true);
   assert.equal(supportedKeys.get("tongTien"), false);
@@ -34,6 +35,7 @@ test("catalog includes PNK người giao scalar descriptions", () => {
   const { scalarFields } = getChungTuPdfFieldCatalog();
   const nguoiGiao = scalarFields.find((f) => f.namedRange === "FIELD_nguoi_giao_hang");
   const diaChi = scalarFields.find((f) => f.namedRange === "FIELD_dia_chi");
+  const lyDoNhapKho = scalarFields.find((f) => f.namedRange === "FIELD_ly_do_nhap_kho");
   const nhapTaiKho = scalarFields.find((f) => f.namedRange === "FIELD_nhap_tai_kho");
 
   assert.ok(nguoiGiao);
@@ -43,6 +45,10 @@ test("catalog includes PNK người giao scalar descriptions", () => {
   assert.ok(diaChi);
   assert.equal(diaChi.fieldKey, "diaChi");
   assert.match(String(diaChi.description), /PNK|bộ phận/i);
+
+  assert.ok(lyDoNhapKho);
+  assert.equal(lyDoNhapKho.fieldKey, "lyDoNhapKho");
+  assert.match(String(lyDoNhapKho.description), /lý do nhập kho/i);
 
   assert.ok(nhapTaiKho);
   assert.equal(nhapTaiKho.fieldKey, "nhapTaiKho");

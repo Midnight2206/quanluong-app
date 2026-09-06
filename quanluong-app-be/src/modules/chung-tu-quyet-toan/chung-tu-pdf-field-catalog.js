@@ -27,6 +27,9 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
     buildScalarField("FIELD_dia_chi", "diaChi", "Bộ phận người giao (PNK); không dùng cho đơn vị", {
       supportsLabel: true,
     }),
+    buildScalarField("FIELD_ly_do_nhap_kho", "lyDoNhapKho", "Lý do nhập kho", {
+      supportsLabel: true,
+    }),
     buildScalarField("FIELD_nhap_tai_kho", "nhapTaiKho", "Nhập tại kho", {
       supportsLabel: true,
     }),

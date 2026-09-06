@@ -569,6 +569,7 @@ function buildPnkSheetContext({
   dateTo,
   aggregationMode,
   resolveSettingsForSlips,
+  lyDoNhapKho,
   nhapTaiKho,
 }) {
   const detailRows = aggregateSnapshotDetailRows((slices ?? []).flatMap((slice) => slice.detailRows ?? []));
@@ -592,6 +593,7 @@ function buildPnkSheetContext({
       buyerSignatureName,
       nguoiGiaoHang: buyerName,
       diaChi: buyerTitle,
+      lyDoNhapKho,
       nhapTaiKho,
       sliceCount: slices.length,
       lineCount: detailRows.length,
@@ -606,11 +608,13 @@ async function resolvePnkFromBkmhSlices({
   dateTo,
   aggregationMode,
   resolveSettingsForSlips,
+  lyDoNhapKho,
   nhapTaiKho,
 }) {
   const safeDateFrom = toIsoDateOnly(dateFrom);
   const safeDateTo = toIsoDateOnly(dateTo);
   const mode = normalizePnkAggregationMode(aggregationMode);
+  const safeLyDoNhapKho = String(lyDoNhapKho ?? "").trim();
   const safeNhapTaiKho = String(nhapTaiKho ?? "").trim();
   const rawSlices = await prisma.chungTuBkmhSlice.findMany({
     where: {
@@ -685,6 +689,7 @@ async function resolvePnkFromBkmhSlices({
         dateTo: safeDateTo,
         aggregationMode: mode,
         resolveSettingsForSlips,
+        lyDoNhapKho: safeLyDoNhapKho,
         nhapTaiKho: safeNhapTaiKho,
       });
       if (!context) continue;
@@ -706,6 +711,7 @@ async function resolvePnkFromBkmhSlices({
         dateTo: safeDateTo,
         aggregationMode: mode,
         resolveSettingsForSlips,
+        lyDoNhapKho: safeLyDoNhapKho,
         nhapTaiKho: safeNhapTaiKho,
       });
       if (!context) continue;
@@ -741,6 +747,7 @@ async function resolvePnkFromBkmhSlices({
         dateTo: safeDateTo,
         aggregationMode: mode,
         sheetContexts,
+        lyDoNhapKho: safeLyDoNhapKho,
         nhapTaiKho: safeNhapTaiKho,
         buyerCount: sheetContexts.length,
         sliceCount: sourceSlices.length,
@@ -950,6 +957,7 @@ export async function resolveChungTuContext({
   settings,
   exportingUserProfile,
   resolvedBkmhBuyer = null,
+  lyDoNhapKho,
   nhapTaiKho,
 }) {
   const meta = assertKnownCategoryKey(categoryKey);
@@ -1055,6 +1063,7 @@ export async function resolveChungTuContext({
       dateTo: safePnkDateTo,
       aggregationMode,
       resolveSettingsForSlips,
+      lyDoNhapKho,
       nhapTaiKho,
     });
     const hashPayload = {
@@ -1084,6 +1093,7 @@ export async function resolveChungTuContext({
         })),
       })),
       settings: resolveSettingsForSlips(),
+      lyDoNhapKho: String(lyDoNhapKho ?? "").trim(),
       nhapTaiKho: String(nhapTaiKho ?? "").trim(),
     };
     return {

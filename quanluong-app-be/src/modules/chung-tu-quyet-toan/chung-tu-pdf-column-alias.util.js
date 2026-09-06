@@ -19,6 +19,7 @@ const STATIC_ALIASES = Object.freeze({
   ngay_thang_nam: "ngayThangNam",
   ho_ten_nguoi_mua: "hoTenNguoiMua",
   nguoi_mua: "hoTenNguoiMua",
+  ly_do_nhap_kho: "lyDoNhapKho",
 });
 
 /** Scalar-only: so/soPhieu template keys share soChungTu value + fieldLabels. */

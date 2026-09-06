@@ -253,6 +253,7 @@ async function createChungTuPdfExportBatch({
   if (isPnk) {
     resolveArgs.dateFrom = safeDateFrom || undefined;
     resolveArgs.dateTo = safeDateTo || undefined;
+    resolveArgs.lyDoNhapKho = String(savedSignatureSettings?.extraFields?.lyDoNhapKho ?? "").trim();
     resolveArgs.nhapTaiKho = String(savedSignatureSettings?.extraFields?.nhapTaiKho ?? "").trim();
   }
   const { context, sourceDataHash } = await resolveChungTuContext(resolveArgs);

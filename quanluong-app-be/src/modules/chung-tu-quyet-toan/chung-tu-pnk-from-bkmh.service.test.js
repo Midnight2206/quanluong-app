@@ -33,6 +33,7 @@ test("resolvePnkFromBkmhSlices throws clear error when no BKMH slices exist in r
       dateTo: "2026-06-03",
       aggregationMode: "by-day",
       resolveSettingsForSlips: () => ({ donVi: "Kho A" }),
+      lyDoNhapKho: "Nhap hang bo sung",
       nhapTaiKho: "Kho tong",
     }),
     /Không có dữ liệu BKMH từ ngày 2026-06-01 đến 2026-06-03/,
@@ -148,6 +149,7 @@ test("resolvePnkFromBkmhSlices groups by buyerKey and day in by-day mode", async
     dateTo: "2026-06-02",
     aggregationMode: "by-day",
     resolveSettingsForSlips: () => ({ donVi: "Kho A" }),
+    lyDoNhapKho: "Nhap hang bo sung",
     nhapTaiKho: "Kho tong",
   });
 
@@ -187,6 +189,7 @@ test("resolvePnkFromBkmhSlices groups by buyerKey and day in by-day mode", async
       buyerKey: ctx.buyerKey,
       nguoiGiaoHang: ctx.nguoiGiaoHang,
       diaChi: ctx.diaChi,
+      lyDoNhapKho: ctx.lyDoNhapKho,
       nhapTaiKho: ctx.nhapTaiKho,
       buyerSignatureName: ctx.buyerSignatureName,
       aggregationMode: ctx.aggregationMode,
@@ -197,6 +200,7 @@ test("resolvePnkFromBkmhSlices groups by buyerKey and day in by-day mode", async
         buyerKey: "user:7",
         nguoiGiaoHang: "Nguyen Van A",
         diaChi: "Tai vu",
+        lyDoNhapKho: "Nhap hang bo sung",
         nhapTaiKho: "Kho tong",
         buyerSignatureName: "Th/tá Nguyen Van A",
         aggregationMode: "by-day",
@@ -206,6 +210,7 @@ test("resolvePnkFromBkmhSlices groups by buyerKey and day in by-day mode", async
         buyerKey: "name:tran thi b",
         nguoiGiaoHang: "Tran Thi B",
         diaChi: "Hau can",
+        lyDoNhapKho: "Nhap hang bo sung",
         nhapTaiKho: "Kho tong",
         buyerSignatureName: "Trung uy Tran Thi B",
         aggregationMode: "by-day",
@@ -230,6 +235,7 @@ test("resolvePnkFromBkmhSlices groups by buyerKey and day in by-day mode", async
   );
   assert.equal(result.rootContext.sheetContexts.length, 2);
   assert.equal(result.rootContext.aggregationMode, "by-day");
+  assert.equal(result.rootContext.lyDoNhapKho, "Nhap hang bo sung");
   assert.equal(result.rootContext.nhapTaiKho, "Kho tong");
 });
 
@@ -293,6 +299,7 @@ test("resolvePnkFromBkmhSlices groups one buyer across days in full mode", async
     dateTo: "2026-06-02",
     aggregationMode: "full",
     resolveSettingsForSlips: () => ({ donVi: "Kho A" }),
+    lyDoNhapKho: "Nhap hang bo sung",
     nhapTaiKho: "Kho tong",
   });
 
@@ -301,6 +308,7 @@ test("resolvePnkFromBkmhSlices groups one buyer across days in full mode", async
   assert.equal(result.sheetContexts[0].aggregationMode, "full");
   assert.equal(result.sheetContexts[0].nguoiGiaoHang, "Nguyen Van A");
   assert.equal(result.sheetContexts[0].diaChi, "Tai vu");
+  assert.equal(result.sheetContexts[0].lyDoNhapKho, "Nhap hang bo sung");
   assert.equal(result.sheetContexts[0].nhapTaiKho, "Kho tong");
   assert.equal(
     result.sheetContexts[0].canCuPnk,
@@ -316,6 +324,7 @@ test("resolvePnkFromBkmhSlices groups one buyer across days in full mode", async
   );
   assert.equal(result.rootContext.sheetContexts.length, 1);
   assert.equal(result.rootContext.aggregationMode, "full");
+  assert.equal(result.rootContext.lyDoNhapKho, "Nhap hang bo sung");
   assert.equal(result.rootContext.nhapTaiKho, "Kho tong");
 });
 
@@ -352,6 +361,7 @@ test("resolvePnkFromBkmhSlices throws 400 when a source slice misses buyerKey", 
       dateTo: "2026-06-01",
       aggregationMode: "by-day",
       resolveSettingsForSlips: () => ({ donVi: "Kho A" }),
+      lyDoNhapKho: "Nhap hang bo sung",
       nhapTaiKho: "Kho tong",
     }),
     (error) => {

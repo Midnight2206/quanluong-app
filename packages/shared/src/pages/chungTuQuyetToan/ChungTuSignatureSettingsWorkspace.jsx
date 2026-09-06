@@ -41,6 +41,7 @@ const signatureBlockSchema = z.object({
 const formSchema = z.object({
   signatureBlock: signatureBlockSchema,
   extraFields: z.object({
+    lyDoNhapKho: z.string().optional().default(""),
     nhapTaiKho: z.string().optional().default(""),
   }),
 });
@@ -106,6 +107,7 @@ function cloneDefaultSignatureBlock({ isPnkCategory = false } = {}) {
 
 function normalizeExtraFields(input) {
   return {
+    lyDoNhapKho: String(input?.lyDoNhapKho ?? "").trim(),
     nhapTaiKho: String(input?.nhapTaiKho ?? "").trim(),
   };
 }
@@ -298,20 +300,37 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
       >
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
           {isPnkCategory ? (
-            <label className="block space-y-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-                Nhập tại kho
-              </span>
-              <input
-                className={fieldClass}
-                disabled={!canWrite || isLoading || saving}
-                placeholder="Ví dụ: Kho trung tâm"
-                {...register("extraFields.nhapTaiKho")}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Giá trị này sẽ đi vào `FIELD_nhap_tai_kho` khi xuất PNK.
-              </p>
-            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block space-y-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                  Lý do nhập kho
+                </span>
+                <input
+                  className={fieldClass}
+                  disabled={!canWrite || isLoading || saving}
+                  placeholder="Ví dụ: Nhập hàng bổ sung"
+                  {...register("extraFields.lyDoNhapKho")}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Giá trị này sẽ đi vào `FIELD_ly_do_nhap_kho` khi xuất PNK.
+                </p>
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
+                  Nhập tại kho
+                </span>
+                <input
+                  className={fieldClass}
+                  disabled={!canWrite || isLoading || saving}
+                  placeholder="Ví dụ: Kho trung tâm"
+                  {...register("extraFields.nhapTaiKho")}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Giá trị này sẽ đi vào `FIELD_nhap_tai_kho` khi xuất PNK.
+                </p>
+              </label>
+            </div>
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-3">

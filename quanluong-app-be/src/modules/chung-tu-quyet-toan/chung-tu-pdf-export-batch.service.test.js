@@ -283,7 +283,7 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
   }
 });
 
-test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + nhapTaiKho", async () => {
+test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + PNK extra fields", async () => {
   prismaTemplateFindFirst.mock.mockImplementation(async () => ({
     id: 16,
     categoryKey: "phieu-nhap-kho",
@@ -295,11 +295,15 @@ test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + 
     context: {
       periodDate: "2026-06-01",
       buyerSignatureName: "Th/tá Nguyen Van A",
+      lyDoNhapKho: "Nhap hang bo sung",
+      nhapTaiKho: "Kho trung tam",
       detailRows: [{ stt: 1, tenHang: "Gạo" }],
       sheetContexts: [
         {
           periodDate: "2026-06-01",
           buyerSignatureName: "Th/tá Nguyen Van A",
+          lyDoNhapKho: "Nhap hang bo sung",
+          nhapTaiKho: "Kho trung tam",
           detailRows: [{ stt: 1, tenHang: "Gạo" }],
         },
       ],
@@ -310,7 +314,7 @@ test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + 
     id: 6,
     categoryKey: "phieu-nhap-kho",
     signatureBlockJson: { columns: 1, slots: [{ key: "nguoi_giao", label: "Nguoi giao" }] },
-    extraFieldsJson: { nhapTaiKho: "Kho trung tam" },
+    extraFieldsJson: { lyDoNhapKho: "Nhap hang bo sung", nhapTaiKho: "Kho trung tam" },
     updatedById: 88,
     createdAt: new Date("2026-08-22T00:00:00.000Z"),
     updatedAt: new Date("2026-08-22T00:00:00.000Z"),
@@ -345,6 +349,7 @@ test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + 
       issueSlipId: undefined,
       unitIds: undefined,
       aggregationMode: "full",
+      lyDoNhapKho: "Nhap hang bo sung",
       nhapTaiKho: "Kho trung tam",
       exportingUserProfile: { donVi: "Kho A" },
       settings: {},
