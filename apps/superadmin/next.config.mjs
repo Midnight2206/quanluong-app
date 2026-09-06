@@ -37,13 +37,7 @@ const nextConfig = {
     REFRESH_TOKEN_COOKIE_NAME: process.env.REFRESH_TOKEN_COOKIE_NAME || "ql.rt",
   },
   async redirects() {
-    return [
-      {
-        source: "/dashboard/lttp-nhap-xuat",
-        destination: "/lttp-nhap-xuat",
-        permanent: true,
-      },
-    ];
+    return [];
   },
   async rewrites() {
     const socketOrigin = process.env.NEXT_INTERNAL_API_ORIGIN;
