@@ -446,6 +446,28 @@ export async function openChungTuPdfBatchMergedPdf(batchKey, options = {}) {
   };
 }
 
+export async function openChungTuPdfBatchFile(batchKey, fileId, options = {}) {
+  const batch = batchKey != null ? String(batchKey).trim() : "";
+  const file = fileId != null ? String(fileId).trim() : "";
+  const { targetWindow = null } = options ?? {};
+  const { data: blob, headers } = await apiRequest({
+    url: `/chungtuquyettoan/pdf-export-batches/${encodeURIComponent(batch)}/files/${encodeURIComponent(file)}`,
+    method: "get",
+    responseType: "blob",
+    returnHeaders: true,
+  });
+  const pdfBlob = blob instanceof Blob ? blob : new Blob([blob], { type: "application/pdf" });
+  const objectUrl = URL.createObjectURL(pdfBlob);
+  const openedWindow = openObjectUrlInNewWindow(objectUrl, targetWindow);
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 120_000);
+  const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
+  return {
+    openedWindow,
+    objectUrl,
+    fileName: filenameFromContentDisposition(cd) ?? `${batch}-${file}.pdf`,
+  };
+}
+
 export async function downloadChungTuPdfBatchFile(batchKey, fileId, fileName) {
   const batch = batchKey != null ? String(batchKey).trim() : "";
   const file = fileId != null ? String(fileId).trim() : "";

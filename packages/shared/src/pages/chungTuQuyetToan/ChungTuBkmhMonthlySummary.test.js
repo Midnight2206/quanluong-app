@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 const categoryWorkspaceSource = readFileSync(
@@ -22,6 +22,8 @@ const slicePanelSource = readFileSync(
   new URL("./ChungTuBkmhSliceSummaryPanel.jsx", import.meta.url),
   "utf8",
 );
+const pnkPanelUrl = new URL("./ChungTuPnkBatchSummaryPanel.jsx", import.meta.url);
+const pnkPanelSource = existsSync(pnkPanelUrl) ? readFileSync(pnkPanelUrl, "utf8") : "";
 
 test("category workspace keeps summary in the unified tab order and gates it with hasSummary", () => {
   assert.match(categoryWorkspaceSource, /config\?\.hasSummary/);
@@ -34,6 +36,8 @@ test("category workspace keeps summary in the unified tab order and gates it wit
 test("summary workspace lists monthly rows with unit filter and panel trigger", () => {
   assert.match(summaryWorkspaceSource, /useChungTuUnitScope/);
   assert.match(summaryWorkspaceSource, /useChungTuBkmhMonthlyListQuery/);
+  assert.match(summaryWorkspaceSource, /useChungTuPdfExportBatchesQuery/);
+  assert.match(summaryWorkspaceSource, /phieu-nhap-kho/);
   assert.match(summaryWorkspaceSource, /Mở tổng hợp/);
   assert.match(summaryWorkspaceSource, /Tháng/);
   assert.match(summaryWorkspaceSource, /Chế độ gộp/);
@@ -41,6 +45,7 @@ test("summary workspace lists monthly rows with unit filter and panel trigger", 
   assert.match(summaryWorkspaceSource, /Tổng tiền tháng/);
   assert.match(summaryWorkspaceSource, /Cập nhật lúc/);
   assert.match(summaryWorkspaceSource, /ChungTuBkmhSliceSummaryPanel/);
+  assert.match(summaryWorkspaceSource, /ChungTuPnkBatchSummaryPanel/);
 });
 
 test("slice summary panel loads detail data and exposes view download print actions", () => {
@@ -55,6 +60,18 @@ test("slice summary panel loads detail data and exposes view download print acti
   assert.match(slicePanelSource, /Xem/);
   assert.match(slicePanelSource, /Tải/);
   assert.match(slicePanelSource, /In/);
+});
+
+test("PNK summary panel exposes per-file metadata and merged zip actions", () => {
+  assert.match(pnkPanelSource, /Số CT|soChungTu/);
+  assert.match(pnkPanelSource, /ngayThangNam|periodDate/);
+  assert.match(pnkPanelSource, /recipientUnitName/);
+  assert.match(pnkPanelSource, /tongTien/);
+  assert.match(
+    pnkPanelSource,
+    /openChungTuPdfBatchFile|downloadChungTuPdfBatchFile|openChungTuPdfBatchMergedPdf|downloadChungTuPdfBatchZip/i,
+  );
+  assert.match(pnkPanelSource, /merged\.pdf|Tải zip|In tất cả/i);
 });
 
 test("export workspace routes monthly BKMH exports to monthly mutation", () => {

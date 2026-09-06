@@ -6,12 +6,14 @@ import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable
 import { Button } from "@/components/ui/Button";
 import { CHUNG_TU_AGGREGATION_MODE_OPTIONS } from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
 import { useChungTuBkmhMonthlyListQuery } from "@/features/chung-tu-quyet-toan/api/chungTuBkmhMonthlyApi";
+import { useChungTuPdfExportBatchesQuery } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { formatVnd } from "@/utils/formatVnd";
 import { cn } from "@/utils/cn";
 import { formatPeriodMonth } from "@/pages/chungTuQuyetToan/chungTuFormat";
 import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScope";
 import { ChungTuExportWizardCard } from "./ChungTuExportWizard";
 import { ChungTuBkmhSliceSummaryPanel } from "./ChungTuBkmhSliceSummaryPanel.jsx";
+import { ChungTuPnkBatchSummaryPanel } from "./ChungTuPnkBatchSummaryPanel.jsx";
 
 const fieldClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
@@ -28,6 +30,18 @@ function formatExportedAt(value) {
   return exportTimeFormatter.format(date);
 }
 
+function formatPnkBatchPeriodLabel(batch) {
+  if (batch?.periodMonth) {
+    return formatPeriodMonth(batch.periodMonth);
+  }
+  const displayName = String(batch?.displayName ?? "").trim();
+  const separatorIndex = displayName.lastIndexOf(" - ");
+  if (separatorIndex >= 0) {
+    return displayName.slice(separatorIndex + 3).trim() || "—";
+  }
+  return batch?.periodDate?.slice?.(0, 10) || "—";
+}
+
 /**
  * @param {{ categoryKey: string }} props
  */
@@ -35,10 +49,17 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
   const { canPickUnits, unitsForDropdown, effectiveUnitId, persistManualUnitId } =
     useChungTuUnitScope();
   const [selectedMonthly, setSelectedMonthly] = useState(null);
+  const [selectedBatch, setSelectedBatch] = useState(null);
+  const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
+  const isPnkCategory = categoryKey === "phieu-nhap-kho";
 
   const { data: monthlyRows = [], isLoading } = useChungTuBkmhMonthlyListQuery(
     { storageUnitId: effectiveUnitId },
-    { skip: !effectiveUnitId },
+    { skip: !isBkmhCategory || !effectiveUnitId },
+  );
+  const { data: pdfExportBatches = [], isLoading: batchLoading } = useChungTuPdfExportBatchesQuery(
+    { unitId: effectiveUnitId, categoryKey },
+    { skip: !isPnkCategory || !effectiveUnitId },
   );
 
   const aggregationLabelByValue = useMemo(
@@ -59,7 +80,11 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
         {canPickUnits && unitsForDropdown.length > 0 && effectiveUnitId != null ? (
           <ChungTuExportWizardCard
             title="Bộ lọc"
-            description="Chọn kho LTTP để xem các tháng BKMH đã xuất."
+            description={
+              isPnkCategory
+                ? "Chọn kho LTTP để xem các folder PDF PNK đã xuất."
+                : "Chọn kho LTTP để xem các tháng BKMH đã xuất."
+            }
             expanded={expandedLayout}
           >
             <label className="block min-w-0 space-y-1" htmlFor={`ct-summary-unit-${categoryKey}`}>
@@ -85,7 +110,8 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
           </ChungTuExportWizardCard>
         ) : null}
 
-        {isLoading ? (
+        {isBkmhCategory ? (
+          isLoading ? (
           <ChungTuExportWizardCard
             title="Tổng hợp BKMH"
             expanded={expandedLayout}
@@ -96,7 +122,7 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
               Đang tải bảng tổng hợp…
             </p>
           </ChungTuExportWizardCard>
-        ) : monthlyRows.length === 0 ? (
+          ) : monthlyRows.length === 0 ? (
           <ChungTuExportWizardCard
             title="Tổng hợp BKMH"
             expanded={expandedLayout}
@@ -106,7 +132,7 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
               Chưa có tháng BKMH nào cho đơn vị này.
             </p>
           </ChungTuExportWizardCard>
-        ) : (
+          ) : (
           <ChungTuExportWizardCard
             title={`Tổng hợp BKMH (${monthlyRows.length})`}
             description="Mỗi dòng là một tháng đã xuất cho kho LTTP đang chọn."
@@ -160,19 +186,116 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
               </table>
             </StickyResponsiveTable>
           </ChungTuExportWizardCard>
+          )
+        ) : isPnkCategory ? (
+          batchLoading ? (
+            <ChungTuExportWizardCard
+              title="Tổng hợp folder PNK"
+              expanded={expandedLayout}
+              bodyClassName="py-6"
+            >
+              <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                Đang tải bảng tổng hợp…
+              </p>
+            </ChungTuExportWizardCard>
+          ) : pdfExportBatches.length === 0 ? (
+            <ChungTuExportWizardCard
+              title="Tổng hợp folder PNK"
+              expanded={expandedLayout}
+              bodyClassName="py-6"
+            >
+              <p className="text-center text-sm text-muted-foreground">
+                Chưa có folder PDF PNK nào cho đơn vị này.
+              </p>
+            </ChungTuExportWizardCard>
+          ) : (
+            <ChungTuExportWizardCard
+              title={`Tổng hợp folder PNK (${pdfExportBatches.length})`}
+              description="Mỗi dòng là một folder PDF PNK; mở để xem danh sách file đã xuất."
+              expanded={expandedLayout}
+              bodyClassName="space-y-3"
+            >
+              <StickyResponsiveTable stickyLevel={2} className="border-border/80">
+                <table className="w-full min-w-[60rem] text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-[10px] uppercase text-muted-foreground">
+                      <th className="px-3 py-2 font-semibold">Folder</th>
+                      <th className="px-3 py-2 font-semibold">Kỳ</th>
+                      <th className="px-3 py-2 font-semibold">Số file</th>
+                      <th className="px-3 py-2 font-semibold">Tổng tiền</th>
+                      <th className="px-3 py-2 font-semibold">Cập nhật lúc</th>
+                      <th className="px-3 py-2 font-semibold text-right">Mở tổng hợp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pdfExportBatches.map((batch) => (
+                      <tr key={batch.batchKey} className="border-b border-border/50">
+                        <td className="px-3 py-2.5 font-medium text-foreground">
+                          {batch.displayName || batch.batchKey || "Folder PDF"}
+                        </td>
+                        <td className="px-3 py-2.5 text-foreground">{formatPnkBatchPeriodLabel(batch)}</td>
+                        <td className="px-3 py-2.5 text-foreground">
+                          {batch.fileCount ?? batch.files?.length ?? 0}
+                        </td>
+                        <td className="px-3 py-2.5 text-foreground">{formatVnd(batch.tongTienFolder)}</td>
+                        <td className="px-3 py-2.5 text-muted-foreground">
+                          {formatExportedAt(batch.updatedAt || batch.createdAt)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 gap-1.5 text-xs"
+                            onClick={() => setSelectedBatch(batch)}
+                          >
+                            Mở tổng hợp
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </StickyResponsiveTable>
+            </ChungTuExportWizardCard>
+          )
+        ) : (
+          <ChungTuExportWizardCard
+            title="Tổng hợp"
+            expanded={expandedLayout}
+            bodyClassName="py-6"
+          >
+            <p className="text-center text-sm text-muted-foreground">
+              Loại chứng từ này chưa có bảng tổng hợp.
+            </p>
+          </ChungTuExportWizardCard>
         )}
       </div>
 
-      <ChungTuBkmhSliceSummaryPanel
-        monthlyId={selectedMonthly?.id ?? ""}
-        aggregationMode={selectedMonthly?.aggregationMode ?? ""}
-        open={Boolean(selectedMonthly)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedMonthly(null);
-          }
-        }}
-      />
+      {isBkmhCategory ? (
+        <ChungTuBkmhSliceSummaryPanel
+          monthlyId={selectedMonthly?.id ?? ""}
+          aggregationMode={selectedMonthly?.aggregationMode ?? ""}
+          open={Boolean(selectedMonthly)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedMonthly(null);
+            }
+          }}
+        />
+      ) : null}
+
+      {isPnkCategory ? (
+        <ChungTuPnkBatchSummaryPanel
+          batch={selectedBatch}
+          open={Boolean(selectedBatch)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedBatch(null);
+            }
+          }}
+        />
+      ) : null}
     </>
   );
 }
