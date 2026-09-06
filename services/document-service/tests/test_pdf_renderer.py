@@ -69,11 +69,11 @@ def test_imported_minimal_template_renders_pdf():
 
 
 def test_multi_row_header_repeats_on_continuation_pages():
-    from test_template_importer import _make_two_row_header_template
+    from test_template_importer import _make_pnk_like_two_row_header
 
     importer = importlib.import_module("app.import.template_importer")
     metadata = importer.parse_template(
-        _make_two_row_header_template(), name="chung-tu", version="1"
+        _make_pnk_like_two_row_header(), name="chung-tu", version="1"
     )
     rows = [
         {
@@ -92,9 +92,10 @@ def test_multi_row_header_repeats_on_continuation_pages():
     assert len(pages) >= 2
     for page in pages:
         text = page.extract_text() or ""
-        assert "Hàng hóa" in text
-        assert "STT" in text
-        assert "Tên hàng" in text
+        assert "TT" in text
+        assert "Số lượng" in text
+        assert "Yêu cầu" in text
+        assert "Thực nhập" in text
 
 
 def test_vietnamese_text_extracted():

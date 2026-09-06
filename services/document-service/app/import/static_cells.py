@@ -9,6 +9,8 @@ from .excel_coords import (
     DEFAULT_ROW_HEIGHT_PT,
     _row_height_pt,
     cell_top_left_pt,
+    enclosing_merge_bounds,
+    merged_range_height_pt,
     merged_range_width_pt,
 )
 from .field_named_ranges import is_field_named_range
@@ -40,28 +42,32 @@ def _style_dict(cell):
     return font, align, border
 
 
-def _row_groups(sheet, row: int, min_col: int, max_col: int):
-    col = min_col
-    while col <= max_col:
-        merged = next(
-            (
-                cell_range
-                for cell_range in sheet.merged_cells.ranges
-                if cell_range.min_row <= row <= cell_range.max_row
-                and cell_range.min_col <= col <= cell_range.max_col
-            ),
-            None,
-        )
-        if merged is None:
-            yield col, col
-            col += 1
-            continue
-        if merged.min_col < min_col or merged.max_col > max_col:
-            yield col, col
-            col += 1
-            continue
-        yield merged.min_col, merged.max_col
-        col = merged.max_col + 1
+def iter_static_merge_origins(
+    sheet,
+    *,
+    min_col: int,
+    max_col: int,
+    min_row: int,
+    max_row: int,
+):
+    visited: set[tuple[int, int]] = set()
+    for row in range(min_row, max_row + 1):
+        for col in range(min_col, max_col + 1):
+            cell = sheet.cell(row, col)
+            if isinstance(cell, MergedCell):
+                continue
+            merge_bounds = enclosing_merge_bounds(sheet, row, col)
+            if merge_bounds is None:
+                bounds = (col, row, col, row)
+            else:
+                bounds = merge_bounds
+                if bounds[0] < min_col or bounds[2] > max_col:
+                    bounds = (col, row, col, row)
+            origin_key = (bounds[1], bounds[0])
+            if origin_key in visited:
+                continue
+            visited.add(origin_key)
+            yield (*bounds, cell)
 
 
 def field_coords_from_workbook(
@@ -107,53 +113,54 @@ def collect_static_cells(
     skip_coords = field_coords or set()
     static_cells: list[StaticCellMeta] = []
 
-    for row in range(1, sheet.max_row + 1):
-        if row == data_row:
+    for min_col, min_row, max_col, max_row, cell in iter_static_merge_origins(
+        sheet,
+        min_col=header_min_col,
+        max_col=header_max_col,
+        min_row=1,
+        max_row=sheet.max_row,
+    ):
+        if min_row <= data_row <= max_row:
             continue
-        if header_min_row <= row <= header_max_row:
+        if (min_row, min_col) in skip_coords:
+            continue
+        if header_min_row <= min_row <= header_max_row:
             layer = "header"
-        elif row > data_row:
+        elif min_row > data_row:
             layer = "signature"
-        elif row < header_min_row:
+        elif min_row < header_min_row:
             layer = "body"
         else:
             # Hàng giữa TABLE_HEADER và TABLE_DATA_ROW (tiêu đề phụ / khoảng trống).
             layer = "body"
-
-        row_height = _row_height_pt(sheet, row)
-        for min_col, max_col in _row_groups(sheet, row, header_min_col, header_max_col):
-            if (row, min_col) in skip_coords:
-                continue
-            cell = sheet.cell(row, min_col)
-            if isinstance(cell, MergedCell):
-                continue
-            font, align, border = _style_dict(cell)
-            value = _cell_value(cell)
-            if not value and not _has_visible_border(border):
-                continue
-            x, y_top = cell_top_left_pt(
-                sheet,
-                row,
-                min_col,
-                page_height=page_height,
-                margin_top=margin_top,
-                margin_left=margin_left,
+        font, align, border = _style_dict(cell)
+        value = _cell_value(cell)
+        if not value and not _has_visible_border(border):
+            continue
+        x, y_top = cell_top_left_pt(
+            sheet,
+            min_row,
+            min_col,
+            page_height=page_height,
+            margin_top=margin_top,
+            margin_left=margin_left,
+        )
+        width = merged_range_width_pt(sheet, min_col, max_col)
+        height = merged_range_height_pt(sheet, min_row, max_row)
+        static_cells.append(
+            StaticCellMeta(
+                layer=layer,
+                row=min_row,
+                x=x,
+                y=y_top - height,
+                width_pt=width,
+                height_pt=height,
+                value=value,
+                font=font,
+                align=align,
+                border=border,
             )
-            width = merged_range_width_pt(sheet, min_col, max_col)
-            static_cells.append(
-                StaticCellMeta(
-                    layer=layer,
-                    row=row,
-                    x=x,
-                    y=y_top - row_height,
-                    width_pt=width,
-                    height_pt=row_height,
-                    value=value,
-                    font=font,
-                    align=align,
-                    border=border,
-                )
-            )
+        )
     return static_cells
 
 
@@ -167,6 +174,7 @@ __all__ = [
     "collect_static_cells",
     "field_coords_from_cell_refs",
     "field_coords_from_workbook",
+    "iter_static_merge_origins",
     "static_block_height_pt",
     "DEFAULT_ROW_HEIGHT_PT",
 ]

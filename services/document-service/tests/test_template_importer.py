@@ -75,6 +75,41 @@ def _make_two_row_header_template(*, vertical_merge_first_column: bool = False) 
     return _save_workbook(workbook)
 
 
+def _make_pnk_like_two_row_header() -> bytes:
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    sheet = workbook["ChungTu"]
+
+    for merged_range in ("B5:C5", "E5:F5", "B6:C6", "E6:F6"):
+        sheet.unmerge_cells(merged_range)
+
+    sheet["A5"] = "TT"
+    sheet["B5"] = "Tên, nhãn hiệu, quy cách, phẩm chất vật tư, dụng cụ, sản phẩm, hàng hóa"
+    sheet["C5"] = "ĐVT"
+    sheet["D5"] = "Số lượng"
+    sheet["D6"] = "Yêu cầu"
+    sheet["E6"] = "Thực nhập"
+    sheet["F5"] = "Đơn giá"
+    sheet["G5"] = "Thành tiền"
+    sheet.merge_cells("A5:A6")
+    sheet.merge_cells("B5:B6")
+    sheet.merge_cells("C5:C6")
+    sheet.merge_cells("D5:E5")
+    sheet.merge_cells("F5:F6")
+    sheet.merge_cells("G5:G6")
+    sheet.row_dimensions[5].height = 20
+    sheet.row_dimensions[6].height = 24
+
+    del workbook.defined_names["TABLE_HEADER"]
+    del workbook.defined_names["TABLE_DATA_ROW"]
+    workbook.defined_names.add(
+        DefinedName("TABLE_HEADER", attr_text="'ChungTu'!$A$5:$G$6")
+    )
+    workbook.defined_names.add(
+        DefinedName("TABLE_DATA_ROW", attr_text="'ChungTu'!$A$7:$G$7")
+    )
+    return _save_workbook(workbook)
+
+
 def test_parse_minimal_template():
     metadata = _parse_template(make_minimal_template())
 
@@ -133,6 +168,24 @@ def test_table_header_vertical_merge_reads_title_from_merge_origin():
 
     assert metadata.table.columns[0].title == "STT"
     assert metadata.table.columns[0].key == "stt"
+
+
+def test_header_vertical_merge_static_cell_uses_full_height():
+    metadata = _parse_template(_make_pnk_like_two_row_header())
+
+    tt = next(
+        cell
+        for cell in metadata.static_cells
+        if cell.layer == "header" and cell.value == "TT"
+    )
+    so_luong = next(
+        cell
+        for cell in metadata.static_cells
+        if cell.layer == "header" and cell.value == "Số lượng"
+    )
+
+    assert tt.height_pt == pytest.approx(44.0)
+    assert so_luong.width_pt > tt.width_pt
 
 
 def test_table_header_rejects_upper_row_merge_outside_bounds():
