@@ -2,7 +2,6 @@ import { NL_FIELD_CATALOG_SCALARS } from "./chung-tu-nl-field.js";
 
 const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
   scalarFields: Object.freeze([
-    buildScalarField("FIELD_ngay_thang_nam", "ngayThangNam", "Ngày DD tháng MM năm YYYY"),
     buildScalarField("FIELD_ngay", "ngay", "Ngày"),
     buildScalarField("FIELD_thang", "thang", "Tháng"),
     buildScalarField("FIELD_nam", "nam", "Năm"),
@@ -13,8 +12,6 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
       { supportsLabel: true },
     ),
     buildScalarField("FIELD_tong_tien", "tongTien", "Tổng tiền (format VND)"),
-    buildScalarField("FIELD_don_vi", "donVi", "Tên đơn vị"),
-    buildScalarField("FIELD_don_vi_cap_tren", "donViCapTren", "Đơn vị cấp trên"),
     buildScalarField("FIELD_quyen_so", "quyenSo", "Quyển số", { supportsLabel: true }),
     buildScalarField("FIELD_so_chung_tu", "soChungTu", "Số chứng từ", { supportsLabel: true }),
     buildScalarField("FIELD_ho_ten_nguoi_mua", "hoTenNguoiMua", "Họ và tên người mua", {

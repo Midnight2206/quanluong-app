@@ -29,6 +29,15 @@ const SCALAR_ALIASES = Object.freeze({
   soPhieu: "soChungTu",
 });
 
+const LEGACY_NL_ONLY_FIELD_NAMES = new Set([
+  "don_vi",
+  "donVi",
+  "don_vi_cap_tren",
+  "donViCapTren",
+  "ngay_thang_nam",
+  "ngayThangNam",
+]);
+
 function snakeToCamel(key) {
   return String(key ?? "").replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
@@ -53,8 +62,9 @@ export function resolveScalarFieldKey(templateFieldKey, { categoryKey } = {}) {
   const raw = String(templateFieldKey ?? "").trim();
   const nlFieldKey = resolveNlFieldKey(raw);
   if (nlFieldKey) return nlFieldKey;
-  const { fieldName: key } = splitNamedRangePrefix(raw);
+  const { prefix, fieldName: key } = splitNamedRangePrefix(raw);
   if (!key) return "";
+  if (prefix === "FIELD_" && LEGACY_NL_ONLY_FIELD_NAMES.has(key)) return "";
   if (key === "can_cu_bkmh" || key === "canCuBkmh") return "";
   if (isPnkCategory(categoryKey) && (key === "dia_chi" || key === "diaChi")) {
     return "diaChi";

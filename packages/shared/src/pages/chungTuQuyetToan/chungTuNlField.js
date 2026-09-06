@@ -2,6 +2,12 @@ export const NL_FIELD_PREFIX = "NL_FIELD_";
 
 const NL_FIELD_KEY_ALIASES = Object.freeze({
   can_cu_pnk: "canCuPnk",
+  don_vi: "donVi",
+  donVi: "donVi",
+  don_vi_cap_tren: "donViCapTren",
+  donViCapTren: "donViCapTren",
+  ngay_thang_nam: "ngayThangNam",
+  ngayThangNam: "ngayThangNam",
 });
 
 function normalizeNamedRange(value) {

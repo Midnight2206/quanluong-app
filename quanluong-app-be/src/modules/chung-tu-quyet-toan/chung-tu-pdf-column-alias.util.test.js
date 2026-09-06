@@ -23,7 +23,15 @@ test("resolveScalarFieldKey maps tong_tien_bang_chu to tongTienBangChu", () => {
   assert.equal(resolveScalarFieldKey("tong_tien_bang_chu"), "tongTienBangChu");
 });
 
-test("resolveScalarFieldKey maps ngay_thang_nam to ngayThangNam", () => {
+test("resolveScalarFieldKey maps shared unit/date fields through NL_FIELD only", () => {
+  assert.equal(resolveScalarFieldKey("NL_FIELD_don_vi"), "donVi");
+  assert.equal(resolveScalarFieldKey("NL_FIELD_don_vi_cap_tren"), "donViCapTren");
+  assert.equal(resolveScalarFieldKey("NL_FIELD_ngay_thang_nam"), "ngayThangNam");
+  assert.equal(resolveScalarFieldKey("FIELD_don_vi"), "");
+  assert.equal(resolveScalarFieldKey("FIELD_don_vi_cap_tren"), "");
+  assert.equal(resolveScalarFieldKey("FIELD_ngay_thang_nam"), "");
+  assert.equal(resolveScalarFieldKey("don_vi"), "donVi");
+  assert.equal(resolveScalarFieldKey("don_vi_cap_tren"), "donViCapTren");
   assert.equal(resolveScalarFieldKey("ngay_thang_nam"), "ngayThangNam");
 });
 

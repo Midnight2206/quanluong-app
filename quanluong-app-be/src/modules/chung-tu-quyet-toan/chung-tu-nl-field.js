@@ -3,6 +3,12 @@ import { NL_FIELD_NAMED_RANGE_PREFIX, splitNamedRangePrefix } from "./chung-tu-n
 const NL_FIELD_KEY_BY_NAME = Object.freeze({
   can_cu_pnk: "canCuPnk",
   canCuPnk: "canCuPnk",
+  don_vi: "donVi",
+  donVi: "donVi",
+  don_vi_cap_tren: "donViCapTren",
+  donViCapTren: "donViCapTren",
+  ngay_thang_nam: "ngayThangNam",
+  ngayThangNam: "ngayThangNam",
 });
 
 export const NL_FIELD_CATALOG_SCALARS = Object.freeze([
@@ -10,6 +16,24 @@ export const NL_FIELD_CATALOG_SCALARS = Object.freeze([
     namedRange: "NL_FIELD_can_cu_pnk",
     fieldKey: "canCuPnk",
     description: "Căn cứ PNK hardcoded từ BKMH (số, ngày, người mua)",
+    supportsLabel: false,
+  }),
+  Object.freeze({
+    namedRange: "NL_FIELD_don_vi",
+    fieldKey: "donVi",
+    description: "Tên đơn vị",
+    supportsLabel: false,
+  }),
+  Object.freeze({
+    namedRange: "NL_FIELD_don_vi_cap_tren",
+    fieldKey: "donViCapTren",
+    description: "Đơn vị cấp trên",
+    supportsLabel: false,
+  }),
+  Object.freeze({
+    namedRange: "NL_FIELD_ngay_thang_nam",
+    fieldKey: "ngayThangNam",
+    description: "Ngày DD tháng MM năm YYYY",
     supportsLabel: false,
   }),
 ]);
@@ -34,6 +58,7 @@ export function isNlFieldNamedRange(name) {
 }
 
 export function resolveNlFieldKey(raw) {
+  if (splitNamedRangePrefix(raw).prefix === "FIELD_") return "";
   const { fieldName } = splitNamedRangePrefix(raw);
   return NL_FIELD_KEY_BY_NAME[fieldName] ?? "";
 }

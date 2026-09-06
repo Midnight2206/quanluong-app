@@ -17,6 +17,15 @@ const SCALAR_ALIASES = Object.freeze({
   soPhieu: "soChungTu",
 });
 
+const LEGACY_NL_ONLY_FIELD_NAMES = new Set([
+  "don_vi",
+  "donVi",
+  "don_vi_cap_tren",
+  "donViCapTren",
+  "ngay_thang_nam",
+  "ngayThangNam",
+]);
+
 function normalizeNamedRange(value) {
   return String(value ?? "").trim();
 }
@@ -47,6 +56,7 @@ export function resolvePdfScalarFieldKey(templateFieldKey, { categoryKey } = {})
 
   const key = stripLabelFieldPrefix(raw);
   if (!key) return "";
+  if (isLabelFieldNamedRange(raw) && LEGACY_NL_ONLY_FIELD_NAMES.has(key)) return "";
   if (key === "can_cu_bkmh" || key === "canCuBkmh") return "";
   if (
     String(categoryKey ?? "").trim() === "phieu-nhap-kho" &&

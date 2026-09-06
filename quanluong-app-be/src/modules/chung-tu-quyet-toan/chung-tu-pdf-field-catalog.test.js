@@ -29,6 +29,20 @@ test("catalog marks supported template label fields", () => {
   assert.equal(supportedKeys.get("nhapTaiKho"), true);
   assert.equal(supportedKeys.get("tongTien"), false);
   assert.equal(supportedKeys.get("donVi"), false);
+  assert.equal(supportedKeys.get("donViCapTren"), false);
+  assert.equal(supportedKeys.get("ngayThangNam"), false);
+});
+
+test("catalog exposes shared unit/date fields as NL_FIELD only", () => {
+  const { scalarFields } = getChungTuPdfFieldCatalog();
+  const byRange = new Map(scalarFields.map((field) => [field.namedRange, field]));
+
+  assert.equal(byRange.has("FIELD_don_vi"), false);
+  assert.equal(byRange.has("FIELD_don_vi_cap_tren"), false);
+  assert.equal(byRange.has("FIELD_ngay_thang_nam"), false);
+  assert.equal(byRange.get("NL_FIELD_don_vi")?.fieldKey, "donVi");
+  assert.equal(byRange.get("NL_FIELD_don_vi_cap_tren")?.fieldKey, "donViCapTren");
+  assert.equal(byRange.get("NL_FIELD_ngay_thang_nam")?.fieldKey, "ngayThangNam");
 });
 
 test("catalog includes PNK người giao scalar descriptions", () => {

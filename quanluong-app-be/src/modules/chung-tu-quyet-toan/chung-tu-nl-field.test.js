@@ -51,6 +51,18 @@ test("resolveNlFieldKey maps NL_FIELD_can_cu_pnk only", () => {
   assert.equal(resolveNlFieldKey("FIELD_can_cu_bkmh"), "");
 });
 
+test("resolveNlFieldKey maps shared unit/date NL fields only", () => {
+  assert.equal(resolveNlFieldKey("NL_FIELD_don_vi"), "donVi");
+  assert.equal(resolveNlFieldKey("NL_FIELD_don_vi_cap_tren"), "donViCapTren");
+  assert.equal(resolveNlFieldKey("NL_FIELD_ngay_thang_nam"), "ngayThangNam");
+  assert.equal(resolveNlFieldKey("don_vi"), "donVi");
+  assert.equal(resolveNlFieldKey("don_vi_cap_tren"), "donViCapTren");
+  assert.equal(resolveNlFieldKey("ngay_thang_nam"), "ngayThangNam");
+  assert.equal(resolveNlFieldKey("FIELD_don_vi"), "");
+  assert.equal(resolveNlFieldKey("FIELD_don_vi_cap_tren"), "");
+  assert.equal(resolveNlFieldKey("FIELD_ngay_thang_nam"), "");
+});
+
 test("isNlFieldNamedRange recognizes NL prefix", () => {
   assert.equal(isNlFieldNamedRange("NL_FIELD_can_cu_pnk"), true);
   assert.equal(isNlFieldNamedRange("FIELD_can_cu_pnk"), false);
@@ -62,6 +74,24 @@ test("NL_FIELD_CATALOG_SCALARS exposes canCuPnk as non-label field", () => {
       namedRange: "NL_FIELD_can_cu_pnk",
       fieldKey: "canCuPnk",
       description: "Căn cứ PNK hardcoded từ BKMH (số, ngày, người mua)",
+      supportsLabel: false,
+    },
+    {
+      namedRange: "NL_FIELD_don_vi",
+      fieldKey: "donVi",
+      description: "Tên đơn vị",
+      supportsLabel: false,
+    },
+    {
+      namedRange: "NL_FIELD_don_vi_cap_tren",
+      fieldKey: "donViCapTren",
+      description: "Đơn vị cấp trên",
+      supportsLabel: false,
+    },
+    {
+      namedRange: "NL_FIELD_ngay_thang_nam",
+      fieldKey: "ngayThangNam",
+      description: "Ngày DD tháng MM năm YYYY",
       supportsLabel: false,
     },
   ]);
