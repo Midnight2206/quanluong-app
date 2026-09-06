@@ -1,5 +1,6 @@
 import { BookOpen, FileText, Home, LayoutDashboard, Users, Warehouse } from "lucide-react";
-import { getMainAppOrigin, getSuperadminAppOrigin } from "@/utils/superadminPortal";
+import { DASHBOARD_SUPERADMIN_TAB_META } from "@/pages/dashboard/superadminDashboardTabMeta";
+import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 /**
  * Sidebar cho user nghiệp vụ / admin đơn vị.
@@ -81,35 +82,14 @@ export const superadminNavItems = [
 ];
 
 /**
- * Sidebar trên cổng superadmin: liên kết về app chính + dashboard nội bộ.
+ * Sidebar trên cổng superadmin: các mục dashboard quản trị hệ thống.
  */
-export const superadminPortalNavItems = [
-  { to: `${getMainAppOrigin()}/`, label: "Ứng dụng chính", icon: Home, external: true },
-  {
-    to: "/dashboard/units",
-    label: "Quản trị hệ thống",
-    icon: LayoutDashboard,
-    activePathPrefix: "/dashboard",
-  },
-  {
-    to: "/lttp-nhap-xuat",
-    label: "Nhập xuất LTTP",
-    icon: Warehouse,
-    requiresAuth: true,
-    routeAccessKey: "nav-lttp-nhap-xuat",
-  },
-  {
-    to: "/users",
-    label: "Người dùng",
-    icon: Users,
-    requiresAuth: true,
-    routeAccessKey: "nav-users",
-  },
-  {
-    to: "/so-sach-bep-an",
-    label: "Sổ sách bếp ăn",
-    icon: BookOpen,
-    requiresAuth: true,
-    routeAccessKey: "nav-kitchen-books",
-  },
-];
+export const superadminPortalNavItems = DASHBOARD_SUPERADMIN_TAB_META.map((t) => ({
+  to: `/dashboard/${t.path}`,
+  label: t.shortLabel,
+  title: t.label,
+  icon: t.icon,
+  section: t.section,
+  requiresAuth: true,
+  routeAccessKey: t.routeAccessKey,
+}));
