@@ -27,6 +27,7 @@ import { formatPeriodLabel, formatPeriodMonth } from "@/pages/chungTuQuyetToan/c
 import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScope";
 import { ChungTuExportWizardCard } from "./ChungTuExportWizard";
 import { ChungTuBkmhSliceSummaryPanel } from "./ChungTuBkmhSliceSummaryPanel.jsx";
+import { ChungTuPnkBatchSummaryPanel } from "./ChungTuPnkBatchSummaryPanel.jsx";
 import { formatVnd } from "@/utils/formatVnd";
 
 const fieldClass =
@@ -73,7 +74,9 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   const [actionError, setActionError] = useState(null);
   const [busyActionKey, setBusyActionKey] = useState("");
   const [selectedMonthly, setSelectedMonthly] = useState(null);
+  const [selectedPnkBatch, setSelectedPnkBatch] = useState(null);
   const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
+  const isPnkCategory = categoryKey === "phieu-nhap-kho";
 
   const { data: monthlyRows = [], isLoading: monthlyLoading } = useChungTuBkmhMonthlyListQuery(
     { storageUnitId: effectiveUnitId },
@@ -226,6 +229,9 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
         unitId: effectiveUnitId,
         categoryKey,
       }).unwrap();
+      if (String(selectedPnkBatch?.batchKey) === String(item.batchKey)) {
+        setSelectedPnkBatch(null);
+      }
       notifySuccess("Đã xóa folder PDF.");
     } catch (e) {
       const message = e?.data?.message || e?.message || "Không xóa được folder PDF.";
@@ -476,7 +482,11 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
         ) : (
           <ChungTuExportWizardCard
             title={`Lịch sử folder PDF (${pdfExportBatches.length})`}
-            description="Mỗi lần xuất tạo một folder; mở từng folder để tải zip, in gộp hoặc tải file lẻ."
+            description={
+              isPnkCategory
+                ? "Mỗi thẻ là một folder PNK đã xuất; có thể in gộp, tải zip hoặc mở tổng hợp file."
+                : "Mỗi lần xuất tạo một folder; mở từng folder để tải zip, in gộp hoặc tải file lẻ."
+            }
             expanded={expandedLayout}
             bodyClassName="space-y-3"
           >
@@ -485,47 +495,121 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
               const templateLabel =
                 templateLabelById.get(String(item.pdfTemplateId ?? "")) ||
                 (item.pdfTemplateId != null ? `Mẫu #${item.pdfTemplateId}` : "—");
+              const batchHeader = (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="flex items-center gap-2 text-sm font-semibold leading-snug text-foreground">
+                        <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{item.displayName || item.batchKey || templateLabel}</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {isPnkCategory
+                          ? `${item.fileCount ?? 0} file · ${formatVnd(item.tongTienFolder)}`
+                          : `${item.fileCount ?? 0} file · ${templateLabel}`}
+                      </p>
+                    </div>
+                    <p className="text-right text-[11px] text-muted-foreground">
+                      {formatExportedAt(item.createdAt)}
+                    </p>
+                  </div>
+
+                  <dl className={cn("grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4", !isPnkCategory && "mt-3")}>
+                    <div className="rounded-lg bg-muted/25 px-2.5 py-2">
+                      <dt className="text-[10px] uppercase text-muted-foreground">Kỳ</dt>
+                      <dd className="mt-0.5 font-medium text-foreground">
+                        {formatPeriodLabel(item, exportKind)}
+                      </dd>
+                    </div>
+                    <div className="rounded-lg bg-muted/25 px-2.5 py-2">
+                      <dt className="text-[10px] uppercase text-muted-foreground">Mẫu</dt>
+                      <dd className="mt-0.5 font-medium leading-snug text-foreground">{templateLabel}</dd>
+                    </div>
+                    <div className="rounded-lg bg-muted/25 px-2.5 py-2">
+                      <dt className="text-[10px] uppercase text-muted-foreground">Người tạo</dt>
+                      <dd className="mt-0.5 font-medium text-foreground">{creatorLabel}</dd>
+                    </div>
+                    <div className="rounded-lg bg-muted/25 px-2.5 py-2">
+                      <dt className="text-[10px] uppercase text-muted-foreground">Chế độ gộp</dt>
+                      <dd className="mt-0.5 font-medium text-foreground">
+                        {aggregationLabelByValue.get(item.aggregationMode) || item.aggregationMode || "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </>
+              );
+
+              if (isPnkCategory) {
+                return (
+                  <div key={item.batchKey} className="space-y-3 rounded-xl border border-border/70 bg-card/30 p-3 sm:p-4">
+                    {batchHeader}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 gap-1.5 text-xs"
+                        disabled={busyActionKey !== "" || deletingExportBatch}
+                        onClick={() => handlePrintBatch(item)}
+                      >
+                        {busyActionKey === `print:${item.batchKey}` ? (
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Printer className="size-3.5" aria-hidden />
+                        )}
+                        In tất cả
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-10 gap-1.5 text-xs"
+                        disabled={busyActionKey !== "" || deletingExportBatch}
+                        onClick={() => handleDownloadZip(item)}
+                      >
+                        {busyActionKey === `zip:${item.batchKey}` ? (
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        ) : (
+                          <Archive className="size-3.5" aria-hidden />
+                        )}
+                        Tải zip
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 gap-1.5 text-xs"
+                        disabled={busyActionKey !== "" || deletingExportBatch}
+                        onClick={() => setSelectedPnkBatch(item)}
+                      >
+                        <Eye className="size-3.5" aria-hidden />
+                        Xem tổng hợp
+                      </Button>
+                      {canWrite ? (
+                        <Button
+                          type="button"
+                          variant="dangerGhost"
+                          className="h-10 gap-1.5 text-xs"
+                          disabled={busyActionKey !== "" || deletingExportBatch}
+                          onClick={() => handleDeleteBatch(item)}
+                        >
+                          {busyActionKey === `delete:${item.batchKey}` ? (
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                          ) : (
+                            <Trash2 className="size-3.5" aria-hidden />
+                          )}
+                          Xóa
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <details
                   key={item.batchKey}
                   className="rounded-xl border border-border/70 bg-card/30"
                 >
                   <summary className="cursor-pointer list-none px-3 py-3 sm:px-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <p className="flex items-center gap-2 text-sm font-semibold leading-snug text-foreground">
-                          <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{item.displayName || item.batchKey || templateLabel}</span>
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {item.fileCount ?? 0} file · {templateLabel}
-                        </p>
-                      </div>
-                      <p className="text-right text-[11px] text-muted-foreground">
-                        {formatExportedAt(item.createdAt)}
-                      </p>
-                    </div>
-
-                    <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                      <div className="rounded-lg bg-muted/25 px-2.5 py-2">
-                        <dt className="text-[10px] uppercase text-muted-foreground">Kỳ</dt>
-                        <dd className="mt-0.5 font-medium text-foreground">
-                          {formatPeriodLabel(item, exportKind)}
-                        </dd>
-                      </div>
-                      <div className="rounded-lg bg-muted/25 px-2.5 py-2">
-                        <dt className="text-[10px] uppercase text-muted-foreground">Mẫu</dt>
-                        <dd className="mt-0.5 font-medium leading-snug text-foreground">{templateLabel}</dd>
-                      </div>
-                      <div className="rounded-lg bg-muted/25 px-2.5 py-2">
-                        <dt className="text-[10px] uppercase text-muted-foreground">Người tạo</dt>
-                        <dd className="mt-0.5 font-medium text-foreground">{creatorLabel}</dd>
-                      </div>
-                      <div className="rounded-lg bg-muted/25 px-2.5 py-2">
-                        <dt className="text-[10px] uppercase text-muted-foreground">Chế độ gộp</dt>
-                        <dd className="mt-0.5 font-medium text-foreground">{item.aggregationMode || "—"}</dd>
-                      </div>
-                    </dl>
+                    {batchHeader}
                   </summary>
 
                   <div className="space-y-3 border-t border-border/70 px-3 py-3 sm:px-4">
@@ -576,46 +660,48 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                       ) : null}
                     </div>
 
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
-                        File trong folder
-                      </p>
-                      {Array.isArray(item.files) && item.files.length > 0 ? (
-                        item.files.map((file) => (
-                          <div
-                            key={file.fileId || file.exportKey}
-                            className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-foreground">
-                                {file.fileName || "PDF"}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground">
-                                {file.sortKey || file.exportKey || "Không có sort key"}
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="h-9 gap-1.5 text-xs sm:self-auto"
-                              disabled={busyActionKey !== "" || deletingExportBatch}
-                              onClick={() => handleDownloadFile(item, file)}
-                            >
-                              {busyActionKey === `file:${item.batchKey}:${file.fileId}` ? (
-                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                              ) : (
-                                <Download className="size-3.5" aria-hidden />
-                              )}
-                              Tải file
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="rounded-lg border border-border/60 bg-background px-3 py-3 text-xs text-muted-foreground">
-                          Folder này chưa có file PDF nào.
+                    {!isBkmhCategory && !isPnkCategory ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
+                          File trong folder
                         </p>
-                      )}
-                    </div>
+                        {Array.isArray(item.files) && item.files.length > 0 ? (
+                          item.files.map((file) => (
+                            <div
+                              key={file.fileId || file.exportKey}
+                              className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-foreground">
+                                  {file.fileName || "PDF"}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {file.sortKey || file.exportKey || "Không có sort key"}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-9 gap-1.5 text-xs sm:self-auto"
+                                disabled={busyActionKey !== "" || deletingExportBatch}
+                                onClick={() => handleDownloadFile(item, file)}
+                              >
+                                {busyActionKey === `file:${item.batchKey}:${file.fileId}` ? (
+                                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                                ) : (
+                                  <Download className="size-3.5" aria-hidden />
+                                )}
+                                Tải file
+                              </Button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="rounded-lg border border-border/60 bg-background px-3 py-3 text-xs text-muted-foreground">
+                            Folder này chưa có file PDF nào.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </details>
               );
@@ -631,6 +717,17 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
           onOpenChange={(open) => {
             if (!open) {
               setSelectedMonthly(null);
+            }
+          }}
+        />
+      ) : null}
+      {isPnkCategory ? (
+        <ChungTuPnkBatchSummaryPanel
+          batch={selectedPnkBatch}
+          open={Boolean(selectedPnkBatch)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedPnkBatch(null);
             }
           }}
         />
