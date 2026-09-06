@@ -22,6 +22,7 @@ import {
   useDeleteChungTuPdfExportBatchMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { useConfirm } from "@/contexts/ConfirmProvider";
 import { formatPeriodLabel, formatPeriodMonth } from "@/pages/chungTuQuyetToan/chungTuFormat";
 import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScope";
 import { ChungTuExportWizardCard } from "./ChungTuExportWizard";
@@ -67,6 +68,7 @@ function formatCreatorLabel(item, currentUser) {
 export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
   const currentUser = useCurrentUser();
+  const { confirm } = useConfirm();
   const { canPickUnits, unitsForDropdown, effectiveUnitId, persistManualUnitId } = useChungTuUnitScope();
   const [actionError, setActionError] = useState(null);
   const [busyActionKey, setBusyActionKey] = useState("");
@@ -209,7 +211,12 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const handleDeleteBatch = async (item) => {
-    const ok = window.confirm("Xóa folder PDF này khỏi lịch sử?");
+    const ok = await confirm({
+      title: "Xóa folder PDF?",
+      message: "Folder PDF này sẽ bị xóa khỏi lịch sử đã xuất.",
+      confirmLabel: "Xóa",
+      variant: "danger",
+    });
     if (!ok) return;
     setActionError(null);
     try {
@@ -230,7 +237,12 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const handleDeleteMonthly = async (item) => {
-    const ok = window.confirm("Xóa tháng BKMH này khỏi lịch sử?");
+    const ok = await confirm({
+      title: "Xóa lịch sử tháng BKMH?",
+      message: "Tháng BKMH này sẽ bị xóa khỏi lịch sử đã lưu.",
+      confirmLabel: "Xóa",
+      variant: "danger",
+    });
     if (!ok) return;
     setActionError(null);
     try {

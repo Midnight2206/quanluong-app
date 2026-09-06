@@ -31,6 +31,7 @@ import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { apiRequest } from "@/services/apiRequest";
 import { changePasswordSchema, meProfileFormSchema } from "@/features/auth/schemas/authSchemas";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { useConfirm } from "@/contexts/ConfirmProvider";
 import { cn } from "@/utils/cn";
 import { resolveMediaUrl } from "@/utils/runtimeEnv";
 
@@ -93,6 +94,7 @@ function formatLockoutRemaining(totalSec) {
 export function ProfilePage() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { confirm } = useConfirm();
   const user = useCurrentUser();
   const avatarUrl = user?.profile?.avatarUrl;
   const avatarDisplaySrc = avatarUrl ? resolveMediaUrl(avatarUrl) : null;
@@ -251,7 +253,13 @@ export function ProfilePage() {
 
   async function onDeleteAvatar() {
     if (!avatarUrl) return;
-    if (!window.confirm("Xóa ảnh đại diện hiện tại?")) return;
+    const ok = await confirm({
+      title: "Xóa ảnh đại diện?",
+      message: "Ảnh đại diện hiện tại sẽ bị xóa khỏi hồ sơ của bạn.",
+      confirmLabel: "Xóa",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await deleteAvatar().unwrap();
       notifySuccess("Đã xóa ảnh đại diện.");

@@ -2,6 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/contexts/ConfirmProvider";
 import { useApplyKitchenMenuAiMutation } from "@/features/kitchen-books/api/kitchenBooksApi";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { MEAL_PERIOD_LABELS } from "./KitchenDishCatalogTab.jsx";
@@ -52,6 +53,7 @@ export function KitchenMenuAiSuggestDialog({
   onApplied,
 }) {
   const [applyAi, { isLoading: applying }] = useApplyKitchenMenuAiMutation();
+  const { confirm } = useConfirm();
 
   if (!open || !preview) {
     return null;
@@ -62,9 +64,12 @@ export function KitchenMenuAiSuggestDialog({
 
   async function handleApply() {
     if (dayHasDishes(menuData)) {
-      const ok = window.confirm(
-        "Ngày này đã có món. Áp dụng AI sẽ ghi đè cả 3 buổi (Sáng/Trưa/Chiều). Tiếp tục?",
-      );
+      const ok = await confirm({
+        title: "Ghi đè thực đơn hiện có?",
+        message: "Ngày này đã có món. Áp dụng AI sẽ ghi đè cả 3 buổi (Sáng/Trưa/Chiều).",
+        confirmLabel: "Tiếp tục",
+        variant: "default",
+      });
       if (!ok) {
         return;
       }
