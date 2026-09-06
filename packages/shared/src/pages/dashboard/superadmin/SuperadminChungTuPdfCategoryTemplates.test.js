@@ -28,9 +28,17 @@ test("superadmin PDF templates screen saves per-template field labels", () => {
   assert.match(superadminTemplatesSource, /Lưu nhãn field/);
   assert.match(superadminTemplatesSource, /Mẫu không có Named Range FIELD_/);
   assert.match(superadminTemplatesSource, /Mẫu đã ngừng dùng chỉ xem được nhãn đã lưu/);
+  assert.match(superadminTemplatesSource, /role="dialog"/);
+  assert.match(superadminTemplatesSource, /aria-modal="true"/);
+  assert.match(superadminTemplatesSource, /setFieldLabelsModalOpen\(true\)/);
+  assert.match(superadminTemplatesSource, /Nhãn field cho mẫu/);
   assert.doesNotMatch(superadminTemplatesSource, /supportsLabel/);
   assert.doesNotMatch(
     superadminTemplatesSource,
     /fieldsLoading \|\| fieldCatalogLoading/,
+  );
+  assert.doesNotMatch(
+    superadminTemplatesSource,
+    /Named Range trên mẫu[\s\S]{0,1200}Danh sách này lấy từ scalar field trên mẫu đang chọn/,
   );
 });
