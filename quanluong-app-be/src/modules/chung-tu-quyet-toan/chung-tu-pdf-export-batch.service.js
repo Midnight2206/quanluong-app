@@ -138,7 +138,7 @@ function mapBatchExportRow(row, batchKey) {
     fileName: row.fileName,
     sortKey: row.sortKey ?? null,
     soChungTu: summary?.soChungTu ?? null,
-    periodDate: summary?.periodDate ?? toIsoDateOnly(row.periodDate),
+    periodDate: summary?.periodDate ?? null,
     ngayThangNam: summary?.ngayThangNam ?? null,
     tongTien: summary?.tongTien ?? null,
     recipientUnitName: summary?.recipientUnitName ?? null,

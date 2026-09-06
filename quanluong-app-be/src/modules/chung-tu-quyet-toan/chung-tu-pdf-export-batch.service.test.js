@@ -125,7 +125,9 @@ mock.module("../../services/document-service.client.js", {
 });
 
 const { pickExportSlices } = await import("./chung-tu-pdf-batch-slices.util.js");
-const { createChungTuPdfExportBatch } = await import("./chung-tu-pdf-export-batch.service.js");
+const { createChungTuPdfExportBatch, getChungTuPdfExportBatch } = await import(
+  "./chung-tu-pdf-export-batch.service.js"
+);
 
 test.beforeEach(() => {
   prismaTemplateFindFirst.mock.resetCalls();
@@ -411,6 +413,58 @@ test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + 
   } finally {
     randomBytesMock.mock.restore();
   }
+});
+
+test("getChungTuPdfExportBatch leaves summary fields null when summaryJson is missing", async () => {
+  const now = new Date("2026-08-23T05:00:00.000Z");
+  prismaBatchFindUnique.mock.mockImplementationOnce(async () => ({
+    id: 42,
+    batchKey: "ctpdf_batch_legacy",
+    categoryKey: "bang-ke-mua-hang",
+    unitId: 9,
+    periodMonth: "2026-06",
+    periodDate: new Date("2026-06-01T00:00:00.000Z"),
+    issueSlipId: null,
+    unitIdsJson: [10],
+    aggregationMode: "by-day",
+    pdfTemplateId: 15,
+    documentServiceTemplateId: 901,
+    documentServiceFolderId: 700,
+    displayName: "BKMH legacy",
+    fileCount: 1,
+    sourceDataHash: "legacy-hash",
+    signaturesJson: { signatures: {}, signatureDates: {} },
+    createdById: 88,
+    createdAt: now,
+    updatedAt: now,
+    exports: [
+      {
+        id: 1,
+        exportKey: "ctpdf_legacy_1",
+        fileName: "2026-06-01.pdf",
+        documentServiceFileId: 10,
+        sortKey: "2026-06-01",
+        summaryJson: null,
+        periodDate: new Date("2026-06-01T00:00:00.000Z"),
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+  }));
+
+  const result = await getChungTuPdfExportBatch({
+    batchKey: "ctpdf_batch_legacy",
+    effectiveUnitIds: [9, 10],
+  });
+
+  assert.equal(result.files.length, 1);
+  const file = result.files[0];
+  assert.equal(file.soChungTu, null);
+  assert.equal(file.periodDate, null);
+  assert.equal(file.ngayThangNam, null);
+  assert.equal(file.tongTien, null);
+  assert.equal(file.recipientUnitName, null);
+  assert.equal(file.summary, null);
 });
 
 test("createChungTuPdfExportBatch passes template fieldLabelsJson into rendered payload", async () => {
