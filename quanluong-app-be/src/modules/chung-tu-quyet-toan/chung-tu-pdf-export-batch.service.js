@@ -26,6 +26,10 @@ import { extractTemplateKeys } from "./chung-tu-pdf-export.service.js";
 import { getChungTuSignatureSettings } from "./chung-tu-signature-settings.service.js";
 import { pickExportSlices } from "./chung-tu-pdf-batch-slices.util.js";
 import { fillSignatureDatesFromPeriod } from "./chung-tu-signature-dates.util.js";
+import {
+  buildExportSummaryFromContext,
+  sumFolderTongTien,
+} from "./chung-tu-pdf-export-summary.util.js";
 
 function assertUnitInEffectiveBranch(unitId, effectiveUnitIds) {
   const uid = Number(unitId);
@@ -123,12 +127,22 @@ function buildBatchDisplayName({ meta, aggregationMode, periodDate, periodMonth,
 
 function mapBatchExportRow(row, batchKey) {
   const fileId = row.documentServiceFileId ?? null;
+  const summary =
+    row.summaryJson && typeof row.summaryJson === "object" && !Array.isArray(row.summaryJson)
+      ? row.summaryJson
+      : null;
   return {
     id: row.id,
     exportKey: row.exportKey,
     fileId,
     fileName: row.fileName,
     sortKey: row.sortKey ?? null,
+    soChungTu: summary?.soChungTu ?? null,
+    periodDate: summary?.periodDate ?? toIsoDateOnly(row.periodDate),
+    ngayThangNam: summary?.ngayThangNam ?? null,
+    tongTien: summary?.tongTien ?? null,
+    recipientUnitName: summary?.recipientUnitName ?? null,
+    summary,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     downloadPath:
@@ -166,6 +180,7 @@ function mapBatchRow(row) {
     updatedAt: row.updatedAt.toISOString(),
     zipPath: `/chungtuquyettoan/pdf-export-batches/${row.batchKey}/zip`,
     mergedPdfPath: `/chungtuquyettoan/pdf-export-batches/${row.batchKey}/merged.pdf`,
+    tongTienFolder: sumFolderTongTien(files),
     files,
   };
 }
@@ -324,6 +339,7 @@ async function createChungTuPdfExportBatch({
         fileName: file.file_name,
         documentServiceFileId: Number(file.file_id),
         sortKey: slice.sortKey ?? null,
+        summaryJson: buildExportSummaryFromContext(slice.context),
       });
     }
 
@@ -374,6 +390,7 @@ async function createChungTuPdfExportBatch({
             fileName: file.fileName,
             documentServiceFileId: file.documentServiceFileId,
             sortKey: file.sortKey,
+            summaryJson: file.summaryJson,
             sourceDataHash,
             signaturesJson: {
               signatures,

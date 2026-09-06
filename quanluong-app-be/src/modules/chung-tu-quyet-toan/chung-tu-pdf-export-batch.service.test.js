@@ -33,25 +33,35 @@ const resolveChungTuContext = mock.fn(async () => ({
     periodMonth: "2026-06",
     sheetContexts: [
       {
+        soChungTu: "CT-0601",
         periodDate: "2026-06-01",
         donVi: "Kho A",
+        recipientUnitName: "Đại đội 1",
+        ngayThangNam: "Ngày 01 tháng 06 năm 2026",
         tongTien: "1.000",
         detailRows: [{ stt: 1, tenHang: "Gạo" }],
       },
       {
+        soChungTu: "CT-0602",
         periodDate: "2026-06-02",
         donVi: "Kho A",
+        recipientUnitName: "Đại đội 1",
+        ngayThangNam: "Ngày 02 tháng 06 năm 2026",
         tongTien: "0",
         detailRows: [],
       },
       {
+        soChungTu: "CT-0603",
         periodDate: "2026-06-03",
         donVi: "Kho A",
+        recipientUnitName: "Đại đội 2",
+        ngayThangNam: "Ngày 03 tháng 06 năm 2026",
         tongTien: "1.000",
         detailRows: [{ stt: 1, tenHang: "Muối" }],
       },
     ],
     detailRows: [{ stt: 1, tenHang: "Gạo" }, { stt: 2, tenHang: "Muối" }],
+    soChungTu: "CT-THANG-06",
     tongTien: "2.000",
     donVi: "Kho A",
   },
@@ -269,11 +279,32 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
     assert.equal(createdPayload.exports.create.length, 2);
     assert.equal(createdPayload.exports.create[0].documentServiceFileId, 10);
     assert.equal(createdPayload.exports.create[1].documentServiceFileId, 11);
+    assert.deepEqual(createdPayload.exports.create[0].summaryJson, {
+      soChungTu: "CT-0601",
+      periodDate: "2026-06-01",
+      ngayThangNam: "Ngày 01 tháng 06 năm 2026",
+      tongTien: 1000,
+      recipientUnitName: "Đại đội 1",
+    });
+    assert.deepEqual(createdPayload.exports.create[1].summaryJson, {
+      soChungTu: "CT-0603",
+      periodDate: "2026-06-03",
+      ngayThangNam: "Ngày 03 tháng 06 năm 2026",
+      tongTien: 1000,
+      recipientUnitName: "Đại đội 2",
+    });
 
     assert.equal(result.fileCount, 2);
     assert.equal(result.folderId, 700);
+    assert.equal(result.tongTienFolder, 2000);
     assert.equal(result.files.length, 2);
     assert.equal(result.files[0].fileName, "2026-06-01.pdf");
+    assert.equal(result.files[0].soChungTu, "CT-0601");
+    assert.equal(result.files[0].periodDate, "2026-06-01");
+    assert.equal(result.files[0].ngayThangNam, "Ngày 01 tháng 06 năm 2026");
+    assert.equal(result.files[0].tongTien, 1000);
+    assert.equal(result.files[0].recipientUnitName, "Đại đội 1");
+    assert.deepEqual(result.files[0].summary, createdPayload.exports.create[0].summaryJson);
     assert.equal(
       result.files[0].downloadPath,
       `/chungtuquyettoan/pdf-export-batches/${result.batchKey}/files/10`,

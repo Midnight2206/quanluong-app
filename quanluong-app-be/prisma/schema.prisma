@@ -343,6 +343,7 @@ model ChungTuPdfExport {
   batchId                    Int?
   documentServiceFileId      Int?
   sortKey                    String?                @db.VarChar(128)
+  summaryJson                Json?
   sourceDataHash             String?                @db.VarChar(64)
   signaturesJson             Json?
   createdById                Int
