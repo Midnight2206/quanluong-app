@@ -120,7 +120,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
           const classNameBuilder = ({ isActive }) => {
             const active = navItemPathMatches(item, pathname) || isActive;
             return cn(
-              "flex min-h-[3.25rem] shrink-0 min-w-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-medium leading-tight transition touch-manipulation sm:min-w-[4rem] sm:gap-1 sm:text-[11px]",
+              "flex min-h-[3.25rem] flex-1 min-w-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-medium leading-tight transition touch-manipulation sm:min-w-[4rem] sm:gap-1 sm:text-[11px]",
               active
                 ? "bg-secondary text-foreground"
                 : "text-muted-foreground active:bg-secondary/90 active:text-foreground",

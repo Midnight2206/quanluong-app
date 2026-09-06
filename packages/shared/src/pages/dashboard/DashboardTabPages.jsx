@@ -2,7 +2,6 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Building2 } from "lucide-react";
 import { startNavigationIntent } from "@/components/navigation/navigationIntentStore";
 import { UnitPathBreadcrumb } from "@/components/common/UnitPathBreadcrumb";
 import { Card, CardContent } from "@/components/ui/Card";

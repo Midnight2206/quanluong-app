@@ -36,9 +36,6 @@ const nextConfig = {
     ACCESS_TOKEN_COOKIE_NAME: process.env.ACCESS_TOKEN_COOKIE_NAME || "ql.at",
     REFRESH_TOKEN_COOKIE_NAME: process.env.REFRESH_TOKEN_COOKIE_NAME || "ql.rt",
   },
-  async redirects() {
-    return [];
-  },
   async rewrites() {
     const socketOrigin = process.env.NEXT_INTERNAL_API_ORIGIN;
     if (!socketOrigin || String(socketOrigin).trim() === "") {
