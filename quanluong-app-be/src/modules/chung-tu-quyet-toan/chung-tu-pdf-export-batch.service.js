@@ -73,6 +73,7 @@ function buildBatchKey() {
 }
 
 const PNK_NGUOI_GIAO_SLOT_KEY = "nguoi_giao";
+const PXK_NGUOI_NHAN_SLOT_KEY = "nguoi_nhan";
 
 function materializePnkNguoiGiaoSignatureBlock(signatureBlock, context) {
   if (!signatureBlock || typeof signatureBlock !== "object") return signatureBlock;
@@ -94,6 +95,36 @@ function materializePnkNguoiGiaoSignatureBlock(signatureBlock, context) {
   };
   const otherSlots = rawSlots.filter(
     (slot) => !(slot && typeof slot === "object" && String(slot.key ?? "").trim() === PNK_NGUOI_GIAO_SLOT_KEY),
+  );
+  return {
+    ...signatureBlock,
+    slots: [lockedSlot, ...otherSlots],
+  };
+}
+
+function materializePxkNguoiNhanSignatureBlock(signatureBlock, context) {
+  if (!signatureBlock || typeof signatureBlock !== "object") return signatureBlock;
+  const rawSlots = Array.isArray(signatureBlock.slots) ? signatureBlock.slots : [];
+  const existingSlot =
+    rawSlots.find(
+      (slot) => slot && typeof slot === "object" && String(slot.key ?? "").trim() === PXK_NGUOI_NHAN_SLOT_KEY,
+    ) ?? null;
+  const signatureName =
+    String(context?.signatureName ?? "").trim() || String(context?.nguoiNhan ?? "").trim();
+  const lockedSlot = {
+    ...(existingSlot && typeof existingSlot === "object" ? existingSlot : {}),
+    key: PXK_NGUOI_NHAN_SLOT_KEY,
+    label: "NGƯỜI NHẬN",
+    col: Number.isFinite(Number(existingSlot?.col)) ? Number(existingSlot.col) : 0,
+    col_span: Number.isFinite(Number(existingSlot?.col_span)) ? Number(existingSlot.col_span) : 1,
+    source: "static",
+    static_name: signatureName,
+    locked: true,
+    show_date_line: Boolean(existingSlot?.show_date_line),
+  };
+  const otherSlots = rawSlots.filter(
+    (slot) =>
+      !(slot && typeof slot === "object" && String(slot.key ?? "").trim() === PXK_NGUOI_NHAN_SLOT_KEY),
   );
   return {
     ...signatureBlock,
@@ -222,6 +253,7 @@ async function createChungTuPdfExportBatch({
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
   const meta = assertKnownCategoryKey(categoryKey);
   const isPnk = categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO;
+  const isPxk = categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO;
   const selectedUnitIds = periodMonth && !isPnk
     ? resolveSelectedUnitIds({ unitIds, unitId, effectiveUnitIds })
     : undefined;
@@ -271,6 +303,10 @@ async function createChungTuPdfExportBatch({
     resolveArgs.lyDoNhapKho = String(savedSignatureSettings?.extraFields?.lyDoNhapKho ?? "").trim();
     resolveArgs.nhapTaiKho = String(savedSignatureSettings?.extraFields?.nhapTaiKho ?? "").trim();
   }
+  if (isPxk) {
+    resolveArgs.xuatTaiKho = String(savedSignatureSettings?.extraFields?.xuatTaiKho ?? "").trim();
+    resolveArgs.diaDiem = String(savedSignatureSettings?.extraFields?.diaDiem ?? "").trim();
+  }
   const { context, sourceDataHash } = await resolveChungTuContext(resolveArgs);
 
   const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
@@ -306,7 +342,9 @@ async function createChungTuPdfExportBatch({
     for (const slice of slices) {
       const sliceSignatureBlock = isPnk
         ? materializePnkNguoiGiaoSignatureBlock(finalSignatureBlock, slice.context)
-        : finalSignatureBlock;
+        : isPxk
+          ? materializePxkNguoiNhanSignatureBlock(finalSignatureBlock, slice.context)
+          : finalSignatureBlock;
       const sliceSignatureDates = fillSignatureDatesFromPeriod({
         signatureBlock: sliceSignatureBlock,
         signatureDates,

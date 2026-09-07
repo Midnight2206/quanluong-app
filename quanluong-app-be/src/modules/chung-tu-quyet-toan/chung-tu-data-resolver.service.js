@@ -988,6 +988,21 @@ async function resolveMonthlySheetContexts({
   };
 }
 
+function attachPxkSignatureExtraFields(monthly, { xuatTaiKho, diaDiem }) {
+  if (!monthly || typeof monthly !== "object") return;
+  const safeXuatTaiKho = String(xuatTaiKho ?? "").trim();
+  const safeDiaDiem = String(diaDiem ?? "").trim();
+  if (monthly.rootContext && typeof monthly.rootContext === "object") {
+    monthly.rootContext.xuatTaiKho = safeXuatTaiKho;
+    monthly.rootContext.diaDiem = safeDiaDiem;
+  }
+  for (const ctx of monthly.sheetContexts ?? []) {
+    if (!ctx || typeof ctx !== "object") continue;
+    ctx.xuatTaiKho = safeXuatTaiKho;
+    ctx.diaDiem = safeDiaDiem;
+  }
+}
+
 export async function resolveChungTuContext({
   categoryKey,
   unitId,
@@ -1003,6 +1018,8 @@ export async function resolveChungTuContext({
   resolvedBkmhBuyer = null,
   lyDoNhapKho,
   nhapTaiKho,
+  xuatTaiKho,
+  diaDiem,
 }) {
   const meta = assertKnownCategoryKey(categoryKey);
   const [profile, bkmhHeaderSettings, catalogBuyer] = await Promise.all([
@@ -1165,6 +1182,7 @@ export async function resolveChungTuContext({
           periodDate: ctx.periodDate,
         });
       }
+      attachPxkSignatureExtraFields(monthly, { xuatTaiKho, diaDiem });
     }
     const hashPayload = {
       categoryKey,

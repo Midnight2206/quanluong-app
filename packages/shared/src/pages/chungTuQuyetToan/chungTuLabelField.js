@@ -64,6 +64,12 @@ export function resolvePdfScalarFieldKey(templateFieldKey, { categoryKey } = {})
   ) {
     return "diaChi";
   }
+  if (
+    String(categoryKey ?? "").trim() === "phieu-xuat-kho" &&
+    (key === "dia_chi" || key === "diaChi")
+  ) {
+    return "diaChi";
+  }
   if (SCALAR_ALIASES[key]) return SCALAR_ALIASES[key];
   if (STATIC_ALIASES[key]) return STATIC_ALIASES[key];
   if (camelToSnake(key) === key) return snakeToCamel(key);

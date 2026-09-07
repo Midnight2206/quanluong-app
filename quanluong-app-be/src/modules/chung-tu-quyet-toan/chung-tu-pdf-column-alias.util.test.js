@@ -69,6 +69,21 @@ test("resolveScalarFieldKey maps PNK dia_chi to diaChi", () => {
   assert.equal(resolveScalarFieldKey("diaChi", { categoryKey: "phieu-nhap-kho" }), "diaChi");
 });
 
+test("resolveScalarFieldKey maps PXK scalar aliases", () => {
+  assert.equal(resolveScalarFieldKey("FIELD_nguoi_nhan"), "nguoiNhan");
+  assert.equal(resolveScalarFieldKey("nguoi_nhan"), "nguoiNhan");
+  assert.equal(resolveScalarFieldKey("FIELD_ly_do_xuat_kho"), "lyDoXuatKho");
+  assert.equal(resolveScalarFieldKey("ly_do_xuat_kho"), "lyDoXuatKho");
+  assert.equal(resolveScalarFieldKey("FIELD_xuat_tai_kho"), "xuatTaiKho");
+  assert.equal(resolveScalarFieldKey("xuat_tai_kho"), "xuatTaiKho");
+  assert.equal(resolveScalarFieldKey("FIELD_dia_diem"), "diaDiem");
+  assert.equal(resolveScalarFieldKey("dia_diem"), "diaDiem");
+  assert.equal(
+    resolveScalarFieldKey("FIELD_dia_chi", { categoryKey: "phieu-xuat-kho" }),
+    "diaChi",
+  );
+});
+
 test("resolveScalarFieldKey maps so/soPhieu aliases to soChungTu", () => {
   assert.equal(resolveScalarFieldKey("so"), "soChungTu");
   assert.equal(resolveScalarFieldKey("so_phieu"), "soChungTu");

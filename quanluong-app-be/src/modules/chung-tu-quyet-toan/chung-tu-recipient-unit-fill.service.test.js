@@ -130,6 +130,11 @@ test("PXK and PNK include recipient named ranges", () => {
   const pnk = getDerivedNamedRangeSetForCategory(CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO);
   assert.ok(pxk.has("nguoiNhanHang"));
   assert.ok(pxk.has("donVi"));
+  assert.ok(pxk.has("nguoiNhan"));
+  assert.ok(pxk.has("diaChi"));
+  assert.ok(pxk.has("lyDoXuatKho"));
+  assert.ok(pxk.has("xuatTaiKho"));
+  assert.ok(pxk.has("diaDiem"));
   assert.ok(pnk.has("nguoiNhanHang"));
   assert.ok(pnk.has("donVi"));
   assert.ok(pnk.has("canCuPnk"));

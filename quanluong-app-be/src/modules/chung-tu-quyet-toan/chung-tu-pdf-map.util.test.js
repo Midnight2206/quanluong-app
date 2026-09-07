@@ -137,6 +137,35 @@ test("pickMappedFields maps PNK người giao scalar fields", () => {
   );
 });
 
+test("pickMappedFields maps PXK scalar fields", () => {
+  assert.deepEqual(
+    pickMappedFields(
+      {
+        nguoiNhan: "Nguyễn Văn A",
+        diaChi: "Phòng hậu cần",
+        lyDoXuatKho: "Cấp tiếp phẩm tháng 06 năm 2026",
+        xuatTaiKho: "Kho trung tâm",
+        diaDiem: "Doanh trại A",
+      },
+      [
+        "FIELD_nguoi_nhan",
+        "FIELD_dia_chi",
+        "FIELD_ly_do_xuat_kho",
+        "FIELD_xuat_tai_kho",
+        "FIELD_dia_diem",
+      ],
+      { categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO },
+    ),
+    {
+      FIELD_nguoi_nhan: "Nguyễn Văn A",
+      FIELD_dia_chi: "Phòng hậu cần",
+      FIELD_ly_do_xuat_kho: "Cấp tiếp phẩm tháng 06 năm 2026",
+      FIELD_xuat_tai_kho: "Kho trung tâm",
+      FIELD_dia_diem: "Doanh trại A",
+    },
+  );
+});
+
 assert.deepEqual(
   mapDetailRows(
     [{ stt: "1", tenHang: "Gạo", thanhTien: "10.000", ignoreMe: true }],

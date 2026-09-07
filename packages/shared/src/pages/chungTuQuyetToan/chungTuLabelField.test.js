@@ -27,3 +27,14 @@ test("resolvePdfScalarFieldKey keeps scalar aliases and NL mapping", () => {
   assert.equal(resolvePdfScalarFieldKey("can_cu_pnk"), "canCuPnk");
   assert.equal(resolvePdfScalarFieldKey("FIELD_can_cu_bkmh"), "");
 });
+
+test("resolvePdfScalarFieldKey maps PXK scalar aliases", () => {
+  assert.equal(resolvePdfScalarFieldKey("FIELD_nguoi_nhan"), "nguoiNhan");
+  assert.equal(resolvePdfScalarFieldKey("FIELD_ly_do_xuat_kho"), "lyDoXuatKho");
+  assert.equal(resolvePdfScalarFieldKey("FIELD_xuat_tai_kho"), "xuatTaiKho");
+  assert.equal(resolvePdfScalarFieldKey("FIELD_dia_diem"), "diaDiem");
+  assert.equal(
+    resolvePdfScalarFieldKey("FIELD_dia_chi", { categoryKey: "phieu-xuat-kho" }),
+    "diaChi",
+  );
+});

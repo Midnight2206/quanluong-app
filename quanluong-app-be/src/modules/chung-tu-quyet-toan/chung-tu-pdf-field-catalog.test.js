@@ -68,3 +68,36 @@ test("catalog includes PNK người giao scalar descriptions", () => {
   assert.equal(nhapTaiKho.fieldKey, "nhapTaiKho");
   assert.match(String(nhapTaiKho.description), /nhập tại kho/i);
 });
+
+test("catalog includes PXK scalar descriptions", () => {
+  const { scalarFields } = getChungTuPdfFieldCatalog();
+  const nguoiNhan = scalarFields.find((f) => f.namedRange === "FIELD_nguoi_nhan");
+  const diaChi = scalarFields.find((f) => f.namedRange === "FIELD_dia_chi");
+  const lyDoXuatKho = scalarFields.find((f) => f.namedRange === "FIELD_ly_do_xuat_kho");
+  const xuatTaiKho = scalarFields.find((f) => f.namedRange === "FIELD_xuat_tai_kho");
+  const diaDiem = scalarFields.find((f) => f.namedRange === "FIELD_dia_diem");
+
+  assert.ok(nguoiNhan);
+  assert.equal(nguoiNhan.fieldKey, "nguoiNhan");
+  assert.equal(nguoiNhan.supportsLabel, true);
+  assert.match(String(nguoiNhan.description), /người nhận/i);
+
+  assert.ok(diaChi);
+  assert.equal(diaChi.fieldKey, "diaChi");
+  assert.equal(diaChi.supportsLabel, true);
+
+  assert.ok(lyDoXuatKho);
+  assert.equal(lyDoXuatKho.fieldKey, "lyDoXuatKho");
+  assert.equal(lyDoXuatKho.supportsLabel, true);
+  assert.match(String(lyDoXuatKho.description), /lý do xuất kho/i);
+
+  assert.ok(xuatTaiKho);
+  assert.equal(xuatTaiKho.fieldKey, "xuatTaiKho");
+  assert.equal(xuatTaiKho.supportsLabel, true);
+  assert.match(String(xuatTaiKho.description), /xuất tại kho/i);
+
+  assert.ok(diaDiem);
+  assert.equal(diaDiem.fieldKey, "diaDiem");
+  assert.equal(diaDiem.supportsLabel, true);
+  assert.match(String(diaDiem.description), /địa điểm/i);
+});

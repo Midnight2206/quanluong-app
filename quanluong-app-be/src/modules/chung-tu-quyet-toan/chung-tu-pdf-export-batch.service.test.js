@@ -316,6 +316,98 @@ test("createChungTuPdfExportBatch creates a folder batch with one file per non-e
   }
 });
 
+test("createChungTuPdfExportBatch forwards PXK extra fields and materializes nguoi_nhan slot", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 17,
+    categoryKey: "phieu-xuat-kho",
+    displayName: "PXK A",
+    documentServiceTemplateId: 903,
+    status: "published",
+  }));
+  resolveChungTuContext.mock.mockImplementationOnce(async () => ({
+    context: {
+      periodMonth: "2026-06",
+      lyDoXuatKho: "Cap tiep pham thang 06 nam 2026",
+      xuatTaiKho: "Kho trung tam",
+      diaDiem: "Doanh trai A",
+      sheetContexts: [
+        {
+          periodDate: "2026-06-01",
+          signatureName: "Th/tá Nguyen Van A",
+          nguoiNhan: "Nguyen Van A",
+          lyDoXuatKho: "Cap tiep pham thang 06 nam 2026",
+          xuatTaiKho: "Kho trung tam",
+          diaDiem: "Doanh trai A",
+          detailRows: [{ stt: 1, tenHang: "Gao" }],
+        },
+      ],
+      detailRows: [{ stt: 1, tenHang: "Gao" }],
+    },
+    sourceDataHash: "pxk-hash-123",
+  }));
+  prismaSignatureSettingsFindUnique.mock.mockImplementation(async () => ({
+    id: 7,
+    categoryKey: "phieu-xuat-kho",
+    signatureBlockJson: { columns: 2, slots: [{ key: "nguoi_nhan", label: "Nguoi nhan" }] },
+    extraFieldsJson: { xuatTaiKho: "Kho trung tam", diaDiem: "Doanh trai A" },
+    updatedById: 88,
+    createdAt: new Date("2026-08-22T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-22T00:00:00.000Z"),
+  }));
+
+  const randomBytesMock = mock.method(crypto, "randomBytes", () =>
+    Buffer.from("abcdef123456", "hex"),
+  );
+  try {
+    await createChungTuPdfExportBatch({
+      categoryKey: "phieu-xuat-kho",
+      unitId: 9,
+      periodMonth: "2026-06",
+      aggregationMode: "by-unit",
+      pdfTemplateId: 17,
+      unitIds: [10],
+      exportingUserProfile: { donVi: "Kho A" },
+      signatures: {},
+      signatureDates: {},
+      settings: {},
+      createdById: 88,
+      effectiveUnitIds: [9, 10, 11],
+    });
+
+    assert.deepEqual(resolveChungTuContext.mock.calls[0].arguments[0], {
+      categoryKey: "phieu-xuat-kho",
+      unitId: 9,
+      periodDate: undefined,
+      periodMonth: "2026-06",
+      issueSlipId: undefined,
+      unitIds: [10],
+      aggregationMode: "by-unit",
+      xuatTaiKho: "Kho trung tam",
+      diaDiem: "Doanh trai A",
+      exportingUserProfile: { donVi: "Kho A" },
+      settings: {},
+    });
+    assert.equal(renderToDocumentFolder.mock.callCount(), 1);
+    assert.deepEqual(renderToDocumentFolder.mock.calls[0].arguments[1].signatureBlock, {
+      columns: 2,
+      slots: [
+        {
+          key: "nguoi_nhan",
+          label: "NGƯỜI NHẬN",
+          col: 0,
+          col_span: 1,
+          source: "static",
+          static_name: "Th/tá Nguyen Van A",
+          locked: true,
+          show_date_line: false,
+        },
+      ],
+    });
+  } finally {
+    randomBytesMock.mock.restore();
+  }
+});
+
 test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + PNK extra fields", async () => {
   prismaTemplateFindFirst.mock.mockImplementation(async () => ({
     id: 16,

@@ -46,6 +46,10 @@ function isPnkCategory(categoryKey) {
   return String(categoryKey ?? "").trim() === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO;
 }
 
+function isPxkCategory(categoryKey) {
+  return String(categoryKey ?? "").trim() === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO;
+}
+
 export function resolveColumnFieldKey(templateColumnKey) {
   const key = String(templateColumnKey ?? "").trim();
   if (!key) return "";
@@ -67,6 +71,9 @@ export function resolveScalarFieldKey(templateFieldKey, { categoryKey } = {}) {
   if (prefix === "FIELD_" && LEGACY_NL_ONLY_FIELD_NAMES.has(key)) return "";
   if (key === "can_cu_bkmh" || key === "canCuBkmh") return "";
   if (isPnkCategory(categoryKey) && (key === "dia_chi" || key === "diaChi")) {
+    return "diaChi";
+  }
+  if (isPxkCategory(categoryKey) && (key === "dia_chi" || key === "diaChi")) {
     return "diaChi";
   }
   if (SCALAR_ALIASES[key]) return SCALAR_ALIASES[key];
