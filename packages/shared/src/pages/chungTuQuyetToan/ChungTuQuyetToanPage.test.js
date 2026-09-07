@@ -61,6 +61,20 @@ test("BKMH signature workspace shows auto-resolved header info instead of manual
   assert.doesNotMatch(signatureSettingsSource, /registerBkmhHeader\("boPhan"\)/);
 });
 
+test("PXK signature workspace saves xuatTaiKho + diaDiem and locks thu_kho + nguoi_nhan slots", () => {
+  assert.match(signatureSettingsSource, /categoryKey === "phieu-xuat-kho"/);
+  assert.match(signatureSettingsSource, /key:\s*"thu_kho"/);
+  assert.match(signatureSettingsSource, /key:\s*"nguoi_nhan"/);
+  assert.match(signatureSettingsSource, /register\("extraFields\.xuatTaiKho"\)/);
+  assert.match(signatureSettingsSource, /register\("extraFields\.diaDiem"\)/);
+  assert.match(signatureSettingsSource, /FIELD_xuat_tai_kho/);
+  assert.match(signatureSettingsSource, /FIELD_dia_diem/);
+  assert.match(signatureSettingsSource, /xuatTaiKho/);
+  assert.match(signatureSettingsSource, /diaDiem/);
+  assert.match(signatureSettingsSource, /ensurePxkSignatureBlock/);
+  assert.match(signatureSettingsSource, /slotValue\?\.locked/);
+});
+
 test("PNK signature workspace saves lyDoNhapKho + nhapTaiKho and locks nguoi_giao slot", () => {
   assert.match(apiSource, /extraFields/);
   assert.match(signatureSettingsSource, /categoryKey === "phieu-nhap-kho"/);

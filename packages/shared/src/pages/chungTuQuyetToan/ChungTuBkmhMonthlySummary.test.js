@@ -102,7 +102,8 @@ test("PNK monthly export uses date range and only allows by-day or full aggregat
   assert.match(exportWorkspaceSource, /label: "Nhiều ngày"/);
   assert.match(exportWorkspaceSource, /1 PDF \/ buyer x ngày/);
   assert.match(exportWorkspaceSource, /1 PDF \/ buyer, gộp nhiều ngày/);
-  assert.match(exportWorkspaceSource, /aggregationOptions = useMemo\(\s*\(\) => \(isPnkMonthly \? PNK_AGGREGATION_MODE_OPTIONS : CHUNG_TU_AGGREGATION_MODE_OPTIONS\)/);
+  assert.match(exportWorkspaceSource, /aggregationOptions = useMemo\([\s\S]*isPnkMonthly[\s\S]*PNK_AGGREGATION_MODE_OPTIONS/);
+  assert.match(exportWorkspaceSource, /isPxkMonthly[\s\S]*PXK_AGGREGATION_MODE_OPTIONS/);
   assert.match(exportWorkspaceSource, /dateFrom/);
   assert.match(exportWorkspaceSource, /dateTo/);
 });
@@ -139,6 +140,28 @@ test("PNK monthly export hides data-unit picker and omits unitIds from payload",
     /isPnkMonthly\s*\?\s*Boolean\(dateFrom\) && Boolean\(dateTo\)\s*:\s*selectedDataUnitIds\.length > 0/,
   );
   assert.match(exportWorkspaceSource, /buyer từ BKMH/);
+});
+
+test("PXK monthly export uses by-unit and by-day aggregation only with by-unit default", () => {
+  assert.match(exportWorkspaceSource, /categoryKey === "phieu-xuat-kho" && isMonthly/);
+  assert.match(exportWorkspaceSource, /const PXK_AGGREGATION_MODE_OPTIONS = Object\.freeze/);
+  assert.match(exportWorkspaceSource, /CHUNG_TU_AGGREGATION_MODES\.BY_UNIT/);
+  assert.match(exportWorkspaceSource, /label: "Theo đơn vị"/);
+  assert.match(exportWorkspaceSource, /label: "Theo ngày"/);
+  const pxkOptionsMatch = exportWorkspaceSource.match(
+    /const PXK_AGGREGATION_MODE_OPTIONS = Object\.freeze\([\s\S]*?\]\);/,
+  );
+  const pxkOptionsBlock = pxkOptionsMatch?.[0] ?? "";
+  assert.ok(pxkOptionsBlock.length > 0, "PXK aggregation options block should exist");
+  assert.doesNotMatch(pxkOptionsBlock, /FULL|"full"/);
+  assert.match(
+    exportWorkspaceSource,
+    /aggregationOptions = useMemo\([\s\S]*isPxkMonthly[\s\S]*PXK_AGGREGATION_MODE_OPTIONS/,
+  );
+  assert.match(
+    exportWorkspaceSource,
+    /setAggregationMode\([\s\S]*CHUNG_TU_AGGREGATION_MODES\.BY_UNIT/,
+  );
 });
 
 test("history workspace switches BKMH to monthly cards and summary panel", () => {

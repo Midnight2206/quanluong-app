@@ -78,6 +78,41 @@ const PNK_AGGREGATION_MODE_OPTIONS = Object.freeze([
   },
 ]);
 
+const PXK_AGGREGATION_MODE_OPTIONS = Object.freeze([
+  {
+    value: CHUNG_TU_AGGREGATION_MODES.BY_UNIT,
+    label: "Theo đơn vị",
+    hint: "1 PDF / đơn vị nhận, gộp cả tháng.",
+  },
+  {
+    value: CHUNG_TU_AGGREGATION_MODES.BY_DAY,
+    label: "Theo ngày",
+    hint: "1 PDF / đơn vị × ngày theo dữ liệu LTTP trong tháng.",
+  },
+]);
+
+const DEFAULT_PXK_THU_KHO_SLOT = {
+  key: "thu_kho",
+  label: "THỦ KHO",
+  col: 0,
+  col_span: 1,
+  source: "static",
+  static_name: "",
+  show_date_line: false,
+  locked: true,
+};
+
+const DEFAULT_PXK_NGUOI_NHAN_SLOT = {
+  key: "nguoi_nhan",
+  label: "NGƯỜI NHẬN",
+  col: 1,
+  col_span: 1,
+  source: "static",
+  static_name: "",
+  show_date_line: false,
+  locked: true,
+};
+
 function getTemplateLabel(template) {
   if (!template) return "";
   const base = template.displayName || template.name || `Mẫu #${template.id}`;
@@ -171,6 +206,50 @@ function normalizeSignatureBlockConfig(signatureBlock) {
   };
 }
 
+function ensurePxkLockedSlotsFirst(signatureBlock) {
+  if (!signatureBlock || typeof signatureBlock !== "object") {
+    return {
+      columns: 2,
+      gap_pt: 40,
+      date_line_gap_pt: 14,
+      slots: [{ ...DEFAULT_PXK_THU_KHO_SLOT }, { ...DEFAULT_PXK_NGUOI_NHAN_SLOT }],
+    };
+  }
+  const rawSlots = Array.isArray(signatureBlock.slots) ? signatureBlock.slots : [];
+  const existingThuKho = rawSlots.find((slot) => slot?.key === DEFAULT_PXK_THU_KHO_SLOT.key);
+  const existingNguoiNhan = rawSlots.find((slot) => slot?.key === DEFAULT_PXK_NGUOI_NHAN_SLOT.key);
+  const lockedThuKho = {
+    ...DEFAULT_PXK_THU_KHO_SLOT,
+    col: Number.isFinite(Number(existingThuKho?.col)) ? Number(existingThuKho.col) : 0,
+    col_span: Number.isFinite(Number(existingThuKho?.col_span)) ? Number(existingThuKho.col_span) : 1,
+    static_name:
+      typeof existingThuKho?.static_name === "string" ? existingThuKho.static_name.trim() : "",
+    show_date_line:
+      existingThuKho?.show_date_line == null
+        ? DEFAULT_PXK_THU_KHO_SLOT.show_date_line
+        : Boolean(existingThuKho.show_date_line),
+  };
+  const lockedNguoiNhan = {
+    ...DEFAULT_PXK_NGUOI_NHAN_SLOT,
+    col: Number.isFinite(Number(existingNguoiNhan?.col)) ? Number(existingNguoiNhan.col) : 1,
+    col_span: Number.isFinite(Number(existingNguoiNhan?.col_span))
+      ? Number(existingNguoiNhan.col_span)
+      : 1,
+    show_date_line:
+      existingNguoiNhan?.show_date_line == null
+        ? DEFAULT_PXK_NGUOI_NHAN_SLOT.show_date_line
+        : Boolean(existingNguoiNhan.show_date_line),
+  };
+  const otherSlots = rawSlots.filter(
+    (slot) =>
+      slot?.key !== DEFAULT_PXK_THU_KHO_SLOT.key && slot?.key !== DEFAULT_PXK_NGUOI_NHAN_SLOT.key,
+  );
+  return {
+    ...signatureBlock,
+    slots: [lockedThuKho, lockedNguoiNhan, ...otherSlots],
+  };
+}
+
 function ensurePnkNguoiGiaoSlotFirst(signatureBlock) {
   if (!signatureBlock || typeof signatureBlock !== "object") {
     return {
@@ -218,6 +297,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const isBySlip = exportKind === CHUNG_TU_EXPORT_KIND.BY_SLIP;
   const isBkmhMonthly = categoryKey === "bang-ke-mua-hang" && isMonthly;
   const isPnkMonthly = categoryKey === "phieu-nhap-kho" && isMonthly;
+  const isPxkMonthly = categoryKey === "phieu-xuat-kho" && isMonthly;
   const showAggregationPicker = isMonthly;
 
   const [periodMonth, setPeriodMonth] = useState(() => todayYmd().slice(0, 7));
@@ -231,7 +311,11 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     ? aggregationMode === CHUNG_TU_AGGREGATION_MODES.FULL
       ? CHUNG_TU_AGGREGATION_MODES.FULL
       : CHUNG_TU_AGGREGATION_MODES.BY_DAY
-    : aggregationMode;
+    : isPxkMonthly
+      ? aggregationMode === CHUNG_TU_AGGREGATION_MODES.BY_DAY
+        ? CHUNG_TU_AGGREGATION_MODES.BY_DAY
+        : CHUNG_TU_AGGREGATION_MODES.BY_UNIT
+      : aggregationMode;
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [signatures, setSignatures] = useState({});
   const [signatureDates, setSignatureDates] = useState({});
@@ -252,8 +336,13 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   );
 
   const aggregationOptions = useMemo(
-    () => (isPnkMonthly ? PNK_AGGREGATION_MODE_OPTIONS : CHUNG_TU_AGGREGATION_MODE_OPTIONS),
-    [isPnkMonthly],
+    () =>
+      isPnkMonthly
+        ? PNK_AGGREGATION_MODE_OPTIONS
+        : isPxkMonthly
+          ? PXK_AGGREGATION_MODE_OPTIONS
+          : CHUNG_TU_AGGREGATION_MODE_OPTIONS,
+    [isPnkMonthly, isPxkMonthly],
   );
   const aggregationLabel = useMemo(
     () => aggregationOptions.find((o) => o.value === effectiveAggregationMode)?.label ?? effectiveAggregationMode,
@@ -290,6 +379,11 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     setIssueSlipId("");
     setDateFrom(todayYmd());
     setDateTo(todayYmd());
+    setAggregationMode(
+      categoryKey === "phieu-xuat-kho"
+        ? CHUNG_TU_AGGREGATION_MODES.BY_UNIT
+        : CHUNG_TU_AGGREGATION_MODES.BY_DAY,
+    );
   }, [categoryKey]);
 
   const { data: templates = [], isLoading: templatesLoading } = useChungTuPdfTemplatesQuery(categoryKey, {
@@ -326,8 +420,10 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     () =>
       isPnkMonthly
         ? ensurePnkNguoiGiaoSlotFirst(savedSignatureBlock ?? templateSignatureBlock ?? null)
-        : (savedSignatureBlock ?? templateSignatureBlock ?? null),
-    [isPnkMonthly, savedSignatureBlock, templateSignatureBlock],
+        : isPxkMonthly
+          ? ensurePxkLockedSlotsFirst(savedSignatureBlock ?? templateSignatureBlock ?? null)
+          : (savedSignatureBlock ?? templateSignatureBlock ?? null),
+    [isPnkMonthly, isPxkMonthly, savedSignatureBlock, templateSignatureBlock],
   );
   const signatureSlots = useMemo(
     () => normalizeSignatureSlots(activeSignatureBlock),
