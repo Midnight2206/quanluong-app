@@ -259,6 +259,25 @@ export function useDeleteChungTuPdfExportBatchMutation() {
   });
 }
 
+export function useReExportPdfBatchMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ batchKey, pdfTemplateId, refreshData, ...rest }) =>
+      apiRequest({
+        url: `/chungtuquyettoan/pdf-export-batches/${encodeURIComponent(batchKey)}/re-export`,
+        method: "post",
+        data: { pdfTemplateId, refreshData: Boolean(refreshData), ...rest },
+      }),
+    onSuccess: (data, variables) => {
+      invalidateChungTuPdfExportBatches(
+        qc,
+        data?.unitId ?? variables?.unitId,
+        data?.categoryKey ?? variables?.categoryKey,
+      );
+    },
+  });
+}
+
 export function useChungTuSignatureSettingsQuery(categoryKey, options = {}) {
   const { skip, ...rest } = options;
   const key = normalizeCategoryKey(categoryKey);

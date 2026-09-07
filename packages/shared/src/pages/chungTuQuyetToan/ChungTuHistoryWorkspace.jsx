@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Download, Eye, FolderOpen, Loader2, Printer, Trash2 } from "lucide-react";
+import { Archive, Download, Eye, FolderOpen, Loader2, Printer, RefreshCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
@@ -12,6 +12,7 @@ import {
   openChungTuBkmhMonthlyMergedPdf,
   useChungTuBkmhMonthlyListQuery,
   useDeleteChungTuBkmhMonthlyMutation,
+  useReExportBkmhMonthlyMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuBkmhMonthlyApi";
 import {
   downloadChungTuPdfBatchFile,
@@ -20,6 +21,7 @@ import {
   useChungTuPdfExportBatchesQuery,
   useChungTuPdfTemplatesQuery,
   useDeleteChungTuPdfExportBatchMutation,
+  useReExportPdfBatchMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { useConfirm } from "@/contexts/ConfirmProvider";
@@ -28,6 +30,7 @@ import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScop
 import { ChungTuExportWizardCard } from "./ChungTuExportWizard";
 import { ChungTuBkmhSliceSummaryPanel } from "./ChungTuBkmhSliceSummaryPanel.jsx";
 import { ChungTuPnkBatchSummaryPanel } from "./ChungTuPnkBatchSummaryPanel.jsx";
+import { ChungTuReExportDialog } from "./ChungTuReExportDialog.jsx";
 import { formatVnd } from "@/utils/formatVnd";
 
 const fieldClass =
@@ -75,6 +78,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   const [busyActionKey, setBusyActionKey] = useState("");
   const [selectedMonthly, setSelectedMonthly] = useState(null);
   const [selectedPnkBatch, setSelectedPnkBatch] = useState(null);
+  const [reExportTarget, setReExportTarget] = useState(null);
   const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
   const isPnkCategory = categoryKey === "phieu-nhap-kho";
   const isPxkCategory = categoryKey === "phieu-xuat-kho";
@@ -89,12 +93,15 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
     { skip: isBkmhCategory || !effectiveUnitId },
   );
   const { data: templates = [] } = useChungTuPdfTemplatesQuery(categoryKey, {
-    skip: !categoryKey || isBkmhCategory,
+    skip: !categoryKey,
   });
 
   const [deleteBkmhMonthly, { isLoading: deletingBkmhMonthly }] = useDeleteChungTuBkmhMonthlyMutation();
   const [deletePdfExportBatch, { isLoading: deletingExportBatch }] =
     useDeleteChungTuPdfExportBatchMutation();
+  const [reExportPdfBatch, { isLoading: reExportingBatch }] = useReExportPdfBatchMutation();
+  const [reExportBkmhMonthly, { isLoading: reExportingBkmh }] = useReExportBkmhMonthlyMutation();
+  const reExportBusy = reExportingBatch || reExportingBkmh;
   const templateLabelById = useMemo(
     () =>
       new Map(
@@ -241,6 +248,37 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
       notifyError(message);
     } finally {
       setBusyActionKey("");
+    }
+  };
+
+  const handleReExportSubmit = async ({ pdfTemplateId, refreshData }) => {
+    if (!reExportTarget) return;
+    setActionError(null);
+    try {
+      if (reExportTarget.kind === "bkmh") {
+        await reExportBkmhMonthly({
+          id: reExportTarget.id,
+          pdfTemplateId,
+          refreshData,
+          storageUnitId: effectiveUnitId,
+          periodMonth: reExportTarget.periodMonth,
+        }).unwrap();
+      } else {
+        await reExportPdfBatch({
+          batchKey: reExportTarget.batchKey,
+          pdfTemplateId,
+          refreshData,
+          unitId: effectiveUnitId,
+          categoryKey,
+        }).unwrap();
+      }
+      notifySuccess("Đã xuất lại chứng từ.");
+      setReExportTarget(null);
+    } catch (e) {
+      const message = e?.data?.message || e?.message || "Xuất lại thất bại.";
+      setActionError(message);
+      notifyError(message);
+      throw e;
     }
   };
 
@@ -441,6 +479,25 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                       {canWrite ? (
                         <Button
                           type="button"
+                          variant="secondary"
+                          className="h-10 gap-1.5 text-xs"
+                          disabled={busyActionKey !== "" || deletingBkmhMonthly || reExportBusy}
+                          onClick={() =>
+                            setReExportTarget({
+                              kind: "bkmh",
+                              id: item.id,
+                              periodMonth: item.periodMonth,
+                              pdfTemplateId: item.pdfTemplateId,
+                            })
+                          }
+                        >
+                          <RefreshCw className="size-3.5" aria-hidden />
+                          Xuất lại
+                        </Button>
+                      ) : null}
+                      {canWrite ? (
+                        <Button
+                          type="button"
                           variant="dangerGhost"
                           className="h-10 gap-1.5 text-xs"
                           disabled={busyActionKey !== "" || deletingBkmhMonthly}
@@ -587,6 +644,24 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                       {canWrite ? (
                         <Button
                           type="button"
+                          variant="secondary"
+                          className="h-10 gap-1.5 text-xs"
+                          disabled={busyActionKey !== "" || deletingExportBatch || reExportBusy}
+                          onClick={() =>
+                            setReExportTarget({
+                              kind: "batch",
+                              batchKey: item.batchKey,
+                              pdfTemplateId: item.pdfTemplateId,
+                            })
+                          }
+                        >
+                          <RefreshCw className="size-3.5" aria-hidden />
+                          Xuất lại
+                        </Button>
+                      ) : null}
+                      {canWrite ? (
+                        <Button
+                          type="button"
                           variant="dangerGhost"
                           className="h-10 gap-1.5 text-xs"
                           disabled={busyActionKey !== "" || deletingExportBatch}
@@ -644,6 +719,24 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                         )}
                         In tất cả
                       </Button>
+                      {canWrite ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="h-10 gap-1.5 text-xs"
+                          disabled={busyActionKey !== "" || deletingExportBatch || reExportBusy}
+                          onClick={() =>
+                            setReExportTarget({
+                              kind: "batch",
+                              batchKey: item.batchKey,
+                              pdfTemplateId: item.pdfTemplateId,
+                            })
+                          }
+                        >
+                          <RefreshCw className="size-3.5" aria-hidden />
+                          Xuất lại
+                        </Button>
+                      ) : null}
                       {canWrite ? (
                         <Button
                           type="button"
@@ -734,6 +827,18 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
           }}
         />
       ) : null}
+      <ChungTuReExportDialog
+        open={Boolean(reExportTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReExportTarget(null);
+          }
+        }}
+        templates={templates}
+        defaultTemplateId={reExportTarget?.pdfTemplateId ?? null}
+        submitting={reExportBusy}
+        onSubmit={handleReExportSubmit}
+      />
     </>
   );
 }

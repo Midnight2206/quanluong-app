@@ -87,6 +87,26 @@ export function useDeleteChungTuBkmhMonthlyMutation() {
   });
 }
 
+export function useReExportBkmhMonthlyMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, pdfTemplateId, refreshData, ...rest }) =>
+      apiRequest({
+        url: `/chungtuquyettoan/bkmh-monthly/${encodeURIComponent(id)}/re-export`,
+        method: "post",
+        data: { pdfTemplateId, refreshData: Boolean(refreshData), ...rest },
+      }),
+    onSuccess: (data, variables) => {
+      invalidateChungTuBkmhMonthly(
+        qc,
+        data?.storageUnitId ?? variables?.storageUnitId,
+        data?.periodMonth ?? variables?.periodMonth,
+      );
+      invalidateChungTuBkmhMonthlyDetail(qc, data?.id ?? variables?.id);
+    },
+  });
+}
+
 function filenameFromContentDisposition(header) {
   if (!header || typeof header !== "string") {
     return null;

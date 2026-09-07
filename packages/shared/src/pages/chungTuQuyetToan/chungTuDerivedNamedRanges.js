@@ -13,4 +13,4 @@ export const CHUNG_TU_DERIVED_NAMED_RANGE_NAMES = Object.freeze([
 
 export const CHUNG_TU_DERIVED_NAMED_RANGE_HELP =
   "Named range camelCase (một ô): ngay, thang, nam, ngayThangNam, so, soChungTu, quyenSo, tongTienBangChu. " +
-  "so/quyenSo/tongTienBangChu tự thêm nhãn (Số:, Quyển số:, …).";
+  "so/soChungTu = số chạy pad 4 trong quyển mmyy; so/quyenSo/tongTienBangChu tự thêm nhãn (Số:, Quyển số:, …).";
