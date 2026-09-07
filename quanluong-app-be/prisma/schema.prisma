@@ -344,6 +344,7 @@ model ChungTuPdfExport {
   documentServiceFileId      Int?
   sortKey                    String?                @db.VarChar(128)
   summaryJson                Json?
+  contextJson                Json?
   sourceDataHash             String?                @db.VarChar(64)
   signaturesJson             Json?
   createdById                Int
@@ -355,6 +356,34 @@ model ChungTuPdfExport {
 
   @@index([categoryKey, unitId, createdAt])
   @@index([batchId])
+}
+
+model ChungTuDocNumberCounter {
+  id          Int      @id @default(autoincrement())
+  unitId      Int
+  categoryKey String   @db.VarChar(80)
+  quyenSo     String   @db.VarChar(8)
+  nextSeq     Int      @default(1)
+  updatedAt   DateTime @updatedAt
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, categoryKey, quyenSo])
+  @@index([unitId, categoryKey])
+}
+
+model ChungTuDocNumberAssignment {
+  id          Int      @id @default(autoincrement())
+  unitId      Int
+  categoryKey String   @db.VarChar(80)
+  quyenSo     String   @db.VarChar(8)
+  sheetKey    String   @db.VarChar(191)
+  seq         Int
+  soChungTu   String   @db.VarChar(16)
+  createdAt   DateTime @default(now())
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, categoryKey, quyenSo, sheetKey])
+  @@index([unitId, categoryKey, quyenSo])
 }
 
 /// Cấu hình khối chữ ký PDF theo loại chứng từ (categoryKey).
@@ -624,6 +653,8 @@ model Unit {
   chungTuDocuments          ChungTuDocument[]
   chungTuPdfExports         ChungTuPdfExport[]
   chungTuPdfExportBatches   ChungTuPdfExportBatch[]
+  chungTuDocNumberCounters  ChungTuDocNumberCounter[]
+  chungTuDocNumberAssignments ChungTuDocNumberAssignment[]
   bkmhMonthlyExports        ChungTuBkmhMonthly[]
   kitchenDishCatalogs       KitchenDishCatalog[]
   kitchenMenuDays           KitchenMenuDay[]
