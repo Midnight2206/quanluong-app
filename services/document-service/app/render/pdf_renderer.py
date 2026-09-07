@@ -5,7 +5,7 @@ from io import BytesIO
 
 from reportlab.pdfgen import canvas
 
-from app.pagination import PagePlan, plan_pages
+from app.pagination import PagePlan, apply_content_row_heights, plan_pages
 from app.render.amount_in_words import (
     draw_amount_in_words_line,
     format_amount_in_words_line,
@@ -321,7 +321,7 @@ def _draw_page(
             table_left=table_left,
             height=_carry_row_height(table, page),
             columns=columns,
-            label="Mang từ trang trước",
+            label="Mang sang",
             amount=sum_amount(prev_rows, amount_key),
             amount_key=amount_key,
             font_size=row_font_size,
@@ -346,14 +346,14 @@ def _draw_page(
 
     carry_h = _carry_row_height(table, page)
     if page.has_carry_to_next:
-        # Tổng lũy kế hết trang này = "Mang từ trang trước" của trang sau.
+        # Tổng lũy kế hết trang này = "Mang sang" của trang sau.
         y = _draw_carry_row(
             pdf,
             y=y,
             table_left=table_left,
             height=carry_h,
             columns=columns,
-            label="Cộng chuyển trang sau",
+            label="Cộng mang sang",
             amount=sum_amount(prev_rows, amount_key) + sum_amount(page_rows, amount_key),
             amount_key=amount_key,
             font_size=row_font_size,
@@ -457,20 +457,25 @@ def render_pdf(
         page_height - metadata.page.margin_top - metadata.page.margin_bottom
     )
     if rows:
-        pages = plan_pages(
-            n_rows=len(rows),
-            page_content_height=page1_content,
-            continuation_content_height=continuation_content,
-            header_height=table.header_height_pt,
-            carry_row_height=max(
-                table.carry_height_pt,
-                max(natural_height, table.row_height_min),
-            ),
-            signature_block_height=sig_height,
-            row_height_min=max(natural_height, table.row_height_min),
-            row_height_max=max(natural_height, table.row_height_max),
-            min_rows_last_page=table.min_rows_last_page,
-        ).pages
+        # Phân trang theo chiều cao an toàn (= max nội dung) để không tràn trang,
+        # rồi gán lại chiều cao từng dòng theo nội dung ô.
+        pages = apply_content_row_heights(
+            plan_pages(
+                n_rows=len(rows),
+                page_content_height=page1_content,
+                continuation_content_height=continuation_content,
+                header_height=table.header_height_pt,
+                carry_row_height=max(
+                    table.carry_height_pt,
+                    max(natural_height, table.row_height_min),
+                ),
+                signature_block_height=sig_height,
+                row_height_min=max(natural_height, table.row_height_min),
+                row_height_max=max(natural_height, table.row_height_max),
+                min_rows_last_page=table.min_rows_last_page,
+            ).pages,
+            needed_heights,
+        )
     else:
         pages = [
             PagePlan(

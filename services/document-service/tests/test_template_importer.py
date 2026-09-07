@@ -484,3 +484,16 @@ def test_interior_nl_field_merge_skips_static_cell():
         and cell.x + cell.width_pt > field.x
     ]
     assert overlapping == []
+
+
+def test_named_range_tokenizer_error_maps_to_validation_error():
+    """Excel sheet-copy names like `01 (2)` can produce attr_text openpyxl cannot tokenize."""
+    errors = importlib.import_module("app.import.errors")
+
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    workbook.create_sheet("01 (2)")
+    workbook.defined_names.add(
+        DefinedName("FIELD_so_phieu", attr_text="=$'01 (2)'.$A$5")
+    )
+    with pytest.raises(errors.TemplateValidationError, match="không đọc được"):
+        _parse_template(_save_workbook(workbook))

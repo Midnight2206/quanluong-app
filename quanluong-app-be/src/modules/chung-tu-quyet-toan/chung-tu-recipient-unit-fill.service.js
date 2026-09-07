@@ -66,9 +66,12 @@ export function mergeRecipientUnitFillFields(target, fillFields) {
   if (!target || !fillFields) return target;
   target.nguoiNhanHang = fillFields.nguoiNhanHang ?? "";
   target.nguoiNhan = fillFields.nguoiNhan ?? fillFields.nguoiNhanHang ?? "";
-  target.donVi = fillFields.donVi ?? "";
+  // donVi = đơn vị cấp mình from creating user profile — do not overwrite with recipient unit.
   target.diaChi = fillFields.diaChi ?? "";
   target.signatureName = fillFields.signatureName ?? "";
+  if (fillFields.donVi && !String(target.recipientUnitName ?? "").trim()) {
+    target.recipientUnitName = fillFields.donVi;
+  }
   return target;
 }
 
@@ -92,7 +95,15 @@ export async function attachRecipientUnitFillToMonthlyContexts(monthly, { aggreg
 
   for (const ctx of monthly?.sheetContexts ?? []) {
     const uid = Number(ctx.recipientUnitId);
-    const fill = fillMap.get(uid);
+    const fill =
+      fillMap.get(uid) ??
+      ({
+        nguoiNhanHang: "",
+        nguoiNhan: "",
+        donVi: "",
+        diaChi: "",
+        signatureName: "",
+      });
     mergeRecipientUnitFillFields(ctx, fill);
     if (fill?.donVi && !String(ctx.recipientUnitName ?? "").trim()) {
       ctx.recipientUnitName = fill.donVi;
@@ -112,9 +123,9 @@ export async function resolveRecipientUnitFillForSlip(slip) {
     return {
       nguoiNhanHang,
       nguoiNhan: nguoiNhanHang,
-      donVi: unitName,
       diaChi: "",
       signatureName: nguoiNhanHang,
+      ...(unitName ? { recipientUnitName: unitName } : {}),
     };
   }
   const fillMap = await loadRecipientUnitFillMap([uid]);
@@ -122,10 +133,10 @@ export async function resolveRecipientUnitFillForSlip(slip) {
   const nguoiNhanHang =
     String(slip?.recipientDisplayName ?? "").trim() || base.nguoiNhanHang || "";
   return {
-    ...base,
     nguoiNhanHang,
     nguoiNhan: nguoiNhanHang,
-    donVi: unitName || base.donVi || "",
+    diaChi: base.diaChi ?? "",
     signatureName: nguoiNhanHang ? base.signatureName || nguoiNhanHang : base.signatureName,
+    recipientUnitName: unitName || base.donVi || "",
   };
 }

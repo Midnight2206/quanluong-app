@@ -12,6 +12,7 @@ from app.template.metadata import (
     TableMeta,
     TemplateMetadata,
 )
+from .column_key_repair import repair_weak_columns_from_static_headers
 
 
 def _sheet_name(fields: list[TemplateField], header_row_range: str) -> str:
@@ -80,6 +81,7 @@ def load_metadata_from_db(
         )
         for cell in (table_config.static_cells or [])
     ]
+    columns = repair_weak_columns_from_static_headers(columns, static_cells)
     return TemplateMetadata(
         name=template.name,
         version=template.version,

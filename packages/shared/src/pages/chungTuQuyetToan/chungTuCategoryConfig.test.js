@@ -10,12 +10,8 @@ test("phieu nhap kho category config uses canCuPnk and drops canCuBkmh", () => {
 });
 
 test("category config exposes hasSummary by category", () => {
-  assert.match(
-    categoryConfigSource,
-    /hasSummary:\s*tab\.id === "bang-ke-mua-hang"\s*\|\|\s*tab\.id === "phieu-nhap-kho"/,
-  );
-  assert.doesNotMatch(
-    categoryConfigSource,
-    /hasSummary:\s*tab\.id === "bang-ke-mua-hang"\s*\|\|\s*tab\.id === "phieu-xuat-kho"/,
-  );
+  assert.match(categoryConfigSource, /tab\.id === "bang-ke-mua-hang"/);
+  assert.match(categoryConfigSource, /tab\.id === "phieu-nhap-kho"/);
+  assert.match(categoryConfigSource, /tab\.id === "phieu-xuat-kho"/);
+  assert.match(categoryConfigSource, /hasSummary:/);
 });

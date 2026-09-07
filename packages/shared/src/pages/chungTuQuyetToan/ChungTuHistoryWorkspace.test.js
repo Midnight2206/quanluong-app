@@ -7,20 +7,21 @@ const historySrc = readFileSync(
   "utf8",
 );
 
-test("PNK history uses summary panel instead of file accordion", () => {
+test("PNK and PXK history use summary panel instead of file accordion", () => {
   assert.match(historySrc, /phieu-nhap-kho/);
+  assert.match(historySrc, /phieu-xuat-kho/);
   assert.match(historySrc, /Xem tổng hợp/);
   assert.match(historySrc, /ChungTuPnkBatchSummaryPanel/);
-  assert.match(historySrc, /isPnkCategory|phieu-nhap-kho/);
+  assert.match(historySrc, /isFolderSummaryCategory/);
   assert.match(
     historySrc,
-    /!isBkmhCategory && !isPnkCategory|!isPnkCategory && !isBkmhCategory/,
+    /!isBkmhCategory && !isFolderSummaryCategory/,
   );
   const fileAccordionIdx = historySrc.indexOf("File trong folder");
   assert.ok(fileAccordionIdx >= 0, "expected File trong folder block");
   assert.doesNotMatch(
     historySrc.slice(Math.max(0, fileAccordionIdx - 80), fileAccordionIdx + 40),
-    /isPnkCategory\s*\?\s*.*File trong folder/,
+    /isFolderSummaryCategory\s*\?\s*.*File trong folder/,
   );
 });
 

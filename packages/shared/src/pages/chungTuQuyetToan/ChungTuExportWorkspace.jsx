@@ -789,7 +789,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             />
           </label>
         </>
-      ) : !isBkmhMonthly ? (
+      ) : !isMonthly ? (
         <label className="space-y-1" htmlFor={`ct-export-date-${categoryKey}`}>
           <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
             Ngày chứng từ

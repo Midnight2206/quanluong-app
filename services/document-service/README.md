@@ -10,7 +10,7 @@ Docs: [P1 design](../../docs/superpowers/specs/2026-08-17-document-service-p1-de
 
 ## P2 scope
 
-**In:** `render_demo_pdf(fields, rows) -> bytes` — synthetic demo template (fields + 5-col table + pagination via P1 planner). Fonts bundled in `fonts/` (`DejaVuSans.ttf`, `DejaVuSans-Bold.ttf`); registered on import via `app/render/fonts.py`. **Out:** HTTP PDF endpoint (no new routes in `main.py`).
+**In:** `render_demo_pdf(fields, rows) -> bytes` — synthetic demo template (fields + 5-col table + pagination via P1 planner). Fonts bundled in `fonts/` (`Tinos-Regular.ttf`, `Tinos-Bold.ttf` — Times New Roman metric-compatible, Apache 2.0 / SIL OFL); registered on import via `app/render/fonts.py`. **Out:** HTTP PDF endpoint (no new routes in `main.py`).
 
 ```python
 from app.render import render_demo_pdf

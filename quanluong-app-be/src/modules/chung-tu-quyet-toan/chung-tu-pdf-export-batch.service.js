@@ -110,7 +110,7 @@ function materializePxkNguoiNhanSignatureBlock(signatureBlock, context) {
       (slot) => slot && typeof slot === "object" && String(slot.key ?? "").trim() === PXK_NGUOI_NHAN_SLOT_KEY,
     ) ?? null;
   const signatureName =
-    String(context?.signatureName ?? "").trim() || String(context?.nguoiNhan ?? "").trim();
+    String(context?.signatureName ?? "").trim() || String(context?.nguoiNhan ?? "").trim() || "";
   const lockedSlot = {
     ...(existingSlot && typeof existingSlot === "object" ? existingSlot : {}),
     key: PXK_NGUOI_NHAN_SLOT_KEY,
@@ -118,6 +118,7 @@ function materializePxkNguoiNhanSignatureBlock(signatureBlock, context) {
     col: Number.isFinite(Number(existingSlot?.col)) ? Number(existingSlot.col) : 0,
     col_span: Number.isFinite(Number(existingSlot?.col_span)) ? Number(existingSlot.col_span) : 1,
     source: "static",
+    // Empty string is intentional when unit has no recipient user — PDF still exports.
     static_name: signatureName,
     locked: true,
     show_date_line: Boolean(existingSlot?.show_date_line),

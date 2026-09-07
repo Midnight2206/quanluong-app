@@ -7,6 +7,7 @@ process.env.SESSION_SECRET ||= "test-session-secret";
 
 const {
   aggregateLinesToDetailRows,
+  materializeSignatureBlockForRender,
   resolveDocumentNumberFields,
   resolvePdfHeaderSettings,
   resolveSystemSignatureSlots,
@@ -166,7 +167,7 @@ test("resolvePdfHeaderSettings uses exporting user profile for don vi fields", (
   assert.equal(result.donViSo, "Tieu doan 1");
 });
 
-test("resolvePdfHeaderSettings keeps unit-profile don vi when profile fields empty", () => {
+test("resolvePdfHeaderSettings always prefers creating user profile even when empty", () => {
   const result = resolvePdfHeaderSettings({
     mergedSettings: {
       donViCapTren: "Unit profile cap tren",
@@ -181,8 +182,8 @@ test("resolvePdfHeaderSettings keeps unit-profile don vi when profile fields emp
     categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO,
   });
 
-  assert.equal(result.donViCapTren, "Unit profile cap tren");
-  assert.equal(result.donVi, "Unit profile don vi");
+  assert.equal(result.donViCapTren, "");
+  assert.equal(result.donVi, "");
   assert.equal(result.donViSo, "Legacy unit profile line");
 });
 
@@ -241,7 +242,7 @@ test("resolveSystemSignatureSlots resolves system slots via catalog, passes thro
     "bkmh.nguoiMua": {
       resolve: async () => {
         resolveCalled = true;
-        return { name: "Th/tá A", title: "Tài vụ" };
+        return { name: "A", signatureName: "Th/tá A", title: "Tài vụ" };
       },
     },
   };
@@ -264,6 +265,59 @@ test("resolveSystemSignatureSlots returns null resolvedName when catalog node mi
   assert.equal(result[0].resolvedName, null);
 });
 
+test("materializeSignatureBlockForRender turns resolved system slots into static for document-service", () => {
+  const result = materializeSignatureBlockForRender({
+    columns: 2,
+    slots: [
+      {
+        key: "nguoi_mua",
+        label: "Người mua",
+        col: 0,
+        source: "system",
+        catalogNodeId: "bkmh.nguoiMua",
+        resolvedName: "Th/tá A",
+        resolvedTitle: "Tài vụ",
+      },
+      {
+        key: "thu_truong",
+        label: "Thủ trưởng",
+        col: 1,
+        source: "static",
+        static_name: "B",
+        resolvedName: null,
+      },
+      {
+        key: "empty_sys",
+        label: "X",
+        col: 2,
+        source: "system",
+        catalogNodeId: "bkmh.nguoiMua",
+        resolvedName: null,
+      },
+    ],
+  });
+  assert.deepEqual(result.slots[0], {
+    key: "nguoi_mua",
+    label: "Người mua",
+    col: 0,
+    col_span: 1,
+    show_date_line: false,
+    source: "static",
+    static_name: "Th/tá A",
+  });
+  assert.equal(result.slots[1].source, "static");
+  assert.equal(result.slots[1].static_name, "B");
+  assert.equal(result.slots[1].resolvedName, undefined);
+  assert.deepEqual(result.slots[2], {
+    key: "empty_sys",
+    label: "X",
+    col: 2,
+    col_span: 1,
+    show_date_line: false,
+    source: "dynamic",
+  });
+});
+
 test("resolvePdfHeaderSettings prefers resolvedBkmhBuyer over slip buyer", () => {
   const result = resolvePdfHeaderSettings({
     mergedSettings: {},
@@ -274,10 +328,14 @@ test("resolvePdfHeaderSettings prefers resolvedBkmhBuyer over slip buyer", () =>
       boPhan: "Bo phan from settings",
     },
     slips: [{ slipNo: 1, buyerDisplayName: "Buyer from slip" }],
-    resolvedBkmhBuyer: { name: "Th/tá Catalog Buyer", title: "Tài vụ" },
+    resolvedBkmhBuyer: {
+      name: "Nguyễn Văn A",
+      signatureName: "Th/tá Nguyễn Văn A",
+      title: "Tài vụ",
+    },
   });
 
-  assert.equal(result.hoTenNguoiMua, "Th/tá Catalog Buyer");
+  assert.equal(result.hoTenNguoiMua, "Nguyễn Văn A");
   assert.equal(result.boPhan, "Tài vụ");
 });
 

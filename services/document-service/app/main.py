@@ -306,7 +306,7 @@ class SignatureBlockBody(BaseModel):
     slots: list[SignatureSlotBody]
     columns: int = 2
     gap_pt: float = 40
-    date_line_gap_pt: float = 14
+    date_line_gap_pt: float = 0
 
 
 class DocumentBody(BaseModel):

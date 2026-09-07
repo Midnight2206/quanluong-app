@@ -59,11 +59,12 @@ class SignatureBlockConfig:
     slots: list[SignatureSlot]
     columns: int
     gap_pt: float = 40
-    date_line_gap_pt: float = 14
+    date_line_gap_pt: float = 0
 
     def __post_init__(self) -> None:
         for slot in self.slots:
-            if slot.source == "static" and not (slot.static_name or "").strip():
+            # Allow "" (blank name on PDF); only reject missing key (None).
+            if slot.source == "static" and slot.static_name is None:
                 raise ValueError(
                     f"SignatureSlot '{slot.key}' source=static nhưng thiếu static_name"
                 )

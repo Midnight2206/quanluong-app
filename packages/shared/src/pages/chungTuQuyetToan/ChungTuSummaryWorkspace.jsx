@@ -52,6 +52,9 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
   const [selectedBatch, setSelectedBatch] = useState(null);
   const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
   const isPnkCategory = categoryKey === "phieu-nhap-kho";
+  const isPxkCategory = categoryKey === "phieu-xuat-kho";
+  const isFolderSummaryCategory = isPnkCategory || isPxkCategory;
+  const folderSummaryLabel = isPxkCategory ? "PXK" : "PNK";
 
   const { data: monthlyRows = [], isLoading } = useChungTuBkmhMonthlyListQuery(
     { storageUnitId: effectiveUnitId },
@@ -59,7 +62,7 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
   );
   const { data: pdfExportBatches = [], isLoading: batchLoading } = useChungTuPdfExportBatchesQuery(
     { unitId: effectiveUnitId, categoryKey },
-    { skip: !isPnkCategory || !effectiveUnitId },
+    { skip: !isFolderSummaryCategory || !effectiveUnitId },
   );
 
   const aggregationLabelByValue = useMemo(
@@ -81,8 +84,8 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
           <ChungTuExportWizardCard
             title="Bộ lọc"
             description={
-              isPnkCategory
-                ? "Chọn kho LTTP để xem các folder PDF PNK đã xuất."
+              isFolderSummaryCategory
+                ? `Chọn kho LTTP để xem các folder PDF ${folderSummaryLabel} đã xuất.`
                 : "Chọn kho LTTP để xem các tháng BKMH đã xuất."
             }
             expanded={expandedLayout}
@@ -187,10 +190,10 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
             </StickyResponsiveTable>
           </ChungTuExportWizardCard>
           )
-        ) : isPnkCategory ? (
+        ) : isFolderSummaryCategory ? (
           batchLoading ? (
             <ChungTuExportWizardCard
-              title="Tổng hợp folder PNK"
+              title={`Tổng hợp folder ${folderSummaryLabel}`}
               expanded={expandedLayout}
               bodyClassName="py-6"
             >
@@ -201,18 +204,18 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
             </ChungTuExportWizardCard>
           ) : pdfExportBatches.length === 0 ? (
             <ChungTuExportWizardCard
-              title="Tổng hợp folder PNK"
+              title={`Tổng hợp folder ${folderSummaryLabel}`}
               expanded={expandedLayout}
               bodyClassName="py-6"
             >
               <p className="text-center text-sm text-muted-foreground">
-                Chưa có folder PDF PNK nào cho đơn vị này.
+                {`Chưa có folder PDF ${folderSummaryLabel} nào cho đơn vị này.`}
               </p>
             </ChungTuExportWizardCard>
           ) : (
             <ChungTuExportWizardCard
-              title={`Tổng hợp folder PNK (${pdfExportBatches.length})`}
-              description="Mỗi dòng là một folder PDF PNK; mở để xem danh sách file đã xuất."
+              title={`Tổng hợp folder ${folderSummaryLabel} (${pdfExportBatches.length})`}
+              description={`Mỗi dòng là một folder PDF ${folderSummaryLabel}; mở để xem danh sách file đã xuất.`}
               expanded={expandedLayout}
               bodyClassName="space-y-3"
             >
@@ -285,7 +288,7 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
         />
       ) : null}
 
-      {isPnkCategory ? (
+      {isFolderSummaryCategory ? (
         <ChungTuPnkBatchSummaryPanel
           batch={selectedBatch}
           open={Boolean(selectedBatch)}

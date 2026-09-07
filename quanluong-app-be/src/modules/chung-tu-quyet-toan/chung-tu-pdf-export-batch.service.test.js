@@ -408,6 +408,72 @@ test("createChungTuPdfExportBatch forwards PXK extra fields and materializes ngu
   }
 });
 
+test("createChungTuPdfExportBatch materializes empty nguoi_nhan when recipient missing", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 17,
+    categoryKey: "phieu-xuat-kho",
+    displayName: "PXK A",
+    documentServiceTemplateId: 903,
+    status: "published",
+  }));
+  resolveChungTuContext.mock.mockImplementationOnce(async () => ({
+    context: {
+      periodMonth: "2026-06",
+      sheetContexts: [
+        {
+          periodDate: "2026-06-01",
+          signatureName: "",
+          nguoiNhan: "",
+          detailRows: [{ stt: 1, tenHang: "Gao" }],
+        },
+      ],
+      detailRows: [{ stt: 1, tenHang: "Gao" }],
+    },
+    sourceDataHash: "pxk-empty-recipient",
+  }));
+  prismaSignatureSettingsFindUnique.mock.mockImplementation(async () => ({
+    id: 7,
+    categoryKey: "phieu-xuat-kho",
+    signatureBlockJson: { columns: 2, slots: [{ key: "nguoi_nhan", label: "Nguoi nhan" }] },
+    extraFieldsJson: {},
+    updatedById: 88,
+    createdAt: new Date("2026-08-22T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-22T00:00:00.000Z"),
+  }));
+
+  const randomBytesMock = mock.method(crypto, "randomBytes", () =>
+    Buffer.from("abcdef123456", "hex"),
+  );
+  try {
+    await createChungTuPdfExportBatch({
+      categoryKey: "phieu-xuat-kho",
+      unitId: 9,
+      periodMonth: "2026-06",
+      aggregationMode: "by-unit",
+      pdfTemplateId: 17,
+      unitIds: [10],
+      exportingUserProfile: { donVi: "Kho A" },
+      signatures: {},
+      signatureDates: {},
+      settings: {},
+      createdById: 88,
+      effectiveUnitIds: [9, 10, 11],
+    });
+
+    assert.equal(renderToDocumentFolder.mock.callCount(), 1);
+    assert.equal(
+      renderToDocumentFolder.mock.calls[0].arguments[1].signatureBlock.slots[0].static_name,
+      "",
+    );
+    assert.equal(
+      renderToDocumentFolder.mock.calls[0].arguments[1].signatureBlock.slots[0].source,
+      "static",
+    );
+  } finally {
+    randomBytesMock.mock.restore();
+  }
+});
+
 test("createChungTuPdfExportBatch keeps PNK full mode and forwards date range + PNK extra fields", async () => {
   prismaTemplateFindFirst.mock.mockImplementation(async () => ({
     id: 16,

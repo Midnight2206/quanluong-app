@@ -328,6 +328,18 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "bkmhMonthlyExcel",
+    method: "GET",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/bkmh-monthly/:id/excel",
+    pathRoute: "/api/chungtuquyettoan/bkmh-monthly/:id/excel",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      name: "Chứng từ quyết toán",
+      description: "Xuất bảng tổng hợp slice BKMH trong một tháng ra file Excel.",
+    },
+  },
+  {
     key: "bkmhMonthlyCreate",
     method: "POST",
     module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,

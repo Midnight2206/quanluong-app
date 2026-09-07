@@ -156,10 +156,12 @@ export function resolvePdfHeaderSettings({
   if (exportingUserProfile && typeof exportingUserProfile === "object") {
     const donViCapTren = normalizeText(profile.donViCapTren);
     const donVi = normalizeText(profile.donVi);
-    // Empty profile must not blank unit-profile / legacy donViSo.
-    resolved.donViCapTren = donViCapTren || resolved.donViCapTren;
-    resolved.donVi = donVi || resolved.donVi;
-    resolved.donViSo = donVi || resolved.donViSo;
+    // Always from creating user's profile (not unit profile / recipient unit).
+    resolved.donViCapTren = donViCapTren;
+    resolved.donVi = donVi;
+    if (donVi) {
+      resolved.donViSo = donVi;
+    }
   }
   if (categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) {
     return resolved;

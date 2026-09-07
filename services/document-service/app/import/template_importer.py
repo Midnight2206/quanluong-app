@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from io import BytesIO
 from zipfile import BadZipFile
 
 from openpyxl import load_workbook
+from openpyxl.formula.tokenizer import TokenizerError
 from openpyxl.utils import get_column_letter, range_boundaries
 from openpyxl.utils.cell import column_index_from_string, coordinate_from_string
 from openpyxl.utils.exceptions import InvalidFileException
@@ -32,6 +32,7 @@ from .excel_coords import (
     signature_block_height_pt,
 )
 from .field_named_ranges import split_field_named_range
+from .header_titles import is_weak_header_title, slug_header_title, unique_column_key
 from .layout_fit import fit_layout_to_page
 from .layout_validate import validate_template_layout
 from .static_cells import collect_static_cells, static_block_height_pt
@@ -71,9 +72,11 @@ def _resolve_defined_range(workbook, defined_name, owner_sheet=None):
             destinations = [(owner_sheet.title, defined_name.attr_text)]
         else:
             destinations = list(defined_name.destinations)
-    except (AttributeError, TypeError, ValueError) as exc:
+    except (AttributeError, TypeError, ValueError, TokenizerError) as exc:
+        # TokenizerError: sheet name like `01 (2)` / broken attr_text (Excel sheet copy).
         raise TemplateValidationError(
-            f"Named Range {name} phải là một vùng hình chữ nhật"
+            f"Named Range {name} tham chiếu không đọc được "
+            f"(kiểm tra Name Manager; tránh tên sheet bản sao kiểu '01 (2)')"
         ) from exc
     if len(destinations) != 1:
         raise TemplateValidationError(
@@ -202,10 +205,25 @@ def _header_cell_title(sheet, row: int, col: int) -> str:
     return "" if cell.value is None else str(cell.value).strip()
 
 
+def _column_header_title(
+    sheet,
+    header_bounds: tuple[int, int, int, int],
+    min_col: int,
+) -> str:
+    """Prefer meaningful title over letter/number code row in multi-row headers."""
+    _min_c, top_row, _max_c, bottom_row = header_bounds
+    bottom_title = _header_cell_title(sheet, bottom_row, min_col)
+    if not is_weak_header_title(bottom_title):
+        return bottom_title
+    for row in range(bottom_row - 1, top_row - 1, -1):
+        title = _header_cell_title(sheet, row, min_col)
+        if not is_weak_header_title(title):
+            return title
+    return bottom_title
+
+
 def _slug(text: str) -> str:
-    normalized = unicodedata.normalize("NFKD", text.replace("Đ", "D").replace("đ", "d"))
-    ascii_text = normalized.encode("ascii", "ignore").decode("ascii").lower()
-    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", ascii_text)).strip("_")
+    return slug_header_title(text)
 
 
 def _style_dict(cell):
@@ -394,15 +412,13 @@ def parse_template(
     header_bottom_row = header_bounds[3]
     for min_col, max_col in header_groups:
         cell = _header_title_source_cell(header_sheet, header_bottom_row, min_col)
-        title = _header_cell_title(header_sheet, header_bottom_row, min_col)
+        title = _column_header_title(header_sheet, header_bounds, min_col)
         base_key = _slug(title)
         if not _FIELD_NAME_RE.fullmatch(base_key):
             raise TemplateValidationError(
                 f"Tiêu đề cột không tạo được key hợp lệ: {title!r}"
             )
-        used_keys[base_key] = used_keys.get(base_key, 0) + 1
-        count = used_keys[base_key]
-        key = base_key if count == 1 else f"{base_key}_{count}"
+        key = unique_column_key(base_key, used_keys)
         align_h = cell.alignment.horizontal or "left"
         if align_h not in {"left", "center", "right"}:
             align_h = "left"

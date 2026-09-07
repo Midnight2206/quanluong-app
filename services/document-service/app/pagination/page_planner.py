@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import floor
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 
 class PaginationError(ValueError):
@@ -15,6 +15,20 @@ class PagePlan:
     has_carry_from_prev: bool
     has_carry_to_next: bool
     is_last: bool
+
+
+def apply_content_row_heights(
+    pages: Sequence[PagePlan],
+    content_heights: Sequence[float],
+) -> List[PagePlan]:
+    """Gán chiều cao theo nội dung từng dòng; phân trang vẫn dùng chiều cao an toàn."""
+    return [
+        replace(
+            page,
+            row_heights=[float(content_heights[index]) for index in page.row_indices],
+        )
+        for page in pages
+    ]
 
 
 @dataclass

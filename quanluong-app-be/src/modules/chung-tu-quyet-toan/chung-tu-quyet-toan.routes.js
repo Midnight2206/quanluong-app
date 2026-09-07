@@ -27,6 +27,7 @@ import {
   deleteChungTuPdfExportBatchController,
   deleteChungTuPdfExportController,
   deleteTemplateCatalogController,
+  exportChungTuBkmhMonthlyExcelController,
   getChungTuBkmhMonthlyController,
   getChungTuDocumentController,
   getChungTuPdfExportBatchController,
@@ -408,6 +409,13 @@ chungTuQuyetToanRouter.get(
   permissionMiddleware([routePermissions.bkmhMonthlyDetail]),
   validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
   asyncHandler(getChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id/excel",
+  permissionMiddleware([routePermissions.bkmhMonthlyExcel]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(exportChungTuBkmhMonthlyExcelController),
 );
 
 chungTuQuyetToanRouter.get(

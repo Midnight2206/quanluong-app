@@ -4,6 +4,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 CELL_PADDING_PT = 2.0
 LINE_HEIGHT_RATIO = 1.2
+_BALANCE_SEARCH_STEPS = 24
 
 
 def line_height_for(font_size: float) -> float:
@@ -15,21 +16,32 @@ def wrap_text_to_width(
     font_name: str,
     font_size: float,
     max_width_pt: float,
+    *,
+    balance: bool = False,
 ) -> list[str]:
-    """Ngắt text theo độ rộng thật (stringWidth), không theo số ký tự.
+    """Ngắt text theo độ rộng thật (stringWidth).
 
-    Từ đơn dài hơn max_width_pt giữ nguyên 1 dòng (chấp nhận tràn nhẹ).
+    `balance=True` (bảng dữ liệu): cân độ dài các dòng khi wrap.
+    Field / static cell giữ greedy mặc định.
     """
     raw = "" if text is None else str(text)
     if max_width_pt <= 0:
         return raw.split("\n") or [""]
     lines: list[str] = []
     for paragraph in raw.split("\n"):
-        lines.extend(_wrap_paragraph(paragraph, font_name, font_size, max_width_pt))
+        lines.extend(
+            _wrap_paragraph(
+                paragraph,
+                font_name,
+                font_size,
+                max_width_pt,
+                balance=balance,
+            )
+        )
     return lines or [""]
 
 
-def _wrap_paragraph(
+def _greedy_wrap_paragraph(
     paragraph: str,
     font_name: str,
     font_size: float,
@@ -53,14 +65,71 @@ def _wrap_paragraph(
     return lines
 
 
+def _balance_wrap_paragraph(
+    paragraph: str,
+    font_name: str,
+    font_size: float,
+    max_width_pt: float,
+    target_lines: int,
+) -> list[str]:
+    """Giữ cùng số dòng với greedy, thu hẹp độ rộng hiệu dụng để các dòng đều hơn.
+
+    Giống text-wrap: balance — tìm width nhỏ nhất mà vẫn wrap ≤ target_lines.
+    """
+    greedy = _greedy_wrap_paragraph(paragraph, font_name, font_size, max_width_pt)
+    if target_lines <= 1 or len(greedy) <= 1:
+        return greedy
+
+    lo = 0.0
+    hi = float(max_width_pt)
+    best = greedy
+    for _ in range(_BALANCE_SEARCH_STEPS):
+        mid = (lo + hi) / 2.0
+        trial = _greedy_wrap_paragraph(paragraph, font_name, font_size, mid)
+        if len(trial) <= target_lines:
+            best = trial
+            hi = mid
+        else:
+            lo = mid
+
+    if len(best) > target_lines:
+        return greedy
+    # Mỗi dòng vẫn phải ≤ max_width_pt (greedy với hi ≤ max_width).
+    return best
+
+
+def _wrap_paragraph(
+    paragraph: str,
+    font_name: str,
+    font_size: float,
+    max_width_pt: float,
+    *,
+    balance: bool = False,
+) -> list[str]:
+    greedy = _greedy_wrap_paragraph(paragraph, font_name, font_size, max_width_pt)
+    if not balance or len(greedy) <= 1:
+        return greedy
+    return _balance_wrap_paragraph(
+        paragraph,
+        font_name,
+        font_size,
+        max_width_pt,
+        target_lines=len(greedy),
+    )
+
+
 def measure_wrapped_height(
     text: str,
     font_name: str,
     font_size: float,
     max_width_pt: float,
     line_height: float,
+    *,
+    balance: bool = False,
 ) -> float:
-    lines = wrap_text_to_width(text, font_name, font_size, max_width_pt)
+    lines = wrap_text_to_width(
+        text, font_name, font_size, max_width_pt, balance=balance
+    )
     return len(lines) * line_height
 
 
@@ -87,6 +156,7 @@ def compute_row_height(
                 font_size=font_size,
                 max_width_pt=inner_width,
                 line_height=line_height,
+                balance=True,
             )
         )
     return max(max(heights, default=line_height), row_height_min)

@@ -34,13 +34,13 @@ def test_build_carry_row_values_puts_label_and_amount():
     ]
     values = build_carry_row_values(
         columns,
-        label="Cộng chuyển trang sau",
+        label="Cộng mang sang",
         amount=150000,
         amount_key="thanh_tien",
     )
     assert values == {
         "stt": "",
-        "ten": "Cộng chuyển trang sau",
+        "ten": "Cộng mang sang",
         "thanh_tien": "150.000",
     }
 

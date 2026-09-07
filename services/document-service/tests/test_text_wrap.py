@@ -3,6 +3,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 from app.render.fonts import FONT_REGULAR
 from app.render.text_wrap import (
     CELL_PADDING_PT,
+    _greedy_wrap_paragraph,
     compute_row_height,
     line_height_for,
     measure_wrapped_height,
@@ -25,6 +26,31 @@ def test_wrap_long_word_stays_on_one_line():
     word = "SiêuDàiKhôngCóKhoảngTrắng" * 3
     lines = wrap_text_to_width(word, FONT_REGULAR, 10, 40.0)
     assert lines == [word]
+
+
+def test_wrap_balances_line_lengths_when_multi_line():
+    """Không để dòng trên đầy / dòng dưới rất ngắn — cân độ dài các dòng."""
+    text = "Thịt bò tươi loại một rất ngon dùng cho bữa trưa"
+    max_width = 90.0
+    greedy = _greedy_wrap_paragraph(text, FONT_REGULAR, 10, max_width)
+    balanced = wrap_text_to_width(text, FONT_REGULAR, 10, max_width, balance=True)
+    assert len(balanced) == len(greedy)
+    assert len(balanced) >= 2
+    for line in balanced:
+        assert stringWidth(line, FONT_REGULAR, 10) <= max_width
+
+    greedy_widths = [stringWidth(line, FONT_REGULAR, 10) for line in greedy]
+    balanced_widths = [stringWidth(line, FONT_REGULAR, 10) for line in balanced]
+    greedy_spread = max(greedy_widths) - min(greedy_widths)
+    balanced_spread = max(balanced_widths) - min(balanced_widths)
+    assert balanced_spread <= greedy_spread
+
+
+def test_wrap_default_is_greedy_not_balanced():
+    text = "Thịt bò tươi loại một rất ngon dùng cho bữa trưa"
+    max_width = 90.0
+    greedy = _greedy_wrap_paragraph(text, FONT_REGULAR, 10, max_width)
+    assert wrap_text_to_width(text, FONT_REGULAR, 10, max_width) == greedy
 
 
 def test_measure_wrapped_height_matches_line_count():

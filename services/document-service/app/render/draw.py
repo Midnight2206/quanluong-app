@@ -192,9 +192,12 @@ def _draw_wrapped_lines(
     font_size: float,
     align: Align,
     valign: VAlign,
+    balance: bool = False,
 ) -> None:
     inner_width = max(width - 2 * CELL_PADDING_PT, 1.0)
-    lines = wrap_text_to_width(text, font_name, font_size, inner_width)
+    lines = wrap_text_to_width(
+        text, font_name, font_size, inner_width, balance=balance
+    )
     line_height = line_height_for(font_size)
     block_height = len(lines) * line_height
     if valign == "top":
@@ -250,6 +253,7 @@ def draw_merged_cell(
         font_size=font_size,
         align=align,
         valign=valign,
+        balance=True,
     )
 
 

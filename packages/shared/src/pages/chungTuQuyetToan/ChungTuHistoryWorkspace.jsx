@@ -77,6 +77,8 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   const [selectedPnkBatch, setSelectedPnkBatch] = useState(null);
   const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
   const isPnkCategory = categoryKey === "phieu-nhap-kho";
+  const isPxkCategory = categoryKey === "phieu-xuat-kho";
+  const isFolderSummaryCategory = isPnkCategory || isPxkCategory;
 
   const { data: monthlyRows = [], isLoading: monthlyLoading } = useChungTuBkmhMonthlyListQuery(
     { storageUnitId: effectiveUnitId },
@@ -483,8 +485,8 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
           <ChungTuExportWizardCard
             title={`Lịch sử folder PDF (${pdfExportBatches.length})`}
             description={
-              isPnkCategory
-                ? "Mỗi thẻ là một folder PNK đã xuất; có thể in gộp, tải zip hoặc mở tổng hợp file."
+              isFolderSummaryCategory
+                ? "Mỗi thẻ là một folder đã xuất; có thể in gộp, tải zip hoặc mở tổng hợp file."
                 : "Mỗi lần xuất tạo một folder; mở từng folder để tải zip, in gộp hoặc tải file lẻ."
             }
             expanded={expandedLayout}
@@ -504,7 +506,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                         <span className="truncate">{item.displayName || item.batchKey || templateLabel}</span>
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {isPnkCategory
+                        {isFolderSummaryCategory
                           ? `${item.fileCount ?? 0} file · ${formatVnd(item.tongTienFolder)}`
                           : `${item.fileCount ?? 0} file · ${templateLabel}`}
                       </p>
@@ -514,7 +516,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                     </p>
                   </div>
 
-                  <dl className={cn("grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4", !isPnkCategory && "mt-3")}>
+                  <dl className={cn("grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4", !isFolderSummaryCategory && "mt-3")}>
                     <div className="rounded-lg bg-muted/25 px-2.5 py-2">
                       <dt className="text-[10px] uppercase text-muted-foreground">Kỳ</dt>
                       <dd className="mt-0.5 font-medium text-foreground">
@@ -539,7 +541,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                 </>
               );
 
-              if (isPnkCategory) {
+              if (isFolderSummaryCategory) {
                 return (
                   <div key={item.batchKey} className="space-y-3 rounded-xl border border-border/70 bg-card/30 p-3 sm:p-4">
                     {batchHeader}
@@ -660,7 +662,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                       ) : null}
                     </div>
 
-                    {!isBkmhCategory && !isPnkCategory ? (
+                    {!isBkmhCategory && !isFolderSummaryCategory ? (
                       <div className="space-y-2">
                         <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
                           File trong folder
@@ -721,7 +723,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
           }}
         />
       ) : null}
-      {isPnkCategory ? (
+      {isFolderSummaryCategory ? (
         <ChungTuPnkBatchSummaryPanel
           batch={selectedPnkBatch}
           open={Boolean(selectedPnkBatch)}

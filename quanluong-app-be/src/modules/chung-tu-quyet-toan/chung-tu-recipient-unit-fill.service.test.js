@@ -38,7 +38,7 @@ test.beforeEach(() => {
 });
 
 test("mergeRecipientUnitFillFields writes recipient fill fields", () => {
-  const ctx = { sheetName: "DV A" };
+  const ctx = { sheetName: "DV A", donVi: "Don vi cap minh", recipientUnitName: "" };
   mergeRecipientUnitFillFields(ctx, {
     nguoiNhanHang: "Nguyễn Văn A",
     nguoiNhan: "Nguyễn Văn A",
@@ -48,7 +48,8 @@ test("mergeRecipientUnitFillFields writes recipient fill fields", () => {
   });
   assert.equal(ctx.nguoiNhanHang, "Nguyễn Văn A");
   assert.equal(ctx.nguoiNhan, "Nguyễn Văn A");
-  assert.equal(ctx.donVi, "Tiểu đoàn 1");
+  assert.equal(ctx.donVi, "Don vi cap minh");
+  assert.equal(ctx.recipientUnitName, "Tiểu đoàn 1");
   assert.equal(ctx.diaChi, "Phòng hậu cần");
   assert.equal(ctx.signatureName, "Th/tá Nguyễn Văn A");
 });
@@ -110,13 +111,15 @@ test("attachRecipientUnitFillToMonthlyContexts fills by-day contexts", async () 
   prismaUnitFindMany.mock.mockImplementation(async () => [{ id: 10, name: "Tiểu đoàn 1" }]);
 
   const monthly = {
-    sheetContexts: [{ recipientUnitId: 10, periodDate: "2026-06-05" }],
+    sheetContexts: [{ recipientUnitId: 10, periodDate: "2026-06-05", donVi: "Cap minh" }],
   };
   await attachRecipientUnitFillToMonthlyContexts(monthly, { aggregationMode: "by-day" });
   const ctx = monthly.sheetContexts[0];
   assert.equal(ctx.nguoiNhan, "Nguyễn Văn A");
   assert.equal(ctx.diaChi, "Phòng hậu cần");
   assert.equal(ctx.signatureName, "Th/tá Nguyễn Văn A");
+  assert.equal(ctx.donVi, "Cap minh");
+  assert.equal(ctx.recipientUnitName, "Tiểu đoàn 1");
 });
 
 test("legacy named range keys map nguoiNhanHang and donVi", () => {

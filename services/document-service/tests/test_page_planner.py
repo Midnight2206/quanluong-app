@@ -1,6 +1,6 @@
 import pytest
 
-from app.pagination.page_planner import plan_pages
+from app.pagination.page_planner import apply_content_row_heights, plan_pages
 
 
 def test_single_page_all_rows():
@@ -15,6 +15,23 @@ def test_single_page_all_rows():
     assert result.pages[0].row_indices == [0, 1, 2]
     assert result.pages[0].is_last is True
     assert all(18 <= height <= 28 for height in result.pages[0].row_heights)
+
+
+def test_apply_content_row_heights_keeps_short_rows_short():
+    planned = plan_pages(
+        n_rows=4,
+        page_content_height=500,
+        header_height=20,
+        signature_block_height=40,
+        row_height_min=36,
+        row_height_max=36,
+    )
+    content = [18.0, 18.0, 36.0, 18.0]
+    pages = apply_content_row_heights(planned.pages, content)
+
+    assert len(pages) == 1
+    assert pages[0].row_heights == content
+    assert pages[0].row_indices == [0, 1, 2, 3]
 
 
 def test_uniform_search_keeps_at_least_two_rows_on_last_page():

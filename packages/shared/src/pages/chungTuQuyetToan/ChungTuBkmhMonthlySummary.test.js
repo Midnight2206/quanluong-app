@@ -38,6 +38,8 @@ test("summary workspace lists monthly rows with unit filter and panel trigger", 
   assert.match(summaryWorkspaceSource, /useChungTuBkmhMonthlyListQuery/);
   assert.match(summaryWorkspaceSource, /useChungTuPdfExportBatchesQuery/);
   assert.match(summaryWorkspaceSource, /phieu-nhap-kho/);
+  assert.match(summaryWorkspaceSource, /phieu-xuat-kho/);
+  assert.match(summaryWorkspaceSource, /isFolderSummaryCategory/);
   assert.match(summaryWorkspaceSource, /Mở tổng hợp/);
   assert.match(summaryWorkspaceSource, /Tháng/);
   assert.match(summaryWorkspaceSource, /Chế độ gộp/);
@@ -82,11 +84,11 @@ test("export workspace routes monthly BKMH exports to monthly mutation", () => {
   assert.match(exportWorkspaceSource, /sliceCount:/);
 });
 
-test("BKMH monthly export hides Ngày chứng từ but keeps Tháng chứng từ", () => {
+test("BKMH and PXK monthly export hide Ngày chứng từ but keep Tháng chứng từ", () => {
   assert.match(exportWorkspaceSource, /Tháng chứng từ/);
   assert.match(
     exportWorkspaceSource,
-    /isPnkMonthly \?[\s\S]*: !isBkmhMonthly \?[\s\S]*Ngày chứng từ/,
+    /isPnkMonthly \?[\s\S]*: !isMonthly \?[\s\S]*Ngày chứng từ/,
   );
 });
 
