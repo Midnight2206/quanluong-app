@@ -1,10 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
+process.env.DATABASE_URL ||= "mysql://test:test@localhost/test";
+process.env.JWT_ACCESS_SECRET ||= "test-jwt-secret";
+process.env.SESSION_SECRET ||= "test-session-secret";
+
+const {
   aggregateLinesToDetailRows,
+  materializeSignatureBlockForRender,
   resolveDocumentNumberFields,
-} from "./chung-tu-data-resolver.service.js";
+  resolvePdfHeaderSettings,
+  resolveSystemSignatureSlots,
+} = await import("./chung-tu-data-resolver.service.js");
 import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 
 test("aggregateLinesToDetailRows sums quantity and amount for same commodity", () => {
@@ -40,6 +47,42 @@ test("aggregateLinesToDetailRows sums quantity and amount for same commodity", (
   assert.equal(rows[0].nguoiBan, "A, B");
   assert.equal(rows[1].tenHang, "Thịt");
   assert.equal(rows[1].soLuong, 1);
+});
+
+test("aggregateLinesToDetailRows keeps separate rows when same commodity has different unitPrice", () => {
+  const rows = aggregateLinesToDetailRows([
+    {
+      commodity: { id: 1, name: "Gạo", measureUnit: "Kg" },
+      lttpSupplier: { name: "A" },
+      quantity: 2,
+      unitPrice: 10000,
+      amount: 20000,
+    },
+    {
+      commodity: { id: 1, name: "Gạo", measureUnit: "Kg" },
+      lttpSupplier: { name: "A" },
+      quantity: 3,
+      unitPrice: 12000,
+      amount: 36000,
+    },
+  ]);
+
+  assert.equal(rows.length, 2);
+  assert.deepEqual(
+    rows.map((row) => row.donGia),
+    ["10.000", "12.000"],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.soLuong),
+    [2, 3],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.stt),
+    [1, 2],
+  );
+  // Must not be average 11000 → "11.000"
+  assert.notEqual(rows[0].donGia, "11.000");
+  assert.notEqual(rows[1].donGia, "11.000");
 });
 
 test("aggregateLinesToDetailRows renumbers stt after merge", () => {
@@ -102,4 +145,223 @@ test("resolveDocumentNumberFields ignores manual overrides for bang ke", () => {
   });
   assert.equal(result.soChungTu, "062615");
   assert.equal(result.quyenSo, "0626");
+});
+
+test("resolvePdfHeaderSettings uses exporting user profile for don vi fields", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {
+      donViCapTren: "Unit profile cap tren",
+      donVi: "Unit profile don vi",
+      donViSo: "Legacy unit profile line",
+    },
+    rawSettings: {},
+    exportingUserProfile: {
+      donViCapTren: "Su doan 372",
+      donVi: "Tieu doan 1",
+    },
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO,
+  });
+
+  assert.equal(result.donViCapTren, "Su doan 372");
+  assert.equal(result.donVi, "Tieu doan 1");
+  assert.equal(result.donViSo, "Tieu doan 1");
+});
+
+test("resolvePdfHeaderSettings always prefers creating user profile even when empty", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {
+      donViCapTren: "Unit profile cap tren",
+      donVi: "Unit profile don vi",
+      donViSo: "Legacy unit profile line",
+    },
+    rawSettings: {},
+    exportingUserProfile: {
+      donViCapTren: null,
+      donVi: "  ",
+    },
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO,
+  });
+
+  assert.equal(result.donViCapTren, "");
+  assert.equal(result.donVi, "");
+  assert.equal(result.donViSo, "Legacy unit profile line");
+});
+
+test("resolvePdfHeaderSettings prefers slip buyer over BKMH header settings", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {},
+    rawSettings: {},
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    bkmhHeaderSettings: {
+      hoTenNguoiMua: "Buyer from settings",
+      boPhan: "Bo phan from settings",
+    },
+    slips: [
+      {
+        slipNo: 1,
+        buyerDisplayName: "Buyer from slip",
+      },
+    ],
+  });
+
+  assert.equal(result.hoTenNguoiMua, "Buyer from slip");
+  assert.equal(result.nguoiMua, "Buyer from slip");
+  assert.equal(result.signerNguoiMua, "Buyer from slip");
+});
+
+test("resolvePdfHeaderSettings prefers unit-profile boPhan over BKMH settings", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {
+      boPhan: "Bo phan from unit profile",
+    },
+    rawSettings: {},
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    bkmhHeaderSettings: {
+      hoTenNguoiMua: "Buyer from settings",
+      boPhan: "Bo phan from settings",
+    },
+    slips: [
+      {
+        slipNo: 1,
+        buyerDisplayName: "   ",
+        buyerUser: {
+          username: "   ",
+          profile: { fullName: "   " },
+        },
+      },
+    ],
+  });
+
+  assert.equal(result.hoTenNguoiMua, "Buyer from settings");
+  assert.equal(result.boPhan, "Bo phan from unit profile");
+});
+
+test("resolveSystemSignatureSlots resolves system slots via catalog, passes through static/prompt unchanged", async () => {
+  let resolveCalled = false;
+  const mockCatalog = {
+    "bkmh.nguoiMua": {
+      resolve: async () => {
+        resolveCalled = true;
+        return { name: "A", signatureName: "Th/tá A", title: "Tài vụ" };
+      },
+    },
+  };
+  const slots = [
+    { label: "Người mua", source: "system", catalogNodeId: "bkmh.nguoiMua" },
+    { label: "Thủ trưởng", source: "static", staticName: "B", staticTitle: "Chỉ huy" },
+    { label: "Người nhận", source: "prompt" },
+  ];
+  const result = await resolveSystemSignatureSlots(slots, { storageUnitId: 1 }, mockCatalog);
+  assert.equal(resolveCalled, true);
+  assert.equal(result[0].resolvedName, "Th/tá A");
+  assert.equal(result[0].resolvedTitle, "Tài vụ");
+  assert.equal(result[1].resolvedName, null);
+  assert.equal(result[2].resolvedName, null);
+});
+
+test("resolveSystemSignatureSlots returns null resolvedName when catalog node missing", async () => {
+  const slots = [{ label: "X", source: "system", catalogNodeId: "nonexistent.node" }];
+  const result = await resolveSystemSignatureSlots(slots, {}, {});
+  assert.equal(result[0].resolvedName, null);
+});
+
+test("materializeSignatureBlockForRender turns resolved system slots into static for document-service", () => {
+  const result = materializeSignatureBlockForRender({
+    columns: 2,
+    slots: [
+      {
+        key: "nguoi_mua",
+        label: "Người mua",
+        col: 0,
+        source: "system",
+        catalogNodeId: "bkmh.nguoiMua",
+        resolvedName: "Th/tá A",
+        resolvedTitle: "Tài vụ",
+      },
+      {
+        key: "thu_truong",
+        label: "Thủ trưởng",
+        col: 1,
+        source: "static",
+        static_name: "B",
+        resolvedName: null,
+      },
+      {
+        key: "empty_sys",
+        label: "X",
+        col: 2,
+        source: "system",
+        catalogNodeId: "bkmh.nguoiMua",
+        resolvedName: null,
+      },
+    ],
+  });
+  assert.deepEqual(result.slots[0], {
+    key: "nguoi_mua",
+    label: "Người mua",
+    col: 0,
+    col_span: 1,
+    show_date_line: false,
+    source: "static",
+    static_name: "Th/tá A",
+  });
+  assert.equal(result.slots[1].source, "static");
+  assert.equal(result.slots[1].static_name, "B");
+  assert.equal(result.slots[1].resolvedName, undefined);
+  assert.deepEqual(result.slots[2], {
+    key: "empty_sys",
+    label: "X",
+    col: 2,
+    col_span: 1,
+    show_date_line: false,
+    source: "dynamic",
+  });
+});
+
+test("resolvePdfHeaderSettings prefers resolvedBkmhBuyer over slip buyer", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {},
+    rawSettings: {},
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    bkmhHeaderSettings: {
+      hoTenNguoiMua: "Buyer from settings",
+      boPhan: "Bo phan from settings",
+    },
+    slips: [{ slipNo: 1, buyerDisplayName: "Buyer from slip" }],
+    resolvedBkmhBuyer: {
+      name: "Nguyễn Văn A",
+      signatureName: "Th/tá Nguyễn Văn A",
+      title: "Tài vụ",
+    },
+  });
+
+  assert.equal(result.hoTenNguoiMua, "Nguyễn Văn A");
+  assert.equal(result.boPhan, "Tài vụ");
+});
+
+test("resolvePdfHeaderSettings falls back to BKMH settings when slip buyer and boPhan empty", () => {
+  const result = resolvePdfHeaderSettings({
+    mergedSettings: {
+      boPhan: "   ",
+    },
+    rawSettings: {},
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    bkmhHeaderSettings: {
+      hoTenNguoiMua: "Buyer from settings",
+      boPhan: "Bo phan from settings",
+    },
+    slips: [
+      {
+        slipNo: 1,
+        buyerDisplayName: "   ",
+        buyerUser: {
+          username: "   ",
+          profile: { fullName: "   " },
+        },
+      },
+    ],
+  });
+
+  assert.equal(result.hoTenNguoiMua, "Buyer from settings");
+  assert.equal(result.boPhan, "Bo phan from settings");
 });

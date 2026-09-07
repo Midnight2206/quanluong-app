@@ -3,7 +3,7 @@ import { usePersistedNavTabSelection } from "@/hooks/usePersistedNavTab";
 import { cn } from "@/utils/cn";
 
 /**
- * @param {{ id: string, label: string, panel: React.ReactNode, badge?: React.ReactNode }[]} tabs
+ * @param {{ id: string, label: string, panel: React.ReactNode, badge?: React.ReactNode, disabled?: boolean }[]} tabs
  * @param {string} [defaultTabId]
  * @param {string} [persistId] — nếu có, lưu `sessionStorage` tại khóa `quanluong:navTab:${persistId}`
  * @param {string} [className] — outer wrapper; với `scrollablePanel` bật: thường thêm `min-h-0 flex-1` khi nằm trong flex column.
@@ -34,12 +34,14 @@ export function TabPanel({
   const tabListRef = useRef(null);
   const [tabFade, setTabFade] = useState({ left: false, right: false });
   const firstId = tabs[0]?.id;
+  const enabledTabs = tabs.filter((tab) => !tab.disabled);
+  const firstEnabledId = enabledTabs[0]?.id ?? firstId;
   const validIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
 
   const [activeId, setActiveId] = usePersistedNavTabSelection(
     persistId ? persistId : null,
     validIds,
-    defaultTabId ?? firstId,
+    tabs.some((tab) => tab.id === defaultTabId && !tab.disabled) ? defaultTabId : firstEnabledId,
   );
 
   if (!tabs.length) {
@@ -48,16 +50,28 @@ export function TabPanel({
 
   const safeActive = (() => {
     if (forcedActiveTabId && validIds.includes(forcedActiveTabId)) {
-      return forcedActiveTabId;
+      const forcedTab = tabs.find((tab) => tab.id === forcedActiveTabId);
+      if (forcedTab && !forcedTab.disabled) {
+        return forcedActiveTabId;
+      }
     }
-    return tabs.some((t) => t.id === activeId) && activeId ? activeId : firstId;
+    return tabs.some((tab) => tab.id === activeId && !tab.disabled) && activeId ? activeId : firstEnabledId;
   })();
-  const activeTab = tabs.find((t) => t.id === safeActive) ?? tabs[0];
+  const activeTab = tabs.find((tab) => tab.id === safeActive) ?? enabledTabs[0] ?? tabs[0];
 
   function handleSelectTab(id) {
+    if (tabs.some((tab) => tab.id === id && tab.disabled)) {
+      return;
+    }
     setActiveId(id);
     onTabSelect?.(id);
   }
+
+  useEffect(() => {
+    if (safeActive && activeId !== safeActive) {
+      setActiveId(safeActive);
+    }
+  }, [activeId, safeActive, setActiveId]);
 
   useEffect(() => {
     if (!scrollableTabList) {
@@ -139,9 +153,11 @@ export function TabPanel({
               role="tab"
               id={tabId}
               aria-selected={isActive}
+              aria-disabled={tab.disabled || undefined}
               aria-controls={panelId}
               tabIndex={isActive ? 0 : -1}
-              onClick={() => handleSelectTab(tab.id)}
+              disabled={tab.disabled}
+              onClick={tab.disabled ? undefined : () => handleSelectTab(tab.id)}
               className={cn(
                 "relative gap-1.5 rounded-t-md px-2.5 py-2.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm sm:gap-2 sm:px-3 sm:py-2.5",
                 scrollableTabList ? "shrink-0 whitespace-nowrap" : null,
@@ -153,6 +169,7 @@ export function TabPanel({
                 isActive
                   ? "bg-background text-foreground shadow-sm ring-1 ring-border/70 after:absolute after:inset-x-1 after:-bottom-px after:z-10 after:h-0.5 after:rounded-full after:bg-primary"
                   : "text-foreground/75 hover:bg-muted/70 hover:text-foreground",
+                tab.disabled && "cursor-not-allowed opacity-50 hover:bg-transparent hover:text-foreground/75",
               )}
             >
               <span className={cn(equalWidthTabs ? "text-center leading-tight" : "shrink-0")}>{tab.label}</span>

@@ -31,6 +31,7 @@ import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { apiRequest } from "@/services/apiRequest";
 import { changePasswordSchema, meProfileFormSchema } from "@/features/auth/schemas/authSchemas";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { useConfirm } from "@/contexts/ConfirmProvider";
 import { cn } from "@/utils/cn";
 import { resolveMediaUrl } from "@/utils/runtimeEnv";
 
@@ -93,6 +94,7 @@ function formatLockoutRemaining(totalSec) {
 export function ProfilePage() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { confirm } = useConfirm();
   const user = useCurrentUser();
   const avatarUrl = user?.profile?.avatarUrl;
   const avatarDisplaySrc = avatarUrl ? resolveMediaUrl(avatarUrl) : null;
@@ -127,7 +129,11 @@ export function ProfilePage() {
       address: "",
       description: "",
       jobTitle: "",
-      rank: "",
+      rankFull: "",
+      rankAbbr: "",
+      department: "",
+      donViCapTren: "",
+      donVi: "",
       birthday: "",
     },
   });
@@ -175,7 +181,11 @@ export function ProfilePage() {
       address: user.profile?.address || "",
       description: user.profile?.description || "",
       jobTitle: user.profile?.jobTitle || "",
-      rank: user.profile?.rank || "",
+      rankFull: user.profile?.rankFull || "",
+      rankAbbr: user.profile?.rankAbbr || "",
+      department: user.profile?.department || "",
+      donViCapTren: user.profile?.donViCapTren || "",
+      donVi: user.profile?.donVi || "",
       birthday: formatDateForInput(user.profile?.birthday),
     });
   }, [user, resetProfile]);
@@ -243,7 +253,13 @@ export function ProfilePage() {
 
   async function onDeleteAvatar() {
     if (!avatarUrl) return;
-    if (!window.confirm("Xóa ảnh đại diện hiện tại?")) return;
+    const ok = await confirm({
+      title: "Xóa ảnh đại diện?",
+      message: "Ảnh đại diện hiện tại sẽ bị xóa khỏi hồ sơ của bạn.",
+      confirmLabel: "Xóa",
+      variant: "danger",
+    });
+    if (!ok) return;
     try {
       await deleteAvatar().unwrap();
       notifySuccess("Đã xóa ảnh đại diện.");
@@ -260,7 +276,11 @@ export function ProfilePage() {
         address: values.address?.trim() || null,
         description: values.description?.trim() || null,
         jobTitle: values.jobTitle?.trim() || null,
-        rank: values.rank?.trim() || null,
+        rankFull: values.rankFull?.trim() || null,
+        rankAbbr: values.rankAbbr?.trim() || null,
+        department: values.department?.trim() || null,
+        donViCapTren: values.donViCapTren?.trim() || null,
+        donVi: values.donVi?.trim() || null,
         birthday: values.birthday ? values.birthday : null,
       }).unwrap();
       notifySuccess("Đã lưu hồ sơ.");
@@ -414,14 +434,41 @@ export function ProfilePage() {
                     {...regProfile("description")}
                   />
                 </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Chức danh (text)</span>
+                  <input className={fieldClass} {...regProfile("jobTitle")} />
+                </label>
+                {/* Cấp bậc */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium">Cấp bậc đầy đủ</span>
+                      <input
+                        className={fieldClass}
+                        placeholder="Vd: Thiếu tá"
+                        {...regProfile("rankFull")}
+                      />
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block space-y-2">
+                      <span className="text-sm font-medium">Viết tắt</span>
+                      <input className={fieldClass} placeholder="Vd: Th/tá" {...regProfile("rankAbbr")} />
+                    </label>
+                  </div>
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-sm font-medium">Bộ phận</span>
+                  <input className={fieldClass} {...regProfile("department")} />
+                </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium">Chức danh (text)</span>
-                    <input className={fieldClass} {...regProfile("jobTitle")} />
+                    <span className="text-sm font-medium">Đơn vị cấp trên</span>
+                    <input className={fieldClass} {...regProfile("donViCapTren")} />
                   </label>
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium">Cấp bậc / hàm</span>
-                    <input className={fieldClass} {...regProfile("rank")} />
+                    <span className="text-sm font-medium">Đơn vị</span>
+                    <input className={fieldClass} {...regProfile("donVi")} />
                   </label>
                 </div>
                 <label className="block space-y-2 sm:max-w-xs">

@@ -1,5 +1,6 @@
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { CHUNG_TU_AGGREGATION_MODES } from "./chung-tu-category.constants.js";
+import { formatSystemPersonName } from "./chung-tu-signature-catalog.js";
 
 function resolveRecipientPersonName(row, slipRecipientDisplayName = "") {
   const fromSlip = String(slipRecipientDisplayName ?? "").trim();
@@ -10,9 +11,21 @@ function resolveRecipientPersonName(row, slipRecipientDisplayName = "") {
   return fromUser;
 }
 
+function buildRecipientUnitFillFields(row, donVi = "") {
+  const nguoiNhanHang = resolveRecipientPersonName(row);
+  const person = formatSystemPersonName(row?.user);
+  return {
+    nguoiNhanHang,
+    nguoiNhan: nguoiNhanHang,
+    donVi,
+    diaChi: String(row?.user?.profile?.department ?? "").trim(),
+    signatureName: person?.signatureName ?? nguoiNhanHang,
+  };
+}
+
 /**
  * @param {number[]} recipientUnitIds
- * @returns {Promise<Map<number, { nguoiNhanHang: string, donVi: string }>>}
+ * @returns {Promise<Map<number, { nguoiNhanHang: string, nguoiNhan: string, donVi: string, diaChi: string, signatureName: string }>>}
  */
 export async function loadRecipientUnitFillMap(recipientUnitIds) {
   const ids = [...new Set((recipientUnitIds ?? []).map(Number).filter((id) => id > 0))];
@@ -27,7 +40,7 @@ export async function loadRecipientUnitFillMap(recipientUnitIds) {
         user: {
           select: {
             username: true,
-            profile: { select: { fullName: true } },
+            profile: { select: { fullName: true, rankAbbr: true, department: true } },
           },
         },
       },
@@ -44,11 +57,7 @@ export async function loadRecipientUnitFillMap(recipientUnitIds) {
   const rowByUnitId = new Map(rows.map((row) => [Number(row.recipientUnitId), row]));
 
   for (const id of ids) {
-    const row = rowByUnitId.get(id);
-    map.set(id, {
-      nguoiNhanHang: resolveRecipientPersonName(row),
-      donVi: nameByUnitId.get(id) ?? "",
-    });
+    map.set(id, buildRecipientUnitFillFields(rowByUnitId.get(id), nameByUnitId.get(id) ?? ""));
   }
   return map;
 }
@@ -56,17 +65,28 @@ export async function loadRecipientUnitFillMap(recipientUnitIds) {
 export function mergeRecipientUnitFillFields(target, fillFields) {
   if (!target || !fillFields) return target;
   target.nguoiNhanHang = fillFields.nguoiNhanHang ?? "";
-  target.donVi = fillFields.donVi ?? "";
+  target.nguoiNhan = fillFields.nguoiNhan ?? fillFields.nguoiNhanHang ?? "";
+  // donVi = đơn vị cấp mình from creating user profile — do not overwrite with recipient unit.
+  target.diaChi = fillFields.diaChi ?? "";
+  target.signatureName = fillFields.signatureName ?? "";
+  if (fillFields.donVi && !String(target.recipientUnitName ?? "").trim()) {
+    target.recipientUnitName = fillFields.donVi;
+  }
   return target;
 }
 
 /**
- * Gắn người nhận / đơn vị cho từng sheet khi gộp theo đơn vị.
+ * Gắn người nhận / đơn vị cho từng sheet khi gộp theo đơn vị hoặc theo ngày.
  * @param {{ sheetContexts?: object[], aggregationMode?: string }} monthly
  */
 export async function attachRecipientUnitFillToMonthlyContexts(monthly, { aggregationMode } = {}) {
   const mode = String(aggregationMode ?? "").trim();
-  if (mode !== CHUNG_TU_AGGREGATION_MODES.BY_UNIT) return monthly;
+  if (
+    mode !== CHUNG_TU_AGGREGATION_MODES.BY_UNIT &&
+    mode !== CHUNG_TU_AGGREGATION_MODES.BY_DAY
+  ) {
+    return monthly;
+  }
 
   const unitIds = (monthly?.sheetContexts ?? [])
     .map((ctx) => Number(ctx.recipientUnitId))
@@ -75,7 +95,15 @@ export async function attachRecipientUnitFillToMonthlyContexts(monthly, { aggreg
 
   for (const ctx of monthly?.sheetContexts ?? []) {
     const uid = Number(ctx.recipientUnitId);
-    const fill = fillMap.get(uid);
+    const fill =
+      fillMap.get(uid) ??
+      ({
+        nguoiNhanHang: "",
+        nguoiNhan: "",
+        donVi: "",
+        diaChi: "",
+        signatureName: "",
+      });
     mergeRecipientUnitFillFields(ctx, fill);
     if (fill?.donVi && !String(ctx.recipientUnitName ?? "").trim()) {
       ctx.recipientUnitName = fill.donVi;
@@ -91,17 +119,24 @@ export async function resolveRecipientUnitFillForSlip(slip) {
   const uid = Number(slip?.recipientUnitId);
   const unitName = String(slip?.recipientUnit?.name ?? "").trim();
   if (!Number.isInteger(uid) || uid <= 0) {
+    const nguoiNhanHang = String(slip?.recipientDisplayName ?? "").trim();
     return {
-      nguoiNhanHang: String(slip?.recipientDisplayName ?? "").trim(),
-      donVi: unitName,
+      nguoiNhanHang,
+      nguoiNhan: nguoiNhanHang,
+      diaChi: "",
+      signatureName: nguoiNhanHang,
+      ...(unitName ? { recipientUnitName: unitName } : {}),
     };
   }
   const fillMap = await loadRecipientUnitFillMap([uid]);
-  const base = fillMap.get(uid) ?? { nguoiNhanHang: "", donVi: unitName };
+  const base = fillMap.get(uid) ?? buildRecipientUnitFillFields(undefined, unitName);
   const nguoiNhanHang =
     String(slip?.recipientDisplayName ?? "").trim() || base.nguoiNhanHang || "";
   return {
     nguoiNhanHang,
-    donVi: unitName || base.donVi || "",
+    nguoiNhan: nguoiNhanHang,
+    diaChi: base.diaChi ?? "",
+    signatureName: nguoiNhanHang ? base.signatureName || nguoiNhanHang : base.signatureName,
+    recipientUnitName: unitName || base.donVi || "",
   };
 }

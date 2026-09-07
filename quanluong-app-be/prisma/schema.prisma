@@ -156,6 +156,13 @@ model User {
   lttpAsDefaultForRecipientUnit          LttpRecipientUnitDefaultUser[] @relation("LttpRecipientDefaultUserUser")
   chungTuQuyetToanTemplateConfigs        ChungTuQuyetToanTemplateConfig[]
   chungTuDocumentsCreated                ChungTuDocument[] @relation("ChungTuDocumentCreatedBy")
+  chungTuPdfTemplatesUploaded            ChungTuPdfTemplate[] @relation("ChungTuPdfTemplateUploadedBy")
+  chungTuPdfExportsCreated               ChungTuPdfExport[] @relation("ChungTuPdfExportCreatedBy")
+  chungTuPdfExportBatchesCreated         ChungTuPdfExportBatch[] @relation("ChungTuPdfExportBatchCreatedBy")
+  chungTuBkmhMonthlyCreated              ChungTuBkmhMonthly[] @relation("ChungTuBkmhMonthlyCreatedBy")
+  chungTuBkmhMonthlyUpdated              ChungTuBkmhMonthly[] @relation("ChungTuBkmhMonthlyUpdatedBy")
+  chungTuBkmhHeaderSettingsUpdated       ChungTuBkmhHeaderSettings[] @relation("ChungTuBkmhHeaderSettingsUpdatedBy")
+  chungTuSignatureSettingsUpdated        ChungTuSignatureSettings[] @relation("ChungTuSignatureSettingsUpdatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
 
@@ -272,6 +279,108 @@ model ChungTuDocument {
   @@index([unitId, categoryKey])
 }
 
+model ChungTuPdfTemplate {
+  id                         Int      @id @default(autoincrement())
+  categoryKey                String   @db.VarChar(80)
+  displayName                String   @db.VarChar(200)
+  documentServiceTemplateId  Int
+  name                       String   @db.VarChar(120)
+  version                    String   @db.VarChar(64)
+  status                     String   @default("draft") @db.VarChar(20)
+  fieldLabelsJson            Json?
+  uploadedById               Int
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  uploadedBy                 User     @relation("ChungTuPdfTemplateUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@unique([categoryKey, documentServiceTemplateId])
+  @@index([categoryKey, status])
+}
+
+/// Lô xuất PDF chứng từ (folder trên document-service + metadata file con).
+model ChungTuPdfExportBatch {
+  id                         Int                 @id @default(autoincrement())
+  batchKey                   String              @unique @db.VarChar(200)
+  categoryKey                String              @db.VarChar(80)
+  unitId                     Int
+  periodMonth                String?             @db.VarChar(7)
+  periodDate                 DateTime?           @db.Date
+  issueSlipId                Int?
+  unitIdsJson                Json
+  aggregationMode            String?             @db.VarChar(32)
+  pdfTemplateId              Int
+  documentServiceTemplateId  Int
+  documentServiceFolderId    Int
+  displayName                String              @db.VarChar(255)
+  fileCount                  Int
+  sourceDataHash             String?             @db.VarChar(64)
+  signaturesJson             Json?
+  createdById                Int
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+  unit                       Unit                @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy                  User                @relation("ChungTuPdfExportBatchCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  exports                    ChungTuPdfExport[]
+
+  @@index([categoryKey, unitId, createdAt])
+}
+
+model ChungTuPdfExport {
+  id                         Int                    @id @default(autoincrement())
+  exportKey                  String                 @unique @db.VarChar(200)
+  categoryKey                String                 @db.VarChar(80)
+  unitId                     Int
+  periodMonth                String?                @db.VarChar(7)
+  periodDate                 DateTime?              @db.Date
+  issueSlipId                Int?
+  unitIdsJson                Json
+  aggregationMode            String?                @db.VarChar(32)
+  pdfTemplateId              Int
+  documentServiceTemplateId  Int
+  fileName                   String                 @db.VarChar(255)
+  /// Legacy MEDIA_ROOT path; export mới dùng document-service folder.
+  storagePath                String?                @db.VarChar(512)
+  batchId                    Int?
+  documentServiceFileId      Int?
+  sortKey                    String?                @db.VarChar(128)
+  summaryJson                Json?
+  sourceDataHash             String?                @db.VarChar(64)
+  signaturesJson             Json?
+  createdById                Int
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+  unit                       Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy                  User                   @relation("ChungTuPdfExportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  batch                      ChungTuPdfExportBatch? @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([categoryKey, unitId, createdAt])
+  @@index([batchId])
+}
+
+/// Cấu hình khối chữ ký PDF theo loại chứng từ (categoryKey).
+model ChungTuSignatureSettings {
+  id                 Int      @id @default(autoincrement())
+  categoryKey        String   @unique @db.VarChar(80)
+  signatureBlockJson Json
+  extraFieldsJson    Json?
+  updatedById        Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  updatedBy          User     @relation("ChungTuSignatureSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+}
+
+/// Cấu hình header BKMH theo loại chứng từ (chỉ áp dụng cho bang-ke-mua-hang).
+model ChungTuBkmhHeaderSettings {
+  id            Int      @id @default(autoincrement())
+  categoryKey   String   @unique @db.VarChar(80)
+  hoTenNguoiMua String?  @db.VarChar(191)
+  boPhan        String?  @db.VarChar(255)
+  updatedById   Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  updatedBy     User     @relation("ChungTuBkmhHeaderSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+}
+
 /// Snapshot BKMH mỗi lần tạo/đồng bộ (theo ngày hoặc cả tháng).
 model ChungTuBkmhSnapshot {
   id              Int             @id @default(autoincrement())
@@ -294,6 +403,60 @@ model ChungTuBkmhSnapshot {
 
   @@index([documentId, syncedAt])
   @@index([periodMonth, periodDate])
+}
+
+model ChungTuBkmhMonthly {
+  id                        Int                  @id @default(autoincrement())
+  storageUnitId             Int
+  periodMonth               String               @db.VarChar(7)
+  aggregationMode           String               @db.VarChar(32)
+  unitIdsJson               Json
+  pdfTemplateId             Int
+  documentServiceTemplateId Int
+  documentServiceFolderId   Int
+  displayName               String               @db.VarChar(255)
+  tongTienThang             Decimal?             @db.Decimal(18, 2)
+  sliceCount                Int
+  sourceDataHash            String?              @db.VarChar(64)
+  signaturesJson            Json?
+  createdById               Int
+  updatedById               Int
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+  storageUnit               Unit                 @relation(fields: [storageUnitId], references: [id], onDelete: Cascade)
+  createdBy                 User                 @relation("ChungTuBkmhMonthlyCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy                 User                 @relation("ChungTuBkmhMonthlyUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  slices                    ChungTuBkmhSlice[]
+
+  @@unique([storageUnitId, periodMonth])
+  @@index([storageUnitId, updatedAt])
+}
+
+model ChungTuBkmhSlice {
+  id                    Int                @id @default(autoincrement())
+  monthlyId             Int
+  sortKey               String             @db.VarChar(128)
+  soChungTu             String?            @db.VarChar(64)
+  periodDate            DateTime?          @db.Date
+  recipientUnitId       Int?
+  recipientUnitName     String?            @db.VarChar(255)
+  ngayThangNam          String?            @db.VarChar(128)
+  tongTien              Decimal?           @db.Decimal(18, 2)
+  /// Snapshot detailRows lúc xuất PDF (display + raw numeric).
+  detailRowsJson        Json?
+  buyerUserId           Int?
+  buyerKey              String?  @db.VarChar(191)
+  buyerName             String?  @db.VarChar(191)
+  buyerSignatureName    String?  @db.VarChar(255)
+  buyerTitle            String?  @db.VarChar(255)
+  documentServiceFileId Int
+  fileName              String             @db.VarChar(255)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  monthly               ChungTuBkmhMonthly @relation(fields: [monthlyId], references: [id], onDelete: Cascade)
+
+  @@unique([monthlyId, sortKey])
+  @@index([monthlyId])
 }
 
 /// Tin nhắn 1–1 realtime (Socket.io); lưu DB để tải lại lịch sử.
@@ -367,9 +530,13 @@ model Profile {
   avatarUrl   String?
   description String?   @db.Text
   jobTitle    String?
-  rank        String?
+  rankFull     String?  @db.VarChar(128)
+  rankAbbr     String?  @db.VarChar(32)
+  department   String?  @db.VarChar(255)
   phoneNumber String?
   address     String?   @db.Text
+  donViCapTren String?  @db.VarChar(255)
+  donVi        String?  @db.VarChar(255)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -455,6 +622,9 @@ model Unit {
   unitMealPeriodSplits      UnitMealPeriodSplit[]
   chungTuUnitProfile        ChungTuUnitProfile?
   chungTuDocuments          ChungTuDocument[]
+  chungTuPdfExports         ChungTuPdfExport[]
+  chungTuPdfExportBatches   ChungTuPdfExportBatch[]
+  bkmhMonthlyExports        ChungTuBkmhMonthly[]
   kitchenDishCatalogs       KitchenDishCatalog[]
   kitchenMenuDays           KitchenMenuDay[]
   kitchenReceiptSlips       KitchenReceiptSlip[]

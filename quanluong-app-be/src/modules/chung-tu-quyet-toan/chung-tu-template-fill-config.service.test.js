@@ -69,14 +69,14 @@ test("buildDerivedNamedRangeMappings still accepts legacy snake_case", () => {
   assert.equal(byName.tongTienBanChu, "tongTienBangChu");
 });
 
-test("buildDerivedNamedRangeMappings maps canCuBkmh for phieu nhap kho", () => {
+test("buildDerivedNamedRangeMappings maps NL_FIELD_can_cu_pnk for phieu nhap kho", () => {
   const meta = spreadsheetMetaWithRanges([
-    { name: "canCuBkmh", startColumnIndex: 0, endColumnIndex: 12 },
+    { name: "NL_FIELD_can_cu_pnk", startColumnIndex: 0, endColumnIndex: 12 },
     { name: "soChungTu", startColumnIndex: 10, endColumnIndex: 11 },
   ]);
   const mappings = buildDerivedNamedRangeMappings(meta, "phieu-nhap-kho");
   const byName = Object.fromEntries(mappings.map((m) => [m.rangeName, m.fieldKey]));
-  assert.equal(byName.canCuBkmh, "canCuBkmh");
+  assert.equal(byName.NL_FIELD_can_cu_pnk, "canCuPnk");
   assert.equal(byName.soChungTu, "soChungTu");
 });
 

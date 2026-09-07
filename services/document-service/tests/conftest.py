@@ -47,3 +47,39 @@ def make_minimal_template() -> bytes:
 
 def make_mismatched_columns_template() -> bytes:
     return _template_bytes(data_range="$A$6:$F$6")
+
+
+def make_landscape_template(margin_top_in: float = 1.0, margin_left_in: float = 0.75) -> bytes:
+    """Template với orientation=landscape và margin tùy chỉnh (đơn vị inch)."""
+    from openpyxl.worksheet.page import PageMargins, PrintPageSetup
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "ChungTu"
+
+    sheet["A1"] = "Đơn vị"
+    _add_name(workbook, "FIELD_don_vi", sheet.title, "$A$1")
+
+    headers = ("STT", "Tên hàng", "ĐVT", "Số lượng", "Ghi chú")
+    starts = ("A5", "B5", "D5", "E5", "G5")
+    for cell_ref, title in zip(starts, headers):
+        sheet[cell_ref] = title
+    sheet.merge_cells("B5:C5")
+    sheet.merge_cells("E5:F5")
+    sheet.merge_cells("B6:C6")
+    sheet.merge_cells("E6:F6")
+    _add_name(workbook, "TABLE_HEADER", sheet.title, "$A$5:$G$5")
+    _add_name(workbook, "TABLE_DATA_ROW", sheet.title, "$A$6:$G$6")
+
+    # Đặt margin và orientation
+    sheet.page_margins = PageMargins(
+        top=margin_top_in,
+        bottom=0.75,
+        left=margin_left_in,
+        right=0.5,
+    )
+    sheet.page_setup = PrintPageSetup(orientation="landscape", paperSize=9)  # 9 = A4
+
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()

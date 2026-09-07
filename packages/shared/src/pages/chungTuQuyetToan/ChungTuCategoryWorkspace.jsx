@@ -4,10 +4,12 @@ import { useMemo } from "react";
 import { TabPanel } from "@/components/common/TabPanel";
 import { ChungTuExportWorkspace } from "./ChungTuExportWorkspace.jsx";
 import { ChungTuHistoryWorkspace } from "./ChungTuHistoryWorkspace.jsx";
+import { ChungTuSummaryWorkspace } from "./ChungTuSummaryWorkspace.jsx";
+import { ChungTuSignatureSettingsWorkspace } from "./ChungTuSignatureSettingsWorkspace.jsx";
 import { getChungTuCategoryConfig } from "./chungTuCategoryConfig";
 
 /**
- * Một loại chứng từ: tab con Xuất chứng từ + Lịch sử.
+ * Một loại chứng từ với 4 tab con thống nhất theo category.
  * @param {{ categoryKey: string }} props
  */
 export function ChungTuCategoryWorkspace({ categoryKey }) {
@@ -26,12 +28,23 @@ export function ChungTuCategoryWorkspace({ categoryKey }) {
         ),
       },
       {
+        id: "summary",
+        label: "Tổng hợp",
+        disabled: !config?.hasSummary,
+        panel: config?.hasSummary ? <ChungTuSummaryWorkspace categoryKey={categoryKey} /> : null,
+      },
+      {
         id: "history",
         label: "Lịch sử",
         panel: <ChungTuHistoryWorkspace categoryKey={categoryKey} exportKind={config?.exportKind} />,
       },
+      {
+        id: "signature-settings",
+        label: "Cài đặt chữ ký",
+        panel: <ChungTuSignatureSettingsWorkspace categoryKey={categoryKey} />,
+      },
     ],
-    [categoryKey, config?.exportKind],
+    [categoryKey, config?.exportKind, config?.hasSummary],
   );
 
   return (

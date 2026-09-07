@@ -1,15 +1,20 @@
 import importlib
 from unittest.mock import MagicMock
 
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from app.models import Template, TemplateField, TemplateTableConfig
 from conftest import make_minimal_template
 
 template_service = importlib.import_module("app.import.template_service")
 blob = importlib.import_module("app.import.blob")
+errors = importlib.import_module("app.import.errors")
 
 
 def test_import_template_persists_template_fields_and_table_config():
     session = MagicMock()
+    session.scalar.return_value = None
     added: list[object] = []
 
     def capture_add(obj: object) -> None:
@@ -66,6 +71,7 @@ def test_import_template_persists_template_fields_and_table_config():
 
 def test_import_template_uses_blob_store_save_result():
     session = MagicMock()
+    session.scalar.return_value = None
     added: list[object] = []
 
     class StubBlobStore(blob.BlobStore):
@@ -93,3 +99,83 @@ def test_import_template_uses_blob_store_save_result():
     assert template_id == 7
     template = next(obj for obj in added if isinstance(obj, Template))
     assert template.file_path == "s3://bucket/templates/demo/v2.xlsx"
+
+
+def test_import_template_raises_when_name_version_exists():
+    session = MagicMock()
+    session.scalar.return_value = 42
+
+    with pytest.raises(
+        errors.TemplateExistsError,
+        match=r"Mẫu «chung-tu» phiên bản «1» đã tồn tại",
+    ):
+        template_service.import_template(
+            session,
+            name="chung-tu",
+            version="1",
+            xlsx_bytes=make_minimal_template(),
+        )
+
+    session.add.assert_not_called()
+    session.commit.assert_not_called()
+
+
+def test_import_template_second_import_same_name_version_raises():
+    session = MagicMock()
+    added: list[object] = []
+
+    def capture_add(obj: object) -> None:
+        added.append(obj)
+
+    def assign_template_id() -> None:
+        for obj in added:
+            if isinstance(obj, Template) and obj.id is None:
+                obj.id = 1
+
+    session.add.side_effect = capture_add
+    session.flush.side_effect = assign_template_id
+    session.scalar.side_effect = [None, 1]
+
+    xlsx = make_minimal_template()
+    template_id = template_service.import_template(
+        session,
+        name="chung-tu",
+        version="1",
+        xlsx_bytes=xlsx,
+    )
+    assert template_id == 1
+
+    with pytest.raises(
+        errors.TemplateExistsError,
+        match=r"Mẫu «chung-tu» phiên bản «1» đã tồn tại",
+    ):
+        template_service.import_template(
+            session,
+            name="chung-tu",
+            version="1",
+            xlsx_bytes=xlsx,
+        )
+
+
+def test_import_template_maps_postgres_name_version_unique_violation():
+    session = MagicMock()
+    session.scalar.return_value = None
+    added: list[object] = []
+    session.add.side_effect = added.append
+    session.flush.side_effect = lambda: setattr(
+        next(obj for obj in added if isinstance(obj, Template)), "id", 7
+    )
+    orig = Exception(
+        'duplicate key value violates unique constraint "templates_name_version_key"'
+    )
+    session.commit.side_effect = IntegrityError("INSERT INTO templates", {}, orig)
+
+    with pytest.raises(errors.TemplateExistsError):
+        template_service.import_template(
+            session,
+            name="chung-tu",
+            version="1",
+            xlsx_bytes=make_minimal_template(),
+        )
+
+    session.rollback.assert_called_once()

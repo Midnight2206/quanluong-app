@@ -27,7 +27,12 @@ const CATEGORY_DERIVED_NAMED_RANGES = Object.freeze({
     "quyenSo",
     "tongTienBangChu",
     "nguoiNhanHang",
+    "nguoiNhan",
     "donVi",
+    "diaChi",
+    "lyDoXuatKho",
+    "xuatTaiKho",
+    "diaDiem",
   ]),
   "phieu-nhap-kho": Object.freeze([
     "ngay",
@@ -38,7 +43,7 @@ const CATEGORY_DERIVED_NAMED_RANGES = Object.freeze({
     "soChungTu",
     "quyenSo",
     "tongTienBangChu",
-    "canCuBkmh",
+    "canCuPnk",
     "nguoiNhanHang",
     "donVi",
   ]),
@@ -52,6 +57,7 @@ const CATEGORY_DERIVED_NAMED_RANGES = Object.freeze({
  *   exportKind?: "monthly"|"by-slip"|"by-date",
  *   subtitle: string,
  *   hint?: string,
+ *   hasSummary: boolean,
  *   derivedNamedRangeNames?: readonly string[],
  * }} ChungTuCategoryConfig
  */
@@ -70,6 +76,10 @@ export const CHUNG_TU_CATEGORY_CONFIG_LIST = CHUNG_TU_QUYET_TOAN_DOCUMENT_TABS.m
     exportKind: exportKindById[tab.id],
     subtitle: tab.subtitle,
     hint: tab.hint,
+    hasSummary:
+      tab.id === "bang-ke-mua-hang" ||
+      tab.id === "phieu-nhap-kho" ||
+      tab.id === "phieu-xuat-kho",
     derivedNamedRangeNames:
       CATEGORY_DERIVED_NAMED_RANGES[tab.id] ?? CHUNG_TU_DERIVED_NAMED_RANGE_NAMES,
   };

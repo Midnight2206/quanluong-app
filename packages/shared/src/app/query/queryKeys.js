@@ -105,6 +105,37 @@ export const qk = {
   },
   chungTuQuyetToan: {
     root: ["chungTuQuyetToan"],
+    pdfTemplates: (categoryKey, scope = "published") => [
+      "chungTuQuyetToan",
+      "pdfTemplates",
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+      scope === "active" ? "published" : scope,
+    ],
+    pdfTemplateFields: (templateId) => ["chungTuQuyetToan", "pdfTemplateFields", String(templateId ?? "")],
+    pdfExports: (unitId, categoryKey) => [
+      "chungTuQuyetToan",
+      "pdfExports",
+      String(unitId ?? ""),
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
+    pdfExportBatches: (unitId, categoryKey) => [
+      "chungTuQuyetToan",
+      "pdfExportBatches",
+      String(unitId ?? ""),
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
+    pdfExportBatch: (batchKey) => ["chungTuQuyetToan", "pdfExportBatch", String(batchKey ?? "")],
+    signatureSettings: (categoryKey) => [
+      "chungTuQuyetToan",
+      "signatureSettings",
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
+    bkmhHeaderSettings: (categoryKey) => [
+      "chungTuQuyetToan",
+      "bkmhHeaderSettings",
+      categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
+    ],
+    pdfFieldCatalog: () => ["chungTuQuyetToan", "pdfFieldCatalog"],
     templateCatalog: (categoryKey) => [
       "chungTuQuyetToan",
       "templateCatalog",
@@ -131,6 +162,13 @@ export const qk = {
       categoryKey != null && String(categoryKey).trim() ? String(categoryKey).trim() : "_all",
     ],
     document: (documentKey) => ["chungTuQuyetToan", "document", String(documentKey)],
+    bkmhMonthly: (storageUnitId, periodMonth) => [
+      "chungTuQuyetToan",
+      "bkmhMonthly",
+      String(storageUnitId ?? ""),
+      periodMonth ?? "_all",
+    ],
+    bkmhMonthlyDetail: (id) => ["chungTuQuyetToan", "bkmhMonthlyDetail", String(id ?? "")],
   },
 };
 

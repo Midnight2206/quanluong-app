@@ -1,0 +1,472 @@
+import assert from "node:assert/strict";
+import { mock, test } from "node:test";
+
+process.env.DATABASE_URL ||= "mysql://test:test@localhost/test";
+process.env.JWT_ACCESS_SECRET ||= "test-jwt-secret";
+process.env.SESSION_SECRET ||= "test-session-secret";
+
+const uploadTemplate = mock.fn(async ({ buffer, name, version }) => ({
+  id: 42,
+  name,
+  version,
+  bufferLength: buffer?.length ?? 0,
+}));
+
+const previewTemplatePdfResponse = mock.fn(
+  async (templateId) =>
+    new Response(`preview-${templateId}`, {
+      status: 200,
+      headers: { "content-type": "application/pdf" },
+    }),
+);
+const publishTemplate = mock.fn(async (templateId) => ({ id: templateId, status: "published" }));
+const retireTemplate = mock.fn(async (templateId) => ({ id: templateId, status: "retired" }));
+const getTemplateFields = mock.fn(async (templateId) => [
+  { key: "don_vi", label: "Đơn vị", templateId },
+]);
+
+const prismaFindMany = mock.fn(async () => []);
+const prismaFindFirst = mock.fn(async () => null);
+const prismaCreate = mock.fn(async ({ data }) => ({ id: 1, status: "draft", ...data }));
+const prismaFindUnique = mock.fn(async () => null);
+const prismaUpdate = mock.fn(async ({ where, data }) => ({ id: where.id, ...data }));
+
+mock.module("../../services/document-service.client.js", {
+  exports: {
+    getTemplateFields,
+    previewTemplatePdfResponse,
+    publishTemplate,
+    retireTemplate,
+    uploadTemplate,
+  },
+});
+
+mock.module("../../infra/database/prisma/prisma.client.js", {
+  exports: {
+    prisma: {
+      chungTuPdfTemplate: {
+        findMany: prismaFindMany,
+        findFirst: prismaFindFirst,
+        create: prismaCreate,
+        findUnique: prismaFindUnique,
+        update: prismaUpdate,
+      },
+    },
+  },
+});
+
+const { AppError } = await import("../../errors/app-error.js");
+const { ERROR_CODES } = await import("../../errors/error-codes.js");
+const {
+  createChungTuPdfTemplate,
+  getChungTuPdfTemplateFields,
+  listChungTuPdfTemplates,
+  previewChungTuPdfTemplate,
+  publishChungTuPdfTemplate,
+  retireChungTuPdfTemplate,
+  updateChungTuPdfTemplateFieldLabels,
+} = await import("./chung-tu-pdf-template.service.js");
+
+test.beforeEach(() => {
+  uploadTemplate.mock.resetCalls();
+  previewTemplatePdfResponse.mock.resetCalls();
+  publishTemplate.mock.resetCalls();
+  retireTemplate.mock.resetCalls();
+  getTemplateFields.mock.resetCalls();
+  prismaFindMany.mock.resetCalls();
+  prismaFindFirst.mock.resetCalls();
+  prismaCreate.mock.resetCalls();
+  prismaFindUnique.mock.resetCalls();
+  prismaUpdate.mock.resetCalls();
+});
+
+test("listChungTuPdfTemplates includeNonPublished omits status filter", async () => {
+  prismaFindMany.mock.resetCalls();
+  await listChungTuPdfTemplates({
+    categoryKey: "bang-ke-mua-hang",
+    includeNonPublished: true,
+  });
+  const call = prismaFindMany.mock.calls[0].arguments[0];
+  assert.equal(call.where.categoryKey, "bang-ke-mua-hang");
+  assert.equal(Object.prototype.hasOwnProperty.call(call.where, "status"), false);
+});
+
+test("getChungTuPdfTemplateFields allowNonPublished returns retired row fields", async () => {
+  prismaFindUnique.mock.mockImplementation(async () => ({
+    id: 3,
+    status: "retired",
+    documentServiceTemplateId: 42,
+  }));
+  getTemplateFields.mock.resetCalls();
+  const result = await getChungTuPdfTemplateFields({ id: 3, allowNonPublished: true });
+  assert.equal(result.template.id, 3);
+  assert.equal(getTemplateFields.mock.callCount(), 1);
+});
+
+test("listChungTuPdfTemplates filters by categoryKey and published status", async () => {
+  const rows = [{ id: 9, categoryKey: "phieu-nhap-kho", status: "published" }];
+  prismaFindMany.mock.mockImplementation(async () => rows);
+
+  const result = await listChungTuPdfTemplates({ categoryKey: " phieu-nhap-kho " });
+
+  assert.deepEqual(result, [{ ...rows[0], fieldLabels: {} }]);
+  assert.equal(prismaFindMany.mock.callCount(), 1);
+  assert.deepEqual(prismaFindMany.mock.calls[0].arguments[0], {
+    where: { categoryKey: "phieu-nhap-kho", status: "published" },
+    orderBy: [{ updatedAt: "desc" }],
+  });
+});
+
+test("createChungTuPdfTemplate uploads then persists document-service template id", async () => {
+  const buffer = Buffer.from("pdf-template");
+  const created = {
+    id: 7,
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "Biên bản A",
+    documentServiceTemplateId: 42,
+    name: "bien-ban-a",
+    version: "v1",
+    uploadedById: 3,
+    status: "draft",
+  };
+  prismaCreate.mock.mockImplementation(async () => created);
+
+  const result = await createChungTuPdfTemplate({
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "Biên bản A",
+    name: "bien-ban-a",
+    version: "v1",
+    buffer,
+    uploadedById: 3,
+  });
+
+  assert.equal(uploadTemplate.mock.callCount(), 1);
+  assert.deepEqual(uploadTemplate.mock.calls[0].arguments[0], {
+    buffer,
+    name: "bien-ban-a",
+    version: "v1",
+  });
+  assert.equal(prismaCreate.mock.callCount(), 1);
+  assert.deepEqual(prismaCreate.mock.calls[0].arguments[0], {
+    data: {
+      categoryKey: "bang-ke-mua-hang",
+      displayName: "Biên bản A",
+      documentServiceTemplateId: 42,
+      name: "bien-ban-a",
+      version: "v1",
+      uploadedById: 3,
+      fieldLabelsJson: {},
+    },
+  });
+  assert.deepEqual(result, { ...created, fieldLabels: {} });
+});
+
+test("createChungTuPdfTemplate seeds field labels from latest prior same-name template", async () => {
+  const buffer = Buffer.from("pdf-template");
+  const priorFieldLabels = {
+    soChungTu: "Số chứng từ: ",
+    donVi: "Đơn vị: ",
+  };
+  prismaFindFirst.mock.mockImplementation(async () => ({
+    id: 6,
+    fieldLabelsJson: priorFieldLabels,
+  }));
+  prismaCreate.mock.mockImplementation(async ({ data }) => ({
+    id: 8,
+    status: "draft",
+    ...data,
+  }));
+
+  const result = await createChungTuPdfTemplate({
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "Biên bản A",
+    name: "bien-ban-a",
+    version: "v2",
+    buffer,
+    uploadedById: 3,
+  });
+
+  assert.deepEqual(prismaFindFirst.mock.calls[0].arguments[0], {
+    where: {
+      categoryKey: "bang-ke-mua-hang",
+      name: "bien-ban-a",
+    },
+    orderBy: [{ updatedAt: "desc" }],
+    select: { fieldLabelsJson: true },
+  });
+  assert.deepEqual(prismaCreate.mock.calls[0].arguments[0], {
+    data: {
+      categoryKey: "bang-ke-mua-hang",
+      displayName: "Biên bản A",
+      documentServiceTemplateId: 42,
+      name: "bien-ban-a",
+      version: "v2",
+      uploadedById: 3,
+      fieldLabelsJson: priorFieldLabels,
+    },
+  });
+  assert.deepEqual(result.fieldLabels, priorFieldLabels);
+});
+
+test("createChungTuPdfTemplate uses empty field labels when no prior same-name template exists", async () => {
+  const buffer = Buffer.from("pdf-template");
+  prismaFindFirst.mock.mockImplementation(async () => null);
+  prismaCreate.mock.mockImplementation(async ({ data }) => ({
+    id: 9,
+    status: "draft",
+    ...data,
+  }));
+
+  const result = await createChungTuPdfTemplate({
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "Biên bản B",
+    name: "bien-ban-b",
+    version: "v1",
+    buffer,
+    uploadedById: 4,
+  });
+
+  assert.deepEqual(prismaCreate.mock.calls[0].arguments[0], {
+    data: {
+      categoryKey: "bang-ke-mua-hang",
+      displayName: "Biên bản B",
+      documentServiceTemplateId: 42,
+      name: "bien-ban-b",
+      version: "v1",
+      uploadedById: 4,
+      fieldLabelsJson: {},
+    },
+  });
+  assert.deepEqual(result.fieldLabels, {});
+});
+
+test("publishChungTuPdfTemplate publishes draft row in document service and prisma", async () => {
+  const row = {
+    id: 5,
+    status: "draft",
+    documentServiceTemplateId: 11,
+    categoryKey: "phieu-xuat-kho",
+  };
+  const published = { ...row, status: "published" };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  prismaUpdate.mock.mockImplementation(async () => published);
+
+  const result = await publishChungTuPdfTemplate({ id: "5" });
+
+  assert.equal(prismaFindUnique.mock.callCount(), 1);
+  assert.deepEqual(prismaFindUnique.mock.calls[0].arguments[0], { where: { id: 5 } });
+  assert.equal(publishTemplate.mock.callCount(), 1);
+  assert.deepEqual(publishTemplate.mock.calls[0].arguments, [11]);
+  assert.equal(prismaUpdate.mock.callCount(), 1);
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 5 },
+    data: { status: "published" },
+  });
+  assert.deepEqual(result, { ...published, fieldLabels: {} });
+});
+
+test("publishChungTuPdfTemplate still updates prisma when document service already published", async () => {
+  const row = {
+    id: 15,
+    status: "draft",
+    documentServiceTemplateId: 21,
+    categoryKey: "phieu-xuat-kho",
+  };
+  const published = { ...row, status: "published" };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  publishTemplate.mock.mockImplementation(async () => {
+    throw new AppError({
+      message: "Document service lỗi HTTP 409",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  });
+  prismaUpdate.mock.mockImplementation(async () => published);
+
+  const result = await publishChungTuPdfTemplate({ id: "15" });
+
+  assert.equal(publishTemplate.mock.callCount(), 1);
+  assert.deepEqual(publishTemplate.mock.calls[0].arguments, [21]);
+  assert.equal(prismaUpdate.mock.callCount(), 1);
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 15 },
+    data: { status: "published" },
+  });
+  assert.deepEqual(result, { ...published, fieldLabels: {} });
+});
+
+test("retireChungTuPdfTemplate retires published row in document service and prisma", async () => {
+  const row = {
+    id: 6,
+    status: "published",
+    documentServiceTemplateId: 12,
+    categoryKey: "phieu-xuat-kho",
+  };
+  const retired = { ...row, status: "retired" };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  prismaUpdate.mock.mockImplementation(async () => retired);
+
+  const result = await retireChungTuPdfTemplate({ id: "6" });
+
+  assert.equal(prismaFindUnique.mock.callCount(), 1);
+  assert.deepEqual(prismaFindUnique.mock.calls[0].arguments[0], { where: { id: 6 } });
+  assert.equal(retireTemplate.mock.callCount(), 1);
+  assert.deepEqual(retireTemplate.mock.calls[0].arguments, [12]);
+  assert.equal(prismaUpdate.mock.callCount(), 1);
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 6 },
+    data: { status: "retired" },
+  });
+  assert.deepEqual(result, { ...retired, fieldLabels: {} });
+});
+
+test("retireChungTuPdfTemplate still updates prisma when document service already retired", async () => {
+  const row = {
+    id: 16,
+    status: "published",
+    documentServiceTemplateId: 22,
+    categoryKey: "phieu-xuat-kho",
+  };
+  const retired = { ...row, status: "retired" };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  retireTemplate.mock.mockImplementation(async () => {
+    throw new AppError({
+      message: "Document service lỗi HTTP 409",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  });
+  prismaUpdate.mock.mockImplementation(async () => retired);
+
+  const result = await retireChungTuPdfTemplate({ id: "16" });
+
+  assert.equal(retireTemplate.mock.callCount(), 1);
+  assert.deepEqual(retireTemplate.mock.calls[0].arguments, [22]);
+  assert.equal(prismaUpdate.mock.callCount(), 1);
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 16 },
+    data: { status: "retired" },
+  });
+  assert.deepEqual(result, { ...retired, fieldLabels: {} });
+});
+
+test("updateChungTuPdfTemplateFieldLabels keeps non-catalog keys and coerces values", async () => {
+  const row = {
+    id: 23,
+    status: "published",
+    categoryKey: "phieu-nhap-kho",
+    documentServiceTemplateId: 77,
+  };
+  const updated = {
+    ...row,
+    fieldLabelsJson: {
+      soChungTu: "Số: ",
+      donVi: "Đơn vị: ",
+      ghiChu: "Ghi chú: ",
+      unknownKey: "Giữ",
+      bad: "12",
+    },
+  };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+  prismaUpdate.mock.mockImplementation(async () => updated);
+
+  const result = await updateChungTuPdfTemplateFieldLabels({
+    id: "23",
+    fieldLabels: {
+      soChungTu: "Số: ",
+      donVi: "Đơn vị: ",
+      ghiChu: "Ghi chú: ",
+      unknownKey: "Giữ",
+      bad: 12,
+    },
+  });
+
+  assert.deepEqual(prismaUpdate.mock.calls[0].arguments[0], {
+    where: { id: 23 },
+    data: {
+      fieldLabelsJson: {
+        soChungTu: "Số: ",
+        donVi: "Đơn vị: ",
+        ghiChu: "Ghi chú: ",
+        unknownKey: "Giữ",
+        bad: "12",
+      },
+    },
+  });
+  assert.deepEqual(result.fieldLabels, {
+    soChungTu: "Số: ",
+    donVi: "Đơn vị: ",
+    ghiChu: "Ghi chú: ",
+    unknownKey: "Giữ",
+    bad: "12",
+  });
+});
+
+test("updateChungTuPdfTemplateFieldLabels rejects retired templates", async () => {
+  prismaFindUnique.mock.mockImplementation(async () => ({
+    id: 24,
+    status: "retired",
+    documentServiceTemplateId: 88,
+  }));
+
+  await assert.rejects(
+    () =>
+      updateChungTuPdfTemplateFieldLabels({
+        id: 24,
+        fieldLabels: { soChungTu: "Số: " },
+      }),
+    (error) =>
+      error instanceof AppError &&
+      error.statusCode === 409 &&
+      error.code === ERROR_CODES.CONFLICT &&
+      /không sửa nhãn field/i.test(error.message),
+  );
+  assert.equal(prismaUpdate.mock.callCount(), 0);
+});
+
+test("getChungTuPdfTemplateFields loads fields from document service", async () => {
+  const row = {
+    id: 2,
+    status: "published",
+    documentServiceTemplateId: 99,
+    categoryKey: "phieu-nhap-kho",
+  };
+  prismaFindUnique.mock.mockImplementation(async () => row);
+
+  const result = await getChungTuPdfTemplateFields({ id: 2 });
+
+  assert.equal(getTemplateFields.mock.callCount(), 1);
+  assert.deepEqual(getTemplateFields.mock.calls[0].arguments, [99]);
+  assert.deepEqual(result, {
+    template: { ...row, fieldLabels: {} },
+    fields: [{ key: "don_vi", label: "Đơn vị", templateId: 99 }],
+  });
+});
+
+test("previewChungTuPdfTemplate returns upstream response for existing row", async () => {
+  prismaFindUnique.mock.mockImplementation(async () => ({
+    id: 8,
+    status: "retired",
+    documentServiceTemplateId: 123,
+  }));
+
+  const result = await previewChungTuPdfTemplate({ id: 8 });
+
+  assert.equal(previewTemplatePdfResponse.mock.callCount(), 1);
+  assert.deepEqual(previewTemplatePdfResponse.mock.calls[0].arguments, [123]);
+  assert.equal(result.fallbackContentDisposition, 'inline; filename="preview-123.pdf"');
+  assert.equal(result.upstreamResponse.headers.get("content-type"), "application/pdf");
+  assert.equal(await result.upstreamResponse.text(), "preview-123");
+});
+
+test("unsupported categoryKey throws validation AppError", async () => {
+  await assert.rejects(
+    () => listChungTuPdfTemplates({ categoryKey: "unknown-category" }),
+    (error) =>
+      error instanceof AppError &&
+      error.statusCode === 400 &&
+      error.code === ERROR_CODES.VALIDATION_ERROR &&
+      /Loại chứng từ không hỗ trợ PDF/i.test(error.message),
+  );
+  assert.equal(prismaFindMany.mock.callCount(), 0);
+});

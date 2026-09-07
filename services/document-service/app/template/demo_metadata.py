@@ -22,6 +22,7 @@ from app.template.metadata import (
     TableMeta,
     TemplateMetadata,
 )
+from app.render.signature_block import default_signature_block
 
 _DEMO_SHEET = "demo"
 _DEMO_HEADER_RANGE = "A10:E10"
@@ -67,7 +68,14 @@ def build_demo_metadata(*, name: str = "demo", version: str = "1") -> TemplateMe
         margin_left=MARGIN_LEFT,
         static_block_height_pt=STATIC_BLOCK_HEIGHT,
     )
-    return TemplateMetadata(name=name, version=version, page=page, fields=fields, table=table)
+    return TemplateMetadata(
+        name=name,
+        version=version,
+        page=page,
+        fields=fields,
+        table=table,
+        signature_block=default_signature_block(),
+    )
 
 
 def _demo_cell_ref(field_name: str) -> str:

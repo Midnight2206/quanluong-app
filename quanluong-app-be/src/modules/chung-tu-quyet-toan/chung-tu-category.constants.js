@@ -79,8 +79,16 @@ export const CHUNG_TU_DERIVED_NAMED_RANGE_SET = new Set(CHUNG_TU_DERIVED_NAMED_R
 
 /** Named range bổ sung theo loại chứng từ (ngoài bộ chung). */
 export const CHUNG_TU_CATEGORY_EXTRA_DERIVED_NAMED_RANGES = Object.freeze({
-  [CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO]: Object.freeze(["canCuBkmh", "nguoiNhanHang", "donVi"]),
-  [CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO]: Object.freeze(["nguoiNhanHang", "donVi"]),
+  [CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO]: Object.freeze(["canCuPnk", "nguoiNhanHang", "donVi"]),
+  [CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO]: Object.freeze([
+    "nguoiNhanHang",
+    "nguoiNhan",
+    "donVi",
+    "diaChi",
+    "lyDoXuatKho",
+    "xuatTaiKho",
+    "diaDiem",
+  ]),
 });
 
 export function getDerivedNamedRangeNamesForCategory(categoryKey) {

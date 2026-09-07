@@ -2,14 +2,36 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Template, TemplateField, TemplateTableConfig
 from app.template.metadata import ColumnMeta, TemplateMetadata
 
 from .blob import BlobStore, NullBlobStore
-from .errors import TemplateValidationError
+from .errors import TemplateExistsError, TemplateValidationError
 from .template_importer import parse_template
+
+_UNIQUE_NAME_VERSION = "templates_name_version_key"
+
+
+def _is_name_version_unique_violation(exc: IntegrityError) -> bool:
+    orig = getattr(exc, "orig", None)
+    if orig is None:
+        return False
+    diag = getattr(orig, "diag", None)
+    if diag is not None and getattr(diag, "constraint_name", None) == _UNIQUE_NAME_VERSION:
+        return True
+    return _UNIQUE_NAME_VERSION in str(orig)
+
+
+def _ensure_template_unique(session: Session, name: str, version: str) -> None:
+    existing = session.scalar(
+        select(Template.id).where(Template.name == name, Template.version == version)
+    )
+    if existing is not None:
+        raise TemplateExistsError(name, version)
 
 
 def _validate_required_fields(
@@ -37,6 +59,7 @@ def import_template(
     metadata = parse_template(xlsx_bytes, name=name, version=version)
     if required_fields is not None:
         _validate_required_fields(metadata, required_fields)
+    _ensure_template_unique(session, metadata.name, metadata.version)
 
     page = metadata.page
     template = Template(
@@ -49,11 +72,21 @@ def import_template(
         margin_right=page.margin_right,
         margin_bottom=page.margin_bottom,
         margin_left=page.margin_left,
+        status="draft",
     )
     session.add(template)
     session.flush()
 
     for field in metadata.fields:
+        align = dict(field.align or {})
+        if field.below_table:
+            align["below_table"] = True
+        if field.width_pt is not None:
+            align["cell_width_pt"] = float(field.width_pt)
+        if field.height_pt is not None:
+            align["cell_height_pt"] = float(field.height_pt)
+        if field.named_range:
+            align["named_range"] = field.named_range
         session.add(
             TemplateField(
                 template_id=template.id,
@@ -63,7 +96,7 @@ def import_template(
                 x=field.x,
                 y=field.y,
                 font=field.font,
-                align=field.align,
+                align=align or None,
                 border=field.border,
             )
         )
@@ -83,9 +116,17 @@ def import_template(
             row_height_max=table.row_height_max,
             min_rows_last_page=table.min_rows_last_page,
             stretch_strategy=table.stretch_strategy,
+            static_cells=[asdict(cell) for cell in (metadata.static_cells or [])],
+            static_block_height_pt=metadata.page.static_block_height_pt,
         )
     )
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        if _is_name_version_unique_violation(exc):
+            raise TemplateExistsError(metadata.name, metadata.version) from exc
+        raise
     return template.id
 
 

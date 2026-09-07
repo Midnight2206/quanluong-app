@@ -95,6 +95,10 @@ export const ROUTE_ACCESS_RULES = {
     description: "Mức tiền ăn (Thông tư 96) — danh mục công khai",
     requiredPermissions: [],
   },
+  "dashboard-chung-tu-pdf-templates": {
+    description: "Quản lý mẫu PDF chứng từ quyết toán (upload Excel)",
+    requiredPermissions: [],
+  },
   "nav-meal-roster": {
     description: "Trang Chấm cơm / danh sách bảo đảm quân lương",
     requiredPermissions: [PERMISSIONS.MEAL_ROSTER_ACCESS],

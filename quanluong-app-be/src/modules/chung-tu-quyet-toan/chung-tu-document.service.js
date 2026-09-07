@@ -325,10 +325,13 @@ async function previewChungTuContext({
   unitId,
   periodDate,
   periodMonth,
+  dateFrom,
+  dateTo,
   issueSlipId,
   unitIds,
   aggregationMode,
   settings,
+  exportingUserProfile,
   effectiveUnitIds,
 }) {
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
@@ -343,10 +346,13 @@ async function previewChungTuContext({
     unitId,
     periodDate,
     periodMonth,
+    dateFrom,
+    dateTo,
     issueSlipId,
     unitIds: selectedUnitIds,
     aggregationMode,
     settings,
+    exportingUserProfile,
   });
   return { context, sourceDataHash };
 }

@@ -16,19 +16,39 @@ import {
   chungTuQuyetToanHealthController,
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
+  createChungTuPdfExportBatchController,
+  createChungTuBkmhMonthlyController,
+  createChungTuPdfTemplateController,
+  createChungTuPdfExportController,
   createChungTuDocumentController,
   createTemplateCatalogController,
+  deleteChungTuBkmhMonthlyController,
   deleteChungTuDocumentController,
+  deleteChungTuPdfExportBatchController,
+  deleteChungTuPdfExportController,
   deleteTemplateCatalogController,
+  exportChungTuBkmhMonthlyExcelController,
+  getChungTuBkmhMonthlyController,
   getChungTuDocumentController,
+  getChungTuPdfExportBatchController,
+  getChungTuPdfExportFileController,
+  getChungTuPdfFieldCatalogController,
+  getChungTuPdfTemplateFieldsController,
+  getChungTuBkmhHeaderSettingsController,
+  getChungTuSignatureSettingsController,
   getChungTuUnitProfileController,
   getCategoryTemplateFillMappingController,
   getTemplateFillRulesController,
   importDriveFileController,
+  listChungTuBkmhMonthlyController,
   listCategoryTemplatesController,
+  listChungTuPdfExportBatchesController,
+  listChungTuPdfExportsController,
+  listChungTuPdfTemplatesController,
   listChungTuDocumentsController,
   listBkmhSnapshotsController,
   listDriveTemplatesController,
+  previewChungTuPdfTemplateController,
   listSpreadsheetNamedRangesController,
   listSpreadsheetNamedRangesSuperadminController,
   listTemplateCatalogController,
@@ -37,9 +57,20 @@ import {
   getTemplateTreeFileMetaController,
   patchTemplateCatalogController,
   previewChungTuContextController,
+  publishChungTuPdfTemplateController,
+  putChungTuBkmhHeaderSettingsController,
+  putChungTuPdfTemplateFieldLabelsController,
   putCategoryTemplateFillMappingController,
+  putChungTuSignatureSettingsController,
   putChungTuUnitProfileController,
   putTemplateFillRulesController,
+  retireChungTuPdfTemplateController,
+  streamChungTuBkmhMonthlyMergedPdfController,
+  streamChungTuBkmhMonthlySliceFileController,
+  streamChungTuBkmhMonthlyZipController,
+  streamChungTuPdfExportBatchFileController,
+  streamChungTuPdfExportBatchMergedPdfController,
+  streamChungTuPdfExportBatchZipController,
   syncChungTuDocumentController,
   templateCatalogFieldRegistryController,
   uploadTemplateCatalogOfficeController,
@@ -47,6 +78,24 @@ import {
 import {
   categoryKeyParamSchema,
   categoryTemplateDriveParamsSchema,
+  chungTuPdfExportBatchCreateBodySchema,
+  chungTuPdfExportBatchFileParamsSchema,
+  chungTuPdfExportBatchKeyParamSchema,
+  chungTuPdfExportBatchListQuerySchema,
+  chungTuBkmhMonthlyCreateBodySchema,
+  chungTuBkmhMonthlyIdParamSchema,
+  chungTuBkmhMonthlyListQuerySchema,
+  chungTuBkmhMonthlySliceFileParamsSchema,
+  chungTuPdfTemplateIdParamSchema,
+  chungTuPdfTemplateFieldLabelsPutBodySchema,
+  chungTuPdfExportCreateBodySchema,
+  chungTuPdfExportKeyParamSchema,
+  chungTuPdfTemplateListQuerySchema,
+  chungTuPdfTemplateUploadBodySchema,
+  chungTuBkmhHeaderSettingsPutBodySchema,
+  chungTuBkmhHeaderSettingsQuerySchema,
+  chungTuSignatureSettingsPutBodySchema,
+  chungTuSignatureSettingsQuerySchema,
   putCategoryTemplateFillMappingBodySchema,
   chungTuContextPreviewBodySchema,
   chungTuDocumentCreateBodySchema,
@@ -99,6 +148,7 @@ function driveImportMulterMiddleware(req, res, next) {
 const routePermissions = Object.fromEntries(
   CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS.map((d) => [d.key, d.permission.code]),
 );
+const LTTP_COMM = DATA_SCOPE_KINDS.LTTP_COMMODITY.code;
 
 chungTuQuyetToanRouter.use(authMiddleware);
 chungTuQuyetToanRouter.use(unitScopeMiddleware);
@@ -198,6 +248,239 @@ chungTuQuyetToanRouter.get(
 );
 
 chungTuQuyetToanRouter.get(
+  "/pdf-templates",
+  permissionMiddleware([routePermissions.pdfTemplateList]),
+  validateRequest({ query: chungTuPdfTemplateListQuerySchema }),
+  asyncHandler(listChungTuPdfTemplatesController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-templates",
+  superadminMiddleware,
+  driveImportMulterMiddleware,
+  validateRequest({ body: chungTuPdfTemplateUploadBodySchema }),
+  asyncHandler(createChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.delete(
+  "/pdf-templates/:id",
+  superadminMiddleware,
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(retireChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-templates/:id/preview",
+  superadminMiddleware,
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(previewChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-templates/:id/publish",
+  superadminMiddleware,
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(publishChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-templates/:id/retire",
+  superadminMiddleware,
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(retireChungTuPdfTemplateController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-templates/:id/fields",
+  permissionMiddleware([routePermissions.pdfTemplateFields]),
+  validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
+  asyncHandler(getChungTuPdfTemplateFieldsController),
+);
+
+chungTuQuyetToanRouter.put(
+  "/pdf-templates/:id/field-labels",
+  superadminMiddleware,
+  validateRequest({
+    params: chungTuPdfTemplateIdParamSchema,
+    body: chungTuPdfTemplateFieldLabelsPutBodySchema,
+  }),
+  asyncHandler(putChungTuPdfTemplateFieldLabelsController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-exports",
+  permissionMiddleware([routePermissions.pdfExportList]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["from", "to"] }),
+  validateRequest({ query: chungTuDocumentsListQuerySchema }),
+  asyncHandler(listChungTuPdfExportsController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-exports",
+  permissionMiddleware([routePermissions.pdfExportCreate]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["periodDate"] }),
+  validateRequest({ body: chungTuPdfExportCreateBodySchema }),
+  asyncHandler(createChungTuPdfExportController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-exports/:exportKey/file",
+  permissionMiddleware([routePermissions.pdfExportFile]),
+  validateRequest({ params: chungTuPdfExportKeyParamSchema }),
+  asyncHandler(getChungTuPdfExportFileController),
+);
+
+chungTuQuyetToanRouter.delete(
+  "/pdf-exports/:exportKey",
+  permissionMiddleware([routePermissions.pdfExportDelete]),
+  validateRequest({ params: chungTuPdfExportKeyParamSchema }),
+  asyncHandler(deleteChungTuPdfExportController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches",
+  permissionMiddleware([routePermissions.pdfExportBatchList]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  validateRequest({ query: chungTuPdfExportBatchListQuerySchema }),
+  asyncHandler(listChungTuPdfExportBatchesController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-export-batches",
+  permissionMiddleware([routePermissions.pdfExportBatchCreate]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["periodDate"] }),
+  validateRequest({ body: chungTuPdfExportBatchCreateBodySchema }),
+  asyncHandler(createChungTuPdfExportBatchController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey",
+  permissionMiddleware([routePermissions.pdfExportBatchDetail]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(getChungTuPdfExportBatchController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey/zip",
+  permissionMiddleware([routePermissions.pdfExportBatchZip]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(streamChungTuPdfExportBatchZipController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey/merged.pdf",
+  permissionMiddleware([routePermissions.pdfExportBatchMergedPdf]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(streamChungTuPdfExportBatchMergedPdfController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey/files/:fileId",
+  permissionMiddleware([routePermissions.pdfExportBatchFile]),
+  validateRequest({ params: chungTuPdfExportBatchFileParamsSchema }),
+  asyncHandler(streamChungTuPdfExportBatchFileController),
+);
+
+chungTuQuyetToanRouter.delete(
+  "/pdf-export-batches/:batchKey",
+  permissionMiddleware([routePermissions.pdfExportBatchDelete]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(deleteChungTuPdfExportBatchController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly",
+  permissionMiddleware([routePermissions.bkmhMonthlyList]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  validateRequest({ query: chungTuBkmhMonthlyListQuerySchema }),
+  asyncHandler(listChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/bkmh-monthly-exports",
+  permissionMiddleware([routePermissions.bkmhMonthlyCreate]),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  validateRequest({ body: chungTuBkmhMonthlyCreateBodySchema }),
+  asyncHandler(createChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id",
+  permissionMiddleware([routePermissions.bkmhMonthlyDetail]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(getChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id/excel",
+  permissionMiddleware([routePermissions.bkmhMonthlyExcel]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(exportChungTuBkmhMonthlyExcelController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id/zip",
+  permissionMiddleware([routePermissions.bkmhMonthlyZip]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(streamChungTuBkmhMonthlyZipController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id/merged.pdf",
+  permissionMiddleware([routePermissions.bkmhMonthlyMergedPdf]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(streamChungTuBkmhMonthlyMergedPdfController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-monthly/:id/slices/:sliceId/file",
+  permissionMiddleware([routePermissions.bkmhMonthlySliceFile]),
+  validateRequest({ params: chungTuBkmhMonthlySliceFileParamsSchema }),
+  asyncHandler(streamChungTuBkmhMonthlySliceFileController),
+);
+
+chungTuQuyetToanRouter.delete(
+  "/bkmh-monthly/:id",
+  permissionMiddleware([routePermissions.bkmhMonthlyDelete]),
+  validateRequest({ params: chungTuBkmhMonthlyIdParamSchema }),
+  asyncHandler(deleteChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/signature-settings",
+  permissionMiddleware([routePermissions.signatureSettingsGet]),
+  validateRequest({ query: chungTuSignatureSettingsQuerySchema }),
+  asyncHandler(getChungTuSignatureSettingsController),
+);
+
+chungTuQuyetToanRouter.put(
+  "/signature-settings",
+  permissionMiddleware([routePermissions.signatureSettingsPut]),
+  validateRequest({ body: chungTuSignatureSettingsPutBodySchema }),
+  asyncHandler(putChungTuSignatureSettingsController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/bkmh-header-settings",
+  permissionMiddleware([routePermissions.bkmhHeaderSettingsGet]),
+  validateRequest({ query: chungTuBkmhHeaderSettingsQuerySchema }),
+  asyncHandler(getChungTuBkmhHeaderSettingsController),
+);
+
+chungTuQuyetToanRouter.put(
+  "/bkmh-header-settings",
+  permissionMiddleware([routePermissions.bkmhHeaderSettingsPut]),
+  validateRequest({ body: chungTuBkmhHeaderSettingsPutBodySchema }),
+  asyncHandler(putChungTuBkmhHeaderSettingsController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-template-field-catalog",
+  permissionMiddleware([routePermissions.pdfTemplateFieldCatalog]),
+  asyncHandler(getChungTuPdfFieldCatalogController),
+);
+
+chungTuQuyetToanRouter.get(
   "/template-tree",
   permissionMiddleware([routePermissions.templateTreeBrowse]),
   validateRequest({ query: templateTreeQuerySchema }),
@@ -221,8 +504,6 @@ chungTuQuyetToanRouter.post(
   }),
   asyncHandler(importDriveFileController),
 );
-
-const LTTP_COMM = DATA_SCOPE_KINDS.LTTP_COMMODITY.code;
 
 chungTuQuyetToanRouter.get(
   "/category-templates/:categoryKey",

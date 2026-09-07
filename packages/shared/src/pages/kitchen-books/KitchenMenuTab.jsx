@@ -155,9 +155,14 @@ export function KitchenMenuTab({
     setDirty(false);
   }, [menuDate, selectedUnitId]);
 
-  function changePeriod(p) {
+  async function changePeriod(p) {
     if (dirty) {
-      const ok = window.confirm("Bạn có thay đổi chưa lưu. Chuyển buổi sẽ bỏ thay đổi?");
+      const ok = await confirm({
+        title: "Bỏ thay đổi chưa lưu?",
+        message: "Chuyển buổi sẽ bỏ các thay đổi chưa lưu của bạn.",
+        confirmLabel: "Chuyển buổi",
+        variant: "default",
+      });
       if (!ok) {
         return;
       }
@@ -167,12 +172,17 @@ export function KitchenMenuTab({
     loadPeriodDraft(p);
   }
 
-  function changeMenuDate(nextDate) {
+  async function changeMenuDate(nextDate) {
     if (nextDate === menuDate) {
       return;
     }
     if (dirty) {
-      const ok = window.confirm("Bạn có thay đổi chưa lưu. Đổi ngày sẽ bỏ thay đổi?");
+      const ok = await confirm({
+        title: "Bỏ thay đổi chưa lưu?",
+        message: "Đổi ngày sẽ bỏ các thay đổi chưa lưu của bạn.",
+        confirmLabel: "Đổi ngày",
+        variant: "default",
+      });
       if (!ok) {
         return;
       }
@@ -216,7 +226,12 @@ export function KitchenMenuTab({
       return;
     }
     if (dirty) {
-      const ok = window.confirm("Bạn có thay đổi chưa lưu. Gợi ý AI sẽ không giữ draft hiện tại. Tiếp tục?");
+      const ok = await confirm({
+        title: "Tiếp tục gợi ý AI?",
+        message: "Bạn có thay đổi chưa lưu. Gợi ý AI sẽ không giữ draft hiện tại.",
+        confirmLabel: "Tiếp tục",
+        variant: "default",
+      });
       if (!ok) {
         return;
       }

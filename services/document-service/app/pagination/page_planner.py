@@ -1,6 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import floor
-from typing import List, Optional
+from typing import List, Optional, Sequence
+
+
+class PaginationError(ValueError):
+    """Pagination input or feasibility failure."""
 
 
 @dataclass
@@ -13,6 +17,20 @@ class PagePlan:
     is_last: bool
 
 
+def apply_content_row_heights(
+    pages: Sequence[PagePlan],
+    content_heights: Sequence[float],
+) -> List[PagePlan]:
+    """Gán chiều cao theo nội dung từng dòng; phân trang vẫn dùng chiều cao an toàn."""
+    return [
+        replace(
+            page,
+            row_heights=[float(content_heights[index]) for index in page.row_indices],
+        )
+        for page in pages
+    ]
+
+
 @dataclass
 class PaginationResult:
     pages: List[PagePlan]
@@ -21,11 +39,20 @@ class PaginationResult:
     row_height_max: float
 
 
+def _content_height_for_page(
+    page_index: int,
+    page_content_height: float,
+    continuation_content_height: float,
+) -> float:
+    return page_content_height if page_index == 0 else continuation_content_height
+
+
 def _pack(
     *,
     n_rows: int,
     row_height: float,
     page_content_height: float,
+    continuation_content_height: float,
     header_height: float,
     carry_row_height: float,
     signature_block_height: float,
@@ -35,11 +62,15 @@ def _pack(
     next_row = 0
 
     while next_row < n_rows:
+        page_index = len(pages)
+        content_h = _content_height_for_page(
+            page_index, page_content_height, continuation_content_height
+        )
         has_carry_from_prev = bool(pages)
         incoming_carry = carry_row_height if has_carry_from_prev else 0
         remaining = n_rows - next_row
         last_height = (
-            page_content_height
+            content_h
             - header_height
             - incoming_carry
             - signature_block_height
@@ -50,7 +81,7 @@ def _pack(
             row_indices = list(range(next_row, n_rows))
             pages.append(
                 PagePlan(
-                    page_index=len(pages),
+                    page_index=page_index,
                     row_indices=row_indices,
                     row_heights=[row_height] * len(row_indices),
                     has_carry_from_prev=has_carry_from_prev,
@@ -61,7 +92,7 @@ def _pack(
             return pages
 
         regular_height = (
-            page_content_height
+            content_h
             - header_height
             - incoming_carry
             - carry_row_height
@@ -78,7 +109,7 @@ def _pack(
         row_indices = list(range(next_row, next_row + rows_on_page))
         pages.append(
             PagePlan(
-                page_index=len(pages),
+                page_index=page_index,
                 row_indices=row_indices,
                 row_heights=[row_height] * len(row_indices),
                 has_carry_from_prev=has_carry_from_prev,
@@ -102,15 +133,26 @@ def plan_pages(
     row_height_max: float = 28,
     min_rows_last_page: int = 2,
     stretch_strategy: str = "end_bias",
+    continuation_content_height: Optional[float] = None,
 ) -> PaginationResult:
     if n_rows < 0:
-        raise ValueError("Số dòng không được âm")
+        raise PaginationError("Số dòng không được âm")
     if row_height_min <= 0 or row_height_min > row_height_max:
-        raise ValueError("Khoảng chiều cao dòng không hợp lệ")
+        raise PaginationError("Khoảng chiều cao dòng không hợp lệ")
     if stretch_strategy != "end_bias":
-        raise ValueError("Chiến lược giãn dòng không được hỗ trợ")
+        raise PaginationError("Chiến lược giãn dòng không được hỗ trợ")
     if n_rows == 0:
         return PaginationResult([], stretch_strategy, row_height_min, row_height_max)
+
+    cont_h = (
+        page_content_height
+        if continuation_content_height is None
+        else float(continuation_content_height)
+    )
+    if cont_h < page_content_height:
+        raise PaginationError(
+            "Chiều cao trang tiếp không được nhỏ hơn trang đầu (static header)"
+        )
 
     # ponytail: uniform-height search only; upgrade to true end_bias by
     # stretching trailing rows while keeping the requested strategy echo.
@@ -124,6 +166,7 @@ def plan_pages(
             n_rows=n_rows,
             row_height=row_height,
             page_content_height=page_content_height,
+            continuation_content_height=cont_h,
             header_height=header_height,
             carry_row_height=carry_row_height,
             signature_block_height=signature_block_height,
@@ -140,4 +183,4 @@ def plan_pages(
             row_height_max=row_height_max,
         )
 
-    raise ValueError("Phân trang không khả thi với giới hạn chiều cao dòng đã cho")
+    raise PaginationError("Phân trang không khả thi với giới hạn chiều cao dòng đã cho")

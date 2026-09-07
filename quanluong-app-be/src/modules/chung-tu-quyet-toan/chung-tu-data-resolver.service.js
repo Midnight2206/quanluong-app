@@ -17,11 +17,15 @@ import {
   normalizeMonthUnitIds,
   normalizePeriodMonth,
 } from "./chung-tu-monthly-sheets.js";
-import { attachCanCuBkmhToMonthlyContexts } from "./chung-tu-pnk-bkmh-basis.service.js";
+import { getChungTuBkmhHeaderSettings } from "./chung-tu-bkmh-header-settings.service.js";
+import { parseBkmhSliceDetailRowsJson, parseTongTien } from "./chung-tu-bkmh-slice-metadata.util.js";
 import {
   attachRecipientUnitFillToMonthlyContexts,
   resolveRecipientUnitFillForSlip,
 } from "./chung-tu-recipient-unit-fill.service.js";
+import { formatLyDoXuatKho } from "./chung-tu-pxk-ly-do.util.js";
+import { formatCanCuPnkText } from "./chung-tu-nl-field.js";
+import { SIGNATURE_CATALOG } from "./chung-tu-signature-catalog.js";
 
 const lineInclude = {
   commodity: { select: { id: true, code: true, name: true, measureUnit: true } },
@@ -61,14 +65,123 @@ function resolveNguoiMuaFromSlips(slips) {
   return "";
 }
 
-function settingsWithSlipNguoiMua(settings, slips) {
-  const fromSlips = resolveNguoiMuaFromSlips(slips);
-  if (!fromSlips) return settings;
+function toFiniteNumber(value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeText(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizePlainObject(value) {
+  return value && typeof value === "object" ? value : {};
+}
+
+/**
+ * Resolve system slots via catalog. Static/prompt slots pass through with resolvedName=null.
+ * @param {object[]} slots
+ * @param {{ storageUnitId?: number, currentUserId?: number, prisma?: object }} ctx
+ * @param {object} [catalog] - injectable for testing
+ */
+export async function resolveSystemSignatureSlots(slots, ctx, catalog = SIGNATURE_CATALOG) {
+  if (!Array.isArray(slots)) return [];
+  return Promise.all(
+    slots.map(async (slot) => {
+      if (slot?.source !== "system") {
+        return { ...slot, resolvedName: null, resolvedTitle: null };
+      }
+      const node = catalog[slot.catalogNodeId];
+      if (!node) return { ...slot, resolvedName: null, resolvedTitle: null };
+      const result = await node.resolve(ctx).catch(() => null);
+      return {
+        ...slot,
+        resolvedName: result?.signatureName ?? result?.name ?? null,
+        resolvedTitle: result?.title ?? null,
+      };
+    }),
+  );
+}
+
+/**
+ * Document-service chỉ chấp nhận source static|dynamic.
+ * System slot đã resolve → static + static_name; chưa resolve → dynamic trống.
+ */
+export function materializeSignatureBlockForRender(signatureBlock) {
+  if (!signatureBlock || typeof signatureBlock !== "object") return signatureBlock;
+  if (!Array.isArray(signatureBlock.slots)) return signatureBlock;
   return {
-    ...settings,
-    signerNguoiMua: fromSlips,
-    hoTenNguoiMua: fromSlips,
-    nguoiMua: fromSlips,
+    ...signatureBlock,
+    slots: signatureBlock.slots.map((slot) => {
+      if (!slot || typeof slot !== "object") return slot;
+      if (slot.source !== "system") {
+        const { resolvedName: _n, resolvedTitle: _t, catalogNodeId: _c, ...rest } = slot;
+        return rest;
+      }
+      const name = String(slot.resolvedName ?? "").trim();
+      const base = {
+        key: slot.key,
+        label: slot.label,
+        col: slot.col,
+        col_span: slot.col_span ?? 1,
+        show_date_line: Boolean(slot.show_date_line),
+      };
+      if (name) return { ...base, source: "static", static_name: name };
+      return { ...base, source: "dynamic" };
+    }),
+  };
+}
+
+export async function prepareSignatureBlockForRender(signatureBlock, ctx, catalog = SIGNATURE_CATALOG) {
+  if (!signatureBlock?.slots) return signatureBlock;
+  const resolved = await resolveSystemSignatureSlots(signatureBlock.slots, ctx, catalog);
+  return materializeSignatureBlockForRender({ ...signatureBlock, slots: resolved });
+}
+
+export function resolvePdfHeaderSettings({
+  mergedSettings,
+  rawSettings,
+  exportingUserProfile,
+  categoryKey,
+  bkmhHeaderSettings,
+  slips,
+  resolvedBkmhBuyer = null,
+}) {
+  const resolved = {
+    ...normalizePlainObject(mergedSettings),
+  };
+  const profile = normalizePlainObject(exportingUserProfile);
+  if (exportingUserProfile && typeof exportingUserProfile === "object") {
+    const donViCapTren = normalizeText(profile.donViCapTren);
+    const donVi = normalizeText(profile.donVi);
+    // Always from creating user's profile (not unit profile / recipient unit).
+    resolved.donViCapTren = donViCapTren;
+    resolved.donVi = donVi;
+    if (donVi) {
+      resolved.donViSo = donVi;
+    }
+  }
+  if (categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) {
+    return resolved;
+  }
+  const settings = normalizePlainObject(rawSettings);
+  const buyerName =
+    resolvedBkmhBuyer?.name ||
+    resolveNguoiMuaFromSlips(slips) ||
+    normalizeText(bkmhHeaderSettings?.hoTenNguoiMua);
+  const boPhan =
+    resolvedBkmhBuyer?.title ||
+    normalizeText(settings.boPhan) ||
+    normalizeText(resolved.boPhan) ||
+    normalizeText(bkmhHeaderSettings?.boPhan);
+  return {
+    ...resolved,
+    signerNguoiMua: buyerName,
+    hoTenNguoiMua: buyerName,
+    nguoiMua: buyerName,
+    boPhan,
   };
 }
 
@@ -107,23 +220,35 @@ function resolveDocumentNumberFields({ settings, parts, categoryKey }) {
 }
 
 function mapLineRow(line, index) {
-  const qty = Number(line.quantity);
-  const requiredQty = Number(line.requiredQuantity);
-  const unitPrice = Number(line.unitPrice);
-  const amount = Number(line.amount);
+  const commodity = line?.commodity ?? null;
+  const qty =
+    toFiniteNumber(line?.quantity) ??
+    toFiniteNumber(line?.soLuong) ??
+    toFiniteNumber(line?.thucNhap) ??
+    toFiniteNumber(line?.thucXuat);
+  const requiredQty = toFiniteNumber(line?.requiredQuantity) ?? toFiniteNumber(line?.yeuCau);
+  const unitPrice = toFiniteNumber(line?.unitPrice) ?? parseTongTien(line?.donGia);
+  const amount = toFiniteNumber(line?.amount) ?? parseTongTien(line?.thanhTien);
+  const supplierName = String(line?.nguoiBan ?? line?.lttpSupplier?.name ?? "").trim();
+  const commodityId =
+    toFiniteNumber(commodity?.id) ?? toFiniteNumber(line?.commodityId);
   return {
     stt: index + 1,
-    tenHang: line.commodity?.name ?? "",
-    maSo: line.commodity?.code ?? "",
-    dvt: line.commodity?.measureUnit ?? "",
-    nguoiBan: line.lttpSupplier?.name ?? "",
+    tenHang: commodity?.name ?? line?.tenHang ?? "",
+    maSo: commodity?.code ?? line?.maSo ?? "",
+    dvt: commodity?.measureUnit ?? line?.dvt ?? "",
+    nguoiBan: supplierName,
     yeuCau: Number.isFinite(requiredQty) ? requiredQty : "",
     thucXuat: Number.isFinite(qty) ? qty : "",
     thucNhap: Number.isFinite(qty) ? qty : "",
     soLuong: Number.isFinite(qty) ? qty : "",
     donGia: Number.isFinite(unitPrice) ? formatVndNumber(unitPrice) : "",
     thanhTien: Number.isFinite(amount) ? formatVndNumber(amount) : "",
-    ghiChu: String(line.lineNote ?? "").trim(),
+    ghiChu: String(line?.lineNote ?? line?.ghiChu ?? "").trim(),
+    commodityId: commodityId != null && commodityId > 0 ? commodityId : null,
+    quantity: Number.isFinite(qty) ? qty : null,
+    unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
+    amount: Number.isFinite(amount) ? amount : null,
   };
 }
 
@@ -230,17 +355,19 @@ async function loadSlipById(issueSlipId) {
 function commodityGroupKey(line) {
   const id = line?.commodity?.id ?? line?.commodityId;
   if (id != null && !Number.isNaN(Number(id))) return `id:${Number(id)}`;
-  const code = String(line?.commodity?.code ?? "").trim();
-  const name = String(line?.commodity?.name ?? "").trim();
-  const unit = String(line?.commodity?.measureUnit ?? "").trim();
+  const code = String(line?.commodity?.code ?? line?.maSo ?? "").trim();
+  const name = String(line?.commodity?.name ?? line?.tenHang ?? "").trim();
+  const unit = String(line?.commodity?.measureUnit ?? line?.dvt ?? "").trim();
   return `fallback:${code}|${name}|${unit}`;
 }
 
-/** Gộp các dòng cùng hàng hóa trong một ngày: cộng số lượng và thành tiền. */
+/** Gộp dòng cùng hàng hóa + cùng unitPrice; khác giá → dòng mới (không trung bình). */
 function aggregateLinesToDetailRows(rawLines) {
   const groups = new Map();
   for (const line of rawLines ?? []) {
-    const key = commodityGroupKey(line);
+    const unitPrice = Number(line.unitPrice);
+    const priceKey = Number.isFinite(unitPrice) ? String(unitPrice) : "__no_price__";
+    const key = `${commodityGroupKey(line)}|${priceKey}`;
     let group = groups.get(key);
     if (!group) {
       group = {
@@ -251,7 +378,7 @@ function aggregateLinesToDetailRows(rawLines) {
         requiredQuantity: 0,
         hasRequiredQuantity: false,
         amount: 0,
-        unitPrices: new Set(),
+        unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
         lineNotes: new Set(),
       };
       groups.set(key, group);
@@ -265,8 +392,6 @@ function aggregateLinesToDetailRows(rawLines) {
       group.requiredQuantity += requiredQty;
       group.hasRequiredQuantity = true;
     }
-    const unitPrice = Number(line.unitPrice);
-    if (Number.isFinite(unitPrice)) group.unitPrices.add(unitPrice);
     const supplierName = String(line.lttpSupplier?.name ?? "").trim();
     if (supplierName) group.supplierNames.add(supplierName);
     const lineNote = String(line.lineNote ?? "").trim();
@@ -274,14 +399,6 @@ function aggregateLinesToDetailRows(rawLines) {
   }
 
   return [...groups.values()].map((group, index) => {
-    const qty = group.quantity;
-    const amount = group.amount;
-    let unitPrice = null;
-    if (qty > 0 && amount > 0) {
-      unitPrice = amount / qty;
-    } else if (group.unitPrices.size === 1) {
-      unitPrice = [...group.unitPrices][0];
-    }
     const supplierNames = [...group.supplierNames];
     const lttpSupplier =
       supplierNames.length === 1
@@ -293,15 +410,77 @@ function aggregateLinesToDetailRows(rawLines) {
       {
         commodity: group.commodity,
         lttpSupplier,
-        quantity: qty,
+        quantity: group.quantity,
         requiredQuantity: group.hasRequiredQuantity ? group.requiredQuantity : null,
-        unitPrice,
-        amount,
+        unitPrice: group.unitPrice,
+        amount: group.amount,
         lineNote: [...group.lineNotes].join("; "),
       },
       index,
     );
   });
+}
+
+function aggregateSnapshotDetailRows(rows) {
+  const groups = new Map();
+  for (const row of rows ?? []) {
+    const unitPrice = toFiniteNumber(row?.unitPrice) ?? parseTongTien(row?.donGia);
+    const priceKey = Number.isFinite(unitPrice) ? String(unitPrice) : "__no_price__";
+    const key = `${commodityGroupKey(row)}|${priceKey}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        commodity: row?.commodity ?? null,
+        commodityId: toFiniteNumber(row?.commodityId),
+        tenHang: String(row?.tenHang ?? row?.commodity?.name ?? "").trim(),
+        maSo: String(row?.maSo ?? row?.commodity?.code ?? "").trim(),
+        dvt: String(row?.dvt ?? row?.commodity?.measureUnit ?? "").trim(),
+        quantity: 0,
+        amount: 0,
+        unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
+        supplierNames: new Set(),
+        lineNotes: new Set(),
+      };
+      groups.set(key, group);
+    }
+
+    if (!group.commodity && row?.commodity) group.commodity = row.commodity;
+    if (group.commodityId == null) group.commodityId = toFiniteNumber(row?.commodityId);
+    if (!group.tenHang) group.tenHang = String(row?.tenHang ?? "").trim();
+    if (!group.maSo) group.maSo = String(row?.maSo ?? "").trim();
+    if (!group.dvt) group.dvt = String(row?.dvt ?? "").trim();
+
+    const qty =
+      toFiniteNumber(row?.quantity) ??
+      toFiniteNumber(row?.soLuong) ??
+      toFiniteNumber(row?.thucNhap);
+    const amount = toFiniteNumber(row?.amount) ?? parseTongTien(row?.thanhTien);
+    if (Number.isFinite(qty)) group.quantity += qty;
+    if (Number.isFinite(amount)) group.amount += amount;
+
+    const supplierName = String(row?.nguoiBan ?? row?.lttpSupplier?.name ?? "").trim();
+    if (supplierName) group.supplierNames.add(supplierName);
+    const lineNote = String(row?.ghiChu ?? row?.lineNote ?? "").trim();
+    if (lineNote) group.lineNotes.add(lineNote);
+  }
+
+  return [...groups.values()].map((group, index) =>
+    mapLineRow(
+      {
+        commodity: group.commodity,
+        commodityId: group.commodityId,
+        tenHang: group.tenHang,
+        maSo: group.maSo,
+        dvt: group.dvt,
+        nguoiBan: [...group.supplierNames].join(", "),
+        quantity: group.quantity,
+        unitPrice: group.unitPrice,
+        amount: group.amount,
+        ghiChu: [...group.lineNotes].join("; "),
+      },
+      index,
+    ),
+  );
 }
 
 function flattenLinesFromSlips(slips) {
@@ -323,6 +502,265 @@ function sumAmount(lines) {
   return total;
 }
 
+function toIsoDateOnly(value) {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : "";
+}
+
+function formatCanCuPnkTextFromSlices(slices) {
+  return formatCanCuPnkText(
+    (slices ?? []).map((slice) => ({
+      soChungTu: slice?.soChungTu,
+      periodDate: toIsoDateOnly(slice?.periodDate),
+      buyerName: String(slice?.buyerName ?? "").trim(),
+    })),
+  );
+}
+
+function noBkmhMonthlySourceError(periodMonth) {
+  return new AppError({
+    message: `Không có dữ liệu BKMH tháng ${periodMonth}. Vui lòng xuất BKMH trước khi xuất PNK.`,
+    statusCode: 400,
+    code: ERROR_CODES.VALIDATION_ERROR,
+  });
+}
+
+function noBkmhRangeSourceError(dateFrom, dateTo) {
+  return new AppError({
+    message: `Không có dữ liệu BKMH từ ngày ${dateFrom} đến ${dateTo}. Vui lòng xuất BKMH trước khi xuất PNK.`,
+    statusCode: 400,
+    code: ERROR_CODES.VALIDATION_ERROR,
+  });
+}
+
+function missingBkmhBuyerKeyError() {
+  return new AppError({
+    message: "BKMH thiếu thông tin người mua trên slice. Vui lòng xuất lại BKMH trước khi xuất PNK.",
+    statusCode: 400,
+    code: ERROR_CODES.VALIDATION_ERROR,
+  });
+}
+
+function normalizePnkAggregationMode(mode) {
+  return String(mode ?? "").trim() === CHUNG_TU_AGGREGATION_MODES.FULL
+    ? CHUNG_TU_AGGREGATION_MODES.FULL
+    : CHUNG_TU_AGGREGATION_MODES.BY_DAY;
+}
+
+function pickFirstNonEmptySliceField(slices, fieldKey) {
+  for (const slice of slices ?? []) {
+    const value = String(slice?.[fieldKey] ?? "").trim();
+    if (value) return value;
+  }
+  return "";
+}
+
+function getLastPeriodDateFromSlices(slices) {
+  let last = "";
+  for (const slice of slices ?? []) {
+    const periodDate = toIsoDateOnly(slice?.periodDate);
+    if (periodDate && (!last || periodDate > last)) last = periodDate;
+  }
+  return last;
+}
+
+function buildPnkSheetContext({
+  slices,
+  periodDate,
+  dateFrom,
+  dateTo,
+  aggregationMode,
+  resolveSettingsForSlips,
+  lyDoNhapKho,
+  nhapTaiKho,
+}) {
+  const detailRows = aggregateSnapshotDetailRows((slices ?? []).flatMap((slice) => slice.detailRows ?? []));
+  if (!detailRows.length) return null;
+  const buyerKey = pickFirstNonEmptySliceField(slices, "buyerKey");
+  const buyerName = pickFirstNonEmptySliceField(slices, "buyerName");
+  const buyerSignatureName = pickFirstNonEmptySliceField(slices, "buyerSignatureName");
+  const buyerTitle = pickFirstNonEmptySliceField(slices, "buyerTitle");
+  const totalAmount = sumAmount(detailRows);
+  return buildContextBase({
+    settings: resolveSettingsForSlips(),
+    periodDate,
+    detailRows,
+    totalAmount,
+    categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+    extra: {
+      dateFrom,
+      dateTo,
+      aggregationMode,
+      buyerKey,
+      buyerSignatureName,
+      nguoiGiaoHang: buyerName,
+      diaChi: buyerTitle,
+      lyDoNhapKho,
+      nhapTaiKho,
+      sliceCount: slices.length,
+      lineCount: detailRows.length,
+      canCuPnk: formatCanCuPnkTextFromSlices(slices),
+    },
+  });
+}
+
+async function resolvePnkFromBkmhSlices({
+  storageUnitId,
+  dateFrom,
+  dateTo,
+  aggregationMode,
+  resolveSettingsForSlips,
+  lyDoNhapKho,
+  nhapTaiKho,
+}) {
+  const safeDateFrom = toIsoDateOnly(dateFrom);
+  const safeDateTo = toIsoDateOnly(dateTo);
+  const mode = normalizePnkAggregationMode(aggregationMode);
+  const safeLyDoNhapKho = String(lyDoNhapKho ?? "").trim();
+  const safeNhapTaiKho = String(nhapTaiKho ?? "").trim();
+  const rawSlices = await prisma.chungTuBkmhSlice.findMany({
+    where: {
+      monthly: {
+        is: {
+          storageUnitId: Number(storageUnitId),
+        },
+      },
+      periodDate: {
+        gte: new Date(`${safeDateFrom}T00:00:00.000Z`),
+        lte: new Date(`${safeDateTo}T23:59:59.999Z`),
+      },
+    },
+    select: {
+      id: true,
+      sortKey: true,
+      soChungTu: true,
+      periodDate: true,
+      recipientUnitId: true,
+      recipientUnitName: true,
+      ngayThangNam: true,
+      detailRowsJson: true,
+      buyerKey: true,
+      buyerName: true,
+      buyerSignatureName: true,
+      buyerTitle: true,
+    },
+    orderBy: [{ periodDate: "asc" }, { sortKey: "asc" }, { id: "asc" }],
+  });
+
+  if (!rawSlices.length) {
+    throw noBkmhRangeSourceError(safeDateFrom, safeDateTo);
+  }
+
+  const sourceSlices = [];
+  for (const slice of rawSlices) {
+    const periodDate = toIsoDateOnly(slice.periodDate);
+    const detailRows = parseBkmhSliceDetailRowsJson(slice.detailRowsJson);
+    if (!periodDate || !detailRows.length) continue;
+    const buyerKey = String(slice.buyerKey ?? "").trim();
+    if (!buyerKey) throw missingBkmhBuyerKeyError();
+    sourceSlices.push({
+      ...slice,
+      periodDate,
+      buyerKey,
+      buyerName: String(slice.buyerName ?? "").trim(),
+      buyerSignatureName: String(slice.buyerSignatureName ?? "").trim(),
+      buyerTitle: String(slice.buyerTitle ?? "").trim(),
+      detailRows,
+    });
+  }
+
+  if (!sourceSlices.length) {
+    throw noBkmhRangeSourceError(safeDateFrom, safeDateTo);
+  }
+
+  const slicesByBuyer = new Map();
+  for (const slice of sourceSlices) {
+    if (!slicesByBuyer.has(slice.buyerKey)) slicesByBuyer.set(slice.buyerKey, []);
+    slicesByBuyer.get(slice.buyerKey).push(slice);
+  }
+
+  const sheetContexts = [];
+  let monthlyTotal = 0;
+  for (const buyerSlices of slicesByBuyer.values()) {
+    if (mode === CHUNG_TU_AGGREGATION_MODES.FULL) {
+      const periodDate = getLastPeriodDateFromSlices(buyerSlices) || safeDateTo;
+      const context = buildPnkSheetContext({
+        slices: buyerSlices,
+        periodDate,
+        dateFrom: safeDateFrom,
+        dateTo: safeDateTo,
+        aggregationMode: mode,
+        resolveSettingsForSlips,
+        lyDoNhapKho: safeLyDoNhapKho,
+        nhapTaiKho: safeNhapTaiKho,
+      });
+      if (!context) continue;
+      monthlyTotal += context.tongTienSo ?? 0;
+      sheetContexts.push(context);
+      continue;
+    }
+
+    const slicesByDate = new Map();
+    for (const slice of buyerSlices) {
+      if (!slicesByDate.has(slice.periodDate)) slicesByDate.set(slice.periodDate, []);
+      slicesByDate.get(slice.periodDate).push(slice);
+    }
+    for (const periodDate of [...slicesByDate.keys()].sort()) {
+      const context = buildPnkSheetContext({
+        slices: slicesByDate.get(periodDate) ?? [],
+        periodDate,
+        dateFrom: safeDateFrom,
+        dateTo: safeDateTo,
+        aggregationMode: mode,
+        resolveSettingsForSlips,
+        lyDoNhapKho: safeLyDoNhapKho,
+        nhapTaiKho: safeNhapTaiKho,
+      });
+      if (!context) continue;
+      monthlyTotal += context.tongTienSo ?? 0;
+      sheetContexts.push(context);
+    }
+  }
+
+  if (!sheetContexts.length) {
+    throw noBkmhRangeSourceError(safeDateFrom, safeDateTo);
+  }
+
+  const rootPeriodDate =
+    mode === CHUNG_TU_AGGREGATION_MODES.FULL
+      ? getLastPeriodDateFromSlices(sourceSlices) || safeDateTo
+      : safeDateFrom;
+
+  return {
+    sheetContexts,
+    allLines: [],
+    allSlips: [],
+    sourceSlices,
+    monthlyTotal,
+    monthlySlipCount: sourceSlices.length,
+    rootContext: buildContextBase({
+      settings: resolveSettingsForSlips(),
+      periodDate: rootPeriodDate,
+      detailRows: sheetContexts.flatMap((ctx) => ctx.detailRows ?? []),
+      totalAmount: monthlyTotal,
+      categoryKey: CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+      extra: {
+        dateFrom: safeDateFrom,
+        dateTo: safeDateTo,
+        aggregationMode: mode,
+        sheetContexts,
+        lyDoNhapKho: safeLyDoNhapKho,
+        nhapTaiKho: safeNhapTaiKho,
+        buyerCount: sheetContexts.length,
+        sliceCount: sourceSlices.length,
+        lineCount: sheetContexts.reduce((sum, ctx) => sum + (ctx.detailRows?.length ?? 0), 0),
+        canCuPnk: formatCanCuPnkTextFromSlices(sourceSlices),
+      },
+    }),
+  };
+}
+
 function buildContextBase({ settings, periodDate, detailRows, totalAmount, categoryKey, extra = {} }) {
   const parts = ymdParts(periodDate);
   const tongTien = totalAmount;
@@ -335,6 +773,7 @@ function buildContextBase({ settings, periodDate, detailRows, totalAmount, categ
     ...settings,
     ...parts,
     ...extra,
+    periodDate: periodDate ?? "",
     ngayThangNam:
       parts.ngay && parts.thang && parts.nam
         ? `Ngày ${parts.ngay} tháng ${parts.thang} năm ${parts.nam}`
@@ -360,8 +799,8 @@ async function resolveMonthlySheetContexts({
   periodMonth,
   unitIds,
   aggregationMode,
-  settings,
   categoryKey,
+  resolveSettingsForSlips,
 }) {
   const selectedUnitIds = normalizeMonthUnitIds(unitIds);
   if (!selectedUnitIds.length) {
@@ -382,10 +821,53 @@ async function resolveMonthlySheetContexts({
 
   if (mode === CHUNG_TU_AGGREGATION_MODES.BY_DAY) {
     const sheetNames = buildMonthDaySheetNames(safeMonth);
+    const unitNameById =
+      categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO
+        ? await loadUnitNameMap(selectedUnitIds)
+        : null;
     for (const sheetName of sheetNames) {
       const day = `${safeMonth}-${sheetName}`;
       const slips = await loadSlipsForDateAcrossUnits(selectedUnitIds, day);
       allSlipsCollected.push(...slips);
+
+      if (categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO) {
+        const slipsByUnit = new Map();
+        for (const slip of slips) {
+          const uid = Number(slip.recipientUnitId);
+          if (!slipsByUnit.has(uid)) slipsByUnit.set(uid, []);
+          slipsByUnit.get(uid).push(slip);
+        }
+        for (const [unitId, unitSlips] of slipsByUnit) {
+          const flatLines = unitSlips.flatMap((s) => s.lines ?? []);
+          const detailRows = flattenLinesFromSlips(unitSlips);
+          if (!detailRows.length) continue;
+          const total = sumAmount(flatLines);
+          monthlyTotal += total;
+          monthlySlipCount += unitSlips.length;
+          allLines.push(...flatLines);
+          sheetContexts.push(
+            buildContextBase({
+              settings: resolveSettingsForSlips(unitSlips),
+              periodDate: day,
+              detailRows,
+              totalAmount: total,
+              categoryKey,
+              extra: {
+                sheetName,
+                periodMonth: safeMonth,
+                selectedUnitIds,
+                aggregationMode: mode,
+                recipientUnitId: unitId,
+                recipientUnitName: unitNameById.get(unitId) ?? "",
+                slipCount: unitSlips.length,
+                lineCount: detailRows.length,
+              },
+            }),
+          );
+        }
+        continue;
+      }
+
       const flatLines = slips.flatMap((s) => s.lines ?? []);
       const detailRows = flattenLinesFromSlips(slips);
       const total = sumAmount(flatLines);
@@ -394,7 +876,7 @@ async function resolveMonthlySheetContexts({
       allLines.push(...flatLines);
       sheetContexts.push(
         buildContextBase({
-          settings: settingsWithSlipNguoiMua(settings, slips),
+          settings: resolveSettingsForSlips(slips),
           periodDate: day,
           detailRows,
           totalAmount: total,
@@ -431,7 +913,7 @@ async function resolveMonthlySheetContexts({
       allLines.push(...flatLines);
       sheetContexts.push(
         buildContextBase({
-          settings: settingsWithSlipNguoiMua(settings, slips),
+          settings: resolveSettingsForSlips(slips),
           periodDate: monthEndDate,
           detailRows,
           totalAmount: total,
@@ -464,7 +946,7 @@ async function resolveMonthlySheetContexts({
       monthlyTotal,
       monthlySlipCount,
       rootContext: buildContextBase({
-        settings: settingsWithSlipNguoiMua(settings, allSlips),
+        settings: resolveSettingsForSlips(allSlips),
         periodDate: monthEndDate,
         detailRows,
         totalAmount: total,
@@ -477,6 +959,7 @@ async function resolveMonthlySheetContexts({
           lineCount: detailRows.length,
         },
       }),
+      allSlips: allSlipsCollected,
     };
   }
 
@@ -489,7 +972,7 @@ async function resolveMonthlySheetContexts({
     monthlyTotal,
     monthlySlipCount,
     rootContext: buildContextBase({
-      settings: settingsWithSlipNguoiMua(settings, allSlipsCollected),
+      settings: resolveSettingsForSlips(allSlipsCollected),
       periodDate: rootPeriodDate,
       detailRows: sheetContexts.flatMap((ctx) => ctx.detailRows ?? []),
       totalAmount: monthlyTotal,
@@ -503,7 +986,23 @@ async function resolveMonthlySheetContexts({
         lineCount: allLines.length,
       },
     }),
+    allSlips: allSlipsCollected,
   };
+}
+
+function attachPxkSignatureExtraFields(monthly, { xuatTaiKho, diaDiem }) {
+  if (!monthly || typeof monthly !== "object") return;
+  const safeXuatTaiKho = String(xuatTaiKho ?? "").trim();
+  const safeDiaDiem = String(diaDiem ?? "").trim();
+  if (monthly.rootContext && typeof monthly.rootContext === "object") {
+    monthly.rootContext.xuatTaiKho = safeXuatTaiKho;
+    monthly.rootContext.diaDiem = safeDiaDiem;
+  }
+  for (const ctx of monthly.sheetContexts ?? []) {
+    if (!ctx || typeof ctx !== "object") continue;
+    ctx.xuatTaiKho = safeXuatTaiKho;
+    ctx.diaDiem = safeDiaDiem;
+  }
 }
 
 export async function resolveChungTuContext({
@@ -511,14 +1010,44 @@ export async function resolveChungTuContext({
   unitId,
   periodDate,
   periodMonth,
+  dateFrom,
+  dateTo,
   issueSlipId,
   unitIds,
   aggregationMode,
   settings,
+  exportingUserProfile,
+  resolvedBkmhBuyer = null,
+  lyDoNhapKho,
+  nhapTaiKho,
+  xuatTaiKho,
+  diaDiem,
 }) {
   const meta = assertKnownCategoryKey(categoryKey);
-  const profile = await getChungTuUnitProfile({ unitId });
+  const [profile, bkmhHeaderSettings, catalogBuyer] = await Promise.all([
+    getChungTuUnitProfile({ unitId }),
+    meta.key === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
+      ? getChungTuBkmhHeaderSettings({ categoryKey: meta.key })
+      : null,
+    meta.key === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG && !resolvedBkmhBuyer
+      ? SIGNATURE_CATALOG["bkmh.nguoiMua"].resolve({ storageUnitId: unitId }).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  const buyerForHeader = resolvedBkmhBuyer ?? catalogBuyer;
   const merged = mergeSettings(profile, settings);
+  const resolveSettingsForSlips = (slips = [], overrides = {}) =>
+    resolvePdfHeaderSettings({
+      mergedSettings: { ...merged, ...overrides },
+      rawSettings: {
+        ...normalizePlainObject(settings),
+        ...normalizePlainObject(overrides),
+      },
+      exportingUserProfile,
+      categoryKey: meta.key,
+      bkmhHeaderSettings,
+      slips,
+      resolvedBkmhBuyer: buyerForHeader,
+    });
 
   if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO && issueSlipId && !periodMonth) {
     const slip = await loadSlipById(issueSlipId);
@@ -534,22 +1063,23 @@ export async function resolveChungTuContext({
     const total = sumAmount(slip.lines ?? []);
     const slipNoDisplay = String(slip.slipNo ?? "").padStart(4, "0");
     const soPhieu = slipNoDisplay;
+    const baseSettings = resolveSettingsForSlips();
     const slipSettings = {
-      ...merged,
-      donViSo: merged.donViSo || slip.printLine1 || slip.unit?.name || "",
-      mauSo: merged.mauSo || slip.formMauSo || "",
-      quyenSo: merged.quyenSo || slip.bookMmyy || "",
-      soChungTu: merged.soChungTu || soPhieu,
-      signerWriter: merged.signerWriter || slip.signerWriter || "",
-      signerApprover: merged.signerApprover || slip.signerApprover || "",
+      ...baseSettings,
+      donViSo: baseSettings.donViSo || slip.printLine1 || slip.unit?.name || "",
+      mauSo: baseSettings.mauSo || slip.formMauSo || "",
+      quyenSo: baseSettings.quyenSo || slip.bookMmyy || "",
+      soChungTu: baseSettings.soChungTu || soPhieu,
+      signerWriter: baseSettings.signerWriter || slip.signerWriter || "",
+      signerApprover: baseSettings.signerApprover || slip.signerApprover || "",
       signerRecipient: slip.signerRecipient || slip.recipientDisplayName || slip.recipientUnit?.name || "",
-      warehouseFrom: merged.warehouseFrom || slip.warehouseFrom || "",
+      warehouseFrom: baseSettings.warehouseFrom || slip.warehouseFrom || "",
       printLine1: slip.printLine1 || "",
-      printLine2: slip.printLine2 || merged.printLine2 || "",
-      ghiChu: merged.ghiChu || slip.note || "",
+      printLine2: slip.printLine2 || baseSettings.printLine2 || "",
+      ghiChu: baseSettings.ghiChu || slip.note || "",
     };
     const context = buildContextBase({
-      settings: slipSettings,
+      settings: resolveSettingsForSlips([slip], slipSettings),
       periodDate: period,
       detailRows,
       totalAmount: total,
@@ -574,9 +1104,65 @@ export async function resolveChungTuContext({
         price: String(l.unitPrice),
         amount: String(l.amount),
       })),
-      settings: merged,
+      settings: resolveSettingsForSlips([slip], slipSettings),
     };
     return { context, sourceDataHash: computeSourceDataHash(hashPayload) };
+  }
+
+  const safePeriodMonth = periodMonth ? normalizePeriodMonth(periodMonth) : undefined;
+  const safePnkDateFrom =
+    meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO
+      ? toIsoDateOnly(dateFrom) || (safePeriodMonth ? `${safePeriodMonth}-01` : "")
+      : "";
+  const safePnkDateTo =
+    meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO
+      ? toIsoDateOnly(dateTo) || (safePeriodMonth ? lastDayOfMonth(safePeriodMonth) : "")
+      : "";
+
+  if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO && safePnkDateFrom && safePnkDateTo) {
+    const monthly = await resolvePnkFromBkmhSlices({
+      storageUnitId: unitId,
+      dateFrom: safePnkDateFrom,
+      dateTo: safePnkDateTo,
+      aggregationMode,
+      resolveSettingsForSlips,
+      lyDoNhapKho,
+      nhapTaiKho,
+    });
+    const hashPayload = {
+      categoryKey,
+      unitId,
+      dateFrom: safePnkDateFrom,
+      dateTo: safePnkDateTo,
+      aggregationMode: normalizePnkAggregationMode(aggregationMode),
+      sourceSlices: (monthly.sourceSlices ?? []).map((slice) => ({
+        id: slice.id,
+        sortKey: slice.sortKey,
+        soChungTu: slice.soChungTu ?? "",
+        periodDate: slice.periodDate,
+        buyerKey: slice.buyerKey ?? "",
+        buyerName: slice.buyerName ?? "",
+        buyerSignatureName: slice.buyerSignatureName ?? "",
+        buyerTitle: slice.buyerTitle ?? "",
+        recipientUnitId: slice.recipientUnitId ?? null,
+        detailRows: (slice.detailRows ?? []).map((row) => ({
+          commodityId: row.commodityId ?? null,
+          tenHang: row.tenHang ?? "",
+          maSo: row.maSo ?? "",
+          dvt: row.dvt ?? "",
+          quantity: row.quantity ?? row.soLuong ?? null,
+          unitPrice: row.unitPrice ?? row.donGia ?? null,
+          amount: row.amount ?? row.thanhTien ?? null,
+        })),
+      })),
+      settings: resolveSettingsForSlips(),
+      lyDoNhapKho: String(lyDoNhapKho ?? "").trim(),
+      nhapTaiKho: String(nhapTaiKho ?? "").trim(),
+    };
+    return {
+      context: monthly.rootContext,
+      sourceDataHash: computeSourceDataHash(hashPayload),
+    };
   }
 
   if (periodMonth) {
@@ -584,21 +1170,26 @@ export async function resolveChungTuContext({
       periodMonth,
       unitIds,
       aggregationMode,
-      settings: merged,
       categoryKey: meta.key,
+      resolveSettingsForSlips,
     });
-    if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO) {
-      await attachCanCuBkmhToMonthlyContexts(monthly, {
-        storageUnitId: unitId,
-        periodMonth,
-        aggregationMode,
-      });
-    }
     await attachRecipientUnitFillToMonthlyContexts(monthly, { aggregationMode });
+    const safeMonth = normalizePeriodMonth(periodMonth);
+    if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO) {
+      const pxkMode = normalizeAggregationMode(aggregationMode);
+      for (const ctx of monthly.sheetContexts ?? []) {
+        ctx.lyDoXuatKho = formatLyDoXuatKho({
+          aggregationMode: pxkMode,
+          periodMonth: safeMonth,
+          periodDate: ctx.periodDate,
+        });
+      }
+      attachPxkSignatureExtraFields(monthly, { xuatTaiKho, diaDiem });
+    }
     const hashPayload = {
       categoryKey,
       unitId,
-      periodMonth: normalizePeriodMonth(periodMonth),
+      periodMonth: safeMonth,
       aggregationMode: normalizeAggregationMode(aggregationMode),
       selectedUnitIds: normalizeMonthUnitIds(unitIds),
       lineIds: monthly.allLines.map((l) => ({
@@ -607,7 +1198,7 @@ export async function resolveChungTuContext({
         price: String(l.unitPrice),
         amount: String(l.amount),
       })),
-      settings: merged,
+      settings: resolveSettingsForSlips(monthly.allSlips),
     };
     return {
       context: monthly.rootContext,
@@ -628,7 +1219,7 @@ export async function resolveChungTuContext({
   const detailRows = flattenLinesFromSlips(slips);
   const total = sumAmount(flatLines);
   const context = buildContextBase({
-    settings: merged,
+    settings: resolveSettingsForSlips(slips),
     periodDate: d,
     detailRows,
     totalAmount: total,
@@ -648,9 +1239,16 @@ export async function resolveChungTuContext({
       price: String(l.unitPrice),
       amount: String(l.amount),
     })),
-    settings: merged,
+    settings: resolveSettingsForSlips(slips),
   };
   return { context, sourceDataHash: computeSourceDataHash(hashPayload) };
 }
 
-export { aggregateLinesToDetailRows, resolveDocumentNumberFields, resolveMonthlySheetContexts };
+export {
+  aggregateLinesToDetailRows,
+  aggregateSnapshotDetailRows,
+  resolveDocumentNumberFields,
+  resolveMonthlySheetContexts,
+  resolvePnkFromBkmhSlices,
+  resolvePnkFromBkmhSlices as resolvePnkMonthlyFromBkmhSlices,
+};

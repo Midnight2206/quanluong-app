@@ -9,7 +9,7 @@ export { WorkspacePanelCard as ChungTuExportWizardCard };
 
 export const CHUNG_TU_EXPORT_WIZARD_STEPS = [
   { id: "params", label: "Tham số & mẫu" },
-  { id: "map", label: "Map & tạo Sheet" },
+  { id: "map", label: "Chữ ký & xuất PDF" },
 ];
 
 export function ChungTuExportWizardStepper({ stepIndex, className }) {

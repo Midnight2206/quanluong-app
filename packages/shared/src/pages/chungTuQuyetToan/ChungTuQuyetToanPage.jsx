@@ -6,6 +6,7 @@ import { TabPanel } from "@/components/common/TabPanel";
 import { Card, CardContent } from "@/components/ui/Card";
 import { cn } from "@/utils/cn";
 import { ChungTuCategoryWorkspace } from "./ChungTuCategoryWorkspace.jsx";
+import { ChungTuPdfFieldCatalogPanel } from "./ChungTuPdfFieldCatalogPanel.jsx";
 import { ChungTuPlaceholderWorkspace } from "./ChungTuPlaceholderWorkspace.jsx";
 import {
   CHUNG_TU_CATEGORY_CONFIG_LIST,
@@ -15,8 +16,8 @@ import { CHUNG_TU_DOC_TAB_STATUS } from "./chungTuQuyetToanTabsMeta";
 
 export function ChungTuQuyetToanPage() {
   const tabs = useMemo(
-    () =>
-      CHUNG_TU_CATEGORY_CONFIG_LIST.map((config) => {
+    () => [
+      ...CHUNG_TU_CATEGORY_CONFIG_LIST.map((config) => {
         const isAvailable = config.status === CHUNG_TU_DOC_TAB_STATUS.AVAILABLE;
         return {
           id: config.categoryKey,
@@ -32,6 +33,12 @@ export function ChungTuQuyetToanPage() {
           ),
         };
       }),
+      {
+        id: "field-catalog",
+        label: "Tra cứu field",
+        panel: <ChungTuPdfFieldCatalogPanel />,
+      },
+    ],
     [],
   );
 

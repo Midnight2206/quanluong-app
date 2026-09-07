@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
 
 /** Chỉ filter — `displayName` lấy từ multipart field (multer → req.body), tin cậy UTF-8 hơn query khi POST FormData */
 const driveImportQuerySchema = z.object({
@@ -18,6 +19,72 @@ const driveFileIdParamsSchema = z.object({
     .min(8)
     .max(128)
     .regex(/^[A-Za-z0-9_-]+$/),
+});
+
+const chungTuPdfCategoryKeySchema = z.preprocess(
+  (v) => (v == null ? "" : String(v).trim()),
+  z.enum([
+    CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG,
+    CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO,
+    CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO,
+  ]),
+);
+
+const chungTuBkmhCategoryKeySchema = z.preprocess(
+  (v) => (v == null ? "" : String(v).trim()),
+  z.literal(CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG),
+);
+
+/** string | null | undefined only — empty trim → null; rejects objects/arrays/numbers */
+const optionalNullableTrimmedString = (max) =>
+  z.preprocess(
+    (v) => {
+      if (v == null) return v;
+      if (typeof v !== "string") return v;
+      const text = v.trim();
+      return text || null;
+    },
+    z.union([z.string().max(max), z.null()]).optional(),
+  );
+
+const chungTuBooleanQueryFlagSchema = z
+  .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+  .optional()
+  .transform((v) => v === true || v === "true" || v === "1");
+
+const chungTuPdfTemplateListQuerySchema = z
+  .object({
+    categoryKey: chungTuPdfCategoryKeySchema,
+    includeNonPublished: chungTuBooleanQueryFlagSchema,
+  })
+  .transform(({ categoryKey, includeNonPublished }) => ({
+    categoryKey,
+    includeNonPublished: Boolean(includeNonPublished),
+  }));
+
+const chungTuPdfTemplateIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+/** multipart (multer): categoryKey + displayName + name + version */
+const chungTuPdfTemplateUploadBodySchema = z.object({
+  categoryKey: chungTuPdfCategoryKeySchema,
+  displayName: z.preprocess(
+    (v) => {
+      if (v == null) {
+        return undefined;
+      }
+      const value = String(v).trim();
+      return value || undefined;
+    },
+    z.string().min(1).max(200).optional(),
+  ),
+  name: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(120)),
+  version: z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string().min(1).max(64)),
+});
+
+const chungTuPdfTemplateFieldLabelsPutBodySchema = z.object({
+  fieldLabels: z.record(z.string().max(120)),
 });
 
 const putTemplateFillRulesBodySchema = z
@@ -186,6 +253,14 @@ const chungTuDocumentBaseBodySchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  dateFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  dateTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   periodMonth: z
     .string()
     .regex(/^\d{4}-\d{2}$/)
@@ -199,8 +274,63 @@ const chungTuDocumentBaseBodySchema = z.object({
 });
 
 function refineChungTuDocumentBody(data, ctx) {
+  if (data.categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO) {
+    if (!data.dateFrom) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu nhập kho cần dateFrom (YYYY-MM-DD).",
+        path: ["dateFrom"],
+      });
+    }
+    if (!data.dateTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu nhập kho cần dateTo (YYYY-MM-DD).",
+        path: ["dateTo"],
+      });
+    }
+    if (data.dateFrom && data.dateTo && data.dateFrom > data.dateTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "dateFrom phải nhỏ hơn hoặc bằng dateTo.",
+        path: ["dateTo"],
+      });
+    }
+    if (data.unitIds?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu nhập kho không hỗ trợ unitIds.",
+        path: ["unitIds"],
+      });
+    }
+    if (
+      data.aggregationMode &&
+      data.aggregationMode !== "by-day" &&
+      data.aggregationMode !== "full"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu nhập kho chỉ hỗ trợ aggregationMode by-day hoặc full.",
+        path: ["aggregationMode"],
+      });
+    }
+    return;
+  }
   if (data.periodMonth) {
-    if (!data.unitIds?.length) {
+    if (
+      data.categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO &&
+      data.aggregationMode === "full"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu xuất kho không hỗ trợ aggregationMode full.",
+        path: ["aggregationMode"],
+      });
+    }
+    if (
+      data.categoryKey !== CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO &&
+      !data.unitIds?.length
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Chứng từ theo tháng cần chọn ít nhất một đơn vị (unitIds).",
@@ -238,6 +368,96 @@ const chungTuContextPreviewBodySchema = chungTuDocumentBaseBodySchema.superRefin
   refineChungTuDocumentBody,
 );
 
+const chungTuPdfExportCreateBodySchema = chungTuDocumentBaseBodySchema
+  .omit({
+    templateDriveFileId: true,
+    templateDisplayName: true,
+  })
+  .extend({
+    categoryKey: chungTuPdfCategoryKeySchema,
+    pdfTemplateId: z.coerce.number().int().positive(),
+    signatures: z.record(z.string()).optional().default({}),
+    signatureDates: z.record(z.string()).optional().default({}),
+    signatureBlock: z.record(z.unknown()).optional(),
+  })
+  .superRefine(refineChungTuDocumentBody);
+
+const chungTuPdfExportBatchCreateBodySchema = chungTuPdfExportCreateBodySchema;
+
+const chungTuPdfExportKeyParamSchema = z.object({
+  exportKey: z.string().min(8).max(200),
+});
+
+const chungTuPdfExportBatchListQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  categoryKey: chungTuPdfCategoryKeySchema.optional(),
+});
+
+const chungTuBkmhMonthlyListQuerySchema = z.object({
+  storageUnitId: z.coerce.number().int().positive(),
+  periodMonth: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .optional(),
+});
+
+const chungTuPdfExportBatchKeyParamSchema = z.object({
+  batchKey: z.string().min(8).max(200),
+});
+
+const chungTuPdfExportBatchFileParamsSchema = z.object({
+  batchKey: z.string().min(8).max(200),
+  fileId: z.coerce.number().int().positive(),
+});
+
+const chungTuBkmhMonthlyIdParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const chungTuBkmhMonthlySliceFileParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  sliceId: z.coerce.number().int().positive(),
+});
+
+const chungTuBkmhMonthlyCreateBodySchema = chungTuPdfExportBatchCreateBodySchema.superRefine(
+  (body, ctx) => {
+    if (body.categoryKey !== CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Chỉ áp dụng cho bảng kê mua hàng.",
+        path: ["categoryKey"],
+      });
+    }
+    if (!body.periodMonth) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "BKMH monthly yêu cầu periodMonth.",
+        path: ["periodMonth"],
+      });
+    }
+  },
+);
+
+const chungTuSignatureSettingsQuerySchema = z.object({
+  categoryKey: chungTuPdfCategoryKeySchema,
+});
+
+const chungTuSignatureSettingsPutBodySchema = z.object({
+  categoryKey: chungTuPdfCategoryKeySchema,
+  signatureBlock: z.record(z.unknown()),
+  extraFields: z.record(z.unknown()).optional(),
+});
+
+const chungTuBkmhHeaderSettingsQuerySchema = z.object({
+  categoryKey: chungTuBkmhCategoryKeySchema,
+});
+
+const chungTuBkmhHeaderSettingsPutBodySchema = z.object({
+  categoryKey: chungTuBkmhCategoryKeySchema,
+  hoTenNguoiMua: optionalNullableTrimmedString(191),
+  boPhan: optionalNullableTrimmedString(255),
+});
+
 const templateTreeQuerySchema = z.object({
   folderId: z.string().min(8).max(128).regex(/^[A-Za-z0-9_-]+$/).optional(),
   categoryKey: z.string().min(1).max(80).optional(),
@@ -255,6 +475,10 @@ export {
   driveImportBodySchema,
   driveImportQuerySchema,
   driveFileIdParamsSchema,
+  chungTuPdfTemplateIdParamSchema,
+  chungTuPdfTemplateListQuerySchema,
+  chungTuPdfTemplateFieldLabelsPutBodySchema,
+  chungTuPdfTemplateUploadBodySchema,
   templateCatalogCreateBodySchema,
   templateCatalogUploadBodySchema,
   templateCatalogIdParamSchema,
@@ -272,6 +496,20 @@ export {
   documentKeyParamSchema,
   chungTuDocumentCreateBodySchema,
   chungTuContextPreviewBodySchema,
+  chungTuPdfExportCreateBodySchema,
+  chungTuPdfExportBatchCreateBodySchema,
+  chungTuPdfExportKeyParamSchema,
+  chungTuPdfExportBatchListQuerySchema,
+  chungTuPdfExportBatchKeyParamSchema,
+  chungTuPdfExportBatchFileParamsSchema,
+  chungTuBkmhMonthlyListQuerySchema,
+  chungTuBkmhMonthlyIdParamSchema,
+  chungTuBkmhMonthlySliceFileParamsSchema,
+  chungTuBkmhMonthlyCreateBodySchema,
+  chungTuSignatureSettingsQuerySchema,
+  chungTuSignatureSettingsPutBodySchema,
+  chungTuBkmhHeaderSettingsQuerySchema,
+  chungTuBkmhHeaderSettingsPutBodySchema,
   templateTreeQuerySchema,
   templateTreeFileParamsSchema,
 };

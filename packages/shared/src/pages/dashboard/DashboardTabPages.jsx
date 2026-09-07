@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Building2, Users } from "lucide-react";
 import { startNavigationIntent } from "@/components/navigation/navigationIntentStore";
 import { UnitPathBreadcrumb } from "@/components/common/UnitPathBreadcrumb";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -22,13 +20,12 @@ import { AdminPendingRegistrationsPanel } from "@/pages/dashboard/admin/AdminPen
 import { SuperadminPermissionMatrixPanel } from "@/pages/dashboard/superadmin/SuperadminPermissionMatrixPanel";
 import { SuperadminUnitsPanel } from "@/pages/dashboard/superadmin/SuperadminUnitsPanel";
 import { SuperadminMealAllowanceRatesPanel } from "@/pages/dashboard/superadmin/SuperadminMealAllowanceRatesPanel";
+import { SuperadminChungTuPdfTemplatesPanel } from "@/pages/dashboard/superadmin/SuperadminChungTuPdfTemplatesPanel";
 import { SuperadminUsersPanel } from "@/pages/dashboard/superadmin/SuperadminUsersPanel";
 import { cn } from "@/utils/cn";
 import { DASHBOARD_LTTP_SUB_PATHS } from "@/pages/dashboard/dashboardTabMeta";
 
 const dashboardCard = "space-y-2 !p-3 sm:!p-4";
-const linkCardClass =
-  "flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition hover:bg-secondary sm:text-sm";
 
 const LTTP_SUB_ORDER = [
   "food-groups",
@@ -63,18 +60,8 @@ export function DashboardUnitsPage() {
 
 export function DashboardUsersPage() {
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3">
-      <Card className="shrink-0 shadow-soft">
-        <CardContent className={cn(dashboardCard, "flex flex-row flex-wrap items-center gap-2")}>
-          <Link href="/users" className={cn(linkCardClass, "w-fit")}>
-            <Users className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-            <span>Mở trang Người dùng (toàn màn hình)</span>
-          </Link>
-        </CardContent>
-      </Card>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <SuperadminUsersPanel />
-      </div>
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <SuperadminUsersPanel />
     </div>
   );
 }
@@ -140,6 +127,14 @@ export function DashboardMealAllowanceRatesPage() {
   return (
     <div className="min-w-0">
       <SuperadminMealAllowanceRatesPanel />
+    </div>
+  );
+}
+
+export function DashboardChungTuPdfTemplatesPage() {
+  return (
+    <div className="min-w-0">
+      <SuperadminChungTuPdfTemplatesPanel />
     </div>
   );
 }
