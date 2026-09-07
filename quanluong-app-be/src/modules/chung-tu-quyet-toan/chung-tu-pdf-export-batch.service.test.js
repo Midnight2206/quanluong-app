@@ -26,6 +26,35 @@ const prismaBatchCreate = mock.fn(async ({ data, include }) => {
 const prismaBatchFindMany = mock.fn(async () => []);
 const prismaBatchFindUnique = mock.fn(async () => null);
 const prismaBatchDelete = mock.fn(async () => ({}));
+const prismaBatchUpdate = mock.fn(async ({ where, data, include }) => {
+  const now = new Date("2026-09-07T05:00:00.000Z");
+  const exports = (data.exports?.create ?? []).map((item, index) => ({
+    id: index + 1,
+    createdAt: now,
+    updatedAt: now,
+    ...item,
+  }));
+  return {
+    id: where?.id ?? 91,
+    createdAt: now,
+    updatedAt: now,
+    batchKey: "batch_reexport",
+    categoryKey: data.categoryKey ?? "phieu-xuat-kho",
+    unitId: 9,
+    periodMonth: "2026-09",
+    periodDate: null,
+    issueSlipId: null,
+    unitIdsJson: [10, 11],
+    aggregationMode: "by-unit",
+    documentServiceFolderId: 700,
+    displayName: "PXK re-export",
+    fileCount: exports.length,
+    createdById: 88,
+    ...data,
+    exports: include?.exports ? exports : undefined,
+  };
+});
+const prismaExportDeleteMany = mock.fn(async () => ({ count: 0 }));
 const prismaSignatureSettingsFindUnique = mock.fn(async () => null);
 
 const resolveChungTuContext = mock.fn(async () => ({
@@ -82,6 +111,17 @@ const renderToDocumentFolder = mock.fn(async (_folderId, body) => ({
   file_name: body.fileName,
 }));
 const deleteDocumentFolder = mock.fn(async () => ({}));
+const clearDocumentFolderFiles = mock.fn(async () => ({}));
+const attachDocNumbersToContexts = mock.fn(async ({ contexts }) => {
+  for (const ctx of contexts ?? []) {
+    ctx.sheetKey = ctx.sheetKey || `sheet:${ctx.recipientUnitId ?? ctx.periodDate ?? "x"}`;
+    ctx.quyenSo = ctx.quyenSo || "0926";
+    ctx.soChungTu = ctx.soChungTu || "0001";
+    ctx.so = ctx.soChungTu;
+    ctx.soPhieu = ctx.soChungTu;
+  }
+  return contexts;
+});
 
 mock.module("../../infra/database/prisma/prisma.client.js", {
   exports: {
@@ -94,6 +134,10 @@ mock.module("../../infra/database/prisma/prisma.client.js", {
         findMany: prismaBatchFindMany,
         findUnique: prismaBatchFindUnique,
         delete: prismaBatchDelete,
+        update: prismaBatchUpdate,
+      },
+      chungTuPdfExport: {
+        deleteMany: prismaExportDeleteMany,
       },
       chungTuSignatureSettings: {
         findUnique: prismaSignatureSettingsFindUnique,
@@ -107,12 +151,14 @@ mock.module("./chung-tu-data-resolver.service.js", {
   exports: {
     resolveChungTuContext,
     prepareSignatureBlockForRender,
+    attachDocNumbersToContexts,
   },
 });
 
 mock.module("../../services/document-service.client.js", {
   exports: {
     createDocumentFolder,
+    clearDocumentFolderFiles,
     deleteDocumentFolder,
     getDocumentFolder: mock.fn(),
     getTemplateFields,
@@ -125,9 +171,11 @@ mock.module("../../services/document-service.client.js", {
 });
 
 const { pickExportSlices } = await import("./chung-tu-pdf-batch-slices.util.js");
-const { createChungTuPdfExportBatch, getChungTuPdfExportBatch } = await import(
-  "./chung-tu-pdf-export-batch.service.js"
-);
+const {
+  createChungTuPdfExportBatch,
+  getChungTuPdfExportBatch,
+  reExportChungTuPdfExportBatch,
+} = await import("./chung-tu-pdf-export-batch.service.js");
 
 test.beforeEach(() => {
   prismaTemplateFindFirst.mock.resetCalls();
@@ -135,11 +183,15 @@ test.beforeEach(() => {
   prismaBatchFindMany.mock.resetCalls();
   prismaBatchFindUnique.mock.resetCalls();
   prismaBatchDelete.mock.resetCalls();
+  prismaBatchUpdate.mock.resetCalls();
+  prismaExportDeleteMany.mock.resetCalls();
   prismaSignatureSettingsFindUnique.mock.resetCalls();
   resolveChungTuContext.mock.resetCalls();
   prepareSignatureBlockForRender.mock.resetCalls();
+  attachDocNumbersToContexts.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
   createDocumentFolder.mock.resetCalls();
+  clearDocumentFolderFiles.mock.resetCalls();
   renderToDocumentFolder.mock.resetCalls();
   deleteDocumentFolder.mock.resetCalls();
 });
@@ -671,4 +723,144 @@ test("createChungTuPdfExportBatch passes template fieldLabelsJson into rendered 
   } finally {
     randomBytesMock.mock.restore();
   }
+});
+
+test("reExportChungTuPdfExportBatch keeps folderId and snapshot numbers without refresh", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 21,
+    categoryKey: "phieu-xuat-kho",
+    displayName: "PXK",
+    documentServiceTemplateId: 501,
+    status: "published",
+    fieldLabelsJson: null,
+  }));
+  prismaBatchFindUnique.mock.mockImplementation(async () => ({
+    id: 91,
+    batchKey: "batch_reexport",
+    categoryKey: "phieu-xuat-kho",
+    unitId: 9,
+    periodMonth: "2026-09",
+    periodDate: null,
+    issueSlipId: null,
+    unitIdsJson: [10, 11],
+    aggregationMode: "by-unit",
+    documentServiceFolderId: 700,
+    displayName: "PXK 09/2026",
+    fileCount: 2,
+    sourceDataHash: "hash-old",
+    signaturesJson: null,
+    createdById: 88,
+    createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+    pdfTemplateId: 20,
+    documentServiceTemplateId: 500,
+    exports: [
+      {
+        id: 1,
+        fileName: "don-vi-10.pdf",
+        sortKey: "unit:10",
+        contextJson: {
+          recipientUnitId: 10,
+          recipientUnitName: "Đại đội 1",
+          soChungTu: "0001",
+          quyenSo: "0926",
+          sheetKey: "unit:10",
+          detailRows: [{ stt: 1, tenHang: "Gạo" }],
+          tongTienSo: 1000,
+        },
+        summaryJson: { tongTienSo: 1000 },
+      },
+      {
+        id: 2,
+        fileName: "don-vi-11.pdf",
+        sortKey: "unit:11",
+        contextJson: {
+          recipientUnitId: 11,
+          recipientUnitName: "Đại đội 2",
+          soChungTu: "0002",
+          quyenSo: "0926",
+          sheetKey: "unit:11",
+          detailRows: [{ stt: 1, tenHang: "Muối" }],
+          tongTienSo: 500,
+        },
+        summaryJson: { tongTienSo: 500 },
+      },
+    ],
+  }));
+  getTemplateFields.mock.mockImplementation(async () => ({
+    fields: [{ field_name: "so_chung_tu", cell_ref: "B2" }],
+    columns: [{ key: "stt", title: "STT" }],
+  }));
+
+  const result = await reExportChungTuPdfExportBatch({
+    batchKey: "batch_reexport",
+    pdfTemplateId: 21,
+    refreshData: false,
+    signatures: {},
+    signatureDates: {},
+    settings: {},
+    createdById: 88,
+    effectiveUnitIds: [9, 10, 11],
+  });
+
+  assert.equal(clearDocumentFolderFiles.mock.callCount(), 1);
+  assert.deepEqual(clearDocumentFolderFiles.mock.calls[0].arguments, [700]);
+  assert.equal(createDocumentFolder.mock.callCount(), 0);
+  assert.equal(deleteDocumentFolder.mock.callCount(), 0);
+  assert.equal(prismaExportDeleteMany.mock.callCount(), 1);
+  assert.equal(resolveChungTuContext.mock.callCount(), 0);
+  assert.equal(attachDocNumbersToContexts.mock.callCount(), 1);
+  const attached = attachDocNumbersToContexts.mock.calls[0].arguments[0].contexts;
+  assert.deepEqual(
+    attached.map((c) => c.soChungTu),
+    ["0001", "0002"],
+  );
+  assert.equal(result.folderId, 700);
+  assert.equal(result.batchKey, "batch_reexport");
+  assert.equal(result.pdfTemplateId, 21);
+});
+
+test("reExportChungTuPdfExportBatch without snapshot requires refreshData", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 21,
+    categoryKey: "phieu-xuat-kho",
+    displayName: "PXK",
+    documentServiceTemplateId: 501,
+    status: "published",
+    fieldLabelsJson: null,
+  }));
+  prismaBatchFindUnique.mock.mockImplementation(async () => ({
+    id: 91,
+    batchKey: "batch_legacy",
+    categoryKey: "phieu-xuat-kho",
+    unitId: 9,
+    periodMonth: "2026-09",
+    periodDate: null,
+    issueSlipId: null,
+    unitIdsJson: [10],
+    aggregationMode: "by-unit",
+    documentServiceFolderId: 700,
+    displayName: "PXK legacy",
+    fileCount: 1,
+    sourceDataHash: null,
+    signaturesJson: null,
+    createdById: 88,
+    createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+    pdfTemplateId: 20,
+    documentServiceTemplateId: 500,
+    exports: [{ id: 1, fileName: "a.pdf", sortKey: "a", contextJson: null }],
+  }));
+
+  await assert.rejects(
+    () =>
+      reExportChungTuPdfExportBatch({
+        batchKey: "batch_legacy",
+        pdfTemplateId: 21,
+        refreshData: false,
+        createdById: 88,
+        effectiveUnitIds: [9, 10],
+      }),
+    (err) => err?.statusCode === 400 && /Đọc lại dữ liệu/.test(String(err?.message ?? "")),
+  );
 });

@@ -1,3 +1,25 @@
+# SDD Progress — pxk-lttp-fields-signatures (2026-09-07)
+
+Plan: docs/superpowers/plans/2026-09-07-pxk-lttp-fields-signatures.md
+
+## Tasks
+
+- Task 1: complete (commits 09413c7..6c129a6, review clean)
+- Task 2: complete (commits 6c129a6..653e080, review clean)
+- Task 3: complete (commits 653e080..5f89661, review clean)
+- Task 4: complete (commits 5f89661..88aad45, review clean)
+- Final review: Ready to merge (88aad45); Important non-blocking: BE default by-day when aggregationMode omitted for PXK API
+
+# SDD Progress — pnk-folder-pdf-summary (2026-09-06)
+
+Plan: docs/superpowers/plans/2026-09-06-pnk-folder-pdf-summary.md
+
+## Tasks
+
+- Task 1: complete (commits 4b546f3..a2630b1, review clean)
+- Task 2: complete (commits a2630b1..3cdb42e, review clean)
+- Task 3: complete (commits 3cdb42e..7bc65b6, review clean)
+
 # SDD Progress — template-field-labels-from-excel-fields (2026-09-05)
 
 Plan: docs/superpowers/plans/2026-09-05-template-field-labels-from-excel-fields.md
@@ -95,3 +117,37 @@ Spec: `docs/superpowers/specs/2026-09-05-nl-field-can-cu-pnk-design.md`
 
 - Task 1: complete (tests green) — BE shared named-range prefix helper, `NL_FIELD_can_cu_pnk` formatter/catalog module, label-field module, and named-range-display compatibility re-export
 
+# SDD Progress — superadmin-dashboard-tabs-to-sidebar (2026-09-06)
+
+Plan: docs/superpowers/plans/2026-09-06-superadmin-dashboard-tabs-to-sidebar.md
+Spec: docs/superpowers/specs/2026-09-06-superadmin-dashboard-tabs-to-sidebar-design.md
+
+## Tasks
+
+- Task 1: complete (commits eb0ebf0..76636eb, review clean) — superadmin-dashboard-tabs-to-sidebar
+- Task 2: complete (commits 76636eb..0169de8, review clean)
+- Task 3: complete (commits 0169de8..4b6ed1a, review clean)
+- Task 4: complete (commits 4b6ed1a..2b07caa, review clean)
+- Final review: Important mobile flex-1 fixed (91ec544); remaining Minors deferred (orphan section headers, aria-label, DEP0205, meta comment)
+
+
+# SDD Progress — chung-tu-doc-number-and-reexport (2026-09-07)
+
+Plan: docs/superpowers/plans/2026-09-07-chung-tu-doc-number-and-reexport.md
+Spec: docs/superpowers/specs/2026-09-07-chung-tu-doc-number-and-reexport-design.md
+
+## Tasks
+
+- Task 1: complete (commits 2a27560..15fb79a, review clean) — Prisma counter/assignment + allocateDocNumber
+- Task 2: complete (commits 15fb79a..6e7d57c, controller self-review — Task tool blocked) — wire allocate into resolver
+- Task 3: complete (commits 6e7d57c..1731baf, controller self-review) — DELETE /v1/folders/{id}/files + Node client
+- Task 4: complete (commits 1731baf..0cd6013, controller) — contextJson on batch export create; BKMH numbers via Task 2 resolve
+- Task 5: complete (commits 0cd6013..143dbd1, controller) — POST .../pdf-export-batches/:batchKey/re-export
+- Task 6: complete (commits 143dbd1..38446fc, controller) — BKMH re-export + create no longer replaces folder
+- Task 7: complete (commit 090ed38) — FE Xuất lại dialog + History actions + API hooks
+- Task 8: complete (acceptance tests green with `--experimental-test-module-mocks`) — re-export keeps folder/numbers; BKMH create rejects duplicate; allocate independent counters; no mmyydd
+
+## Notes
+- Deploy needs `prisma migrate deploy` for doc-number tables + `contextJson`
+- Manual UI smoke still useful: History → Xuất lại trên BKMH/PNK/PXK
+- Task tool blocked mid-run; Tasks 2–8 continued inline with controller self-review

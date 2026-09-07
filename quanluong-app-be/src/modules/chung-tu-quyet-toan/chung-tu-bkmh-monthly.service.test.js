@@ -35,7 +35,14 @@ const prismaMonthlyUpdate = mock.fn(async ({ where, data, include }) => {
     id: where.id,
     storageUnitId: 9,
     periodMonth: "2026-06",
+    documentServiceFolderId: 700,
+    aggregationMode: "by-day",
+    unitIdsJson: [10, 11],
+    displayName: "BKMH 06/2026",
+    tongTienThang: 2000,
+    sliceCount: slices.length,
     createdById: 77,
+    updatedById: 77,
     createdAt: new Date("2026-08-29T05:00:00.000Z"),
     updatedAt: now,
     ...data,
@@ -103,6 +110,7 @@ const renderToDocumentFolder = mock.fn(async (_folderId, body) => ({
   file_name: body.fileName,
 }));
 const deleteDocumentFolder = mock.fn(async () => ({}));
+const clearDocumentFolderFiles = mock.fn(async () => ({}));
 const streamDocumentFolderZip = mock.fn(async (folderId) => ({ kind: "zip", folderId }));
 const streamDocumentFolderMergedPdf = mock.fn(async (folderId) => ({ kind: "merged", folderId }));
 const streamDocumentFolderFile = mock.fn(async (folderId, fileId) => ({
@@ -110,6 +118,16 @@ const streamDocumentFolderFile = mock.fn(async (folderId, fileId) => ({
   folderId,
   fileId,
 }));
+const attachDocNumbersToContexts = mock.fn(async ({ contexts }) => {
+  for (const ctx of contexts ?? []) {
+    ctx.sheetKey = ctx.sheetKey || `day:${ctx.periodDate ?? "x"}`;
+    ctx.quyenSo = ctx.quyenSo || "0626";
+    ctx.soChungTu = ctx.soChungTu || "0001";
+    ctx.so = ctx.soChungTu;
+    ctx.soPhieu = ctx.soChungTu;
+  }
+  return contexts;
+});
 
 mock.module("../../infra/database/prisma/prisma.client.js", {
   exports: {
@@ -142,12 +160,14 @@ mock.module("./chung-tu-data-resolver.service.js", {
   exports: {
     resolveChungTuContext,
     prepareSignatureBlockForRender,
+    attachDocNumbersToContexts,
   },
 });
 
 mock.module("../../services/document-service.client.js", {
   exports: {
     createDocumentFolder,
+    clearDocumentFolderFiles,
     deleteDocumentFolder,
     getDocumentFolder: mock.fn(),
     getTemplateFields,
@@ -164,6 +184,7 @@ const {
   deleteChungTuBkmhMonthly,
   getChungTuBkmhMonthly,
   listChungTuBkmhMonthly,
+  reExportChungTuBkmhMonthly,
   streamChungTuBkmhMonthlyMergedPdf,
   streamChungTuBkmhMonthlySliceFile,
   streamChungTuBkmhMonthlyZip,
@@ -181,8 +202,10 @@ test.beforeEach(() => {
   prismaLttpDefaultsFindUnique.mock.resetCalls();
   resolveChungTuContext.mock.resetCalls();
   prepareSignatureBlockForRender.mock.resetCalls();
+  attachDocNumbersToContexts.mock.resetCalls();
   getTemplateFields.mock.resetCalls();
   createDocumentFolder.mock.resetCalls();
+  clearDocumentFolderFiles.mock.resetCalls();
   renderToDocumentFolder.mock.resetCalls();
   deleteDocumentFolder.mock.resetCalls();
   streamDocumentFolderZip.mock.resetCalls();
@@ -245,11 +268,7 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
           periodMonth: "2026-06",
         },
       },
-      include: {
-        slices: {
-          orderBy: [{ sortKey: "asc" }, { id: "asc" }],
-        },
-      },
+      select: { id: true },
     });
     assert.deepEqual(resolveChungTuContext.mock.calls[0].arguments[0], {
       categoryKey: "bang-ke-mua-hang",
@@ -270,7 +289,7 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
     assert.equal(renderToDocumentFolder.mock.callCount(), 2);
     assert.deepEqual(
       renderToDocumentFolder.mock.calls.map((call) => call.arguments[1].fileName),
-      ["2026-06-01.pdf", "2026-06-03.pdf"],
+      ["Bep A-2026-06-01.pdf", "Bep B-2026-06-03.pdf"],
     );
 
     const createdPayload = prismaMonthlyCreate.mock.calls[0].arguments[0].data;
@@ -293,7 +312,7 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
     });
     assert.equal(createdPayload.slices.create.length, 2);
     assert.deepEqual(createdPayload.slices.create[0], {
-      sortKey: "2026-06-01",
+      sortKey: "Bep A-2026-06-01",
       soChungTu: "CT-01",
       periodDate: new Date("2026-06-01T00:00:00.000Z"),
       recipientUnitId: 10,
@@ -316,7 +335,7 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
       buyerSignatureName: "",
       buyerTitle: "",
       documentServiceFileId: 10,
-      fileName: "2026-06-01.pdf",
+      fileName: "Bep A-2026-06-01.pdf",
     });
     assert.deepEqual(createdPayload.slices.create[1].detailRowsJson, [
       {
@@ -353,60 +372,112 @@ test("createChungTuBkmhMonthlyExport creates a new monthly row and persists non-
   }
 });
 
-test("createChungTuBkmhMonthlyExport replaces an existing monthly row in place", async () => {
-  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
-    id: 15,
-    categoryKey: "bang-ke-mua-hang",
-    displayName: "BKMH A",
-    documentServiceTemplateId: 901,
-    status: "published",
-  }));
+test("createChungTuBkmhMonthlyExport rejects when month already exported", async () => {
   prismaMonthlyFindUnique.mock.mockImplementation(async ({ where }) => {
     if (where?.storageUnitId_periodMonth) {
       return {
         id: 44,
         storageUnitId: 9,
         periodMonth: "2026-06",
-        documentServiceFolderId: 600,
-        createdById: 77,
-        updatedById: 77,
-        createdAt: new Date("2026-08-29T05:00:00.000Z"),
-        updatedAt: new Date("2026-08-29T06:00:00.000Z"),
-        slices: [],
       };
     }
     return null;
   });
 
-  await createChungTuBkmhMonthlyExport({
+  await assert.rejects(
+    () =>
+      createChungTuBkmhMonthlyExport({
+        storageUnitId: 9,
+        periodMonth: "2026-06",
+        unitIds: [10, 11],
+        aggregationMode: "by-day",
+        pdfTemplateId: 15,
+        signatures: {},
+        signatureDates: {},
+        settings: {},
+        exportingUserProfile: { donVi: "Kho A" },
+        createdById: 88,
+        effectiveUnitIds: [9, 10, 11],
+      }),
+    (err) =>
+      err?.statusCode === 400 &&
+      /Xuất lại/.test(String(err?.message ?? "")) &&
+      Number(err?.details?.monthlyId) === 44,
+  );
+  assert.equal(createDocumentFolder.mock.callCount(), 0);
+  assert.equal(deleteDocumentFolder.mock.callCount(), 0);
+  assert.equal(prismaMonthlyUpdate.mock.callCount(), 0);
+});
+
+test("reExportChungTuBkmhMonthly clears same folder and keeps soChungTu without refresh", async () => {
+  prismaTemplateFindFirst.mock.mockImplementation(async () => ({
+    id: 15,
+    categoryKey: "bang-ke-mua-hang",
+    displayName: "BKMH A",
+    documentServiceTemplateId: 901,
+    status: "published",
+    fieldLabelsJson: null,
+  }));
+  const now = new Date("2026-08-30T07:00:00.000Z");
+  prismaMonthlyFindUnique.mock.mockImplementation(async () => ({
+    id: 55,
     storageUnitId: 9,
     periodMonth: "2026-06",
-    unitIds: [10, 11],
     aggregationMode: "by-day",
+    unitIdsJson: [10, 11],
+    pdfTemplateId: 14,
+    documentServiceTemplateId: 900,
+    documentServiceFolderId: 700,
+    displayName: "BKMH 06/2026",
+    tongTienThang: 2000,
+    sliceCount: 1,
+    sourceDataHash: "monthly-hash-123",
+    signaturesJson: null,
+    createdById: 88,
+    updatedById: 88,
+    createdAt: now,
+    updatedAt: now,
+    slices: [
+      {
+        id: 1,
+        monthlyId: 55,
+        sortKey: "2026-06-01",
+        soChungTu: "0003",
+        periodDate: new Date("2026-06-01T00:00:00.000Z"),
+        recipientUnitId: 10,
+        recipientUnitName: "Đại đội 1",
+        ngayThangNam: "Ngày 01 tháng 06 năm 2026",
+        tongTien: 2000,
+        fileName: "2026-06-01.pdf",
+        documentServiceFileId: 11,
+        detailRowsJson: [{ stt: 1, tenHang: "Gao", quantity: 1, unitPrice: 2000, amount: 2000 }],
+      },
+    ],
+  }));
+  getTemplateFields.mock.mockImplementation(async () => ({
+    fields: [{ field_name: "so_chung_tu", cell_ref: "B2" }],
+    columns: [{ key: "stt", title: "STT" }],
+  }));
+
+  const result = await reExportChungTuBkmhMonthly({
+    id: 55,
     pdfTemplateId: 15,
+    refreshData: false,
     signatures: {},
     signatureDates: {},
     settings: {},
-    exportingUserProfile: { donVi: "Kho A" },
     createdById: 88,
     effectiveUnitIds: [9, 10, 11],
   });
 
-  assert.equal(deleteDocumentFolder.mock.callCount(), 1);
-  assert.deepEqual(deleteDocumentFolder.mock.calls[0].arguments, [600]);
-  assert.equal(prismaSliceDeleteMany.mock.callCount(), 1);
-  assert.deepEqual(prismaSliceDeleteMany.mock.calls[0].arguments[0], {
-    where: { monthlyId: 44 },
-  });
-  assert.equal(prismaMonthlyCreate.mock.callCount(), 0);
-  assert.equal(prismaMonthlyUpdate.mock.callCount(), 1);
-  assert.deepEqual(prismaMonthlyUpdate.mock.calls[0].arguments[0].where, { id: 44 });
-  assert.equal(prismaMonthlyUpdate.mock.calls[0].arguments[0].data.updatedById, 88);
-  assert.equal(prismaMonthlyUpdate.mock.calls[0].arguments[0].data.createdById, undefined);
-  assert.equal(prismaMonthlyUpdate.mock.calls[0].arguments[0].data.documentServiceFolderId, 700);
-  assert.equal(prismaMonthlyUpdate.mock.calls[0].arguments[0].data.sliceCount, 2);
-  assert.equal(prismaMonthlyUpdate.mock.calls[0].arguments[0].data.tongTienThang, 2000);
-  assert.equal(prismaMonthlyUpdate.mock.calls[0].arguments[0].data.slices.create.length, 2);
+  assert.equal(clearDocumentFolderFiles.mock.callCount(), 1);
+  assert.deepEqual(clearDocumentFolderFiles.mock.calls[0].arguments, [700]);
+  assert.equal(createDocumentFolder.mock.callCount(), 0);
+  assert.equal(deleteDocumentFolder.mock.callCount(), 0);
+  assert.equal(resolveChungTuContext.mock.callCount(), 0);
+  assert.equal(attachDocNumbersToContexts.mock.callCount(), 1);
+  assert.equal(attachDocNumbersToContexts.mock.calls[0].arguments[0].contexts[0].soChungTu, "0003");
+  assert.equal(result.folderId, 700);
 });
 
 test("list/get/delete and stream helpers map rows and proxy document-service calls", async () => {
