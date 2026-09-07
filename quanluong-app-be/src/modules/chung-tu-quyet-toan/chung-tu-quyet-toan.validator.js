@@ -318,6 +318,16 @@ function refineChungTuDocumentBody(data, ctx) {
   }
   if (data.periodMonth) {
     if (
+      data.categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO &&
+      data.aggregationMode === "full"
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phiếu xuất kho không hỗ trợ aggregationMode full.",
+        path: ["aggregationMode"],
+      });
+    }
+    if (
       data.categoryKey !== CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO &&
       !data.unitIds?.length
     ) {

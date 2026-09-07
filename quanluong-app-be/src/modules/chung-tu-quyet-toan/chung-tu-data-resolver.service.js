@@ -23,6 +23,7 @@ import {
   attachRecipientUnitFillToMonthlyContexts,
   resolveRecipientUnitFillForSlip,
 } from "./chung-tu-recipient-unit-fill.service.js";
+import { formatLyDoXuatKho } from "./chung-tu-pxk-ly-do.util.js";
 import { formatCanCuPnkText } from "./chung-tu-nl-field.js";
 import { SIGNATURE_CATALOG } from "./chung-tu-signature-catalog.js";
 
@@ -818,10 +819,53 @@ async function resolveMonthlySheetContexts({
 
   if (mode === CHUNG_TU_AGGREGATION_MODES.BY_DAY) {
     const sheetNames = buildMonthDaySheetNames(safeMonth);
+    const unitNameById =
+      categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO
+        ? await loadUnitNameMap(selectedUnitIds)
+        : null;
     for (const sheetName of sheetNames) {
       const day = `${safeMonth}-${sheetName}`;
       const slips = await loadSlipsForDateAcrossUnits(selectedUnitIds, day);
       allSlipsCollected.push(...slips);
+
+      if (categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO) {
+        const slipsByUnit = new Map();
+        for (const slip of slips) {
+          const uid = Number(slip.recipientUnitId);
+          if (!slipsByUnit.has(uid)) slipsByUnit.set(uid, []);
+          slipsByUnit.get(uid).push(slip);
+        }
+        for (const [unitId, unitSlips] of slipsByUnit) {
+          const flatLines = unitSlips.flatMap((s) => s.lines ?? []);
+          const detailRows = flattenLinesFromSlips(unitSlips);
+          if (!detailRows.length) continue;
+          const total = sumAmount(flatLines);
+          monthlyTotal += total;
+          monthlySlipCount += unitSlips.length;
+          allLines.push(...flatLines);
+          sheetContexts.push(
+            buildContextBase({
+              settings: resolveSettingsForSlips(unitSlips),
+              periodDate: day,
+              detailRows,
+              totalAmount: total,
+              categoryKey,
+              extra: {
+                sheetName,
+                periodMonth: safeMonth,
+                selectedUnitIds,
+                aggregationMode: mode,
+                recipientUnitId: unitId,
+                recipientUnitName: unitNameById.get(unitId) ?? "",
+                slipCount: unitSlips.length,
+                lineCount: detailRows.length,
+              },
+            }),
+          );
+        }
+        continue;
+      }
+
       const flatLines = slips.flatMap((s) => s.lines ?? []);
       const detailRows = flattenLinesFromSlips(slips);
       const total = sumAmount(flatLines);
@@ -1112,6 +1156,16 @@ export async function resolveChungTuContext({
     });
     await attachRecipientUnitFillToMonthlyContexts(monthly, { aggregationMode });
     const safeMonth = normalizePeriodMonth(periodMonth);
+    if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO) {
+      const pxkMode = normalizeAggregationMode(aggregationMode);
+      for (const ctx of monthly.sheetContexts ?? []) {
+        ctx.lyDoXuatKho = formatLyDoXuatKho({
+          aggregationMode: pxkMode,
+          periodMonth: safeMonth,
+          periodDate: ctx.periodDate,
+        });
+      }
+    }
     const hashPayload = {
       categoryKey,
       unitId,

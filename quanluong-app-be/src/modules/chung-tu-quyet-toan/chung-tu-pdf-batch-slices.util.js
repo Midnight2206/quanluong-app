@@ -28,13 +28,23 @@ function ensureUniqueFileName(baseName, usedNames) {
   return fileName;
 }
 
-function buildByDaySlice(context) {
+function buildByDaySlice(context, usedNames) {
   const periodDate = String(context?.periodDate ?? "").trim();
-  const sortKey = periodDate || String(context?.sheetName ?? "").trim() || "day";
+  const recipientUnitId = context?.recipientUnitId;
+  let base;
+  if (recipientUnitId != null && recipientUnitId !== "") {
+    const unitPart = sanitizeFileBaseName(
+      context.recipientUnitName || `dv-${recipientUnitId}` || "",
+    );
+    const dayPart = periodDate;
+    base = [unitPart, dayPart].filter(Boolean).join("-") || dayPart;
+  } else {
+    base = periodDate || String(context?.sheetName ?? "").trim() || "day";
+  }
   return {
     context,
-    fileName: ensureUniqueFileName(periodDate || sortKey, new Set()),
-    sortKey,
+    fileName: ensureUniqueFileName(base, usedNames),
+    sortKey: base,
   };
 }
 
@@ -69,15 +79,7 @@ function pickExportSlices({ aggregationMode, context }) {
   if (aggregationMode === CHUNG_TU_AGGREGATION_MODES.BY_DAY) {
     return (Array.isArray(rootContext.sheetContexts) ? rootContext.sheetContexts : [])
       .filter(hasDetailRows)
-      .map((slice) => {
-        const periodDate = String(slice?.periodDate ?? "").trim();
-        const sortKey = periodDate || String(slice?.sheetName ?? "").trim() || "day";
-        return {
-          context: slice,
-          fileName: ensureUniqueFileName(periodDate || sortKey, usedNames),
-          sortKey,
-        };
-      });
+      .map((slice) => buildByDaySlice(slice, usedNames));
   }
 
   if (aggregationMode === CHUNG_TU_AGGREGATION_MODES.BY_UNIT) {
