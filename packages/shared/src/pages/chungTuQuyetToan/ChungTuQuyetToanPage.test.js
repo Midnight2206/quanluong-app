@@ -73,6 +73,14 @@ test("PXK signature workspace saves xuatTaiKho + diaDiem and locks thu_kho + ngu
   assert.match(signatureSettingsSource, /diaDiem/);
   assert.match(signatureSettingsSource, /ensurePxkSignatureBlock/);
   assert.match(signatureSettingsSource, /slotValue\?\.locked/);
+  assert.doesNotMatch(
+    signatureSettingsSource,
+    /disabled=\{!canWrite \|\| saving \|\| slotValue\?\.source !== "static" \|\| slotValue\?\.locked\}/,
+  );
+  assert.match(
+    signatureSettingsSource,
+    /slotValue\?\.locked && slotValue\?\.key !== "thu_kho"/,
+  );
 });
 
 test("PNK signature workspace saves lyDoNhapKho + nhapTaiKho and locks nguoi_giao slot", () => {

@@ -721,7 +721,12 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                           </span>
                           <input
                             className={fieldClass}
-                            disabled={!canWrite || saving || slotValue?.source !== "static" || slotValue?.locked}
+                            disabled={
+                              !canWrite ||
+                              saving ||
+                              slotValue?.source !== "static" ||
+                              (slotValue?.locked && slotValue?.key !== "thu_kho")
+                            }
                             placeholder={
                               slotValue?.locked
                                 ? slotValue.key === "nguoi_giao"
