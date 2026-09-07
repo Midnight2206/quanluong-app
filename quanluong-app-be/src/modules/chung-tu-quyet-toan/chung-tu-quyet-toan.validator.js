@@ -405,6 +405,15 @@ const chungTuPdfExportBatchKeyParamSchema = z.object({
   batchKey: z.string().min(8).max(200),
 });
 
+const chungTuPdfExportBatchReExportBodySchema = z.object({
+  pdfTemplateId: z.coerce.number().int().positive(),
+  refreshData: z.boolean().optional().default(false),
+  signatures: z.record(z.string(), z.string()).optional(),
+  signatureDates: z.record(z.string(), z.string()).optional(),
+  signatureBlock: z.any().optional(),
+  settings: z.record(z.string(), z.any()).optional(),
+});
+
 const chungTuPdfExportBatchFileParamsSchema = z.object({
   batchKey: z.string().min(8).max(200),
   fileId: z.coerce.number().int().positive(),
@@ -501,6 +510,7 @@ export {
   chungTuPdfExportKeyParamSchema,
   chungTuPdfExportBatchListQuerySchema,
   chungTuPdfExportBatchKeyParamSchema,
+  chungTuPdfExportBatchReExportBodySchema,
   chungTuPdfExportBatchFileParamsSchema,
   chungTuBkmhMonthlyListQuerySchema,
   chungTuBkmhMonthlyIdParamSchema,

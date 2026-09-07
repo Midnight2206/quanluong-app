@@ -256,6 +256,18 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "pdfExportBatchReExport",
+    method: "POST",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/pdf-export-batches/:batchKey/re-export",
+    pathRoute: "/api/chungtuquyettoan/pdf-export-batches/:batchKey/re-export",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      name: "Chứng từ quyết toán",
+      description: "Xuất lại lô PDF tại chỗ (giữ folder và số chứng từ).",
+    },
+  },
+  {
     key: "pdfExportBatchDetail",
     method: "GET",
     module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,

@@ -17,6 +17,7 @@ import {
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
   createChungTuPdfExportBatchController,
+  reExportChungTuPdfExportBatchController,
   createChungTuBkmhMonthlyController,
   createChungTuPdfTemplateController,
   createChungTuPdfExportController,
@@ -82,6 +83,7 @@ import {
   chungTuPdfExportBatchFileParamsSchema,
   chungTuPdfExportBatchKeyParamSchema,
   chungTuPdfExportBatchListQuerySchema,
+  chungTuPdfExportBatchReExportBodySchema,
   chungTuBkmhMonthlyCreateBodySchema,
   chungTuBkmhMonthlyIdParamSchema,
   chungTuBkmhMonthlyListQuerySchema,
@@ -351,6 +353,16 @@ chungTuQuyetToanRouter.post(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM, asOfQueryKeys: ["periodDate"] }),
   validateRequest({ body: chungTuPdfExportBatchCreateBodySchema }),
   asyncHandler(createChungTuPdfExportBatchController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/pdf-export-batches/:batchKey/re-export",
+  permissionMiddleware([routePermissions.pdfExportBatchReExport]),
+  validateRequest({
+    params: chungTuPdfExportBatchKeyParamSchema,
+    body: chungTuPdfExportBatchReExportBodySchema,
+  }),
+  asyncHandler(reExportChungTuPdfExportBatchController),
 );
 
 chungTuQuyetToanRouter.get(

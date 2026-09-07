@@ -46,6 +46,7 @@ import {
   deleteChungTuPdfExportBatch,
   getChungTuPdfExportBatch,
   listChungTuPdfExportBatches,
+  reExportChungTuPdfExportBatch,
   streamChungTuPdfExportBatchFile,
   streamChungTuPdfExportBatchMergedPdf,
   streamChungTuPdfExportBatchZip,
@@ -324,6 +325,26 @@ async function createChungTuPdfExportBatchController(req, res) {
   });
   return respondCreated(res, {
     message: "Đã tạo lô xuất PDF.",
+    data,
+  });
+}
+
+async function reExportChungTuPdfExportBatchController(req, res) {
+  const body = req.validatedBody;
+  const data = await reExportChungTuPdfExportBatch({
+    batchKey: req.validatedParams.batchKey,
+    pdfTemplateId: body.pdfTemplateId,
+    refreshData: body.refreshData === true,
+    signatures: body.signatures ?? {},
+    signatureDates: body.signatureDates ?? {},
+    signatureBlock: body.signatureBlock,
+    settings: body.settings ?? {},
+    exportingUserProfile: req.user?.profile ?? null,
+    createdById: req.user.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Đã xuất lại lô PDF.",
     data,
   });
 }
@@ -891,6 +912,7 @@ export {
   deleteChungTuDocumentController,
   deleteChungTuPdfExportBatchController,
   deleteChungTuPdfExportController,
+  reExportChungTuPdfExportBatchController,
   createTemplateCatalogController,
   deleteTemplateCatalogController,
   exportChungTuBkmhMonthlyExcelController,
