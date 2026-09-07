@@ -27,6 +27,7 @@ import { getChungTuSignatureSettings } from "./chung-tu-signature-settings.servi
 import { pickExportSlices } from "./chung-tu-pdf-batch-slices.util.js";
 import { fillSignatureDatesFromPeriod } from "./chung-tu-signature-dates.util.js";
 import {
+  buildExportContextJson,
   buildExportSummaryFromContext,
   sumFolderTongTien,
 } from "./chung-tu-pdf-export-summary.util.js";
@@ -379,6 +380,7 @@ async function createChungTuPdfExportBatch({
         documentServiceFileId: Number(file.file_id),
         sortKey: slice.sortKey ?? null,
         summaryJson: buildExportSummaryFromContext(slice.context),
+        contextJson: buildExportContextJson(slice.context),
       });
     }
 
@@ -430,6 +432,7 @@ async function createChungTuPdfExportBatch({
             documentServiceFileId: file.documentServiceFileId,
             sortKey: file.sortKey,
             summaryJson: file.summaryJson,
+            contextJson: file.contextJson,
             sourceDataHash,
             signaturesJson: {
               signatures,
