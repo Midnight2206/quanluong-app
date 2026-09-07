@@ -64,3 +64,15 @@ export function formatVndNumber(value) {
   if (!Number.isFinite(n)) return "";
   return Math.round(n).toLocaleString("vi-VN");
 }
+
+/**
+ * Bỏ nhiễu IEEE-754 sau phép cộng Number (vd. 0.1+0.2 → 0.3000…4).
+ * ponytail: ceiling 6 chữ số thập phân; nếu kho cần >6dp thì đổi sang Decimal.
+ */
+export function sanitizeDecimal(value, maxDecimals = 6) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const factor = 10 ** maxDecimals;
+  return Math.round(n * factor) / factor;
+}

@@ -63,6 +63,27 @@ test("pickMappedFields leaves empty soChungTu empty", () => {
   });
 });
 
+test("pickMappedFields keeps label when value empty or missing", () => {
+  assert.deepEqual(
+    pickMappedFields({ soChungTu: "" }, ["so_chung_tu"], { fieldLabels: { soChungTu: "Số: " } }),
+    { so_chung_tu: "Số: " },
+  );
+  assert.deepEqual(
+    pickMappedFields({ soChungTu: "  " }, ["so_chung_tu"], { fieldLabels: { soChungTu: "Số: " } }),
+    { so_chung_tu: "Số: " },
+  );
+  assert.deepEqual(
+    pickMappedFields({}, ["so_chung_tu", "bo_phan"], {
+      fieldLabels: { soChungTu: "Số: ", boPhan: "- Bộ phận: " },
+    }),
+    { so_chung_tu: "Số: ", bo_phan: "- Bộ phận: " },
+  );
+});
+
+test("pickMappedFields still skips missing fields without label", () => {
+  assert.deepEqual(pickMappedFields({}, ["so_chung_tu", "bo_phan"]), {});
+});
+
 test("pickMappedFields leaves raw values when label missing", () => {
   assert.deepEqual(
     pickMappedFields(

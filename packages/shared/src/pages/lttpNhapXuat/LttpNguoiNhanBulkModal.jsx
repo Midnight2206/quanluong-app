@@ -29,7 +29,7 @@ function BulkRecipientRow({ unit, initialUserId, canWrite }) {
     );
   }, [initialUserId, unit.id]);
 
-  const { data: recipientUsers = [], isLoading: usersLoad } =
+  const { data: recipientUsers = [], isLoading: usersLoad, isError: usersError } =
     useGetLttpRecipientUsersQuery(unit.id, {
       staleTime: 5 * 60 * 1000,
     });
@@ -63,7 +63,15 @@ function BulkRecipientRow({ unit, initialUserId, canWrite }) {
           onChange={(e) => setRecipientUserId(e.target.value)}
           disabled={usersLoad}
         >
-          <option value="">— Chọn người nhận —</option>
+          <option value="">
+            {usersLoad
+              ? "Đang tải…"
+              : usersError
+                ? "Không tải được danh sách"
+                : recipientUsers.length === 0
+                  ? "— Không có user trong nhánh đơn vị —"
+                  : "— Chọn người nhận —"}
+          </option>
           {recipientUsers.map((u) => (
             <option key={u.id} value={u.id}>
               {u.fullName || u.username}
