@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { ClientRedirect } from "@/hocs/ClientRedirect";
+import { useEffect } from "react";
 import { useAuthInitialized, useCurrentUser, useIsAuthenticated } from "@/features/auth/model/authSlice";
 import { getMainAppOrigin } from "@/utils/superadminPortal";
 
@@ -10,18 +9,19 @@ export function SuperadminOnlyRoute({ children }) {
   const initialized = useAuthInitialized();
   const isAuthenticated = useIsAuthenticated();
   const user = useCurrentUser();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (initialized && !isAuthenticated) {
+      window.location.replace(`${getMainAppOrigin()}/login`);
+    }
+  }, [initialized, isAuthenticated]);
 
   if (!initialized) {
     return null;
   }
 
   if (!isAuthenticated) {
-    const q = searchParams.toString();
-    const from = q ? `${pathname}?${q}` : pathname;
-    const href = `/login?from=${encodeURIComponent(from)}`;
-    return <ClientRedirect href={href} replace />;
+    return <p className="text-sm text-muted-foreground">Chuyển tới trang đăng nhập…</p>;
   }
 
   if (user?.type?.name !== "superadmin") {
