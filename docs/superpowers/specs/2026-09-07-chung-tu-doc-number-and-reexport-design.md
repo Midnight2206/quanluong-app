@@ -45,7 +45,9 @@
 |------------|------------|
 | Aggregation by-unit | `unit:{recipientUnitId}` |
 | PXK by-day | `unit:{recipientUnitId}\|day:{YYYY-MM-DD}` |
-| BKMH / PNK slice | bám identity ổn định hiện có (vd. buyerKey + periodDate + unit nếu có); encode thành một string deterministic |
+| BKMH by-day | `day:{YYYY-MM-DD}` (một sheet / ngày như resolver hiện tại) |
+| BKMH by-unit | `unit:{recipientUnitId}` |
+| PNK (từ BKMH slice) | `bkmhSlice:{sourceSliceId}` nếu có id; không thì `buyer:{buyerKey}\|day:{YYYY-MM-DD}` — chốt một trong plan, phải deterministic |
 | Xuất 1 phiếu LTTP | `slip:{issueSlipId}` |
 
 Cùng `(unitId, categoryKey, quyenSo, sheetKey)` luôn map về cùng một `soChungTu`.
