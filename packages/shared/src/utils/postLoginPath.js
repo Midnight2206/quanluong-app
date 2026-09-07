@@ -13,3 +13,20 @@ export function safeInternalPath(raw) {
   }
   return t;
 }
+
+export const SUPERADMIN_PORTAL_CHOOSER_PATH = "/chon-cong";
+
+export function isSuperadminUser(user) {
+  return user?.type?.name === "superadmin";
+}
+
+/**
+ * Đích sau login mật khẩu (path nội bộ app chính).
+ * Superadmin luôn vào trang chọn — bỏ qua `from`.
+ */
+export function resolvePostLoginPath(user, fromRaw) {
+  if (isSuperadminUser(user)) {
+    return SUPERADMIN_PORTAL_CHOOSER_PATH;
+  }
+  return safeInternalPath(fromRaw);
+}

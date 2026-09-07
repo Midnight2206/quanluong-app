@@ -10,10 +10,11 @@ import {
   normalizeAggregationMode,
 } from "./chung-tu-category.constants.js";
 import { normalizeMonthUnitIds, normalizePeriodMonth, lastDayOfMonth } from "./chung-tu-monthly-sheets.js";
-import { resolveChungTuContext } from "./chung-tu-data-resolver.service.js";
+import { resolveChungTuContext, attachDocNumbersToContexts } from "./chung-tu-data-resolver.service.js";
 import { buildDocumentServicePayload } from "./chung-tu-pdf-map.util.js";
 import {
   createDocumentFolder,
+  clearDocumentFolderFiles,
   deleteDocumentFolder,
   getDocumentFolder,
   getTemplateFields,
@@ -27,6 +28,7 @@ import { getChungTuSignatureSettings } from "./chung-tu-signature-settings.servi
 import { pickExportSlices } from "./chung-tu-pdf-batch-slices.util.js";
 import { fillSignatureDatesFromPeriod } from "./chung-tu-signature-dates.util.js";
 import {
+  buildExportContextJson,
   buildExportSummaryFromContext,
   sumFolderTongTien,
 } from "./chung-tu-pdf-export-summary.util.js";
@@ -379,6 +381,7 @@ async function createChungTuPdfExportBatch({
         documentServiceFileId: Number(file.file_id),
         sortKey: slice.sortKey ?? null,
         summaryJson: buildExportSummaryFromContext(slice.context),
+        contextJson: buildExportContextJson(slice.context),
       });
     }
 
@@ -430,6 +433,7 @@ async function createChungTuPdfExportBatch({
             documentServiceFileId: file.documentServiceFileId,
             sortKey: file.sortKey,
             summaryJson: file.summaryJson,
+            contextJson: file.contextJson,
             sourceDataHash,
             signaturesJson: {
               signatures,
@@ -540,12 +544,234 @@ async function getChungTuPdfExportBatchFolder({ batchKey, effectiveUnitIds }) {
   return getDocumentFolder(row.documentServiceFolderId);
 }
 
+async function reExportChungTuPdfExportBatch({
+  batchKey,
+  pdfTemplateId,
+  refreshData = false,
+  signatures = {},
+  signatureDates = {},
+  signatureBlock,
+  settings = {},
+  exportingUserProfile,
+  createdById,
+  effectiveUnitIds,
+}) {
+  const row = await loadBatchRowOrThrow(batchKey);
+  assertUnitInEffectiveBranch(row.unitId, effectiveUnitIds);
+  const categoryKey = row.categoryKey;
+  const meta = assertKnownCategoryKey(categoryKey);
+  const isPnk = categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO;
+  const isPxk = categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO;
+  const folderId = Number(row.documentServiceFolderId);
+
+  const template = await prisma.chungTuPdfTemplate.findFirst({
+    where: {
+      id: Number(pdfTemplateId),
+      status: "published",
+      categoryKey,
+    },
+  });
+  if (!template) {
+    throw notFoundError("Không tìm thấy mẫu PDF.");
+  }
+
+  const safePeriodMonth = row.periodMonth ? normalizePeriodMonth(row.periodMonth) : undefined;
+  const safeAggregationMode = row.aggregationMode
+    ? isPnk
+      ? row.aggregationMode === CHUNG_TU_AGGREGATION_MODES.FULL
+        ? CHUNG_TU_AGGREGATION_MODES.FULL
+        : CHUNG_TU_AGGREGATION_MODES.BY_DAY
+      : normalizeAggregationMode(row.aggregationMode)
+    : undefined;
+  const selectedUnitIds = Array.isArray(row.unitIdsJson) ? row.unitIdsJson.map(Number) : [];
+
+  const [fieldsPayload, savedSignatureSettings] = await Promise.all([
+    getTemplateFields(template.documentServiceTemplateId),
+    getChungTuSignatureSettings({ categoryKey }),
+  ]);
+  const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
+  const fieldLabels =
+    template.fieldLabelsJson && typeof template.fieldLabelsJson === "object" && !Array.isArray(template.fieldLabelsJson)
+      ? Object.fromEntries(
+          Object.entries(template.fieldLabelsJson).map(([key, value]) => [String(key), String(value ?? "")]),
+        )
+      : {};
+  const finalSignatureBlock = signatureBlock ?? savedSignatureSettings?.signatureBlock ?? undefined;
+
+  let slices;
+  let sourceDataHash = row.sourceDataHash;
+
+  if (refreshData) {
+    const resolveArgs = {
+      categoryKey,
+      unitId: row.unitId,
+      periodDate: row.periodDate ? row.periodDate.toISOString().slice(0, 10) : undefined,
+      periodMonth: safePeriodMonth,
+      issueSlipId: row.issueSlipId ?? undefined,
+      unitIds: selectedUnitIds.length ? selectedUnitIds : undefined,
+      aggregationMode: safeAggregationMode,
+      settings,
+      exportingUserProfile,
+    };
+    if (isPnk) {
+      resolveArgs.dateFrom = row.periodDate ? row.periodDate.toISOString().slice(0, 10) : safePeriodMonth;
+      resolveArgs.dateTo = safePeriodMonth ? lastDayOfMonth(safePeriodMonth) : resolveArgs.dateFrom;
+      // Prefer batch periodMonth window when history stored month only
+      if (safePeriodMonth && !row.periodDate) {
+        resolveArgs.dateFrom = `${safePeriodMonth}-01`;
+        resolveArgs.dateTo = lastDayOfMonth(safePeriodMonth);
+      }
+      resolveArgs.lyDoNhapKho = String(savedSignatureSettings?.extraFields?.lyDoNhapKho ?? "").trim();
+      resolveArgs.nhapTaiKho = String(savedSignatureSettings?.extraFields?.nhapTaiKho ?? "").trim();
+    }
+    if (isPxk) {
+      resolveArgs.xuatTaiKho = String(savedSignatureSettings?.extraFields?.xuatTaiKho ?? "").trim();
+      resolveArgs.diaDiem = String(savedSignatureSettings?.extraFields?.diaDiem ?? "").trim();
+    }
+    const resolved = await resolveChungTuContext(resolveArgs);
+    sourceDataHash = resolved.sourceDataHash;
+    slices = pickExportSlices({
+      aggregationMode: safeAggregationMode,
+      context: { ...(resolved.context ?? {}), categoryKey },
+    });
+  } else {
+    const contexts = [];
+    for (const file of row.exports ?? []) {
+      const ctx = file.contextJson;
+      if (!ctx || typeof ctx !== "object" || Array.isArray(ctx)) {
+        throw new AppError({
+          message: "Lô xuất cũ chưa có snapshot dữ liệu. Bật «Đọc lại dữ liệu nguồn» để xuất lại.",
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+        });
+      }
+      contexts.push({ ...ctx });
+    }
+    if (!contexts.length) {
+      throw new AppError({
+        message: "Lô xuất không có file để xuất lại.",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    await attachDocNumbersToContexts({
+      contexts,
+      unitId: row.unitId,
+      categoryKey,
+      periodMonth: safePeriodMonth,
+      aggregationMode: safeAggregationMode,
+    });
+    slices = contexts.map((context, index) => ({
+      context,
+      fileName: row.exports[index]?.fileName || `${String(index + 1).padStart(2, "0")}.pdf`,
+      sortKey: row.exports[index]?.sortKey || context.sheetKey || String(index + 1).padStart(2, "0"),
+    }));
+  }
+
+  await clearDocumentFolderFiles(folderId);
+  await prisma.chungTuPdfExport.deleteMany({ where: { batchId: row.id } });
+
+  const createdFiles = [];
+  for (const slice of slices) {
+    const sliceSignatureBlock = isPnk
+      ? materializePnkNguoiGiaoSignatureBlock(finalSignatureBlock, slice.context)
+      : isPxk
+        ? materializePxkNguoiNhanSignatureBlock(finalSignatureBlock, slice.context)
+        : finalSignatureBlock;
+    const sliceSignatureDates = fillSignatureDatesFromPeriod({
+      signatureBlock: sliceSignatureBlock,
+      signatureDates,
+      context: slice.context,
+      aggregationMode: safeAggregationMode,
+      periodMonth: safePeriodMonth,
+      lastDayOfMonthFn: lastDayOfMonth,
+    });
+    const payload = buildDocumentServicePayload({
+      context: slice.context,
+      fieldKeys,
+      columnKeys,
+      fieldLabels,
+      signatures,
+      signatureDates: sliceSignatureDates,
+      signatureBlock: sliceSignatureBlock,
+    });
+    const file = await renderToDocumentFolder(folderId, {
+      templateId: template.documentServiceTemplateId,
+      fileName: slice.fileName,
+      sortKey: slice.sortKey,
+      fields: payload.fields,
+      rows: payload.rows,
+      signatures: payload.signatures,
+      signatureDates: sliceSignatureDates,
+      signatureBlock: sliceSignatureBlock,
+    });
+    createdFiles.push({
+      exportKey: `ctpdf_${Date.now()}_${crypto.randomBytes(6).toString("hex")}`,
+      fileName: file.file_name,
+      documentServiceFileId: Number(file.file_id),
+      sortKey: slice.sortKey ?? null,
+      summaryJson: buildExportSummaryFromContext(slice.context),
+      contextJson: buildExportContextJson(slice.context),
+    });
+  }
+
+  const updated = await prisma.chungTuPdfExportBatch.update({
+    where: { id: row.id },
+    data: {
+      pdfTemplateId: template.id,
+      documentServiceTemplateId: template.documentServiceTemplateId,
+      fileCount: createdFiles.length,
+      sourceDataHash,
+      signaturesJson: {
+        signatures,
+        signatureDates,
+        ...(finalSignatureBlock ? { signatureBlock: finalSignatureBlock } : {}),
+      },
+      exports: {
+        create: createdFiles.map((file) => ({
+          exportKey: file.exportKey,
+          categoryKey,
+          unitId: row.unitId,
+          periodMonth: row.periodMonth,
+          periodDate: row.periodDate,
+          issueSlipId: row.issueSlipId,
+          unitIdsJson: row.unitIdsJson ?? [],
+          aggregationMode: row.aggregationMode,
+          pdfTemplateId: template.id,
+          documentServiceTemplateId: template.documentServiceTemplateId,
+          fileName: file.fileName,
+          documentServiceFileId: file.documentServiceFileId,
+          sortKey: file.sortKey,
+          summaryJson: file.summaryJson,
+          contextJson: file.contextJson,
+          sourceDataHash,
+          signaturesJson: {
+            signatures,
+            signatureDates,
+            ...(finalSignatureBlock ? { signatureBlock: finalSignatureBlock } : {}),
+          },
+          createdById: createdById ?? row.createdById,
+        })),
+      },
+    },
+    include: {
+      exports: {
+        orderBy: [{ sortKey: "asc" }, { id: "asc" }],
+      },
+    },
+  });
+
+  void meta;
+  return mapBatchRow(updated);
+}
+
 export {
   createChungTuPdfExportBatch,
   deleteChungTuPdfExportBatch,
   getChungTuPdfExportBatch,
   getChungTuPdfExportBatchFolder,
   listChungTuPdfExportBatches,
+  reExportChungTuPdfExportBatch,
   streamChungTuPdfExportBatchFile,
   streamChungTuPdfExportBatchMergedPdf,
   streamChungTuPdfExportBatchZip,

@@ -1185,17 +1185,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    const ru = await prisma.user.findFirst({
-      where: { id: ruId, deletedAt: null, unitId: recipientUnitId },
-      include: { profile: { select: { fullName: true } } },
-    });
-    if (!ru) {
-      throw new AppError({
-        message: "Không tìm thấy user trong đơn vị nhận đã chọn",
-        statusCode: 400,
-        code: ERROR_CODES.VALIDATION_ERROR,
-      });
-    }
+    const ru = await assertRecipientUserAllowedForUnit(ruId, recipientUnitId);
     recipientUserId = ruId;
     const name = (ru.profile?.fullName && String(ru.profile.fullName).trim()) || ru.username;
     recipientDisplayName = recipientDisplayName || name;
@@ -1450,17 +1440,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    const ru = await prisma.user.findFirst({
-      where: { id: ruId, deletedAt: null, unitId: recipientUnitId },
-      include: { profile: { select: { fullName: true } } },
-    });
-    if (!ru) {
-      throw new AppError({
-        message: "Không tìm thấy user trong đơn vị nhận đã chọn",
-        statusCode: 400,
-        code: ERROR_CODES.VALIDATION_ERROR,
-      });
-    }
+    const ru = await assertRecipientUserAllowedForUnit(ruId, recipientUnitId);
     recipientUserId = ruId;
     const name = (ru.profile?.fullName && String(ru.profile.fullName).trim()) || ru.username;
     recipientDisplayName = recipientDisplayName || name;
@@ -2762,26 +2742,21 @@ async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope)
       ? Number(rest.defaultRecipientUserId)
       : null;
   if (defaultRecipientUserId != null) {
-    const u = await prisma.user.findFirst({
-      where: { id: defaultRecipientUserId, deletedAt: null, isActive: true },
-      select: { id: true, unitId: true },
-    });
-    if (!u) {
-      throw new AppError({
-        message: "Người nhận mặc định không tồn tại.",
-        statusCode: 400,
-        code: ERROR_CODES.VALIDATION_ERROR,
+    if (defaultRecipientUnitId != null) {
+      await assertRecipientUserAllowedForUnit(defaultRecipientUserId, defaultRecipientUnitId);
+    } else {
+      const u = await prisma.user.findFirst({
+        where: { id: defaultRecipientUserId, deletedAt: null, isActive: true },
+        select: { id: true, unitId: true },
       });
-    }
-    assertUnitInEffectiveBranch(u.unitId, effectiveUnitIds);
-    if (defaultRecipientUnitId != null && u.unitId !== defaultRecipientUnitId) {
-      throw new AppError({
-        message: "Người nhận mặc định phải thuộc đơn vị nhận đã chọn.",
-        statusCode: 400,
-        code: ERROR_CODES.VALIDATION_ERROR,
-      });
-    }
-    if (defaultRecipientUnitId == null) {
+      if (!u) {
+        throw new AppError({
+          message: "Người nhận mặc định không tồn tại.",
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+        });
+      }
+      assertUnitInEffectiveBranch(u.unitId, effectiveUnitIds);
       defaultRecipientUnitId = u.unitId;
     }
   }
@@ -2957,18 +2932,53 @@ async function putBuyerDefaultForUnit(
   return { unitId: storageUnitId, userId, slipsUpdated, applyToAllSlips: applyToAllSlips !== false };
 }
 
+/** Cùng phạm vi pick với người mua: subtree kho LTTP + tổ tiên tới storage root. */
+async function resolveRecipientPickUnitIds(recipientUnitId) {
+  return resolveBuyerPickUnitIds(recipientUnitId);
+}
+
+async function assertRecipientUserAllowedForUnit(userId, recipientUnitId) {
+  const pickUnitIds = await resolveRecipientPickUnitIds(recipientUnitId);
+  const u = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      deletedAt: null,
+      isActive: true,
+      unitId: { in: pickUnitIds.length ? pickUnitIds : [Number(recipientUnitId)] },
+    },
+    include: { profile: { select: { fullName: true } } },
+  });
+  if (!u) {
+    throw new AppError({
+      message: "Không tìm thấy user trong nhánh đơn vị nhận đã chọn",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  return u;
+}
+
 async function listRecipientUsers({ unitId }, scope, effectiveUnitIds) {
   assertUnitIdInScope(unitId, scope);
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  const pickUnitIds = await resolveRecipientPickUnitIds(unitId);
+  if (!pickUnitIds.length) {
+    return [];
+  }
   const rows = await prisma.user.findMany({
-    where: { unitId, deletedAt: null, isActive: true },
-    select: { id: true, username: true, profile: { select: { fullName: true } } },
+    where: {
+      unitId: { in: pickUnitIds },
+      deletedAt: null,
+      isActive: true,
+    },
+    select: { id: true, username: true, unitId: true, profile: { select: { fullName: true } } },
     orderBy: { id: "asc" },
   });
   return rows.map((u) => ({
     id: u.id,
     username: u.username,
     fullName: u.profile?.fullName ?? null,
+    unitId: u.unitId,
   }));
 }
 
@@ -3021,24 +3031,7 @@ async function putRecipientDefaultUser({ recipientUnitId, userId: userIdIn, addr
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    const u = await prisma.user.findFirst({
-      where: { id: userId, deletedAt: null, isActive: true },
-      select: { id: true, unitId: true },
-    });
-    if (!u) {
-      throw new AppError({
-        message: "Người dùng không tồn tại.",
-        statusCode: 400,
-        code: ERROR_CODES.VALIDATION_ERROR,
-      });
-    }
-    if (u.unitId !== rid) {
-      throw new AppError({
-        message: "Người nhận mặc định phải thuộc đúng đơn vị nhận.",
-        statusCode: 400,
-        code: ERROR_CODES.VALIDATION_ERROR,
-      });
-    }
+    await assertRecipientUserAllowedForUnit(userId, rid);
   }
   assertLttpPrismaDelegates();
   const addressValue =

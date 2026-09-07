@@ -6,7 +6,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { safeInternalPath } from "@/utils/postLoginPath";
+import {
+  resolvePostLoginPath,
+  SUPERADMIN_PORTAL_CHOOSER_PATH,
+} from "@/utils/postLoginPath";
 import { Button } from "@/components/ui/Button";
 import { useLoginMutation } from "@/features/auth/api/authApi";
 import { loginSchema } from "@/features/auth/schemas/authSchemas";
@@ -91,9 +94,9 @@ export function LoginPage() {
 
   async function onSubmit(values) {
     try {
-      await login(values).unwrap();
+      const user = await login(values).unwrap();
       notifySuccess("Đăng nhập thành công");
-      const next = safeInternalPath(searchParams.get("from"));
+      const next = resolvePostLoginPath(user, searchParams.get("from"));
       router.replace(next);
     } catch (error) {
       notifyError(error?.data?.message || "Đăng nhập thất bại.");
@@ -103,8 +106,7 @@ export function LoginPage() {
   async function handleGoogleLogin() {
     setIsGoogleBusy(true);
     try {
-      const from = safeInternalPath(searchParams.get("from"));
-      const params = new URLSearchParams({ from });
+      const params = new URLSearchParams({ from: SUPERADMIN_PORTAL_CHOOSER_PATH });
       const res = await fetch(`${apiBase}/auth/google/login/authorize-url?${params}`, {
         credentials: "include",
         headers: { Accept: "application/json" },

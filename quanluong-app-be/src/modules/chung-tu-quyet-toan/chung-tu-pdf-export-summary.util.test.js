@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildExportContextJson,
   buildExportSummaryFromContext,
   sumFolderTongTien,
 } from "./chung-tu-pdf-export-summary.util.js";
@@ -40,4 +41,22 @@ test("buildExportSummaryFromContext sums detailRows thanhTien when tongTien miss
 test("sumFolderTongTien sums numeric tongTien only", () => {
   assert.equal(sumFolderTongTien([{ tongTien: 1 }, { tongTien: 2 }, {}]), 3);
   assert.equal(sumFolderTongTien([{ soChungTu: "x" }]), null);
+});
+
+test("buildExportContextJson keeps allocated numbers and detailRows", () => {
+  const json = buildExportContextJson({
+    sheetKey: "unit:5",
+    quyenSo: "0626",
+    soChungTu: "0001",
+    periodDate: "2026-06-30",
+    detailRows: [{ stt: 1, soLuong: 2 }],
+    sheetContexts: [{ nested: true }],
+    donVi: "Kho A",
+  });
+  assert.equal(json.sheetKey, "unit:5");
+  assert.equal(json.soChungTu, "0001");
+  assert.equal(json.quyenSo, "0626");
+  assert.deepEqual(json.detailRows, [{ stt: 1, soLuong: 2 }]);
+  assert.equal(json.donVi, "Kho A");
+  assert.equal(json.sheetContexts, undefined);
 });

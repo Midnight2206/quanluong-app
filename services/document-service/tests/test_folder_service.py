@@ -219,3 +219,28 @@ def test_add_folder_document_prefers_not_published_over_duplicate_name(monkeypat
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "TEMPLATE_NOT_PUBLISHED"
+
+
+def test_clear_folder_files_keeps_folder_removes_pdfs(monkeypatch, tmp_path):
+    _database(monkeypatch, tmp_path)
+    template_id = _upload_template()
+    assert _publish(template_id).status_code == 200
+    folder_id = _create_folder("keep-me")
+
+    _add_document(folder_id, template_id, "a.pdf", "a")
+    _add_document(folder_id, template_id, "b.pdf", "b")
+    assert (tmp_path / "folders" / str(folder_id) / "a.pdf").is_file()
+    assert (tmp_path / "folders" / str(folder_id) / "b.pdf").is_file()
+
+    response = client.delete(f"/v1/folders/{folder_id}/files", headers=AUTH_HEADERS)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["folder_id"] == folder_id
+    assert body["deleted_count"] == 2
+
+    listed = client.get(f"/v1/folders/{folder_id}", headers=AUTH_HEADERS)
+    assert listed.status_code == 200
+    assert listed.json()["id"] == folder_id
+    assert listed.json()["files"] == []
+    assert not (tmp_path / "folders" / str(folder_id) / "a.pdf").exists()
+    assert not (tmp_path / "folders" / str(folder_id) / "b.pdf").exists()

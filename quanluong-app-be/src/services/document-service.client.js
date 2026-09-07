@@ -312,7 +312,15 @@ async function deleteDocumentFolder(folderId) {
   return readJsonResponse(response);
 }
 
+async function clearDocumentFolderFiles(folderId) {
+  const response = await requestDocument(`/v1/folders/${folderId}/files`, {
+    method: "DELETE",
+  });
+  return readJsonResponse(response);
+}
+
 export {
+  clearDocumentFolderFiles,
   createDocumentFolder,
   deleteDocumentFolder,
   exportWorkbook,

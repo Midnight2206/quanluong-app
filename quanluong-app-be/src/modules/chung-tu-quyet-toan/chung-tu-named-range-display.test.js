@@ -7,6 +7,13 @@ import {
 } from "./chung-tu-named-range-display.js";
 import { formatDerivedNamedRangeValue as formatFromLabelField } from "./chung-tu-label-field.js";
 
+test("formatDerivedNamedRangeValue keeps label when value empty", () => {
+  assert.equal(formatDerivedNamedRangeValue("soChungTu", "", { label: "Số: " }), "Số: ");
+  assert.equal(formatDerivedNamedRangeValue("boPhan", "  ", { label: "- Bộ phận: " }), "- Bộ phận: ");
+  assert.equal(formatDerivedNamedRangeValue("boPhan", "", { label: "" }), "");
+  assert.equal(formatDerivedNamedRangeValue("boPhan", ""), "");
+});
+
 test("formatDerivedNamedRangeValue returns raw value when label missing", () => {
   assert.equal(formatDerivedNamedRangeValue("quyenSo", "0626"), "0626");
   assert.equal(formatDerivedNamedRangeValue("so", "062615"), "062615");

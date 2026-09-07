@@ -39,6 +39,23 @@ function buildExportSummaryFromContext(context) {
   return Object.values(summary).some((value) => value != null) ? summary : null;
 }
 
+/**
+ * Snapshot enough of a sheet context to re-render without refreshing source data.
+ * Drops nested `sheetContexts` to avoid recursive bulk.
+ */
+function buildExportContextJson(context) {
+  if (!context || typeof context !== "object" || Array.isArray(context)) return null;
+  const { sheetContexts: _nested, allLines: _lines, ...rest } = context;
+  return {
+    ...rest,
+    sheetKey: context.sheetKey ?? null,
+    quyenSo: context.quyenSo ?? null,
+    soChungTu: context.soChungTu ?? null,
+    periodDate: context.periodDate ?? null,
+    detailRows: Array.isArray(context.detailRows) ? context.detailRows : [],
+  };
+}
+
 /** @returns {number|null} */
 function sumFolderTongTien(files) {
   if (!Array.isArray(files) || !files.length) return null;
@@ -53,4 +70,4 @@ function sumFolderTongTien(files) {
   return hasAmount ? sum : null;
 }
 
-export { buildExportSummaryFromContext, sumFolderTongTien };
+export { buildExportContextJson, buildExportSummaryFromContext, sumFolderTongTien };

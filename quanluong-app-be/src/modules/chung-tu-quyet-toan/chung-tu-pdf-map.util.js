@@ -34,9 +34,10 @@ export function pickMappedFields(context, fieldKeys, { categoryKey, fieldLabels 
     const raw = fieldKey
       ? lookupContextValue(context, fieldKey) ?? lookupContextValue(context, camelToSnake(fieldKey))
       : lookupContextValue(context, key);
-    if (raw === undefined) continue;
-    const cell = valueToCell(raw);
     const label = fieldLabels?.[fieldKey] ?? fieldLabels?.[key] ?? "";
+    const hasLabel = String(label).trim() !== "";
+    if (raw === undefined && !hasLabel) continue;
+    const cell = valueToCell(raw ?? "");
     out[key] = fieldKey ? formatDerivedNamedRangeValue(fieldKey, cell, { label }) : cell;
   }
   return out;

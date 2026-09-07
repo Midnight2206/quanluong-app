@@ -46,6 +46,7 @@ import {
   deleteChungTuPdfExportBatch,
   getChungTuPdfExportBatch,
   listChungTuPdfExportBatches,
+  reExportChungTuPdfExportBatch,
   streamChungTuPdfExportBatchFile,
   streamChungTuPdfExportBatchMergedPdf,
   streamChungTuPdfExportBatchZip,
@@ -56,6 +57,7 @@ import {
   exportChungTuBkmhMonthlySummaryExcel,
   getChungTuBkmhMonthly,
   listChungTuBkmhMonthly,
+  reExportChungTuBkmhMonthly,
   streamChungTuBkmhMonthlyMergedPdf,
   streamChungTuBkmhMonthlySliceFile,
   streamChungTuBkmhMonthlyZip,
@@ -328,6 +330,26 @@ async function createChungTuPdfExportBatchController(req, res) {
   });
 }
 
+async function reExportChungTuPdfExportBatchController(req, res) {
+  const body = req.validatedBody;
+  const data = await reExportChungTuPdfExportBatch({
+    batchKey: req.validatedParams.batchKey,
+    pdfTemplateId: body.pdfTemplateId,
+    refreshData: body.refreshData === true,
+    signatures: body.signatures ?? {},
+    signatureDates: body.signatureDates ?? {},
+    signatureBlock: body.signatureBlock,
+    settings: body.settings ?? {},
+    exportingUserProfile: req.user?.profile ?? null,
+    createdById: req.user.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Đã xuất lại lô PDF.",
+    data,
+  });
+}
+
 async function streamChungTuPdfExportBatchZipController(req, res) {
   const upstream = await streamChungTuPdfExportBatchZip({
     batchKey: req.validatedParams.batchKey,
@@ -410,6 +432,26 @@ async function createChungTuBkmhMonthlyController(req, res) {
   });
   return respondCreated(res, {
     message: "Đã xuất BKMH tháng.",
+    data,
+  });
+}
+
+async function reExportChungTuBkmhMonthlyController(req, res) {
+  const body = req.validatedBody;
+  const data = await reExportChungTuBkmhMonthly({
+    id: req.validatedParams.id,
+    pdfTemplateId: body.pdfTemplateId,
+    refreshData: body.refreshData === true,
+    signatures: body.signatures ?? {},
+    signatureDates: body.signatureDates ?? {},
+    signatureBlock: body.signatureBlock,
+    settings: req.chungTuSettings ?? body.settings ?? {},
+    exportingUserProfile: req.userProfile ?? req.user?.profile ?? null,
+    createdById: req.user.id,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  return respondSuccess(res, {
+    message: "Đã xuất lại BKMH tháng.",
     data,
   });
 }
@@ -884,6 +926,7 @@ export {
   seedTemplatesFromSystemController,
   createChungTuPdfTemplateController,
   createChungTuBkmhMonthlyController,
+  reExportChungTuBkmhMonthlyController,
   createChungTuPdfExportBatchController,
   createChungTuPdfExportController,
   createChungTuDocumentController,
@@ -891,6 +934,7 @@ export {
   deleteChungTuDocumentController,
   deleteChungTuPdfExportBatchController,
   deleteChungTuPdfExportController,
+  reExportChungTuPdfExportBatchController,
   createTemplateCatalogController,
   deleteTemplateCatalogController,
   exportChungTuBkmhMonthlyExcelController,

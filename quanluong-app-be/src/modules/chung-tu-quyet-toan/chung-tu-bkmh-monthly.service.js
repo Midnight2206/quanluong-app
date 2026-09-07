@@ -9,12 +9,14 @@ import {
 } from "./chung-tu-category.constants.js";
 import { normalizeMonthUnitIds, normalizePeriodMonth, lastDayOfMonth } from "./chung-tu-monthly-sheets.js";
 import {
+  attachDocNumbersToContexts,
   prepareSignatureBlockForRender,
   resolveChungTuContext,
 } from "./chung-tu-data-resolver.service.js";
 import { buildDocumentServicePayload } from "./chung-tu-pdf-map.util.js";
 import {
   createDocumentFolder,
+  clearDocumentFolderFiles,
   deleteDocumentFolder,
   getTemplateFields,
   renderToDocumentFolder,
@@ -194,12 +196,16 @@ async function createChungTuBkmhMonthlyExport({
         periodMonth: safePeriodMonth,
       },
     },
-    include: {
-      slices: {
-        orderBy: [{ sortKey: "asc" }, { id: "asc" }],
-      },
-    },
+    select: { id: true },
   });
+  if (existingRow) {
+    throw new AppError({
+      message: "BKMH tháng này đã xuất. Dùng «Xuất lại» trên lịch sử để cập nhật tại chỗ.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+      details: { monthlyId: existingRow.id },
+    });
+  }
 
   const template = await prisma.chungTuPdfTemplate.findFirst({
     where: {
@@ -328,33 +334,17 @@ async function createChungTuBkmhMonthlyExport({
     };
 
     let row;
-    if (existingRow) {
-      await deleteDocumentFolder(existingRow.documentServiceFolderId);
-      await prisma.chungTuBkmhSlice.deleteMany({
-        where: { monthlyId: existingRow.id },
-      });
-      row = await prisma.chungTuBkmhMonthly.update({
-        where: { id: existingRow.id },
-        data,
-        include: {
-          slices: {
-            orderBy: [{ sortKey: "asc" }, { id: "asc" }],
-          },
+    row = await prisma.chungTuBkmhMonthly.create({
+      data: {
+        ...data,
+        createdById: Number(createdById),
+      },
+      include: {
+        slices: {
+          orderBy: [{ sortKey: "asc" }, { id: "asc" }],
         },
-      });
-    } else {
-      row = await prisma.chungTuBkmhMonthly.create({
-        data: {
-          ...data,
-          createdById: Number(createdById),
-        },
-        include: {
-          slices: {
-            orderBy: [{ sortKey: "asc" }, { id: "asc" }],
-          },
-        },
-      });
-    }
+      },
+    });
 
     return mapMonthlyRow(row);
   } catch (error) {
@@ -363,6 +353,193 @@ async function createChungTuBkmhMonthlyExport({
     }
     throw error;
   }
+}
+
+async function reExportChungTuBkmhMonthly({
+  id,
+  pdfTemplateId,
+  refreshData = false,
+  signatures = {},
+  signatureDates = {},
+  signatureBlock,
+  settings = {},
+  exportingUserProfile,
+  createdById,
+  effectiveUnitIds,
+}) {
+  const row = await loadMonthlyRowOrThrow(id);
+  assertStorageUnitInEffectiveBranch(row.storageUnitId, effectiveUnitIds);
+  const folderId = Number(row.documentServiceFolderId);
+  const safePeriodMonth = normalizePeriodMonth(row.periodMonth);
+  const safeAggregationMode = normalizeAggregationMode(row.aggregationMode);
+  const selectedUnitIds = Array.isArray(row.unitIdsJson) ? row.unitIdsJson.map(Number) : [];
+
+  const template = await prisma.chungTuPdfTemplate.findFirst({
+    where: {
+      id: Number(pdfTemplateId),
+      status: "published",
+      categoryKey: CATEGORY_KEY,
+    },
+  });
+  if (!template) {
+    throw notFoundError("Không tìm thấy mẫu PDF.");
+  }
+
+  const [fieldsPayload, savedSignatureSettings] = await Promise.all([
+    getTemplateFields(template.documentServiceTemplateId),
+    getChungTuSignatureSettings({ categoryKey: CATEGORY_KEY }),
+  ]);
+  const { fieldKeys, columnKeys } = extractTemplateKeys(fieldsPayload);
+  const fieldLabels =
+    template.fieldLabelsJson && typeof template.fieldLabelsJson === "object" && !Array.isArray(template.fieldLabelsJson)
+      ? Object.fromEntries(
+          Object.entries(template.fieldLabelsJson).map(([key, value]) => [String(key), String(value ?? "")]),
+        )
+      : {};
+
+  const settingsBlock = savedSignatureSettings?.signatureBlock;
+  const blockForResolve =
+    Array.isArray(settingsBlock?.slots) &&
+    settingsBlock.slots.some((s) => s?.source === "system")
+      ? settingsBlock
+      : (signatureBlock ?? settingsBlock ?? undefined);
+  const finalSignatureBlock = await prepareSignatureBlockForRender(blockForResolve, {
+    storageUnitId: Number(row.storageUnitId),
+    currentUserId: Number(createdById ?? row.updatedById),
+  });
+
+  const [resolvedBkmhBuyer, buyerDefaults] = await Promise.all([
+    SIGNATURE_CATALOG["bkmh.nguoiMua"]
+      .resolve({ storageUnitId: Number(row.storageUnitId) })
+      .catch(() => null),
+    prisma.lttpUnitIssueFormDefaults.findUnique({
+      where: { unitId: Number(row.storageUnitId) },
+      select: { defaultBuyerUserId: true },
+    }),
+  ]);
+  const buyerSnapshot = buildBkmhBuyerSnapshotFromPerson(
+    resolvedBkmhBuyer,
+    buyerDefaults?.defaultBuyerUserId ?? null,
+  );
+
+  let slices;
+  let sourceDataHash = row.sourceDataHash;
+  let displayContext = null;
+
+  if (refreshData) {
+    const resolved = await resolveChungTuContext({
+      categoryKey: CATEGORY_KEY,
+      unitId: Number(row.storageUnitId),
+      periodMonth: safePeriodMonth,
+      unitIds: selectedUnitIds,
+      aggregationMode: safeAggregationMode,
+      settings,
+      exportingUserProfile,
+      resolvedBkmhBuyer,
+    });
+    sourceDataHash = resolved.sourceDataHash;
+    displayContext = resolved.context;
+    slices = pickExportSlices({
+      aggregationMode: safeAggregationMode,
+      context: { ...(resolved.context ?? {}), categoryKey: CATEGORY_KEY },
+    });
+  } else {
+    const contexts = [];
+    for (const slice of row.slices ?? []) {
+      const detailRows = parseBkmhSliceDetailRowsJson(slice.detailRowsJson);
+      if (!detailRows.length) {
+        throw new AppError({
+          message: "BKMH tháng thiếu snapshot dòng hàng. Bật «Đọc lại dữ liệu nguồn» để xuất lại.",
+          statusCode: 400,
+          code: ERROR_CODES.VALIDATION_ERROR,
+        });
+      }
+      contexts.push({
+        periodDate: slice.periodDate ? slice.periodDate.toISOString().slice(0, 10) : "",
+        soChungTu: slice.soChungTu,
+        quyenSo: undefined,
+        recipientUnitId: slice.recipientUnitId,
+        recipientUnitName: slice.recipientUnitName,
+        ngayThangNam: slice.ngayThangNam,
+        tongTienSo: slice.tongTien == null ? null : Number(slice.tongTien),
+        detailRows,
+      });
+    }
+    await attachDocNumbersToContexts({
+      contexts,
+      unitId: row.storageUnitId,
+      categoryKey: CATEGORY_KEY,
+      periodMonth: safePeriodMonth,
+      aggregationMode: safeAggregationMode,
+    });
+    slices = contexts.map((context, index) => ({
+      context,
+      fileName: row.slices[index]?.fileName || `${String(index + 1).padStart(2, "0")}.pdf`,
+      sortKey: row.slices[index]?.sortKey || context.sheetKey || String(index + 1).padStart(2, "0"),
+    }));
+    displayContext = contexts[0] ?? null;
+  }
+
+  await clearDocumentFolderFiles(folderId);
+  await prisma.chungTuBkmhSlice.deleteMany({ where: { monthlyId: row.id } });
+
+  const persistedSlices = [];
+  for (const slice of slices) {
+    const sliceSignatureDates = fillSignatureDatesFromPeriod({
+      signatureBlock: finalSignatureBlock,
+      signatureDates,
+      context: slice.context,
+      aggregationMode: safeAggregationMode,
+      periodMonth: safePeriodMonth,
+      lastDayOfMonthFn: lastDayOfMonth,
+    });
+    const payload = buildDocumentServicePayload({
+      context: slice.context,
+      fieldKeys,
+      columnKeys,
+      fieldLabels,
+      signatures,
+      signatureDates: sliceSignatureDates,
+      signatureBlock: finalSignatureBlock,
+    });
+    const renderedFile = await renderToDocumentFolder(folderId, {
+      templateId: template.documentServiceTemplateId,
+      fileName: slice.fileName,
+      sortKey: slice.sortKey,
+      fields: payload.fields,
+      rows: payload.rows,
+      signatures: payload.signatures,
+      signatureDates: sliceSignatureDates,
+      signatureBlock: finalSignatureBlock,
+    });
+    persistedSlices.push(buildSliceCreateInput({ renderedFile, slice, buyerSnapshot }));
+  }
+
+  const updated = await prisma.chungTuBkmhMonthly.update({
+    where: { id: row.id },
+    data: {
+      pdfTemplateId: template.id,
+      documentServiceTemplateId: template.documentServiceTemplateId,
+      displayName: buildDisplayName(safePeriodMonth, displayContext ?? row),
+      tongTienThang: sumSliceTongTien(persistedSlices),
+      sliceCount: persistedSlices.length,
+      sourceDataHash,
+      signaturesJson: {
+        signatures,
+        signatureDates,
+        ...(finalSignatureBlock ? { signatureBlock: finalSignatureBlock } : {}),
+      },
+      updatedById: Number(createdById ?? row.updatedById),
+      slices: { create: persistedSlices },
+    },
+    include: {
+      slices: {
+        orderBy: [{ sortKey: "asc" }, { id: "asc" }],
+      },
+    },
+  });
+
+  return mapMonthlyRow(updated);
 }
 
 async function listChungTuBkmhMonthly({ storageUnitId, periodMonth, effectiveUnitIds }) {
@@ -501,6 +678,7 @@ export {
   exportChungTuBkmhMonthlySummaryExcel,
   getChungTuBkmhMonthly,
   listChungTuBkmhMonthly,
+  reExportChungTuBkmhMonthly,
   streamChungTuBkmhMonthlyMergedPdf,
   streamChungTuBkmhMonthlySliceFile,
   streamChungTuBkmhMonthlyZip,

@@ -17,7 +17,9 @@ import {
   checkChungTuDocumentStaleController,
   seedTemplatesFromSystemController,
   createChungTuPdfExportBatchController,
+  reExportChungTuPdfExportBatchController,
   createChungTuBkmhMonthlyController,
+  reExportChungTuBkmhMonthlyController,
   createChungTuPdfTemplateController,
   createChungTuPdfExportController,
   createChungTuDocumentController,
@@ -82,6 +84,7 @@ import {
   chungTuPdfExportBatchFileParamsSchema,
   chungTuPdfExportBatchKeyParamSchema,
   chungTuPdfExportBatchListQuerySchema,
+  chungTuPdfExportBatchReExportBodySchema,
   chungTuBkmhMonthlyCreateBodySchema,
   chungTuBkmhMonthlyIdParamSchema,
   chungTuBkmhMonthlyListQuerySchema,
@@ -353,6 +356,16 @@ chungTuQuyetToanRouter.post(
   asyncHandler(createChungTuPdfExportBatchController),
 );
 
+chungTuQuyetToanRouter.post(
+  "/pdf-export-batches/:batchKey/re-export",
+  permissionMiddleware([routePermissions.pdfExportBatchReExport]),
+  validateRequest({
+    params: chungTuPdfExportBatchKeyParamSchema,
+    body: chungTuPdfExportBatchReExportBodySchema,
+  }),
+  asyncHandler(reExportChungTuPdfExportBatchController),
+);
+
 chungTuQuyetToanRouter.get(
   "/pdf-export-batches/:batchKey",
   permissionMiddleware([routePermissions.pdfExportBatchDetail]),
@@ -402,6 +415,16 @@ chungTuQuyetToanRouter.post(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   validateRequest({ body: chungTuBkmhMonthlyCreateBodySchema }),
   asyncHandler(createChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/bkmh-monthly/:id/re-export",
+  permissionMiddleware([routePermissions.bkmhMonthlyReExport]),
+  validateRequest({
+    params: chungTuBkmhMonthlyIdParamSchema,
+    body: chungTuPdfExportBatchReExportBodySchema,
+  }),
+  asyncHandler(reExportChungTuBkmhMonthlyController),
 );
 
 chungTuQuyetToanRouter.get(

@@ -26,6 +26,7 @@ from app.folders.folder_service import (
     add_folder_document,
     build_merged_pdf,
     build_zip,
+    clear_folder_files,
     create_folder,
     delete_folder,
     get_folder,
@@ -512,6 +513,23 @@ def get_folder_merged_pdf_route(folder_id: int, _: None = Depends(require_servic
             )
         },
     )
+
+
+@app.delete("/v1/folders/{folder_id}/files")
+def clear_folder_files_route(folder_id: int, _: None = Depends(require_service_key)):
+    try:
+        with get_session() as session:
+            payload = clear_folder_files(session, folder_id)
+            session.commit()
+    except FolderNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=error_detail("NOT_FOUND", str(exc)),
+        )
+    except (SQLAlchemyError, RuntimeError):
+        raise _database_unavailable()
+
+    return payload
 
 
 @app.delete("/v1/folders/{folder_id}")

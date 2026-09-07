@@ -200,6 +200,18 @@ def delete_folder(session: Session, folder_id: int) -> None:
     delete_folder_tree(folder_id)
 
 
+def clear_folder_files(session: Session, folder_id: int) -> dict:
+    folder = _require_folder(session, folder_id)
+    files = list(_folder_files(session, folder_id))
+    for file in files:
+        path = _absolute_pdf_path(file)
+        if path.exists():
+            path.unlink()
+        session.delete(file)
+    session.flush()
+    return {"folder_id": folder.id, "deleted_count": len(files)}
+
+
 __all__ = [
     "FolderFileNotFoundError",
     "FolderNotFoundError",
@@ -208,6 +220,7 @@ __all__ = [
     "add_folder_document",
     "build_merged_pdf",
     "build_zip",
+    "clear_folder_files",
     "create_folder",
     "delete_folder",
     "get_folder",

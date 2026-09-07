@@ -8,7 +8,11 @@ import {
   assertKnownCategoryKey,
   normalizeAggregationMode,
 } from "./chung-tu-category.constants.js";
-import { formatVndNumber, vndToVietnameseDocumentLine } from "./chung-tu-vnd.util.js";
+import {
+  formatVndNumber,
+  sanitizeDecimal,
+  vndToVietnameseDocumentLine,
+} from "./chung-tu-vnd.util.js";
 import { getChungTuUnitProfile } from "./chung-tu-unit-profile.service.js";
 import {
   buildMonthDaySheetNames,
@@ -23,6 +27,11 @@ import {
   attachRecipientUnitFillToMonthlyContexts,
   resolveRecipientUnitFillForSlip,
 } from "./chung-tu-recipient-unit-fill.service.js";
+import { allocateDocNumber } from "./chung-tu-doc-number.service.js";
+import {
+  buildSheetKey,
+  quyenSoFromPeriodMonth,
+} from "./chung-tu-doc-number.util.js";
 import { formatLyDoXuatKho } from "./chung-tu-pxk-ly-do.util.js";
 import { formatCanCuPnkText } from "./chung-tu-nl-field.js";
 import { SIGNATURE_CATALOG } from "./chung-tu-signature-catalog.js";
@@ -197,38 +206,93 @@ function defaultBookMmyyFromParts(parts) {
   return `${parts.thang}${String(parts.nam).slice(-2)}`;
 }
 
-function defaultBangKeSoChungTuFromParts(parts) {
-  const quyenSo = defaultBookMmyyFromParts(parts);
-  const dd = String(parts?.ngay ?? "").padStart(2, "0");
-  if (!quyenSo || !parts?.ngay) return "";
-  return `${quyenSo}${dd}`;
+function resolveDocumentNumberFields({ settings, parts, categoryKey, allocation }) {
+  void categoryKey;
+  const quyenSo =
+    allocation?.quyenSo ||
+    defaultBookMmyyFromParts(parts) ||
+    String(settings?.quyenSo ?? "").trim();
+  const soChungTu = allocation?.soChungTu || "";
+  return { quyenSo, soChungTu };
 }
 
-function resolveDocumentNumberFields({ settings, parts, categoryKey }) {
-  if (categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO) {
-    const quyenSo =
-      String(settings?.quyenSo ?? "").trim() || defaultBookMmyyFromParts(parts);
-    const soChungTu = String(settings?.soChungTu ?? "").trim();
-    return { quyenSo, soChungTu };
+function defaultSheetKeyForContext(ctx, { categoryKey, aggregationMode } = {}) {
+  const mode = normalizeAggregationMode(aggregationMode);
+  if (ctx?.issueSlipId) {
+    return buildSheetKey({ kind: "slip", issueSlipId: ctx.issueSlipId });
   }
-  const quyenSo = defaultBookMmyyFromParts(parts);
-  const soChungTu =
-    categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
-      ? defaultBangKeSoChungTuFromParts(parts)
-      : parts.ngay || "";
-  return { quyenSo, soChungTu };
+  if (categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_NHAP_KHO) {
+    const sliceId = ctx?.sourceSliceId ?? ctx?.bkmhSliceId;
+    if (sliceId != null) {
+      return buildSheetKey({ kind: "bkmh-slice", bkmhSliceId: sliceId });
+    }
+  }
+  if (mode === CHUNG_TU_AGGREGATION_MODES.BY_DAY) {
+    if (
+      categoryKey === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO &&
+      ctx?.recipientUnitId != null
+    ) {
+      return buildSheetKey({
+        kind: "by-day-pxk",
+        recipientUnitId: ctx.recipientUnitId,
+        periodDate: ctx.periodDate,
+      });
+    }
+    return buildSheetKey({ kind: "by-day-bkmh", periodDate: ctx.periodDate });
+  }
+  if (ctx?.recipientUnitId != null) {
+    return buildSheetKey({ kind: "by-unit", recipientUnitId: ctx.recipientUnitId });
+  }
+  return buildSheetKey({ kind: "by-day-bkmh", periodDate: ctx.periodDate });
+}
+
+export async function attachDocNumbersToContexts({
+  contexts,
+  unitId,
+  categoryKey,
+  periodMonth,
+  aggregationMode,
+  sheetKeyForContext,
+  allocate = allocateDocNumber,
+}) {
+  const list = Array.isArray(contexts) ? contexts : [];
+  if (!list.length) return list;
+  const quyenSo =
+    quyenSoFromPeriodMonth(periodMonth) ||
+    defaultBookMmyyFromParts(ymdParts(list[0]?.periodDate));
+  const keyFn =
+    typeof sheetKeyForContext === "function"
+      ? sheetKeyForContext
+      : (ctx) => defaultSheetKeyForContext(ctx, { categoryKey, aggregationMode });
+  for (const ctx of list) {
+    const sheetKey = keyFn(ctx);
+    const allocation = await allocate({ unitId, categoryKey, quyenSo, sheetKey });
+    ctx.sheetKey = sheetKey;
+    ctx.quyenSo = allocation.quyenSo;
+    ctx.soChungTu = allocation.soChungTu;
+    ctx.so = allocation.soChungTu;
+    ctx.soPhieu = allocation.soChungTu;
+  }
+  return list;
 }
 
 function mapLineRow(line, index) {
   const commodity = line?.commodity ?? null;
-  const qty =
+  const qty = sanitizeDecimal(
     toFiniteNumber(line?.quantity) ??
-    toFiniteNumber(line?.soLuong) ??
-    toFiniteNumber(line?.thucNhap) ??
-    toFiniteNumber(line?.thucXuat);
-  const requiredQty = toFiniteNumber(line?.requiredQuantity) ?? toFiniteNumber(line?.yeuCau);
-  const unitPrice = toFiniteNumber(line?.unitPrice) ?? parseTongTien(line?.donGia);
-  const amount = toFiniteNumber(line?.amount) ?? parseTongTien(line?.thanhTien);
+      toFiniteNumber(line?.soLuong) ??
+      toFiniteNumber(line?.thucNhap) ??
+      toFiniteNumber(line?.thucXuat),
+  );
+  const requiredQty = sanitizeDecimal(
+    toFiniteNumber(line?.requiredQuantity) ?? toFiniteNumber(line?.yeuCau),
+  );
+  const unitPrice = sanitizeDecimal(
+    toFiniteNumber(line?.unitPrice) ?? parseTongTien(line?.donGia),
+  );
+  const amount = sanitizeDecimal(
+    toFiniteNumber(line?.amount) ?? parseTongTien(line?.thanhTien),
+  );
   const supplierName = String(line?.nguoiBan ?? line?.lttpSupplier?.name ?? "").trim();
   const commodityId =
     toFiniteNumber(commodity?.id) ?? toFiniteNumber(line?.commodityId);
@@ -238,17 +302,17 @@ function mapLineRow(line, index) {
     maSo: commodity?.code ?? line?.maSo ?? "",
     dvt: commodity?.measureUnit ?? line?.dvt ?? "",
     nguoiBan: supplierName,
-    yeuCau: Number.isFinite(requiredQty) ? requiredQty : "",
-    thucXuat: Number.isFinite(qty) ? qty : "",
-    thucNhap: Number.isFinite(qty) ? qty : "",
-    soLuong: Number.isFinite(qty) ? qty : "",
-    donGia: Number.isFinite(unitPrice) ? formatVndNumber(unitPrice) : "",
-    thanhTien: Number.isFinite(amount) ? formatVndNumber(amount) : "",
+    yeuCau: requiredQty ?? "",
+    thucXuat: qty ?? "",
+    thucNhap: qty ?? "",
+    soLuong: qty ?? "",
+    donGia: unitPrice != null ? formatVndNumber(unitPrice) : "",
+    thanhTien: amount != null ? formatVndNumber(amount) : "",
     ghiChu: String(line?.lineNote ?? line?.ghiChu ?? "").trim(),
     commodityId: commodityId != null && commodityId > 0 ? commodityId : null,
-    quantity: Number.isFinite(qty) ? qty : null,
-    unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
-    amount: Number.isFinite(amount) ? amount : null,
+    quantity: qty,
+    unitPrice,
+    amount,
   };
 }
 
@@ -582,6 +646,7 @@ function buildPnkSheetContext({
   const buyerSignatureName = pickFirstNonEmptySliceField(slices, "buyerSignatureName");
   const buyerTitle = pickFirstNonEmptySliceField(slices, "buyerTitle");
   const totalAmount = sumAmount(detailRows);
+  const primarySliceId = slices?.[0]?.id ?? null;
   return buildContextBase({
     settings: resolveSettingsForSlips(),
     periodDate,
@@ -601,6 +666,8 @@ function buildPnkSheetContext({
       sliceCount: slices.length,
       lineCount: detailRows.length,
       canCuPnk: formatCanCuPnkTextFromSlices(slices),
+      sourceSliceId: primarySliceId,
+      bkmhSliceId: primarySliceId,
     },
   });
 }
@@ -1061,15 +1128,12 @@ export async function resolveChungTuContext({
     const period = slip.issueDate.toISOString().slice(0, 10);
     const detailRows = aggregateLinesToDetailRows(slip.lines ?? []);
     const total = sumAmount(slip.lines ?? []);
-    const slipNoDisplay = String(slip.slipNo ?? "").padStart(4, "0");
-    const soPhieu = slipNoDisplay;
     const baseSettings = resolveSettingsForSlips();
     const slipSettings = {
       ...baseSettings,
       donViSo: baseSettings.donViSo || slip.printLine1 || slip.unit?.name || "",
       mauSo: baseSettings.mauSo || slip.formMauSo || "",
       quyenSo: baseSettings.quyenSo || slip.bookMmyy || "",
-      soChungTu: baseSettings.soChungTu || soPhieu,
       signerWriter: baseSettings.signerWriter || slip.signerWriter || "",
       signerApprover: baseSettings.signerApprover || slip.signerApprover || "",
       signerRecipient: slip.signerRecipient || slip.recipientDisplayName || slip.recipientUnit?.name || "",
@@ -1086,13 +1150,19 @@ export async function resolveChungTuContext({
       categoryKey: meta.key,
       extra: {
         issueSlipId: slip.id,
-        soPhieu,
         bookMmyy: slip.bookMmyy,
         slipNo: slip.slipNo,
         recipientUnitName: slip.recipientUnit?.name ?? "",
         recipientDisplayName: slip.recipientDisplayName ?? "",
         ...(await resolveRecipientUnitFillForSlip(slip)),
       },
+    });
+    await attachDocNumbersToContexts({
+      contexts: [context],
+      unitId,
+      categoryKey: meta.key,
+      periodMonth: period.slice(0, 7),
+      aggregationMode: CHUNG_TU_AGGREGATION_MODES.BY_DAY,
     });
     const hashPayload = {
       categoryKey,
@@ -1129,12 +1199,24 @@ export async function resolveChungTuContext({
       lyDoNhapKho,
       nhapTaiKho,
     });
+    const pnkMode = normalizePnkAggregationMode(aggregationMode);
+    await attachDocNumbersToContexts({
+      contexts: monthly.sheetContexts,
+      unitId,
+      categoryKey: meta.key,
+      periodMonth: safePnkDateFrom.slice(0, 7),
+      aggregationMode: pnkMode,
+    });
+    if (monthly.rootContext && monthly.sheetContexts?.length) {
+      monthly.rootContext.quyenSo = monthly.sheetContexts[0].quyenSo;
+      monthly.rootContext.sheetContexts = monthly.sheetContexts;
+    }
     const hashPayload = {
       categoryKey,
       unitId,
       dateFrom: safePnkDateFrom,
       dateTo: safePnkDateTo,
-      aggregationMode: normalizePnkAggregationMode(aggregationMode),
+      aggregationMode: pnkMode,
       sourceSlices: (monthly.sourceSlices ?? []).map((slice) => ({
         id: slice.id,
         sortKey: slice.sortKey,
@@ -1175,8 +1257,23 @@ export async function resolveChungTuContext({
     });
     await attachRecipientUnitFillToMonthlyContexts(monthly, { aggregationMode });
     const safeMonth = normalizePeriodMonth(periodMonth);
+    const mode = normalizeAggregationMode(aggregationMode);
+    await attachDocNumbersToContexts({
+      contexts: monthly.sheetContexts,
+      unitId,
+      categoryKey: meta.key,
+      periodMonth: safeMonth,
+      aggregationMode: mode,
+    });
+    if (monthly.rootContext && monthly.sheetContexts?.length) {
+      monthly.rootContext.quyenSo = monthly.sheetContexts[0].quyenSo;
+      monthly.rootContext.soChungTu = "";
+      monthly.rootContext.so = "";
+      monthly.rootContext.soPhieu = "";
+      monthly.rootContext.sheetContexts = monthly.sheetContexts;
+    }
     if (meta.key === CHUNG_TU_CATEGORY_KEYS.PHIEU_XUAT_KHO) {
-      const pxkMode = normalizeAggregationMode(aggregationMode);
+      const pxkMode = mode;
       for (const ctx of monthly.sheetContexts ?? []) {
         ctx.lyDoXuatKho = formatLyDoXuatKho({
           aggregationMode: pxkMode,
@@ -1190,7 +1287,7 @@ export async function resolveChungTuContext({
       categoryKey,
       unitId,
       periodMonth: safeMonth,
-      aggregationMode: normalizeAggregationMode(aggregationMode),
+      aggregationMode: mode,
       selectedUnitIds: normalizeMonthUnitIds(unitIds),
       lineIds: monthly.allLines.map((l) => ({
         id: l.id,
@@ -1228,6 +1325,14 @@ export async function resolveChungTuContext({
       slipCount: slips.length,
       lineCount: detailRows.length,
     },
+  });
+  await attachDocNumbersToContexts({
+    contexts: [context],
+    unitId,
+    categoryKey: meta.key,
+    periodMonth: d.slice(0, 7),
+    aggregationMode: CHUNG_TU_AGGREGATION_MODES.BY_DAY,
+    sheetKeyForContext: () => buildSheetKey({ kind: "by-day-bkmh", periodDate: d }),
   });
   const hashPayload = {
     categoryKey,

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { vndToVietnameseDocumentLine } from "./chung-tu-vnd.util.js";
+import { sanitizeDecimal, vndToVietnameseDocumentLine } from "./chung-tu-vnd.util.js";
 
 test("vndToVietnameseDocumentLine reads three-digit groups without undefined", () => {
   const text = vndToVietnameseDocumentLine(103_324_000);
@@ -13,4 +13,11 @@ test("vndToVietnameseDocumentLine reads zero-padded lower groups", () => {
   const text = vndToVietnameseDocumentLine(1_024_000);
   assert.equal(text.includes("undefined"), false);
   assert.equal(text, "Một triệu không trăm hai mươi bốn nghìn đồng");
+});
+
+test("sanitizeDecimal strips IEEE-754 noise", () => {
+  assert.equal(sanitizeDecimal(0.1 + 0.2), 0.3);
+  assert.equal(sanitizeDecimal(0.1999999999999998), 0.2);
+  assert.equal(sanitizeDecimal(null), null);
+  assert.equal(String(sanitizeDecimal(0.1 + 0.2)), "0.3");
 });
