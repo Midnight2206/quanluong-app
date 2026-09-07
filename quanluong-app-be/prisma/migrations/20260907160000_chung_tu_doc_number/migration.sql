@@ -11,8 +11,8 @@ CREATE TABLE `ChungTuDocNumberCounter` (
     `nextSeq` INTEGER NOT NULL DEFAULT 1,
     `updatedAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `ChungTuDocNumberCounter_unitId_categoryKey_quyenSo_key`(`unitId`, `categoryKey`, `quyenSo`),
-    INDEX `ChungTuDocNumberCounter_unitId_categoryKey_idx`(`unitId`, `categoryKey`),
+    UNIQUE INDEX `CtDocNumCtr_uc_ucq`(`unitId`, `categoryKey`, `quyenSo`),
+    INDEX `CtDocNumCtr_idx_uc`(`unitId`, `categoryKey`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -27,8 +27,8 @@ CREATE TABLE `ChungTuDocNumberAssignment` (
     `soChungTu` VARCHAR(16) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    UNIQUE INDEX `ChungTuDocNumberAssignment_unitId_categoryKey_quyenSo_sheetKey_key`(`unitId`, `categoryKey`, `quyenSo`, `sheetKey`),
-    INDEX `ChungTuDocNumberAssignment_unitId_categoryKey_quyenSo_idx`(`unitId`, `categoryKey`, `quyenSo`),
+    UNIQUE INDEX `CtDocNumAsgn_uc_ucqs`(`unitId`, `categoryKey`, `quyenSo`, `sheetKey`),
+    INDEX `CtDocNumAsgn_idx_ucq`(`unitId`, `categoryKey`, `quyenSo`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

@@ -367,8 +367,8 @@ model ChungTuDocNumberCounter {
   updatedAt   DateTime @updatedAt
   unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
-  @@unique([unitId, categoryKey, quyenSo])
-  @@index([unitId, categoryKey])
+  @@unique([unitId, categoryKey, quyenSo], map: "CtDocNumCtr_uc_ucq")
+  @@index([unitId, categoryKey], map: "CtDocNumCtr_idx_uc")
 }
 
 model ChungTuDocNumberAssignment {
@@ -382,8 +382,9 @@ model ChungTuDocNumberAssignment {
   createdAt   DateTime @default(now())
   unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
-  @@unique([unitId, categoryKey, quyenSo, sheetKey])
-  @@index([unitId, categoryKey, quyenSo])
+  // MySQL identifier max 64 chars — default Prisma name overflows
+  @@unique([unitId, categoryKey, quyenSo, sheetKey], map: "CtDocNumAsgn_uc_ucqs")
+  @@index([unitId, categoryKey, quyenSo], map: "CtDocNumAsgn_idx_ucq")
 }
 
 /// Cấu hình khối chữ ký PDF theo loại chứng từ (categoryKey).
