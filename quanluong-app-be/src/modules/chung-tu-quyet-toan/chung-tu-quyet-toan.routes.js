@@ -19,6 +19,7 @@ import {
   createChungTuPdfExportBatchController,
   reExportChungTuPdfExportBatchController,
   createChungTuBkmhMonthlyController,
+  reExportChungTuBkmhMonthlyController,
   createChungTuPdfTemplateController,
   createChungTuPdfExportController,
   createChungTuDocumentController,
@@ -414,6 +415,16 @@ chungTuQuyetToanRouter.post(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   validateRequest({ body: chungTuBkmhMonthlyCreateBodySchema }),
   asyncHandler(createChungTuBkmhMonthlyController),
+);
+
+chungTuQuyetToanRouter.post(
+  "/bkmh-monthly/:id/re-export",
+  permissionMiddleware([routePermissions.bkmhMonthlyReExport]),
+  validateRequest({
+    params: chungTuBkmhMonthlyIdParamSchema,
+    body: chungTuPdfExportBatchReExportBodySchema,
+  }),
+  asyncHandler(reExportChungTuBkmhMonthlyController),
 );
 
 chungTuQuyetToanRouter.get(

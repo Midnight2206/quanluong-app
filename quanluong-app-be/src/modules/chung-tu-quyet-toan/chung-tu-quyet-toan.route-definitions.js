@@ -360,7 +360,19 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     permission: {
       code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
-      description: "Tạo hoặc cập nhật BKMH tháng và render các file PDF slice.",
+      description: "Tạo BKMH tháng và render các file PDF slice.",
+    },
+  },
+  {
+    key: "bkmhMonthlyReExport",
+    method: "POST",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/bkmh-monthly/:id/re-export",
+    pathRoute: "/api/chungtuquyettoan/bkmh-monthly/:id/re-export",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      name: "Chứng từ quyết toán",
+      description: "Xuất lại BKMH tháng tại chỗ (giữ folder và số chứng từ).",
     },
   },
   {
