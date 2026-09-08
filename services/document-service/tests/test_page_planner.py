@@ -95,3 +95,24 @@ def test_infeasible_raises_vietnamese_error():
             header_height=30,
             signature_block_height=20,
         )
+
+
+def test_variable_row_heights_packs_dense_short_rows():
+    """Một dòng wrap cao không được ép mọi dòng = max (BKMH hay dính)."""
+    heights = [80.0, 18.0, 18.0, 18.0, 18.0]
+    # Uniform 80pt: mỗi trang ~1 dòng → trang cuối orphan < min_rows_last_page → fail.
+    result = plan_pages(
+        n_rows=len(heights),
+        page_content_height=200,
+        header_height=40,
+        carry_row_height=20,
+        signature_block_height=80,
+        row_height_min=18,
+        row_height_max=28,
+        min_rows_last_page=2,
+        content_row_heights=heights,
+    )
+    assert len(result.pages) >= 2
+    assert result.pages[-1].is_last is True
+    assert len(result.pages[-1].row_indices) >= 2
+    assert [h for p in result.pages for h in p.row_heights] == heights
