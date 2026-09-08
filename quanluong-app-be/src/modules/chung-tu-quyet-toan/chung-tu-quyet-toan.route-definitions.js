@@ -262,9 +262,10 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-export-batches/:batchKey/re-export",
     pathRoute: "/api/chungtuquyettoan/pdf-export-batches/:batchKey/re-export",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      // Cùng quyền vào trang CTQT: mọi acc đơn vị đều xuất lại được (không khóa theo người tạo).
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
       name: "Chứng từ quyết toán",
-      description: "Xuất lại lô PDF tại chỗ (giữ folder và số chứng từ).",
+      description: "Xuất lại lô PDF tại chỗ trong đơn vị (giữ folder và số chứng từ).",
     },
   },
   {
@@ -322,9 +323,10 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-export-batches/:batchKey",
     pathRoute: "/api/chungtuquyettoan/pdf-export-batches/:batchKey",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      // Cùng quyền vào trang CTQT: mọi acc đơn vị đều xóa folder được (không khóa theo người tạo).
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
       name: "Chứng từ quyết toán",
-      description: "Xóa lô xuất PDF và folder tương ứng trên document-service.",
+      description: "Xóa lô xuất PDF trong đơn vị và folder trên document-service.",
     },
   },
   {
@@ -370,9 +372,9 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/bkmh-monthly/:id/re-export",
     pathRoute: "/api/chungtuquyettoan/bkmh-monthly/:id/re-export",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
       name: "Chứng từ quyết toán",
-      description: "Xuất lại BKMH tháng tại chỗ (giữ folder và số chứng từ).",
+      description: "Xuất lại BKMH tháng tại chỗ trong đơn vị (giữ folder và số chứng từ).",
     },
   },
   {
@@ -430,9 +432,9 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/bkmh-monthly/:id",
     pathRoute: "/api/chungtuquyettoan/bkmh-monthly/:id",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
       name: "Chứng từ quyết toán",
-      description: "Xóa BKMH tháng và folder tương ứng trên document-service.",
+      description: "Xóa BKMH tháng trong đơn vị và folder trên document-service.",
     },
   },
   {

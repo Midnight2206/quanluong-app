@@ -62,6 +62,9 @@ test("slice summary panel loads detail data and exposes view download print acti
   assert.match(slicePanelSource, /Xem/);
   assert.match(slicePanelSource, /Tải/);
   assert.match(slicePanelSource, /In/);
+  // Xem phải mở tab sync trước await (tránh popup blocker), giống In.
+  assert.match(slicePanelSource, /handleViewSlice[\s\S]*?window\.open\("about:blank"/);
+  assert.match(slicePanelSource, /openChungTuBkmhMonthlySliceFile\([\s\S]*?targetWindow:\s*tab/);
 });
 
 test("PNK summary panel exposes per-file metadata and merged zip actions", () => {
