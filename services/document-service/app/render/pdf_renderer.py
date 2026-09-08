@@ -5,7 +5,7 @@ from io import BytesIO
 
 from reportlab.pdfgen import canvas
 
-from app.pagination import PagePlan, apply_content_row_heights, plan_pages
+from app.pagination import PagePlan, plan_pages
 from app.render.amount_in_words import (
     draw_amount_in_words_line,
     format_amount_in_words_line,
@@ -445,7 +445,6 @@ def render_pdf(
         )
         for row in rows
     ]
-    natural_height = max(needed_heights, default=table.row_height_min)
     sig_height = _planner_signature_height(metadata, row_font_size) + amount_h
     page1_content = (
         page_height
@@ -457,25 +456,19 @@ def render_pdf(
         page_height - metadata.page.margin_top - metadata.page.margin_bottom
     )
     if rows:
-        # Phân trang theo chiều cao an toàn (= max nội dung) để không tràn trang,
-        # rồi gán lại chiều cao từng dòng theo nội dung ô.
-        pages = apply_content_row_heights(
-            plan_pages(
-                n_rows=len(rows),
-                page_content_height=page1_content,
-                continuation_content_height=continuation_content,
-                header_height=table.header_height_pt,
-                carry_row_height=max(
-                    table.carry_height_pt,
-                    max(natural_height, table.row_height_min),
-                ),
-                signature_block_height=sig_height,
-                row_height_min=max(natural_height, table.row_height_min),
-                row_height_max=max(natural_height, table.row_height_max),
-                min_rows_last_page=table.min_rows_last_page,
-            ).pages,
-            needed_heights,
-        )
+        # Pack theo chiều cao từng dòng (wrap) — không ép max lên cả bảng (BKMH).
+        pages = plan_pages(
+            n_rows=len(rows),
+            page_content_height=page1_content,
+            continuation_content_height=continuation_content,
+            header_height=table.header_height_pt,
+            carry_row_height=max(table.carry_height_pt, table.row_height_min),
+            signature_block_height=sig_height,
+            row_height_min=table.row_height_min,
+            row_height_max=max(table.row_height_max, table.row_height_min),
+            min_rows_last_page=table.min_rows_last_page,
+            content_row_heights=needed_heights,
+        ).pages
     else:
         pages = [
             PagePlan(
