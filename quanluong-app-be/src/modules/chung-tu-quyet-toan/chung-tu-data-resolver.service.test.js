@@ -42,12 +42,12 @@ test("aggregateLinesToDetailRows sums quantity and amount for same commodity", (
 
   assert.equal(rows.length, 2);
   assert.equal(rows[0].tenHang, "Gạo");
-  assert.equal(rows[0].soLuong, 5);
+  assert.equal(rows[0].soLuong, "5");
   assert.equal(rows[0].thanhTien, "50.000");
   assert.equal(rows[0].donGia, "10.000");
   assert.equal(rows[0].nguoiBan, "A, B");
   assert.equal(rows[1].tenHang, "Thịt");
-  assert.equal(rows[1].soLuong, 1);
+  assert.equal(rows[1].soLuong, "1");
 });
 
 test("aggregateLinesToDetailRows keeps separate rows when same commodity has different unitPrice", () => {
@@ -75,7 +75,7 @@ test("aggregateLinesToDetailRows keeps separate rows when same commodity has dif
   );
   assert.deepEqual(
     rows.map((row) => row.soLuong),
-    [2, 3],
+    ["2", "3"],
   );
   assert.deepEqual(
     rows.map((row) => row.stt),
@@ -103,10 +103,23 @@ test("aggregateLinesToDetailRows cleans float noise in quantity", () => {
   ]);
 
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].soLuong, 0.3);
-  assert.equal(rows[0].thucXuat, 0.3);
-  assert.equal(String(rows[0].soLuong), "0.3");
+  assert.equal(rows[0].soLuong, "0,3");
+  assert.equal(rows[0].thucXuat, "0,3");
+  assert.equal(rows[0].quantity, 0.3);
   assert.equal(String(rows[0].soLuong).includes("999"), false);
+});
+
+test("aggregateLinesToDetailRows formats thousand separators on quantity", () => {
+  const rows = aggregateLinesToDetailRows([
+    {
+      commodity: { id: 1, name: "Gạo", measureUnit: "Kg" },
+      quantity: 3100,
+      unitPrice: 10000,
+      amount: 31_000_000,
+    },
+  ]);
+  assert.equal(rows[0].soLuong, "3.100");
+  assert.equal(rows[0].thanhTien, "31.000.000");
 });
 
 test("aggregateLinesToDetailRows renumbers stt after merge", () => {

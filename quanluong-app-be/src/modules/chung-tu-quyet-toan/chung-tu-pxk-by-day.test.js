@@ -100,7 +100,7 @@ test("PXK by-day: one unit two slips same day merge into one context", async () 
   assert.equal(dayContexts[0].recipientUnitId, 10);
   assert.equal(dayContexts[0].slipCount, 2);
   assert.equal(dayContexts[0].detailRows.length, 1);
-  assert.equal(dayContexts[0].detailRows[0].soLuong, 5);
+  assert.equal(dayContexts[0].detailRows[0].soLuong, "5");
 });
 
 test("BKMH by-day: two units same day stay one sheet context", async () => {

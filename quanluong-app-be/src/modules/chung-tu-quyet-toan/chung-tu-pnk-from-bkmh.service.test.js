@@ -229,8 +229,8 @@ test("resolvePnkFromBkmhSlices groups by buyerKey and day in by-day mode", async
       thanhTien: row.thanhTien,
     })),
     [
-      { soLuong: 5, unitPrice: 10000, thanhTien: "50.000" },
-      { soLuong: 1, unitPrice: 12000, thanhTien: "12.000" },
+      { soLuong: "5", unitPrice: 10000, thanhTien: "50.000" },
+      { soLuong: "1", unitPrice: 12000, thanhTien: "12.000" },
     ],
   );
   assert.equal(result.rootContext.sheetContexts.length, 2);
@@ -320,7 +320,7 @@ test("resolvePnkFromBkmhSlices groups one buyer across days in full mode", async
       unitPrice: row.unitPrice,
       thanhTien: row.thanhTien,
     })),
-    [{ soLuong: 5, unitPrice: 10000, thanhTien: "50.000" }],
+    [{ soLuong: "5", unitPrice: 10000, thanhTien: "50.000" }],
   );
   assert.equal(result.rootContext.sheetContexts.length, 1);
   assert.equal(result.rootContext.aggregationMode, "full");
