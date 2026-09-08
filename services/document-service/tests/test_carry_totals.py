@@ -17,6 +17,12 @@ def test_format_amount_uses_dot_thousands():
     assert format_amount(1234567) == "1.234.567"
 
 
+def test_format_amount_uses_comma_decimals():
+    assert format_amount(3.2) == "3,2"
+    assert format_amount(0.25) == "0,25"
+    assert format_amount(3110100.5) == "3.110.100,5"
+
+
 def test_find_amount_column_prefers_thanh_tien():
     columns = [
         ColumnMeta("stt", "STT", 30, "center"),

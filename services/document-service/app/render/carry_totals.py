@@ -44,8 +44,19 @@ def parse_amount(value) -> float:
 
 
 def format_amount(value: float) -> str:
-    number = int(round(float(value or 0)))
-    return f"{number:,}".replace(",", ".")
+    """VN: chấm nghìn, phẩy thập phân. VND thường nguyên; vẫn hỗ trợ lẻ."""
+    number = float(value or 0)
+    if abs(number - round(number)) < 1e-9:
+        return f"{int(round(number)):,}".replace(",", ".")
+    sign = "-" if number < 0 else ""
+    abs_n = abs(number)
+    # tối đa 6 chữ số thập phân, bỏ zero thừa
+    frac = f"{abs_n:.6f}".rstrip("0").rstrip(".")
+    if "." not in frac:
+        return f"{sign}{int(frac):,}".replace(",", ".")
+    whole, dec = frac.split(".", 1)
+    whole_fmt = f"{int(whole):,}".replace(",", ".")
+    return f"{sign}{whole_fmt},{dec}"
 
 
 def find_amount_column_key(columns) -> str | None:

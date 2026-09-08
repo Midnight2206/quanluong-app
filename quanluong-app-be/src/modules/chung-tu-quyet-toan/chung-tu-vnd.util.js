@@ -66,6 +66,19 @@ export function formatVndNumber(value) {
 }
 
 /**
+ * Số kiểu Việt: dấu chấm phân tách nghìn, dấu phẩy thập phân.
+ * VD: 3100 → "3.100", 0.25 → "0,25", 3110100.5 → "3.110.100,5"
+ */
+export function formatViNumber(value, { maxFractionDigits = 6 } = {}) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString("vi-VN", {
+    useGrouping: true,
+    maximumFractionDigits: maxFractionDigits,
+  });
+}
+
+/**
  * Bỏ nhiễu IEEE-754 sau phép cộng Number (vd. 0.1+0.2 → 0.3000…4).
  * ponytail: ceiling 6 chữ số thập phân; nếu kho cần >6dp thì đổi sang Decimal.
  */

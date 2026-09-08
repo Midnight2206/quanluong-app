@@ -9,6 +9,7 @@ import {
   normalizeAggregationMode,
 } from "./chung-tu-category.constants.js";
 import {
+  formatViNumber,
   formatVndNumber,
   sanitizeDecimal,
   vndToVietnameseDocumentLine,
@@ -302,10 +303,10 @@ function mapLineRow(line, index) {
     maSo: commodity?.code ?? line?.maSo ?? "",
     dvt: commodity?.measureUnit ?? line?.dvt ?? "",
     nguoiBan: supplierName,
-    yeuCau: requiredQty ?? "",
-    thucXuat: qty ?? "",
-    thucNhap: qty ?? "",
-    soLuong: qty ?? "",
+    yeuCau: requiredQty != null ? formatViNumber(requiredQty) : "",
+    thucXuat: qty != null ? formatViNumber(qty) : "",
+    thucNhap: qty != null ? formatViNumber(qty) : "",
+    soLuong: qty != null ? formatViNumber(qty) : "",
     donGia: unitPrice != null ? formatVndNumber(unitPrice) : "",
     thanhTien: amount != null ? formatVndNumber(amount) : "",
     ghiChu: String(line?.lineNote ?? line?.ghiChu ?? "").trim(),
