@@ -47,6 +47,13 @@ def _content_height_for_page(
     return page_content_height if page_index == 0 else continuation_content_height
 
 
+def _page_carry_height(base_carry: float, page_row_heights: Sequence[float]) -> float:
+    """Khớp `_carry_row_height` lúc vẽ: max(template carry, max dòng trên trang)."""
+    if not page_row_heights:
+        return float(base_carry)
+    return max(float(base_carry), max(float(h) for h in page_row_heights))
+
+
 def _pack(
     *,
     n_rows: int,
@@ -60,6 +67,8 @@ def _pack(
 ) -> Optional[List[PagePlan]]:
     pages: List[PagePlan] = []
     next_row = 0
+    # Uniform: carry vẽ = max(base, row_height) vì mọi dòng cùng cao.
+    page_carry = max(float(carry_row_height), float(row_height))
 
     while next_row < n_rows:
         page_index = len(pages)
@@ -67,12 +76,14 @@ def _pack(
             page_index, page_content_height, continuation_content_height
         )
         has_carry_from_prev = bool(pages)
-        incoming_carry = carry_row_height if has_carry_from_prev else 0
+        incoming_carry = page_carry if has_carry_from_prev else 0
         remaining = n_rows - next_row
+        # Trang cuối còn dòng «Cộng» (+ mang sang nếu có) trước khối chữ ký.
         last_height = (
             content_h
             - header_height
             - incoming_carry
+            - page_carry
             - signature_block_height
         )
         last_capacity = max(0, floor(last_height / row_height))
@@ -95,7 +106,7 @@ def _pack(
             content_h
             - header_height
             - incoming_carry
-            - carry_row_height
+            - page_carry
         )
         regular_capacity = max(0, floor(regular_height / row_height))
         if regular_capacity <= 0:
@@ -122,10 +133,6 @@ def _pack(
     return pages if pages and pages[-1].is_last else None
 
 
-def _sum_heights(heights: Sequence[float], start: int, end: int) -> float:
-    return float(sum(heights[start:end]))
-
-
 def _pack_variable(
     *,
     row_heights: Sequence[float],
@@ -136,10 +143,11 @@ def _pack_variable(
     signature_block_height: float,
     min_rows_last_page: int,
 ) -> Optional[List[PagePlan]]:
-    """Pack theo chiều cao từng dòng — không ép max wrap cho cả bảng."""
+    """Pack theo chiều cao từng dòng — reserve carry/Cộng khớp lúc vẽ."""
     n_rows = len(row_heights)
     pages: List[PagePlan] = []
     next_row = 0
+    prev_outgoing_carry = 0.0
 
     while next_row < n_rows:
         page_index = len(pages)
@@ -147,21 +155,21 @@ def _pack_variable(
             page_index, page_content_height, continuation_content_height
         )
         has_carry_from_prev = bool(pages)
-        incoming_carry = carry_row_height if has_carry_from_prev else 0
+        incoming_carry = prev_outgoing_carry if has_carry_from_prev else 0.0
         remaining = n_rows - next_row
-        last_budget = (
-            content_h - header_height - incoming_carry - signature_block_height
-        )
-        remaining_sum = _sum_heights(row_heights, next_row, n_rows)
+        base_budget = content_h - header_height - incoming_carry
 
-        if remaining_sum <= last_budget + 1e-6:
+        remaining_heights = [float(h) for h in row_heights[next_row:n_rows]]
+        cong = _page_carry_height(carry_row_height, remaining_heights)
+        remaining_sum = sum(remaining_heights)
+        if remaining_sum + cong + signature_block_height <= base_budget + 1e-6:
             if remaining >= min_rows_last_page or n_rows < min_rows_last_page:
                 row_indices = list(range(next_row, n_rows))
                 pages.append(
                     PagePlan(
                         page_index=page_index,
                         row_indices=row_indices,
-                        row_heights=[float(row_heights[i]) for i in row_indices],
+                        row_heights=remaining_heights,
                         has_carry_from_prev=has_carry_from_prev,
                         has_carry_to_next=False,
                         is_last=True,
@@ -169,45 +177,50 @@ def _pack_variable(
                 )
                 return pages
 
-        regular_budget = content_h - header_height - incoming_carry - carry_row_height
+        # Continuation: lớn nhất `take` sao cho rows + «Cộng mang sang» fit.
         take = 0
-        acc = 0.0
-        for i in range(next_row, n_rows):
-            h = float(row_heights[i])
-            if take > 0 and acc + h > regular_budget + 1e-6:
+        for candidate in range(1, remaining + 1):
+            chunk = remaining_heights[:candidate]
+            out_carry = _page_carry_height(carry_row_height, chunk)
+            if sum(chunk) + out_carry > base_budget + 1e-6:
                 break
-            if take == 0 and h > regular_budget + 1e-6:
-                return None
-            acc += h
-            take += 1
+            take = candidate
 
         if take <= 0:
             return None
 
-        # Giữ tối thiểu min_rows_last_page cho trang chữ ký khi còn đủ dòng.
         if remaining > min_rows_last_page and remaining - take < min_rows_last_page:
             take = remaining - min_rows_last_page
             if take <= 0:
                 return None
-            # Kiểm tra lại các dòng đã chọn vẫn fit budget (take nhỏ hơn → luôn fit).
+            chunk = remaining_heights[:take]
+            out_carry = _page_carry_height(carry_row_height, chunk)
+            if sum(chunk) + out_carry > base_budget + 1e-6:
+                return None
 
         if take >= remaining:
-            # Còn dòng nhưng không đủ chỗ chữ ký → phải tách; nhường ít nhất 1 dòng.
             take = max(1, remaining - max(1, min_rows_last_page))
             if take >= remaining:
                 return None
+            chunk = remaining_heights[:take]
+            out_carry = _page_carry_height(carry_row_height, chunk)
+            if sum(chunk) + out_carry > base_budget + 1e-6:
+                return None
 
+        chunk = remaining_heights[:take]
+        out_carry = _page_carry_height(carry_row_height, chunk)
         row_indices = list(range(next_row, next_row + take))
         pages.append(
             PagePlan(
                 page_index=page_index,
                 row_indices=row_indices,
-                row_heights=[float(row_heights[i]) for i in row_indices],
+                row_heights=chunk,
                 has_carry_from_prev=has_carry_from_prev,
                 has_carry_to_next=True,
                 is_last=False,
             )
         )
+        prev_outgoing_carry = out_carry
         next_row += take
 
     return pages if pages and pages[-1].is_last else None
