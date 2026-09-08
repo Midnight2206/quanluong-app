@@ -105,10 +105,18 @@ export function ChungTuPnkBatchSummaryPanel({ batch, open, onOpenChange }) {
   const handleViewFile = async (file) => {
     if (!batchKey || file?.fileId == null) return;
     setActionError(null);
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      const message = "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup cho trang này.";
+      setActionError(message);
+      notifyError(message);
+      return;
+    }
     setBusyActionKey(`view:${file.fileId}`);
     try {
-      await openChungTuPdfBatchFile(batchKey, file.fileId);
+      await openChungTuPdfBatchFile(batchKey, file.fileId, { targetWindow: tab });
     } catch (e) {
+      tab.close();
       const message = e?.data?.message || e?.message || "Không mở được file PDF.";
       setActionError(message);
       notifyError(message);

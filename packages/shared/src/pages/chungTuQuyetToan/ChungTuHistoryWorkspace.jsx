@@ -70,7 +70,8 @@ function formatCreatorLabel(item, currentUser) {
  * }} props
  */
 export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
-  const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
+  // Cùng điều kiện vào trang CTQT: mọi acc đơn vị đều xuất lại/xóa được (không khóa theo người tạo).
+  const canManageHistory = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_READ);
   const currentUser = useCurrentUser();
   const { confirm } = useConfirm();
   const { canPickUnits, unitsForDropdown, effectiveUnitId, persistManualUnitId } = useChungTuUnitScope();
@@ -476,7 +477,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                         <Eye className="size-3.5" aria-hidden />
                         Xem tổng hợp
                       </Button>
-                      {canWrite ? (
+                      {canManageHistory ? (
                         <Button
                           type="button"
                           variant="secondary"
@@ -495,7 +496,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                           Xuất lại
                         </Button>
                       ) : null}
-                      {canWrite ? (
+                      {canManageHistory ? (
                         <Button
                           type="button"
                           variant="dangerGhost"
@@ -641,7 +642,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                         <Eye className="size-3.5" aria-hidden />
                         Xem tổng hợp
                       </Button>
-                      {canWrite ? (
+                      {canManageHistory ? (
                         <Button
                           type="button"
                           variant="secondary"
@@ -659,7 +660,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                           Xuất lại
                         </Button>
                       ) : null}
-                      {canWrite ? (
+                      {canManageHistory ? (
                         <Button
                           type="button"
                           variant="dangerGhost"
@@ -719,7 +720,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                         )}
                         In tất cả
                       </Button>
-                      {canWrite ? (
+                      {canManageHistory ? (
                         <Button
                           type="button"
                           variant="secondary"
@@ -737,7 +738,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                           Xuất lại
                         </Button>
                       ) : null}
-                      {canWrite ? (
+                      {canManageHistory ? (
                         <Button
                           type="button"
                           variant="dangerGhost"

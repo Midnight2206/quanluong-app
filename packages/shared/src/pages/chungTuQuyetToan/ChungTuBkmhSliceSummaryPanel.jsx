@@ -84,10 +84,20 @@ export function ChungTuBkmhSliceSummaryPanel({
 
   const handleViewSlice = async (slice) => {
     setActionError(null);
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      const message = "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup cho trang này.";
+      setActionError(message);
+      notifyError(message);
+      return;
+    }
     setBusyActionKey(`view:${slice.id}`);
     try {
-      await openChungTuBkmhMonthlySliceFile(monthlyIdValue, slice.id);
+      await openChungTuBkmhMonthlySliceFile(monthlyIdValue, slice.id, {
+        targetWindow: tab,
+      });
     } catch (e) {
+      tab.close();
       const message = e?.data?.message || e?.message || "Không mở được file PDF.";
       setActionError(message);
       notifyError(message);
