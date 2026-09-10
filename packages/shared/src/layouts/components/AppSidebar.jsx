@@ -31,9 +31,11 @@ function SidebarExternalLink({ item, pathname, afterNav, classNameBuilder, title
     return null;
   }
   const active = navItemPathMatches(item, pathname);
+  const href =
+    typeof item.resolveHref === "function" ? item.resolveHref() : item.to;
   return (
     <a
-      href={item.to}
+      href={href}
       onClick={afterNav}
       title={title}
       className={classNameBuilder({ isActive: active })}
