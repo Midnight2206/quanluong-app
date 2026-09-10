@@ -88,7 +88,7 @@ function createApp(options = {}) {
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: config.app.isProduction,
+      secure: Boolean(config.app.isProduction || config.auth.cookieDomain),
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: "/",
       ...(config.auth.cookieDomain ? { domain: config.auth.cookieDomain } : {}),

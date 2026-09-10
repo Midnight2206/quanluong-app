@@ -13,10 +13,13 @@ const refreshDays =
 
 const cookieDomainOpts = config.auth.cookieDomain ? { domain: config.auth.cookieDomain } : {};
 
+// Cross-subdomain trên HTTPS: luôn Secure khi có COOKIE_DOMAIN (kể cả NODE_ENV≠production).
+const cookieSecure = Boolean(config.app.isProduction || config.auth.cookieDomain);
+
 const ACCESS_TOKEN_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax",
-  secure: config.app.isProduction,
+  secure: cookieSecure,
   path: "/",
   maxAge: accessTokenExpiresInToCookieMaxAgeMs(config.auth.accessTokenExpiresIn),
   ...cookieDomainOpts,

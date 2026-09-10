@@ -1,5 +1,6 @@
 import path from "node:path";
 import dotenv from "dotenv";
+import { normalizeCookieDomain } from "./cookie-domain.js";
 import { requireEnv } from "./require-env.js";
 
 dotenv.config();
@@ -60,17 +61,14 @@ const env = {
   })(),
   refreshTokenExpiresDays: envPositiveIntDays(process.env.REFRESH_TOKEN_EXPIRES_DAYS, 30),
   /**
-   * Domain chung cho cookie httpOnly (vd. `.example.com`) khi UI app và superadmin là hai subdomain
-   * cùng gọi API — trình duyệt mới gửi `ql.at` / `ql.rt` / `ql.sid` giữa các host con.
-   * Để trống = host-only (mỗi origin một bộ cookie). Dev `:8080` / `:8081` không share được qua biến này.
+   * Domain chung cho cookie httpOnly (vd. `.trankhanhan.site`) khi UI app và superadmin
+   * là hai subdomain. Để trống = host-only.
+   * @see normalizeCookieDomain
    */
-  cookieDomain: (() => {
-    const raw = process.env.COOKIE_DOMAIN;
-    if (raw == null || String(raw).trim() === "") {
-      return undefined;
-    }
-    return String(raw).trim();
-  })(),
+  cookieDomain: normalizeCookieDomain(
+    process.env.COOKIE_DOMAIN,
+    process.env.PUBLIC_WEB_URL,
+  ),
   permissionSyncOnBoot: process.env.PERMISSION_SYNC_ON_BOOT !== "false",
   /** Chỉ chạy khi bật rõ ràng — tránh bootstrap superadmin lặp lại / phụ thuộc mặc định yếu. */
   runSuperadminBootstrap: process.env.RUN_SUPERADMIN_BOOTSTRAP === "true",

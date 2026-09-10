@@ -654,7 +654,7 @@ async function logout({ req, refreshToken }) {
 }
 
 async function authenticateAccessToken({ accessToken, sessionAuth }) {
-  if (!accessToken || !sessionAuth?.userId) {
+  if (!accessToken) {
     throw createAuthError();
   }
 
@@ -666,11 +666,18 @@ async function authenticateAccessToken({ accessToken, sessionAuth }) {
     throw createAuthError();
   }
 
-  if (Number(payload.sub) !== sessionAuth.userId) {
+  const jwtUserId = Number(payload.sub);
+  if (!Number.isFinite(jwtUserId) || jwtUserId <= 0) {
     throw createAuthError();
   }
 
-  const user = await getUserById(sessionAuth.userId);
+  // Session ql.sid có thể chưa share (COOKIE_DOMAIN) hoặc mất — JWT ql.at vẫn đủ để nhận diện.
+  // Nếu session có userId thì bắt buộc khớp JWT (chống lệch phiên).
+  if (sessionAuth?.userId != null && Number(sessionAuth.userId) !== jwtUserId) {
+    throw createAuthError();
+  }
+
+  const user = await getUserById(jwtUserId);
   assertActiveUser(user);
   return user;
 }
