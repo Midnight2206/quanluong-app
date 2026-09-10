@@ -44,6 +44,7 @@ import {
 import {
   createChungTuPdfExportBatch,
   deleteChungTuPdfExportBatch,
+  exportChungTuPdfExportBatchSummaryExcel,
   getChungTuPdfExportBatch,
   listChungTuPdfExportBatches,
   reExportChungTuPdfExportBatch,
@@ -356,6 +357,22 @@ async function streamChungTuPdfExportBatchZipController(req, res) {
     effectiveUnitIds: req.effectiveUnitIds,
   });
   await pipeDocumentServiceResponse(res, upstream, "application/zip");
+}
+
+async function exportChungTuPdfExportBatchExcelController(req, res) {
+  const { buffer, fileName } = await exportChungTuPdfExportBatchSummaryExcel({
+    batchKey: req.validatedParams.batchKey,
+    effectiveUnitIds: req.effectiveUnitIds,
+  });
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${String(fileName).replaceAll('"', "")}"`,
+  );
+  return res.send(buffer);
 }
 
 async function streamChungTuPdfExportBatchMergedPdfController(req, res) {
@@ -938,6 +955,7 @@ export {
   createTemplateCatalogController,
   deleteTemplateCatalogController,
   exportChungTuBkmhMonthlyExcelController,
+  exportChungTuPdfExportBatchExcelController,
   getChungTuBkmhMonthlyController,
   getChungTuDocumentController,
   getChungTuPdfExportBatchController,

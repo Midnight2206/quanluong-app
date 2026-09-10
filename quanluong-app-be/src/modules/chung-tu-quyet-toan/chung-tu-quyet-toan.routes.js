@@ -70,6 +70,7 @@ import {
   streamChungTuBkmhMonthlyMergedPdfController,
   streamChungTuBkmhMonthlySliceFileController,
   streamChungTuBkmhMonthlyZipController,
+  exportChungTuPdfExportBatchExcelController,
   streamChungTuPdfExportBatchFileController,
   streamChungTuPdfExportBatchMergedPdfController,
   streamChungTuPdfExportBatchZipController,
@@ -378,6 +379,13 @@ chungTuQuyetToanRouter.get(
   permissionMiddleware([routePermissions.pdfExportBatchZip]),
   validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
   asyncHandler(streamChungTuPdfExportBatchZipController),
+);
+
+chungTuQuyetToanRouter.get(
+  "/pdf-export-batches/:batchKey/excel",
+  permissionMiddleware([routePermissions.pdfExportBatchExcel]),
+  validateRequest({ params: chungTuPdfExportBatchKeyParamSchema }),
+  asyncHandler(exportChungTuPdfExportBatchExcelController),
 );
 
 chungTuQuyetToanRouter.get(

@@ -74,8 +74,9 @@ test("PNK summary panel exposes per-file metadata and merged zip actions", () =>
   assert.match(pnkPanelSource, /tongTien/);
   assert.match(
     pnkPanelSource,
-    /openChungTuPdfBatchFile|downloadChungTuPdfBatchFile|openChungTuPdfBatchMergedPdf|downloadChungTuPdfBatchZip/i,
+    /openChungTuPdfBatchFile|downloadChungTuPdfBatchFile|openChungTuPdfBatchMergedPdf|downloadChungTuPdfBatchZip|downloadChungTuPdfBatchSummaryExcel/i,
   );
+  assert.match(pnkPanelSource, /Xuất Excel/);
   assert.match(pnkPanelSource, /merged\.pdf|Tải zip|In tất cả/i);
 });
 

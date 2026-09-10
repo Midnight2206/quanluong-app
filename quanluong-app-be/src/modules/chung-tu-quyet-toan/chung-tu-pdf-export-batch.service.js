@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import ExcelJS from "exceljs";
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
@@ -213,10 +214,64 @@ function mapBatchRow(row) {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     zipPath: `/chungtuquyettoan/pdf-export-batches/${row.batchKey}/zip`,
+    excelPath: `/chungtuquyettoan/pdf-export-batches/${row.batchKey}/excel`,
     mergedPdfPath: `/chungtuquyettoan/pdf-export-batches/${row.batchKey}/merged.pdf`,
     tongTienFolder: sumFolderTongTien(files),
     files,
   };
+}
+
+function formatBatchFileDateLabel(file) {
+  const ngay = String(file?.ngayThangNam ?? "").trim();
+  if (ngay) return ngay;
+  const periodDate = String(file?.periodDate ?? "").trim();
+  return periodDate ? periodDate.slice(0, 10) : "—";
+}
+
+/**
+ * Bảng tổng hợp file trong 1 folder PNK/PXK (theo ngày / đơn vị / full).
+ * @param {{ aggregationMode?: string, files?: object[] }} batch
+ */
+async function buildPdfExportBatchSummaryExcelBuffer(batch) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("TongHop");
+  const byUnit = String(batch?.aggregationMode ?? "") === "by-unit";
+  const columns = [
+    { header: "Số chứng từ", key: "soChungTu", width: 18 },
+    { header: "Ngày tháng năm", key: "ngayThangNam", width: 36 },
+  ];
+  if (byUnit) {
+    columns.push({ header: "Tên đơn vị", key: "recipientUnitName", width: 28 });
+  }
+  columns.push({ header: "Tổng tiền", key: "tongTien", width: 16 });
+  sheet.columns = columns;
+  sheet.getRow(1).font = { bold: true };
+
+  const files = Array.isArray(batch?.files) ? batch.files : [];
+  for (const file of files) {
+    const row = {
+      soChungTu: file.soChungTu || "—",
+      ngayThangNam: formatBatchFileDateLabel(file),
+      tongTien: file.tongTien == null ? null : Number(file.tongTien),
+    };
+    if (byUnit) {
+      row.recipientUnitName = file.recipientUnitName || "—";
+    }
+    sheet.addRow(row);
+  }
+  sheet.getColumn("tongTien").numFmt = "#,##0";
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
+async function exportChungTuPdfExportBatchSummaryExcel({ batchKey, effectiveUnitIds }) {
+  const batch = await getChungTuPdfExportBatch({ batchKey, effectiveUnitIds });
+  const buffer = await buildPdfExportBatchSummaryExcelBuffer(batch);
+  const categorySlug = String(batch.categoryKey ?? "batch").replace(/[^a-z0-9-]+/gi, "") || "batch";
+  const periodPart = batch.periodMonth
+    ? String(batch.periodMonth)
+    : String(batch.periodDate ?? "").slice(0, 10) || "ky";
+  const fileName = `${categorySlug}-tong-hop-${periodPart}-${batch.batchKey}.xlsx`;
+  return { buffer, fileName, rowCount: batch.files?.length ?? 0 };
 }
 
 async function loadBatchRowOrThrow(batchKey) {
@@ -766,8 +821,10 @@ async function reExportChungTuPdfExportBatch({
 }
 
 export {
+  buildPdfExportBatchSummaryExcelBuffer,
   createChungTuPdfExportBatch,
   deleteChungTuPdfExportBatch,
+  exportChungTuPdfExportBatchSummaryExcel,
   getChungTuPdfExportBatch,
   getChungTuPdfExportBatchFolder,
   listChungTuPdfExportBatches,
