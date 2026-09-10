@@ -48,15 +48,18 @@ export const mainNavItems = [
 
 /**
  * Sidebar superadmin trên app chính: «Quản trị hệ thống» mở cổng superadmin
- * (Next :3000→:3001, Docker :8080→:8081; hoặc NEXT_PUBLIC_SUPERADMIN_ORIGIN khi build).
+ * (Next :3000→:3001, Docker :8080→:8081; prod quanluong.* → admin-quanluong.*;
+ * hoặc NEXT_PUBLIC_SUPERADMIN_ORIGIN khi build — không bake origin lúc import module).
  */
 export const superadminNavItems = [
   { to: "/", label: "Trang chủ", icon: Home },
   {
-    to: `${getSuperadminAppOrigin()}/dashboard`,
+    to: "/dashboard",
     label: "Quản trị hệ thống",
     icon: LayoutDashboard,
     external: true,
+    // Resolve lúc render/click — tránh localhost bake-in từ Docker build trên prod.
+    resolveHref: () => `${getSuperadminAppOrigin()}/dashboard`,
   },
   {
     to: "/lttp-nhap-xuat",
