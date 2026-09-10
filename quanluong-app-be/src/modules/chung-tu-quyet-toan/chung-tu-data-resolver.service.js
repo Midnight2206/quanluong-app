@@ -303,7 +303,7 @@ function mapLineRow(line, index) {
     maSo: commodity?.code ?? line?.maSo ?? "",
     dvt: commodity?.measureUnit ?? line?.dvt ?? "",
     nguoiBan: supplierName,
-    yeuCau: requiredQty != null ? formatViNumber(requiredQty) : "",
+    yeuCau: (requiredQty ?? qty) != null ? formatViNumber(requiredQty ?? qty) : "",
     thucXuat: qty != null ? formatViNumber(qty) : "",
     thucNhap: qty != null ? formatViNumber(qty) : "",
     soLuong: qty != null ? formatViNumber(qty) : "",

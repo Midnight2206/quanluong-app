@@ -122,6 +122,34 @@ test("aggregateLinesToDetailRows formats thousand separators on quantity", () =>
   assert.equal(rows[0].thanhTien, "31.000.000");
 });
 
+test("aggregateLinesToDetailRows fills yeuCau from thucNhap/thucXuat when required missing", () => {
+  const rows = aggregateLinesToDetailRows([
+    {
+      commodity: { id: 1, name: "Gạo", measureUnit: "Kg" },
+      quantity: 5,
+      unitPrice: 10000,
+      amount: 50000,
+    },
+  ]);
+  assert.equal(rows[0].yeuCau, "5");
+  assert.equal(rows[0].thucNhap, "5");
+  assert.equal(rows[0].thucXuat, "5");
+});
+
+test("aggregateLinesToDetailRows keeps explicit requiredQuantity for yeuCau", () => {
+  const rows = aggregateLinesToDetailRows([
+    {
+      commodity: { id: 1, name: "Gạo", measureUnit: "Kg" },
+      quantity: 5,
+      requiredQuantity: 3,
+      unitPrice: 10000,
+      amount: 50000,
+    },
+  ]);
+  assert.equal(rows[0].yeuCau, "3");
+  assert.equal(rows[0].thucNhap, "5");
+});
+
 test("aggregateLinesToDetailRows renumbers stt after merge", () => {
   const rows = aggregateLinesToDetailRows([
     {

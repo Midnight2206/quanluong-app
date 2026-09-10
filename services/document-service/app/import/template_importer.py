@@ -410,6 +410,7 @@ def parse_template(
     columns = []
     header_top_row = header_bounds[1]
     header_bottom_row = header_bounds[3]
+    data_row = data_bounds[1]
     for min_col, max_col in header_groups:
         cell = _header_title_source_cell(header_sheet, header_bottom_row, min_col)
         title = _column_header_title(header_sheet, header_bounds, min_col)
@@ -419,7 +420,9 @@ def parse_template(
                 f"Tiêu đề cột không tạo được key hợp lệ: {title!r}"
             )
         key = unique_column_key(base_key, used_keys)
-        align_h = cell.alignment.horizontal or "left"
+        # Căn ngang từng cột lấy từ TABLE_DATA_ROW (mẫu dòng dữ liệu), không lấy header.
+        data_cell = data_sheet.cell(data_row, min_col)
+        align_h = data_cell.alignment.horizontal or "left"
         if align_h not in {"left", "center", "right"}:
             align_h = "left"
         columns.append(
