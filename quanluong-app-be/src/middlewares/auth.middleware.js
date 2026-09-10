@@ -7,8 +7,8 @@ import {
 } from "../modules/auth/auth.service.js";
 
 /**
- * Cookie access (`ql.at`) là session cookie (hết khi đóng trình duyệt); session `ql.sid` và refresh `ql.rt` có maxAge.
- * Khi chỉ còn sid+rt, thử refresh giống axios — tránh 401 trên fetch không qua interceptor (vd. OAuth Drive).
+ * Cookie access (`ql.at`) + optional session `ql.sid`; khi access hết hạn còn `ql.rt` thì refresh.
+ * JWT hợp lệ đủ để auth kể cả khi session chưa share qua COOKIE_DOMAIN.
  */
 async function authMiddleware(req, res, next) {
   const accessToken = req.cookies?.[AUTH_COOKIE_NAMES.ACCESS_TOKEN];
