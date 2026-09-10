@@ -339,6 +339,28 @@ def test_table_data_row_still_rejects_multi_row():
         _parse_template(changed)
 
 
+def test_column_align_h_comes_from_table_data_row_not_header():
+    """align_h từng cột lấy từ TABLE_DATA_ROW (không lấy từ tiêu đề)."""
+    workbook = load_workbook(BytesIO(make_minimal_template()))
+    sheet = workbook["ChungTu"]
+    # Header center everywhere — nếu đọc nhầm header sẽ ra center.
+    for col in range(1, 8):
+        sheet.cell(5, col).alignment = Alignment(horizontal="center")
+    sheet["A6"].alignment = Alignment(horizontal="center")
+    sheet["B6"].alignment = Alignment(horizontal="left")
+    sheet["D6"].alignment = Alignment(horizontal="right")
+    sheet["E6"].alignment = Alignment(horizontal="right")
+    sheet["G6"].alignment = Alignment(horizontal="left")
+
+    metadata = _parse_template(_save_workbook(workbook))
+    by_key = {column.key: column.align_h for column in metadata.table.columns}
+    assert by_key["stt"] == "center"
+    assert by_key["ten_hang"] == "left"
+    assert by_key["dvt"] == "right"
+    assert by_key["so_luong"] == "right"
+    assert by_key["ghi_chu"] == "left"
+
+
 def test_field_geometry_uses_enclosing_merge():
     """FIELD_* on one cell inside a larger merge uses full merge box."""
     from app.template.page_size import page_dimensions
