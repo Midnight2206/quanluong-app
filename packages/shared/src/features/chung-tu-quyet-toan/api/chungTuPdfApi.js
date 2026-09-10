@@ -444,6 +444,25 @@ export async function downloadChungTuPdfBatchZip(batchKey) {
   downloadBlobAsFile(zipBlob, fileName);
 }
 
+export async function downloadChungTuPdfBatchSummaryExcel(batchKey) {
+  const key = batchKey != null ? String(batchKey).trim() : "";
+  const { data: blob, headers } = await apiRequest({
+    url: `/chungtuquyettoan/pdf-export-batches/${encodeURIComponent(key)}/excel`,
+    method: "get",
+    responseType: "blob",
+    returnHeaders: true,
+  });
+  const excelBlob =
+    blob instanceof Blob
+      ? blob
+      : new Blob([blob], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+  const cd = headers?.["content-disposition"] ?? headers?.["Content-Disposition"];
+  const fileName = filenameFromContentDisposition(cd) ?? `${key}-tong-hop.xlsx`;
+  downloadBlobAsFile(excelBlob, fileName);
+}
+
 export async function openChungTuPdfBatchMergedPdf(batchKey, options = {}) {
   const key = batchKey != null ? String(batchKey).trim() : "";
   const { targetWindow = null } = options ?? {};

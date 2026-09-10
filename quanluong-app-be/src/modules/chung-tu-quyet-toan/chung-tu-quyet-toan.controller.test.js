@@ -39,6 +39,10 @@ const listChungTuPdfExports = mock.fn(async () => []);
 
 const createChungTuPdfExportBatch = mock.fn(async () => ({ batchKey: "batch_1" }));
 const deleteChungTuPdfExportBatch = mock.fn(async () => ({}));
+const exportChungTuPdfExportBatchSummaryExcel = mock.fn(async () => ({
+  buffer: Buffer.from("xlsx"),
+  fileName: "batch-summary.xlsx",
+}));
 const getChungTuPdfExportBatch = mock.fn(async () => ({}));
 const listChungTuPdfExportBatches = mock.fn(async () => []);
 const streamChungTuPdfExportBatchFile = mock.fn(async () => ({}));
@@ -143,6 +147,7 @@ mock.module("./chung-tu-pdf-export-batch.service.js", {
   exports: {
     createChungTuPdfExportBatch,
     deleteChungTuPdfExportBatch,
+    exportChungTuPdfExportBatchSummaryExcel,
     getChungTuPdfExportBatch,
     listChungTuPdfExportBatches,
     streamChungTuPdfExportBatchFile,

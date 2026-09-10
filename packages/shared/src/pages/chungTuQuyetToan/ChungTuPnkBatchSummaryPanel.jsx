@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Eye, Loader2, Printer, X } from "lucide-react";
+import { Download, Eye, FileSpreadsheet, Loader2, Printer, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import {
 } from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
 import {
   downloadChungTuPdfBatchFile,
+  downloadChungTuPdfBatchSummaryExcel,
   downloadChungTuPdfBatchZip,
   openChungTuPdfBatchFile,
   openChungTuPdfBatchMergedPdf,
@@ -18,6 +19,12 @@ import { notifyError, notifySuccess } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { cn } from "@/utils/cn";
 import { formatPeriodMonth } from "@/pages/chungTuQuyetToan/chungTuFormat";
+
+function folderSummaryTitle(categoryKey) {
+  if (categoryKey === "phieu-xuat-kho") return "Tổng hợp folder PXK";
+  if (categoryKey === "phieu-nhap-kho") return "Tổng hợp folder PNK";
+  return "Tổng hợp folder";
+}
 
 function formatBatchPeriodLabel(batch) {
   if (batch?.periodMonth) {
@@ -44,6 +51,7 @@ function formatAggregationModeLabel(value, labels) {
  * @param {{
  *   batch: {
  *     batchKey?: string,
+ *     categoryKey?: string|null,
  *     displayName?: string,
  *     periodMonth?: string|null,
  *     periodDate?: string|null,
@@ -189,6 +197,22 @@ export function ChungTuPnkBatchSummaryPanel({ batch, open, onOpenChange }) {
     }
   };
 
+  const handleExportExcel = async () => {
+    if (!batchKey || files.length === 0) return;
+    setActionError(null);
+    setBusyActionKey("excel");
+    try {
+      await downloadChungTuPdfBatchSummaryExcel(batchKey);
+      notifySuccess("Đã tải file Excel tổng hợp.");
+    } catch (e) {
+      const message = e?.data?.message || e?.message || "Không xuất được file Excel.";
+      setActionError(message);
+      notifyError(message);
+    } finally {
+      setBusyActionKey("");
+    }
+  };
+
   const handlePrintMerged = async () => {
     if (!batchKey) return;
     setActionError(null);
@@ -239,7 +263,9 @@ export function ChungTuPnkBatchSummaryPanel({ batch, open, onOpenChange }) {
       >
         <header className="flex items-start justify-between gap-3 border-b border-border px-3 py-3 sm:px-4">
           <div className="min-w-0 space-y-1">
-            <h2 className="text-sm font-semibold text-foreground">Tổng hợp folder PNK</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              {folderSummaryTitle(batch.categoryKey)}
+            </h2>
             <p className="text-[11px] leading-snug text-muted-foreground">
               {batch.displayName || "Xem các file PDF đã tạo trong folder này."}
             </p>
@@ -278,6 +304,20 @@ export function ChungTuPnkBatchSummaryPanel({ batch, open, onOpenChange }) {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-10 gap-1.5 text-xs"
+              disabled={busyActionKey !== "" || !batchKey || files.length === 0}
+              onClick={handleExportExcel}
+            >
+              {busyActionKey === "excel" ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <FileSpreadsheet className="size-3.5" aria-hidden />
+              )}
+              Xuất Excel
+            </Button>
             <Button
               type="button"
               variant="secondary"

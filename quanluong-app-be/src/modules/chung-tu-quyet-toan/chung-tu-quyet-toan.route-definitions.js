@@ -293,6 +293,18 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "pdfExportBatchExcel",
+    method: "GET",
+    module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
+    path: "/pdf-export-batches/:batchKey/excel",
+    pathRoute: "/api/chungtuquyettoan/pdf-export-batches/:batchKey/excel",
+    permission: {
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      name: "Chứng từ quyết toán",
+      description: "Xuất Excel tổng hợp các phiếu trong một lô xuất PDF (PNK/PXK).",
+    },
+  },
+  {
     key: "pdfExportBatchMergedPdf",
     method: "GET",
     module: CHUNG_TU_QUYET_TOAN_MODULE_NAME,
