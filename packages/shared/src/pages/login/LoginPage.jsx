@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
+  isSuperadminUser,
   resolvePostLoginPath,
   SUPERADMIN_PORTAL_CHOOSER_PATH,
 } from "@/utils/postLoginPath";
@@ -15,6 +16,7 @@ import { useLoginMutation } from "@/features/auth/api/authApi";
 import { loginSchema } from "@/features/auth/schemas/authSchemas";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { getApiBaseUrl } from "@/utils/runtimeEnv";
+import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 const GOOGLE_LOGIN_ERROR_MESSAGES = {
   denied: "Bạn đã huỷ đăng nhập Google.",
@@ -96,6 +98,11 @@ export function LoginPage() {
     try {
       const user = await login(values).unwrap();
       notifySuccess("Đăng nhập thành công");
+      // Từ cổng admin (không có session / cookie domain) → về thẳng dashboard admin.
+      if (isSuperadminUser(user) && searchParams.get("portal") === "admin") {
+        window.location.assign(`${getSuperadminAppOrigin()}/dashboard`);
+        return;
+      }
       const next = resolvePostLoginPath(user, searchParams.get("from"));
       router.replace(next);
     } catch (error) {

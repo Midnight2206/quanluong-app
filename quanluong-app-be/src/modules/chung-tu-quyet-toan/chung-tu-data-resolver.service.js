@@ -288,6 +288,8 @@ function mapLineRow(line, index) {
   const requiredQty = sanitizeDecimal(
     toFiniteNumber(line?.requiredQuantity) ?? toFiniteNumber(line?.yeuCau),
   );
+  // 0 / null = không có số liệu yêu cầu → lấy thực nhập/thực xuất (PXK/PNK thường lưu 0).
+  const yeuCauQty = requiredQty != null && requiredQty !== 0 ? requiredQty : qty;
   const unitPrice = sanitizeDecimal(
     toFiniteNumber(line?.unitPrice) ?? parseTongTien(line?.donGia),
   );
@@ -303,7 +305,7 @@ function mapLineRow(line, index) {
     maSo: commodity?.code ?? line?.maSo ?? "",
     dvt: commodity?.measureUnit ?? line?.dvt ?? "",
     nguoiBan: supplierName,
-    yeuCau: (requiredQty ?? qty) != null ? formatViNumber(requiredQty ?? qty) : "",
+    yeuCau: yeuCauQty != null ? formatViNumber(yeuCauQty) : "",
     thucXuat: qty != null ? formatViNumber(qty) : "",
     thucNhap: qty != null ? formatViNumber(qty) : "",
     soLuong: qty != null ? formatViNumber(qty) : "",
@@ -450,10 +452,11 @@ function aggregateLinesToDetailRows(rawLines) {
     }
     const qty = Number(line.quantity);
     const amount = Number(line.amount);
-    const requiredQty = Number(line.requiredQuantity);
+    // Không dùng Number(null)===0 — coi null/0 là chưa có yêu cầu.
+    const requiredQty = toFiniteNumber(line.requiredQuantity);
     if (Number.isFinite(qty)) group.quantity += qty;
     if (Number.isFinite(amount)) group.amount += amount;
-    if (Number.isFinite(requiredQty)) {
+    if (requiredQty != null && requiredQty !== 0) {
       group.requiredQuantity += requiredQty;
       group.hasRequiredQuantity = true;
     }

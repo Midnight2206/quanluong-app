@@ -8,4 +8,6 @@ test("LoginPage uses resolvePostLoginPath and Google from chooser", () => {
   assert.match(src, /resolvePostLoginPath/);
   assert.match(src, /SUPERADMIN_PORTAL_CHOOSER_PATH/);
   assert.match(src, /login\(values\)\.unwrap\(\)/);
+  assert.match(src, /searchParams\.get\("portal"\) === "admin"/);
+  assert.match(src, /getSuperadminAppOrigin/);
 });

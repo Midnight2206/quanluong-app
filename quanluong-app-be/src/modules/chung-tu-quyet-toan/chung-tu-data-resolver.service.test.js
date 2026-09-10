@@ -136,6 +136,29 @@ test("aggregateLinesToDetailRows fills yeuCau from thucNhap/thucXuat when requir
   assert.equal(rows[0].thucXuat, "5");
 });
 
+test("aggregateLinesToDetailRows treats requiredQuantity 0/null as missing yeuCau", () => {
+  const rows = aggregateLinesToDetailRows([
+    {
+      commodity: { id: 1, name: "Gạo", measureUnit: "Kg" },
+      quantity: 5,
+      requiredQuantity: 0,
+      unitPrice: 10000,
+      amount: 50000,
+    },
+    {
+      commodity: { id: 2, name: "Thịt", measureUnit: "Kg" },
+      quantity: 2,
+      requiredQuantity: null,
+      unitPrice: 12000,
+      amount: 24000,
+    },
+  ]);
+  assert.equal(rows[0].yeuCau, "5");
+  assert.equal(rows[0].thucXuat, "5");
+  assert.equal(rows[1].yeuCau, "2");
+  assert.equal(rows[1].thucXuat, "2");
+});
+
 test("aggregateLinesToDetailRows keeps explicit requiredQuantity for yeuCau", () => {
   const rows = aggregateLinesToDetailRows([
     {
