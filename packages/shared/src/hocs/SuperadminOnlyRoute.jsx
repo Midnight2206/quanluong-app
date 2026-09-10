@@ -12,7 +12,8 @@ export function SuperadminOnlyRoute({ children }) {
 
   useEffect(() => {
     if (initialized && !isAuthenticated) {
-      window.location.replace(`${getMainAppOrigin()}/login`);
+      // Đăng nhập trên app chính (cần COOKIE_DOMAIN chung), rồi quay lại cổng admin.
+      window.location.replace(`${getMainAppOrigin()}/login?portal=admin`);
     }
   }, [initialized, isAuthenticated]);
 
