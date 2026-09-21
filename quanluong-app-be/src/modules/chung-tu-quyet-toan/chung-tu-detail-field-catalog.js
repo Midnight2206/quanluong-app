@@ -11,6 +11,8 @@ export const CHUNG_TU_DETAIL_FIELD_CATALOG = Object.freeze([
   { fieldKey: "yeuCau", label: "Yêu cầu (số lượng)", group: "phieu" },
   { fieldKey: "thucXuat", label: "Thực xuất (số lượng)", group: "phieu" },
   { fieldKey: "thucNhap", label: "Thực nhập (số lượng)", group: "phieu" },
+  { fieldKey: "muaTt", label: "Mua TT (số lượng)", group: "lttp" },
+  { fieldKey: "tgsx", label: "TGSX (số lượng)", group: "lttp" },
   { fieldKey: "soLuong", label: "Số lượng", group: "chung" },
   { fieldKey: "donGia", label: "Đơn giá", group: "chung" },
   { fieldKey: "thanhTien", label: "Thành tiền", group: "chung" },
@@ -46,6 +48,8 @@ export function guessDetailFieldKeyFromLabel(label) {
   if (/yeu cau|theo nhu cau|dat hang/.test(text)) return "yeuCau";
   if (/thuc nhap|nhap thuc te/.test(text)) return "thucNhap";
   if (/thuc xuat|xuat thuc te/.test(text)) return "thucXuat";
+  if (/mua\s*tt|mua truc tiep/.test(text)) return "muaTt";
+  if (/\btgsx\b|gia thanh/.test(text)) return "tgsx";
   if (/so luong|\bsl\b/.test(text)) return "soLuong";
   if (/don gia|gia ban|gia xuat/.test(text)) return "donGia";
   if (/thanh tien|tong tien|so tien/.test(text)) return "thanhTien";

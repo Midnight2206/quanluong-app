@@ -45,7 +45,7 @@ import {
   updateIssueSlip,
   upsertIssueFormDefaults,
 } from "./lttp.service.js";
-import { buildIssueSlipPdfBuffer } from "./lttp-issue-slip-pdf.js";
+import { buildIssueSlipDocumentPdfBuffer } from "./lttp-issue-slip-document.service.js";
 import { mergePdfBuffers } from "./lttp-pdf-merge.js";
 
 const importBodySchema = z.object({
@@ -409,16 +409,12 @@ async function exportIssueSlipPdfController(req, res) {
     req.effectiveUnitIds,
     req.dataScope,
   );
-  const pdfBuffer = await buildIssueSlipPdfBuffer(row);
-  const safeBook = row?.bookMmyy ? String(row.bookMmyy) : "book";
-  const safeNo =
-    row?.slipNo != null && Number.isFinite(Number(row.slipNo))
-      ? String(Number(row.slipNo)).padStart(4, "0")
-      : "0000";
-  const filename = `lttp-phieu-xuat-${safeBook}-${safeNo}.pdf`;
+  const { buffer, fileName } = await buildIssueSlipDocumentPdfBuffer(row, {
+    exportingUserProfile: req.user?.profile ?? null,
+  });
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
-  res.send(pdfBuffer);
+  res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
+  res.send(buffer);
 }
 
 async function exportIssueSlipsPdfMergedController(req, res) {
@@ -432,9 +428,11 @@ async function exportIssueSlipsPdfMergedController(req, res) {
     }
   }
   const buffers = [];
+  const exportingUserProfile = req.user?.profile ?? null;
   for (const id of ids) {
     const row = await getIssueSlipById(id, req.unitScope, req.effectiveUnitIds, req.dataScope);
-    buffers.push(await buildIssueSlipPdfBuffer(row));
+    const { buffer } = await buildIssueSlipDocumentPdfBuffer(row, { exportingUserProfile });
+    buffers.push(buffer);
   }
   const merged = await mergePdfBuffers(buffers);
   res.setHeader("Content-Type", "application/pdf");
@@ -449,6 +447,7 @@ async function createIssueSlipController(req, res) {
     req.unitScope,
     req.effectiveUnitIds,
     req.dataScope,
+    req.user.unitId,
   );
   return respondCreated(res, {
     message: "Đã lưu phiếu xuất",
@@ -462,6 +461,7 @@ async function deleteIssueSlipController(req, res) {
     req.unitScope,
     req.effectiveUnitIds,
     req.dataScope,
+    req.user.unitId,
   );
   return respondSuccess(res, {
     message: "Đã xóa phiếu xuất",
@@ -476,6 +476,7 @@ async function updateIssueSlipController(req, res) {
     req.unitScope,
     req.effectiveUnitIds,
     req.dataScope,
+    req.user.unitId,
   );
   return respondSuccess(res, {
     message: "Đã cập nhật phiếu xuất",
@@ -489,6 +490,7 @@ async function resyncIssueSlipPricesController(req, res) {
     req.unitScope,
     req.effectiveUnitIds,
     req.dataScope,
+    req.user.unitId,
   );
   return respondSuccess(res, {
     message: "Đã đồng bộ đơn giá các dòng theo bảng giá hiệu lực tại ngày phiếu",
@@ -524,6 +526,32 @@ async function putIssueFormDefaultsController(req, res) {
     req.dataScope,
   );
   return respondSuccess(res, { message: "Đã lưu mẫu in", data });
+}
+
+async function getIssueSlipSignatureSettingsController(req, res) {
+  const { getLttpIssueSlipSignatureSettings } = await import(
+    "./lttp-issue-slip-signature-settings.service.js"
+  );
+  const data = await getLttpIssueSlipSignatureSettings(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Cài đặt chữ ký phiếu xuất", data });
+}
+
+async function putIssueSlipSignatureSettingsController(req, res) {
+  const { upsertLttpIssueSlipSignatureSettings } = await import(
+    "./lttp-issue-slip-signature-settings.service.js"
+  );
+  const data = await upsertLttpIssueSlipSignatureSettings(
+    { ...req.validatedBody, updatedById: req.user.id },
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã lưu cài đặt chữ ký", data });
 }
 
 async function listBuyerUsersController(req, res) {
@@ -599,6 +627,8 @@ export {
   getCommodityController,
   putLttpCommodityDefaultSupplierController,
   getIssueFormDefaultsController,
+  getIssueSlipSignatureSettingsController,
+  putIssueSlipSignatureSettingsController,
   getDailyOrderSummaryController,
   getRecipientDefaultUserByUnitController,
   getIssueSlipController,

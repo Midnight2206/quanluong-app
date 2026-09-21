@@ -3,6 +3,8 @@ export const CHUNG_TU_CATEGORY_KEYS = Object.freeze({
   BANG_KE_MUA_HANG: "bang-ke-mua-hang",
   PHIEU_XUAT_KHO: "phieu-xuat-kho",
   PHIEU_NHAP_KHO: "phieu-nhap-kho",
+  /** Phiếu xuất vận hành LTTP (Nhập xuất) — PDF document-service; không phải tab CTQT. */
+  LTTP_PHIEU_XUAT: "lttp-phieu-xuat",
 });
 
 export const CHUNG_TU_CATEGORY_LIST = Object.freeze([
@@ -23,6 +25,20 @@ export const CHUNG_TU_CATEGORY_LIST = Object.freeze([
     label: "Phiếu nhập kho",
     mode: "by-date",
     folderName: "phieu-nhap-kho",
+  },
+]);
+
+/** Category PDF được upload/publish nhưng không hiện tab Chứng từ quyết toán / seed Drive CTQT. */
+export const CHUNG_TU_OPERATIONAL_PDF_CATEGORY_KEYS = Object.freeze([
+  CHUNG_TU_CATEGORY_KEYS.LTTP_PHIEU_XUAT,
+]);
+
+export const CHUNG_TU_OPERATIONAL_PDF_CATEGORY_LIST = Object.freeze([
+  {
+    key: CHUNG_TU_CATEGORY_KEYS.LTTP_PHIEU_XUAT,
+    label: "Phiếu xuất kho (Nhập xuất LTTP)",
+    mode: "by-slip",
+    folderName: "lttp-phieu-xuat",
   },
 ]);
 
@@ -89,6 +105,21 @@ export const CHUNG_TU_CATEGORY_EXTRA_DERIVED_NAMED_RANGES = Object.freeze({
     "xuatTaiKho",
     "diaDiem",
   ]),
+  [CHUNG_TU_CATEGORY_KEYS.LTTP_PHIEU_XUAT]: Object.freeze([
+    "printLine1",
+    "printLine2",
+    "donViCapTren",
+    "formMauSo",
+    "nguoiNhan",
+    "donVi",
+    "nhanTaiKho",
+    "lyDoSuDung",
+    "ngayGiao",
+    "ngayNhan",
+    "boPhan",
+    "nguoiVietPhieu",
+    "nguoiDuyet",
+  ]),
 });
 
 export function getDerivedNamedRangeNamesForCategory(categoryKey) {
@@ -140,6 +171,25 @@ export const CHUNG_TU_DEFAULT_SHEET_TABLE = Object.freeze({
     rowHeightPt: 18,
     totalLabel: "Tổng cộng",
   },
+  [CHUNG_TU_CATEGORY_KEYS.LTTP_PHIEU_XUAT]: {
+    startRow: 9,
+    startCol: 0,
+    templateRow: 9,
+    totalTemplateRow: 10,
+    columns: [
+      "stt",
+      "tenHang",
+      "maSo",
+      "dvt",
+      "muaTt",
+      "tgsx",
+      "donGia",
+      "thanhTien",
+      "ghiChu",
+    ],
+    rowHeightPt: 18,
+    totalLabel: "Tổng cộng",
+  },
 });
 
 /**
@@ -169,6 +219,17 @@ export const CHUNG_TU_CATEGORY_COLUMN_SLOTS = Object.freeze({
     { col: 7, label: "Số lượng (Thực xuất)", defaultFieldKey: "thucXuat" },
     { col: 8, label: "Đơn giá", defaultFieldKey: "donGia" },
     { col: 9, label: "Thành tiền", defaultFieldKey: "thanhTien" },
+  ]),
+  [CHUNG_TU_CATEGORY_KEYS.LTTP_PHIEU_XUAT]: Object.freeze([
+    { col: 0, label: "STT", defaultFieldKey: "stt" },
+    { col: 1, label: "Tên, quy cách vật tư, sản phẩm", defaultFieldKey: "tenHang" },
+    { col: 2, label: "Mã", defaultFieldKey: "maSo" },
+    { col: 3, label: "ĐV", defaultFieldKey: "dvt" },
+    { col: 4, label: "Mua TT", defaultFieldKey: "muaTt" },
+    { col: 5, label: "TGSX", defaultFieldKey: "tgsx" },
+    { col: 6, label: "Giá", defaultFieldKey: "donGia" },
+    { col: 7, label: "Thành tiền", defaultFieldKey: "thanhTien" },
+    { col: 8, label: "Ghi chú", defaultFieldKey: "ghiChu" },
   ]),
 });
 
@@ -240,7 +301,11 @@ export function isIncompleteColumnSlotConfig(savedMappings, suggestedSlots) {
 
 export function getCategoryMeta(categoryKey) {
   const k = String(categoryKey ?? "").trim();
-  return CHUNG_TU_CATEGORY_LIST.find((c) => c.key === k) ?? null;
+  return (
+    CHUNG_TU_CATEGORY_LIST.find((c) => c.key === k) ??
+    CHUNG_TU_OPERATIONAL_PDF_CATEGORY_LIST.find((c) => c.key === k) ??
+    null
+  );
 }
 
 export function assertKnownCategoryKey(categoryKey) {

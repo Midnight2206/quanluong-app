@@ -35,8 +35,16 @@ from app.render.signature_block import (
 )
 from app.render.text_wrap import compute_row_height, line_height_for
 from app.template.demo_metadata import build_demo_metadata
-from app.template.metadata import SignatureBlockConfig, StaticCellMeta, TemplateMetadata
+from app.template.metadata import (
+    FieldMeta,
+    SignatureBlockConfig,
+    StaticCellMeta,
+    TemplateMetadata,
+)
 from app.template.page_size import page_dimensions
+
+# Khoảng sau dòng tổng tiền bằng chữ → cụm FIELD below_table.
+BELOW_TABLE_GAP_AFTER_AMOUNT_PT = 6.0
 
 
 @dataclass(frozen=True)
@@ -45,6 +53,138 @@ class _RenderColumn:
     title: str
     width: float
     align: str
+
+
+def _below_table_fields(metadata: TemplateMetadata) -> list[FieldMeta]:
+    return [
+        field
+        for field in metadata.fields
+        if field.below_table and not should_skip_scalar_field(field.field_name)
+    ]
+
+
+def _field_height_pt(field: FieldMeta) -> float:
+    if field.height_pt and field.height_pt > 0:
+        return float(field.height_pt)
+    _, font_size = render_font(field.font)
+    return line_height_for(font_size)
+
+
+def _below_table_cluster_span_pt(fields: list[FieldMeta]) -> float:
+    """Chiều cao cụm từ đỉnh field cao nhất tới đáy field thấp nhất."""
+    if not fields:
+        return 0.0
+    tops = [float(field.y) for field in fields]
+    bottoms = [float(field.y) - _field_height_pt(field) for field in fields]
+    return max(tops) - min(bottoms)
+
+
+def _below_table_y_offset(fields: list[FieldMeta], y_after_amount: float) -> float:
+    """Offset để đỉnh cụm below_table nằm ngay dưới dòng tổng tiền bằng chữ."""
+    if not fields:
+        return 0.0
+    cluster_top = max(float(field.y) for field in fields)
+    target_top = y_after_amount - BELOW_TABLE_GAP_AFTER_AMOUNT_PT
+    return target_top - cluster_top
+
+
+def _draw_one_static_field(
+    pdf: canvas.Canvas,
+    *,
+    field: FieldMeta,
+    value: str,
+    content_width: float,
+    y_offset: float = 0.0,
+) -> None:
+    width = field.width_pt
+    height = field.height_pt
+    y_top = float(field.y) + y_offset
+    if width and height and width > 0 and height > 0:
+        draw_static_cell(
+            pdf,
+            x=field.x,
+            y=y_top - height,
+            width=width,
+            height=height,
+            value=value,
+            font=field.font,
+            align=field.align,
+            border=field.border,
+        )
+        return
+    font_name, font_size = render_font(field.font)
+    align = (field.align or {}).get("h", "left")
+    draw_text(
+        pdf,
+        x=field.x,
+        y=y_top,
+        text=value,
+        font_name=font_name,
+        font_size=font_size,
+        align=align,
+        max_width=content_width if align == "center" else None,
+    )
+
+
+def _draw_static_fields(
+    pdf: canvas.Canvas,
+    *,
+    metadata: TemplateMetadata,
+    fields: dict[str, str],
+    content_width: float,
+) -> None:
+    for field in metadata.fields:
+        if should_skip_scalar_field(field.field_name):
+            continue
+        # below_table: vẽ sau bảng trên trang cuối (theo chiều cao bảng thật).
+        if field.below_table:
+            continue
+        value = f"{field.label_prefix}{fields.get(field.field_name, '')}"
+        _draw_one_static_field(
+            pdf,
+            field=field,
+            value=value,
+            content_width=content_width,
+        )
+
+
+def _draw_floated_below_table(
+    pdf: canvas.Canvas,
+    *,
+    metadata: TemplateMetadata,
+    fields: dict[str, str],
+    content_width: float,
+    y_after_amount: float,
+    signature_cells: list[StaticCellMeta],
+) -> float:
+    """Vẽ FIELD_* below_table (+ static signature) neo theo đáy bảng; trả y đáy cụm."""
+    below = _below_table_fields(metadata)
+    if not below and not signature_cells:
+        return y_after_amount
+    if not below:
+        # Không có FIELD float — giữ static chữ ký tuyệt đối như cũ.
+        _draw_static_cells(pdf, signature_cells)
+        return y_after_amount
+
+    offset = _below_table_y_offset(below, y_after_amount)
+    for field in below:
+        value = f"{field.label_prefix}{fields.get(field.field_name, '')}"
+        _draw_one_static_field(
+            pdf,
+            field=field,
+            value=value,
+            content_width=content_width,
+            y_offset=offset,
+        )
+    if signature_cells:
+        _draw_static_cells(pdf, signature_cells, y_offset=offset)
+
+    bottoms = [float(field.y) + offset - _field_height_pt(field) for field in below]
+    if signature_cells:
+        bottoms.extend(float(cell.y) + offset for cell in signature_cells)
+    return min(bottoms) if bottoms else y_after_amount
+
+
 
 
 def _style_font(style: dict | None, key: str) -> tuple[str, float]:
@@ -194,47 +334,6 @@ def _draw_table_header(
     return y
 
 
-def _draw_static_fields(
-    pdf: canvas.Canvas,
-    *,
-    metadata: TemplateMetadata,
-    fields: dict[str, str],
-    content_width: float,
-) -> None:
-    for field in metadata.fields:
-        if should_skip_scalar_field(field.field_name):
-            continue
-        value = f"{field.label_prefix}{fields.get(field.field_name, '')}"
-        width = field.width_pt
-        height = field.height_pt
-        if width and height and width > 0 and height > 0:
-            # Căn trong đúng ô Excel (không dùng full content_width).
-            draw_static_cell(
-                pdf,
-                x=field.x,
-                y=field.y - height,
-                width=width,
-                height=height,
-                value=value,
-                font=field.font,
-                align=field.align,
-                border=field.border,
-            )
-            continue
-        font_name, font_size = render_font(field.font)
-        align = (field.align or {}).get("h", "left")
-        draw_text(
-            pdf,
-            x=field.x,
-            y=field.y,
-            text=value,
-            font_name=font_name,
-            font_size=font_size,
-            align=align,
-            max_width=content_width if align == "center" else None,
-        )
-
-
 def _carry_row_height(table, page: PagePlan) -> float:
     """Cùng nhịp chiều cao với dòng dữ liệu trên trang — chữ «Cộng» căn giữa row."""
     if page.row_heights:
@@ -294,6 +393,8 @@ def _draw_page(
     signatures: dict[str, str],
     signature_dates: dict[str, str],
     amount_in_words_text: str,
+    fields: dict[str, str],
+    content_width: float,
 ) -> None:
     table = metadata.table
     table_left = _table_left(metadata, columns)
@@ -380,14 +481,16 @@ def _draw_page(
             max_width=table_width,
             font_size=row_font_size,
         )
-        if static_layers["signature"]:
-            _draw_static_cells(pdf, static_layers["signature"])
-        extra_fields = [
-            field
-            for field in metadata.fields
-            if field.below_table and not should_skip_scalar_field(field.field_name)
-        ]
-        anchor_y = compute_signature_block_anchor_y(y, extra_fields)
+        y = _draw_floated_below_table(
+            pdf,
+            metadata=metadata,
+            fields=fields,
+            content_width=content_width,
+            y_after_amount=y,
+            signature_cells=static_layers["signature"],
+        )
+        # Cụm below_table đã neo theo bảng — không dùng tọa độ Excel tuyệt đối nữa.
+        anchor_y = compute_signature_block_anchor_y(y, [])
         draw_signature_block(
             pdf,
             config=_signature_config(metadata),
@@ -445,7 +548,16 @@ def render_pdf(
         )
         for row in rows
     ]
-    sig_height = _planner_signature_height(metadata, row_font_size) + amount_h
+    sig_height = (
+        _planner_signature_height(metadata, row_font_size)
+        + amount_h
+        + (
+            _below_table_cluster_span_pt(_below_table_fields(metadata))
+            + BELOW_TABLE_GAP_AFTER_AMOUNT_PT
+            if _below_table_fields(metadata)
+            else 0.0
+        )
+    )
     page1_content = (
         page_height
         - metadata.page.margin_top
@@ -509,6 +621,8 @@ def render_pdf(
             signatures=resolved_signatures,
             signature_dates=resolved_dates,
             amount_in_words_text=amount_in_words_text,
+            fields=fields,
+            content_width=content_width,
         )
         pdf.showPage()
     pdf.save()

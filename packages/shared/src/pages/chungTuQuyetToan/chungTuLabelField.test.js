@@ -26,6 +26,8 @@ test("resolvePdfScalarFieldKey keeps scalar aliases and NL mapping", () => {
   assert.equal(resolvePdfScalarFieldKey("NL_FIELD_can_cu_pnk"), "canCuPnk");
   assert.equal(resolvePdfScalarFieldKey("can_cu_pnk"), "canCuPnk");
   assert.equal(resolvePdfScalarFieldKey("FIELD_can_cu_bkmh"), "");
+  assert.equal(resolvePdfScalarFieldKey("FIELD_print_line_1"), "donViCapTren");
+  assert.equal(resolvePdfScalarFieldKey("FIELD_print_line_2"), "donVi");
 });
 
 test("resolvePdfScalarFieldKey maps PXK scalar aliases", () => {

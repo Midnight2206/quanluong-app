@@ -263,6 +263,8 @@ test("resolvePdfHeaderSettings uses exporting user profile for don vi fields", (
 
   assert.equal(result.donViCapTren, "Su doan 372");
   assert.equal(result.donVi, "Tieu doan 1");
+  assert.equal(result.printLine1, "Su doan 372");
+  assert.equal(result.printLine2, "Tieu doan 1");
   assert.equal(result.donViSo, "Tieu doan 1");
 });
 

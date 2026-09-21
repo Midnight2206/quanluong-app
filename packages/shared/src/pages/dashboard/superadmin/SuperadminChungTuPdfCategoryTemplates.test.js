@@ -10,6 +10,10 @@ const superadminTemplatesSource = readFileSync(
   new URL("./SuperadminChungTuPdfCategoryTemplates.jsx", import.meta.url),
   "utf8",
 );
+const panelSource = readFileSync(
+  new URL("./SuperadminChungTuPdfTemplatesPanel.jsx", import.meta.url),
+  "utf8",
+);
 
 test("superadmin PDF templates screen saves per-template field labels", () => {
   assert.match(apiSource, /useUpdateChungTuPdfTemplateFieldLabelsMutation/);
@@ -40,5 +44,13 @@ test("superadmin PDF templates screen saves per-template field labels", () => {
   assert.doesNotMatch(
     superadminTemplatesSource,
     /Named Range trên mẫu[\s\S]{0,1200}Danh sách này lấy từ scalar field trên mẫu đang chọn/,
+  );
+});
+
+test("superadmin PDF templates panel includes LTTP operational category", () => {
+  assert.match(panelSource, /CHUNG_TU_OPERATIONAL_PDF_TEMPLATE_CATEGORIES/);
+  assert.match(
+    panelSource,
+    /CHUNG_TU_OPERATIONAL_PDF_TEMPLATE_CATEGORIES\.map\(\(c\) => \(\{[\s\S]*?categoryKey=\{c\.categoryKey\}/,
   );
 });

@@ -10,6 +10,7 @@ import {
 import { createPortal, flushSync } from "react-dom";
 import {
   Loader2,
+  FileText,
   RefreshCw,
   Settings2,
   Trash2,
@@ -18,12 +19,14 @@ import {
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
+import { useCurrentUser } from "@/features/auth/model/authSlice";
 import {
   useCreateLttpIssueSlipMutation,
   useGetLttpCommoditiesQuery,
   useGetLttpSuppliersQuery,
   useGetLttpEffectivePricesQuery,
   useGetLttpIssueFormDefaultsQuery,
+  useGetLttpIssueSlipSignatureSettingsQuery,
   useGetLttpNextIssueSlipSerialQuery,
   useGetLttpRecipientUsersQuery,
   useGetLttpReceivingDefaultRecipientQuery,
@@ -36,6 +39,7 @@ import { apiRequest } from "@/services/apiRequest";
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { vndToVietnameseDocumentLine } from "@/utils/vndVietnameseText";
+import { openLttpIssueSlipPdfInTab } from "./lttpIssueSlipPdfOpen";
 import {
   clearIssueSlipDraft,
   readIssueSlipDraft,
@@ -85,6 +89,19 @@ function displayNameFromRecipientUserRow(p) {
   const fn = p.fullName != null ? String(p.fullName).trim() : "";
   if (fn !== "") return fn;
   return p.username != null ? String(p.username).trim() : "";
+}
+
+/** Người viết phiếu (ký): rankAbbr + fullName từ user đang đăng nhập. */
+function displayNameFromAuthUser(user) {
+  if (user == null) return "";
+  const fullName =
+    user?.profile?.fullName != null ? String(user.profile.fullName).trim() : "";
+  const name =
+    fullName || (user?.username != null ? String(user.username).trim() : "");
+  if (!name) return "";
+  const rankAbbr =
+    user?.profile?.rankAbbr != null ? String(user.profile.rankAbbr).trim() : "";
+  return [rankAbbr, name].filter(Boolean).join(" ");
 }
 
 /** Quyển số dạng MMYY theo ngày YYYY-MM-DD (khớp backend). */
@@ -424,19 +441,9 @@ function IssueSlipCommoditySearch({
   );
 }
 
-const FONT_CHOICES = [
-  { id: "system", label: "Hệ thống", value: "system-ui, sans-serif" },
-  {
-    id: "times",
-    label: "Times New Roman",
-    value: "'Times New Roman', Times, serif",
-  },
-  { id: "arial", label: "Arial", value: "Arial, Helvetica, sans-serif" },
-  { id: "georgia", label: "Georgia", value: "Georgia, serif" },
-];
-
 /**
- * Tab Phiếu xuất LTTP: bảng nhập (dòng mới khi hoàn tất dòng hiện tại + Enter ở ô SL), giá theo blur mã, in theo cùng mẫu lịch sử, tổng bằng chữ.
+ * Tab Phiếu xuất LTTP: bảng nhập (dòng mới khi hoàn tất dòng hiện tại + Enter ở ô SL), giá theo blur mã.
+ * In PDF qua document-service (mẫu Excel `lttp-phieu-xuat`), không vẽ form HTML.
  *
  * Khi `editingSlip` được truyền, form chuyển sang chế độ sửa: khoá ngày phiếu (giữ ngày + quyển/số gốc),
  * prefill toàn bộ trường, đổi nút lưu thành «Cập nhật phiếu» và hiển thị nút «Hủy».
@@ -458,13 +465,11 @@ export function LttpPhieuXuatTab({
   const [wizardStep, setWizardStep] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [issueDate, setIssueDate] = useState(() => localYmd());
-
-  const [marginTop, setMarginTop] = useState(2);
-  const [marginRight, setMarginRight] = useState(1.5);
-  const [marginBottom, setMarginBottom] = useState(1.5);
-  const [marginLeft, setMarginLeft] = useState(3);
-  const [printFontId, setPrintFontId] = useState("times");
-  const [printFontSizePt, setPrintFontSizePt] = useState(12);
+  const [receivedDate, setReceivedDate] = useState(() => localYmd());
+  const user = useCurrentUser();
+  const profileDonViCapTren = String(user?.profile?.donViCapTren ?? "").trim();
+  const profileDonVi = String(user?.profile?.donVi ?? "").trim();
+  const lockedSignerWriter = useMemo(() => displayNameFromAuthUser(user), [user]);
 
   const [printHeaderLine1, setPrintHeaderLine1] = useState("");
   const [printHeaderLine2, setPrintHeaderLine2] = useState("Quân nhu");
@@ -477,6 +482,7 @@ export function LttpPhieuXuatTab({
   const [buyerDisplayName, setBuyerDisplayName] = useState("");
   const [warehouseFrom, setWarehouseFrom] = useState("Quân nhu");
   const [signerWriter, setSignerWriter] = useState("");
+  const [signerStorekeeper, setSignerStorekeeper] = useState("");
   const [signerRecipient, setSignerRecipient] = useState("");
   const [signerApprover, setSignerApprover] = useState("");
   /** Phân biệt phiếu trên tab Đặt hàng — lưu `LttpIssueSlip.note`, không hiển thị trên bản in. */
@@ -493,8 +499,32 @@ export function LttpPhieuXuatTab({
   const skipReceivingDefAfterDraftRef = useRef(false);
   const skipBuyerDefAfterDraftRef = useRef(false);
   const draftPersistAllowedRef = useRef(false);
+  const profileHeaderSeededRef = useRef(false);
+
+  useEffect(() => {
+    if (isEditMode || profileHeaderSeededRef.current) return;
+    if (!profileDonViCapTren && !profileDonVi) return;
+    profileHeaderSeededRef.current = true;
+    if (profileDonViCapTren) {
+      setPrintHeaderLine1((prev) => prev || profileDonViCapTren);
+    }
+    if (profileDonVi) {
+      setPrintHeaderLine2((prev) => (prev && prev !== "Quân nhu" ? prev : profileDonVi));
+    }
+  }, [isEditMode, profileDonVi, profileDonViCapTren]);
 
   const defLoadedKey = useRef(null);
+  const signatureSeedKey = useRef(null);
+
+  /** Người viết phiếu luôn = user đang làm việc. */
+  useEffect(() => {
+    setSignerWriter(lockedSignerWriter);
+  }, [lockedSignerWriter]);
+
+  /** Người nhận (ký) luôn = tên người nhận đã chọn / settings đơn vị nhận. */
+  useEffect(() => {
+    setSignerRecipient(String(recipientName ?? "").trim());
+  }, [recipientName]);
 
   useEffect(() => {
     setWizardStep(0);
@@ -524,33 +554,11 @@ export function LttpPhieuXuatTab({
           : localYmd();
 
       setIssueDate(ymd);
-      setMarginTop(
-        Number.isFinite(Number(draft.marginTop)) ? Number(draft.marginTop) : 2,
-      );
-      setMarginRight(
-        Number.isFinite(Number(draft.marginRight))
-          ? Number(draft.marginRight)
-          : 1.5,
-      );
-      setMarginBottom(
-        Number.isFinite(Number(draft.marginBottom))
-          ? Number(draft.marginBottom)
-          : 1.5,
-      );
-      setMarginLeft(
-        Number.isFinite(Number(draft.marginLeft))
-          ? Number(draft.marginLeft)
-          : 3,
-      );
-      setPrintFontId(
-        typeof draft.printFontId === "string" && draft.printFontId
-          ? draft.printFontId
-          : "times",
-      );
-      setPrintFontSizePt(
-        Number.isFinite(Number(draft.printFontSizePt))
-          ? Math.min(18, Math.max(8, Number(draft.printFontSizePt)))
-          : 12,
+      setReceivedDate(
+        typeof draft.receivedDate === "string" &&
+          /^\d{4}-\d{2}-\d{2}/.test(draft.receivedDate)
+          ? draft.receivedDate
+          : ymd,
       );
       if (draft.printHeaderLine1 != null) {
         setPrintHeaderLine1(String(draft.printHeaderLine1));
@@ -594,6 +602,9 @@ export function LttpPhieuXuatTab({
       setSignerWriter(
         draft.signerWriter != null ? String(draft.signerWriter) : "",
       );
+      setSignerStorekeeper(
+        draft.signerStorekeeper != null ? String(draft.signerStorekeeper) : "",
+      );
       setSignerRecipient(
         draft.signerRecipient != null ? String(draft.signerRecipient) : "",
       );
@@ -626,6 +637,30 @@ export function LttpPhieuXuatTab({
     selectedUnitId,
     { skip: !selectedUnitId },
   );
+  const { data: signatureSettingsPayload } =
+    useGetLttpIssueSlipSignatureSettingsQuery(selectedUnitId, {
+      skip: !selectedUnitId || isEditMode,
+    });
+
+  useEffect(() => {
+    if (isEditMode || selectedUnitId == null || !signatureSettingsPayload) return;
+    if (signatureSeedKey.current === selectedUnitId) return;
+    signatureSeedKey.current = selectedUnitId;
+    const slots = signatureSettingsPayload.signatureBlock?.slots ?? [];
+    const staticByKey = Object.fromEntries(
+      slots
+        .filter((s) => s?.source === "static" && String(s.static_name ?? "").trim())
+        .map((s) => [s.key, String(s.static_name).trim()]),
+    );
+    // Người viết / người nhận cố định — không seed từ settings static.
+    if (staticByKey.thu_kho) {
+      setSignerStorekeeper((prev) => prev || staticByKey.thu_kho);
+    }
+    if (staticByKey.nguoi_duyet) {
+      setSignerApprover((prev) => prev || staticByKey.nguoi_duyet);
+    }
+  }, [isEditMode, selectedUnitId, signatureSettingsPayload]);
+
   const { data: nextSerialPayload, refetch: refetchNextSerial } =
     useGetLttpNextIssueSlipSerialQuery(
       { unitId: selectedUnitId, date: issueDate },
@@ -648,9 +683,6 @@ export function LttpPhieuXuatTab({
     useGetLttpReceivingDefaultRecipientQuery(recipientUnitId, {
       skip: !recipientUnitId,
     });
-
-  const printFont =
-    FONT_CHOICES.find((f) => f.id === printFontId) ?? FONT_CHOICES[0];
 
   const { data: commoditiesData, isLoading: cLoad } =
     useGetLttpCommoditiesQuery(selectedUnitId, {
@@ -699,16 +731,8 @@ export function LttpPhieuXuatTab({
 
   const settingsSummary = useMemo(
     () =>
-      `Lề ${marginTop} / ${marginRight} / ${marginBottom} / ${marginLeft} cm · ${printFont.label} ${printFontSizePt}pt · Mẫu: ${formMauSo || "—"}`,
-    [
-      formMauSo,
-      marginBottom,
-      marginLeft,
-      marginRight,
-      marginTop,
-      printFont.label,
-      printFontSizePt,
-    ],
+      `Mẫu: ${formMauSo || "—"} · Kho: ${warehouseFrom || "—"} · ĐV in: ${printHeaderLine1 || "—"} / ${printHeaderLine2 || "—"}`,
+    [formMauSo, warehouseFrom, printHeaderLine1, printHeaderLine2],
   );
 
   useEffect(() => {
@@ -755,35 +779,6 @@ export function LttpPhieuXuatTab({
       }
       if (d.warehouseFrom != null) {
         setWarehouseFrom(d.warehouseFrom);
-      }
-      if (d.marginTopCm != null && Number.isFinite(Number(d.marginTopCm))) {
-        setMarginTop(Number(d.marginTopCm));
-      }
-      if (d.marginRightCm != null && Number.isFinite(Number(d.marginRightCm))) {
-        setMarginRight(Number(d.marginRightCm));
-      }
-      if (
-        d.marginBottomCm != null &&
-        Number.isFinite(Number(d.marginBottomCm))
-      ) {
-        setMarginBottom(Number(d.marginBottomCm));
-      }
-      if (d.marginLeftCm != null && Number.isFinite(Number(d.marginLeftCm))) {
-        setMarginLeft(Number(d.marginLeftCm));
-      }
-      if (d.printFontId != null && String(d.printFontId).trim() !== "") {
-        setPrintFontId(String(d.printFontId));
-      }
-      if (
-        d.printFontSizePt != null &&
-        Number.isFinite(Number(d.printFontSizePt))
-      ) {
-        setPrintFontSizePt(
-          Math.min(18, Math.max(8, Number(d.printFontSizePt))),
-        );
-      }
-      if (d.signerWriter != null) {
-        setSignerWriter(d.signerWriter);
       }
       if (d.signerApprover != null) {
         setSignerApprover(d.signerApprover);
@@ -860,9 +855,9 @@ export function LttpPhieuXuatTab({
   /**
    * Tên người nhận trên form:
    * - Tạo mới: theo user đang chọn (recipientUserId) trong danh sách đơn vị nhận.
-   * - Sửa phiếu: nếu DB có `recipientDisplayName` thì luôn dùng (đồng bộ khi phiếu refetch / updatedAt đổi);
-   *   nếu DB trống thì lấy tên user trên phiếu, không có thì lấy user mặc định cài «Người nhận theo đơn vị nhận»;
-   *   không ghi đè chữ ký người nhận nếu phiếu đã lưu signerRecipient.
+   * - Sửa phiếu: nếu DB có `recipientDisplayName` thì luôn dùng; nếu trống thì lấy user trên phiếu /
+   *   user mặc định «Người nhận theo đơn vị nhận».
+   * Chữ ký người nhận luôn đồng bộ theo tên này (không sửa tay).
    */
   useEffect(() => {
     if (recipientUnitId == null) {
@@ -878,9 +873,7 @@ export function LttpPhieuXuatTab({
       if (!p) {
         return;
       }
-      const name = displayNameFromRecipientUserRow(p);
-      setRecipientName(name);
-      setSignerRecipient(name);
+      setRecipientName(displayNameFromRecipientUserRow(p));
       return;
     }
     const slip = editingSlip;
@@ -911,17 +904,12 @@ export function LttpPhieuXuatTab({
       name = displayNameFromRecipientUserRow(p);
     }
     setRecipientName(name);
-    const slipSigner = String(slip.signerRecipient ?? "").trim();
-    if (slipSigner === "" && name) {
-      setSignerRecipient(name);
-    }
   }, [
     isEditMode,
     editingSlip?.id,
     editingSlip?.updatedAt,
     editingSlip?.recipientDisplayName,
     editingSlip?.recipientUserId,
-    editingSlip?.signerRecipient,
     recipientUsers,
     receivingDef,
     receivingDefSuccess,
@@ -948,6 +936,26 @@ export function LttpPhieuXuatTab({
     useUpdateLttpIssueSlipMutation();
   const [resyncSlipPrices, { isLoading: resyncBusy }] =
     useResyncLttpIssueSlipPricesMutation();
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  function openSavedSlipPdf(slipId) {
+    if (slipId == null) return;
+    const tab = window.open("about:blank", "_blank");
+    if (!tab) {
+      notifyError(
+        "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup cho trang này.",
+      );
+      return;
+    }
+    setPdfBusy(true);
+    void (async () => {
+      try {
+        await openLttpIssueSlipPdfInTab(slipId, { targetWindow: tab });
+      } finally {
+        setPdfBusy(false);
+      }
+    })();
+  }
 
   /** Prefill state từ phiếu đang sửa; chạy lại khi cùng id nhưng phiếu refetch (updatedAt / trường nhận đổi). */
   const editHydrateSigRef = useRef(null);
@@ -980,6 +988,11 @@ export function LttpPhieuXuatTab({
     }
     editHydrateSigRef.current = hydrateSig;
     setIssueDate(editingSlip.issueDate);
+    setReceivedDate(
+      editingSlip.receivedDate != null && String(editingSlip.receivedDate).trim() !== ""
+        ? String(editingSlip.receivedDate).slice(0, 10)
+        : editingSlip.issueDate,
+    );
     setRecipientUnitId(
       editingSlip.recipientUnitId != null
         ? Number(editingSlip.recipientUnitId)
@@ -1011,6 +1024,9 @@ export function LttpPhieuXuatTab({
     if (editingSlip.signerWriter != null) {
       setSignerWriter(editingSlip.signerWriter);
     }
+    if (editingSlip.signerStorekeeper != null) {
+      setSignerStorekeeper(editingSlip.signerStorekeeper);
+    }
     setSignerRecipient(
       editingSlip.signerRecipient != null
         ? String(editingSlip.signerRecipient)
@@ -1037,12 +1053,7 @@ export function LttpPhieuXuatTab({
     const handle = window.setTimeout(() => {
       writeIssueSlipDraft(selectedUnitId, {
         issueDate,
-        marginTop,
-        marginRight,
-        marginBottom,
-        marginLeft,
-        printFontId,
-        printFontSizePt,
+        receivedDate,
         printHeaderLine1,
         printHeaderLine2,
         formMauSo,
@@ -1053,6 +1064,7 @@ export function LttpPhieuXuatTab({
         buyerDisplayName,
         warehouseFrom,
         signerWriter,
+        signerStorekeeper,
         signerRecipient,
         signerApprover,
         slipNote,
@@ -1076,12 +1088,7 @@ export function LttpPhieuXuatTab({
     selectedUnitId,
     canWrite,
     issueDate,
-    marginTop,
-    marginRight,
-    marginBottom,
-    marginLeft,
-    printFontId,
-    printFontSizePt,
+    receivedDate,
     printHeaderLine1,
     printHeaderLine2,
     formMauSo,
@@ -1092,6 +1099,7 @@ export function LttpPhieuXuatTab({
     buyerDisplayName,
     warehouseFrom,
     signerWriter,
+    signerStorekeeper,
     signerRecipient,
     signerApprover,
     slipNote,
@@ -1416,6 +1424,7 @@ export function LttpPhieuXuatTab({
     const sharedPayload = {
       note: noteTrim,
       lines,
+      receivedDate: receivedDate?.trim() || issueDate,
       recipientUnitId: recipientUnitId ?? selectedUnitId,
       recipientUserId: recipientUserId ? Number(recipientUserId) : null,
       recipientDisplayName: recipientName?.trim() || null,
@@ -1426,6 +1435,7 @@ export function LttpPhieuXuatTab({
       formMauSo: formMauSo?.trim() || null,
       warehouseFrom: warehouseFrom?.trim() || null,
       signerWriter: signerWriter?.trim() || null,
+      signerStorekeeper: signerStorekeeper?.trim() || null,
       signerRecipient: signerRecipient?.trim() || null,
       signerApprover: signerApprover?.trim() || null,
     };
@@ -1433,17 +1443,21 @@ export function LttpPhieuXuatTab({
       if (isEditMode) {
         await updateSlip({ id: editingSlip.id, ...sharedPayload });
         notifySuccess("Đã cập nhật phiếu xuất.");
+        openSavedSlipPdf(editingSlip.id);
         if (typeof onUpdated === "function") {
           onUpdated();
         }
         return;
       }
-      await createSlip({
+      const created = await createSlip({
         unitId: selectedUnitId,
         issueDate,
         ...sharedPayload,
       });
       notifySuccess("Đã lưu phiếu xuất.");
+      if (created?.id != null) {
+        openSavedSlipPdf(created.id);
+      }
       clearIssueSlipDraft(selectedUnitId);
       setDraftNotice(false);
       setRows([newEmptyRow()]);
@@ -1611,98 +1625,34 @@ export function LttpPhieuXuatTab({
               className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:p-5"
             >
               <p className="text-[10px] font-medium uppercase text-muted-foreground">
-                Tuỳ chọn bản in
+                Nội dung in PDF (mẫu Excel)
               </p>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <label className="text-[10px] text-muted-foreground">
-                  Lề trên (cm)
-                  <input
-                    type="number"
-                    step="0.1"
-                    className={cn(inputClass, "mt-0.5")}
-                    value={marginTop}
-                    onChange={(e) => setMarginTop(Number(e.target.value))}
-                  />
-                </label>
-                <label className="text-[10px] text-muted-foreground">
-                  Lề phải (cm)
-                  <input
-                    type="number"
-                    step="0.1"
-                    className={cn(inputClass, "mt-0.5")}
-                    value={marginRight}
-                    onChange={(e) => setMarginRight(Number(e.target.value))}
-                  />
-                </label>
-                <label className="text-[10px] text-muted-foreground">
-                  Lề dưới (cm)
-                  <input
-                    type="number"
-                    step="0.1"
-                    className={cn(inputClass, "mt-0.5")}
-                    value={marginBottom}
-                    onChange={(e) => setMarginBottom(Number(e.target.value))}
-                  />
-                </label>
-                <label className="text-[10px] text-muted-foreground">
-                  Lề trái (cm)
-                  <input
-                    type="number"
-                    step="0.1"
-                    className={cn(inputClass, "mt-0.5")}
-                    value={marginLeft}
-                    onChange={(e) => setMarginLeft(Number(e.target.value))}
-                  />
-                </label>
-              </div>
-              <div className="space-y-2 border-t border-border/60 pt-3">
-                <p className="text-[10px] font-medium uppercase text-muted-foreground">
-                  Mẫu in phiếu (PDF)
-                </p>
+              <p className="text-[10px] leading-relaxed text-muted-foreground">
+                PDF qua document-service category{" "}
+                <span className="font-mono text-foreground">lttp-phieu-xuat</span>
+                . Layout/font/lề chỉnh trên file mẫu Excel đã upload.{" "}
+                <span className="font-mono text-foreground">FIELD_print_line_1/2</span> cùng nguồn{" "}
+                <span className="font-mono text-foreground">NL_FIELD_don_vi_cap_tren</span> /{" "}
+                <span className="font-mono text-foreground">NL_FIELD_don_vi</span> (hồ sơ cá nhân).
+              </p>
+              <div className="space-y-2">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label className="text-[10px] text-muted-foreground">
-                    Dòng 1 (đầu trái, vd. đơn vị cấp trên)
+                    Dòng 1 (= đơn vị cấp trên trên hồ sơ)
                     <input
                       className={cn(inputClass, "mt-0.5")}
                       value={printHeaderLine1}
                       onChange={(e) => setPrintHeaderLine1(e.target.value)}
-                      placeholder="VD: TRUNG ĐOÀN …"
+                      placeholder={profileDonViCapTren || "VD: TRUNG ĐOÀN …"}
                     />
                   </label>
                   <label className="text-[10px] text-muted-foreground">
-                    Dòng 2 (đầu trái)
+                    Dòng 2 (= đơn vị trên hồ sơ)
                     <input
                       className={cn(inputClass, "mt-0.5")}
                       value={printHeaderLine2}
                       onChange={(e) => setPrintHeaderLine2(e.target.value)}
-                      placeholder="VD: QUÂN NHU"
-                    />
-                  </label>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="text-[10px] text-muted-foreground">
-                    Font chữ
-                    <select
-                      className={cn(inputClass, "mt-0.5")}
-                      value={printFontId}
-                      onChange={(e) => setPrintFontId(e.target.value)}
-                    >
-                      {FONT_CHOICES.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="text-[10px] text-muted-foreground">
-                    Cỡ chữ in (pt)
-                    <input
-                      type="number"
-                      min={8}
-                      max={18}
-                      className={cn(inputClass, "mt-0.5")}
-                      value={printFontSizePt}
-                      onChange={(e) => setPrintFontSizePt(Number(e.target.value))}
+                      placeholder={profileDonVi || "VD: QUÂN NHU"}
                     />
                   </label>
                 </div>
@@ -1727,10 +1677,48 @@ export function LttpPhieuXuatTab({
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label className="text-[10px] text-muted-foreground">
                     Người viết phiếu (ký)
+                    <span className="ml-1 rounded bg-muted px-1 py-0.5 text-[9px] uppercase tracking-wide">
+                      Chỉ xem
+                    </span>
+                    <input
+                      className={cn(
+                        inputClass,
+                        "mt-0.5 cursor-not-allowed bg-muted/40 text-muted-foreground",
+                      )}
+                      value={signerWriter}
+                      readOnly
+                      disabled
+                      title="Luôn lấy từ user đang đăng nhập"
+                    />
+                    <span className="mt-0.5 block text-[9px] text-muted-foreground">
+                      Cố định theo tài khoản đang làm việc.
+                    </span>
+                  </label>
+                  <label className="text-[10px] text-muted-foreground">
+                    Người nhận (ký)
+                    <span className="ml-1 rounded bg-muted px-1 py-0.5 text-[9px] uppercase tracking-wide">
+                      Chỉ xem
+                    </span>
+                    <input
+                      className={cn(
+                        inputClass,
+                        "mt-0.5 cursor-not-allowed bg-muted/40 text-muted-foreground",
+                      )}
+                      value={signerRecipient}
+                      readOnly
+                      disabled
+                      title="Luôn lấy từ người nhận đã chọn"
+                    />
+                    <span className="mt-0.5 block text-[9px] text-muted-foreground">
+                      Cố định theo người nhận trên phiếu / cài đặt đơn vị nhận.
+                    </span>
+                  </label>
+                  <label className="text-[10px] text-muted-foreground">
+                    Thủ kho (ký)
                     <input
                       className={cn(inputClass, "mt-0.5")}
-                      value={signerWriter}
-                      onChange={(e) => setSignerWriter(e.target.value)}
+                      value={signerStorekeeper}
+                      onChange={(e) => setSignerStorekeeper(e.target.value)}
                     />
                   </label>
                   <label className="text-[10px] text-muted-foreground">
@@ -1770,13 +1758,6 @@ export function LttpPhieuXuatTab({
                           printLine2: printHeaderLine2,
                           formMauSo,
                           warehouseFrom,
-                          marginTopCm: marginTop,
-                          marginRightCm: marginRight,
-                          marginBottomCm: marginBottom,
-                          marginLeftCm: marginLeft,
-                          printFontId,
-                          printFontSizePt,
-                          signerWriter,
                           signerApprover,
                         });
                         notifySuccess("Đã lưu cấu hình mẫu in theo đơn vị.");
@@ -1801,8 +1782,7 @@ export function LttpPhieuXuatTab({
                 </div>
               </div>
               <p className="text-[9px] text-muted-foreground">
-                Bản in dùng mẫu phiếu xuất kho (cột số: nghìn «.», thập phân
-                «,»).
+                Bản in dùng mẫu Excel đã publish (document-service).
               </p>
             </div>
           </div>
@@ -1825,7 +1805,7 @@ export function LttpPhieuXuatTab({
         <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
           <label className="min-w-0 space-y-0.5 text-xs sm:min-w-[10rem]">
-            Ngày phiếu{isEditMode ? " (không đổi)" : ""}
+            Ngày phiếu / giao{isEditMode ? " (không đổi)" : ""}
             <input
               type="date"
               className={cn(
@@ -1834,10 +1814,25 @@ export function LttpPhieuXuatTab({
                 isEditMode ? "cursor-not-allowed opacity-70" : "",
               )}
               value={issueDate}
-              onChange={(e) => setIssueDate(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setIssueDate(next);
+                setReceivedDate((prev) =>
+                  !prev || prev === issueDate ? next : prev,
+                );
+              }}
               disabled={isEditMode}
               readOnly={isEditMode}
               title={isEditMode ? "Ngày phiếu giữ nguyên khi sửa." : undefined}
+            />
+          </label>
+          <label className="min-w-0 space-y-0.5 text-xs sm:min-w-[10rem]">
+            Ngày nhận
+            <input
+              type="date"
+              className={cn(inputClass, "mt-0.5 block")}
+              value={receivedDate}
+              onChange={(e) => setReceivedDate(e.target.value)}
             />
           </label>
           {canPickUnits && units.length > 0 ? (
@@ -2532,7 +2527,7 @@ export function LttpPhieuXuatTab({
               type="button"
               className="gap-1.5 text-xs"
               disabled={
-                createBusy || updateBusy || resyncBusy || !selectedUnitId
+                createBusy || updateBusy || resyncBusy || pdfBusy || !selectedUnitId
               }
               onClick={() => void onSubmit()}
             >
@@ -2541,6 +2536,22 @@ export function LttpPhieuXuatTab({
               ) : null}
               {isEditMode ? "Cập nhật phiếu" : "Lưu phiếu xuất"}
             </Button>
+            {isEditMode ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-1.5 text-xs"
+                disabled={pdfBusy || updateBusy || !editingSlip?.id}
+                onClick={() => openSavedSlipPdf(editingSlip.id)}
+              >
+                {pdfBusy ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <FileText className="size-3.5" aria-hidden />
+                )}
+                Xem PDF
+              </Button>
+            ) : null}
             {isEditMode && typeof onCancelEdit === "function" ? (
               <Button
                 type="button"

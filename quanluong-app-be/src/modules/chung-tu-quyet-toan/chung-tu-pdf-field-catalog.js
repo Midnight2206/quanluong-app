@@ -17,7 +17,9 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
     buildScalarField("FIELD_ho_ten_nguoi_mua", "hoTenNguoiMua", "Họ và tên người mua", {
       supportsLabel: true,
     }),
-    buildScalarField("FIELD_bo_phan", "boPhan", "Bộ phận", { supportsLabel: true }),
+    buildScalarField("FIELD_bo_phan", "boPhan", "Bộ phận (BKMH) hoặc department người nhận (LTTP)", {
+      supportsLabel: true,
+    }),
     buildScalarField("FIELD_nguoi_giao_hang", "nguoiGiaoHang", "Họ tên người giao (từ người mua BKMH)", {
       supportsLabel: true,
     }),
@@ -42,6 +44,29 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
     buildScalarField("FIELD_dia_diem", "diaDiem", "Địa điểm", {
       supportsLabel: true,
     }),
+    buildScalarField("FIELD_ly_do_su_dung", "lyDoSuDung", "Lý do sử dụng (cài đặt chữ ký đơn vị LTTP)", {
+      supportsLabel: true,
+    }),
+    buildScalarField("FIELD_ngay_giao", "ngayGiao", "Ngày giao (= ngày phiếu)"),
+    buildScalarField("FIELD_ngay_nhan", "ngayNhan", "Ngày nhận (trên phiếu)"),
+    buildScalarField(
+      "FIELD_print_line_1",
+      "donViCapTren",
+      "Dòng đơn vị in trái dòng 1 — cùng nguồn NL_FIELD_don_vi_cap_tren (hồ sơ người viết)",
+    ),
+    buildScalarField(
+      "FIELD_print_line_2",
+      "donVi",
+      "Dòng đơn vị in trái dòng 2 — cùng nguồn NL_FIELD_don_vi (hồ sơ người viết)",
+    ),
+    buildScalarField("FIELD_form_mau_so", "formMauSo", "Mẫu số phiếu", { supportsLabel: true }),
+    buildScalarField("FIELD_nhan_tai_kho", "nhanTaiKho", "Nhận tại kho (cài đặt chữ ký đơn vị)", {
+      supportsLabel: true,
+    }),
+    buildScalarField("FIELD_nguoi_viet_phieu", "nguoiVietPhieu", "Người viết phiếu", {
+      supportsLabel: true,
+    }),
+    buildScalarField("FIELD_nguoi_duyet", "nguoiDuyet", "Người duyệt", { supportsLabel: true }),
     ...NL_FIELD_CATALOG_SCALARS.map((field) => ({ ...field, label: field.description })),
     buildScalarField("FIELD_ghi_chu", "ghiChu", "Ghi chú"),
   ]),
@@ -51,6 +76,8 @@ const CHUNG_TU_PDF_FIELD_CATALOG = Object.freeze({
     { label: "Tên mặt hàng", fieldKey: "tenHang" },
     { label: "ĐVT", fieldKey: "dvt" },
     { label: "Số lượng", fieldKey: "soLuong" },
+    { label: "Mua TT", fieldKey: "muaTt" },
+    { label: "TGSX", fieldKey: "tgsx" },
     { label: "Đơn giá", fieldKey: "donGia" },
     { label: "Thành tiền", fieldKey: "thanhTien" },
     { label: "Người bán", fieldKey: "nguoiBan" },

@@ -350,6 +350,30 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "getIssueSlipSignatureSettings",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slip-signature-settings",
+    pathRoute: "/api/lttp/issue-slip-signature-settings",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "Cài đặt chữ ký phiếu xuất LTTP",
+      description: "Tải layout chữ ký và extraFields (lý do sử dụng, nhận tại kho) theo đơn vị kho.",
+    },
+  },
+  {
+    key: "putIssueSlipSignatureSettings",
+    method: "PUT",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slip-signature-settings",
+    pathRoute: "/api/lttp/issue-slip-signature-settings",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Lưu cài đặt chữ ký phiếu xuất LTTP",
+      description: "Cập nhật layout chữ ký và extraFields theo đơn vị kho.",
+    },
+  },
+  {
     key: "listRecipientUsers",
     method: "GET",
     module: LTTP_MODULE_NAME,

@@ -79,10 +79,15 @@ function resolveLogicalUnitId(req) {
 /**
  * Gắn `req.dataScope` cho handler đọc/ghi DB theo kind + chính sách đơn vị + (tùy) thời điểm `asOf`.
  *
- * @param {{ dataKind: string, recordIdParam?: string, asOfQueryKeys?: string[] }} opts
+ * @param {{
+ *   dataKind: string,
+ *   recordIdParam?: string,
+ *   asOfQueryKeys?: string[],
+ *   resolveLogicalUnitFallback?: (req: import('express').Request) => Promise<number | null | undefined> | number | null | undefined,
+ * }} opts
  */
 function unitDataScopeMiddleware(opts) {
-  const { dataKind, recordIdParam, asOfQueryKeys = [] } = opts;
+  const { dataKind, recordIdParam, asOfQueryKeys = [], resolveLogicalUnitFallback } = opts;
 
   return async (req, _res, next) => {
     try {
@@ -109,7 +114,13 @@ function unitDataScopeMiddleware(opts) {
         return next();
       }
 
-      const logicalUnitId = resolveLogicalUnitId(req);
+      let logicalUnitId = resolveLogicalUnitId(req);
+      if (!logicalUnitId && typeof resolveLogicalUnitFallback === "function") {
+        const fromRecord = await resolveLogicalUnitFallback(req);
+        if (Number.isInteger(fromRecord) && fromRecord > 0) {
+          logicalUnitId = fromRecord;
+        }
+      }
       if (!logicalUnitId) {
         throw new AppError({
           message: "Thiếu đơn vị ngữ cảnh cho phạm vi dữ liệu",

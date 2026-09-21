@@ -144,6 +144,29 @@ function assertLttpLogicalMatchesDataScope(unitId, dataScope) {
   }
 }
 
+/**
+ * Phiếu xuất chỉ được lập/sửa theo đơn vị của chính user — không viết hộ cấp dưới.
+ * @param {number} logicalUnitId
+ * @param {number | null | undefined} callerUnitId — `req.user.unitId`
+ */
+function assertIssueSlipLogicalUnitIsCallerUnit(logicalUnitId, callerUnitId) {
+  const own = Number(callerUnitId);
+  if (!Number.isInteger(own) || own <= 0) {
+    throw new AppError({
+      message: "Tài khoản chưa gán đơn vị — không thể thao tác phiếu xuất.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  if (Number(logicalUnitId) !== own) {
+    throw new AppError({
+      message: "Chỉ được lập/sửa phiếu xuất của đơn vị mình.",
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+  }
+}
+
 function assertCommodityRowStorage(rowUnitId, dataScope) {
   if (rowUnitId !== dataScope.storageUnitId) {
     throw new AppError({
@@ -915,7 +938,13 @@ const issueSlipInclude = {
   },
   createdBy: { select: { id: true, username: true, profile: { select: { fullName: true } } } },
   recipientUnit: { select: { id: true, name: true } },
-  recipientUser: { select: { id: true, username: true, profile: { select: { fullName: true } } } },
+  recipientUser: {
+    select: {
+      id: true,
+      username: true,
+      profile: { select: { fullName: true, department: true } },
+    },
+  },
   buyerUser: { select: { id: true, username: true, profile: { select: { fullName: true } } } },
 };
 
@@ -924,6 +953,9 @@ function mapIssueSlip(slip) {
     id: slip.id,
     unitId: slip.unitId,
     issueDate: slip.issueDate.toISOString().slice(0, 10),
+    receivedDate: slip.receivedDate
+      ? slip.receivedDate.toISOString().slice(0, 10)
+      : null,
     note: slip.note,
     bookMmyy: slip.bookMmyy,
     slipNo: slip.slipNo,
@@ -938,6 +970,7 @@ function mapIssueSlip(slip) {
           id: slip.recipientUser.id,
           username: slip.recipientUser.username,
           fullName: slip.recipientUser.profile?.fullName ?? null,
+          department: slip.recipientUser.profile?.department ?? null,
         }
       : null,
     printLine1: slip.printLine1,
@@ -945,6 +978,7 @@ function mapIssueSlip(slip) {
     formMauSo: slip.formMauSo,
     warehouseFrom: slip.warehouseFrom,
     signerWriter: slip.signerWriter,
+    signerStorekeeper: slip.signerStorekeeper,
     signerRecipient: slip.signerRecipient,
     signerApprover: slip.signerApprover,
     buyerUserId: slip.buyerUserId,
@@ -999,12 +1033,6 @@ function mapIssueFormDefaultsRow(row) {
     printLine2: row.printLine2,
     formMauSo: row.formMauSo,
     warehouseFrom: row.warehouseFrom,
-    marginTopCm: row.marginTopCm != null ? Number(row.marginTopCm) : null,
-    marginRightCm: row.marginRightCm != null ? Number(row.marginRightCm) : null,
-    marginBottomCm: row.marginBottomCm != null ? Number(row.marginBottomCm) : null,
-    marginLeftCm: row.marginLeftCm != null ? Number(row.marginLeftCm) : null,
-    printFontId: row.printFontId ?? null,
-    printFontSizePt: row.printFontSizePt != null ? Number(row.printFontSizePt) : null,
     signerWriter: row.signerWriter,
     signerApprover: row.signerApprover,
     defaultRecipientUnitId: row.defaultRecipientUnitId,
@@ -1039,9 +1067,10 @@ async function resolveBuyerFields(payload, storageUnitId) {
   return { buyerUserId, buyerDisplayName };
 }
 
-async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataScope) {
+async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataScope, callerUnitId) {
   const { unitId, issueDate, note, lines } = payload;
   assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertIssueSlipLogicalUnitIsCallerUnit(unitId, callerUnitId);
   assertUnitIdInScope(unitId, scope);
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
   if (!Array.isArray(lines) || lines.length === 0) {
@@ -1197,8 +1226,14 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
   const formMauSo = payload.formMauSo?.trim() || null;
   const warehouseFrom = payload.warehouseFrom?.trim() || null;
   const signerWriter = payload.signerWriter?.trim() || null;
+  const signerStorekeeper = payload.signerStorekeeper?.trim() || null;
   const signerApprover = payload.signerApprover?.trim() || null;
   const { buyerUserId, buyerDisplayName } = await resolveBuyerFields(payload, storageUnitId);
+  const receivedDateRaw =
+    payload.receivedDate != null && String(payload.receivedDate).trim() !== ""
+      ? String(payload.receivedDate).trim().slice(0, 10)
+      : null;
+  const receivedD = receivedDateRaw ? parseDateOnly(receivedDateRaw) : null;
 
   assertLttpPrismaDelegates();
 
@@ -1218,6 +1253,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
         data: {
           unitId: storageUnitId,
           issueDate: issueD,
+          receivedDate: receivedD,
           note: note?.trim() || null,
           createdById: userId,
           bookMmyy,
@@ -1230,6 +1266,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
           formMauSo,
           warehouseFrom,
           signerWriter,
+          signerStorekeeper,
           signerRecipient,
           signerApprover,
           buyerUserId,
@@ -1279,7 +1316,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
   return mapIssueSlip(slip);
 }
 
-async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) {
+async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope, callerUnitId) {
   const existing = await prisma.lttpIssueSlip.findFirst({ where: { id } });
   if (!existing) {
     throw new AppError({
@@ -1289,6 +1326,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
     });
   }
   assertCommodityRowStorage(existing.unitId, dataScope);
+  assertIssueSlipLogicalUnitIsCallerUnit(dataScope.logicalUnitId, callerUnitId);
   assertUnitIdInScope(dataScope.logicalUnitId, scope);
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
 
@@ -1452,8 +1490,14 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
   const formMauSo = payload.formMauSo?.trim() || null;
   const warehouseFrom = payload.warehouseFrom?.trim() || null;
   const signerWriter = payload.signerWriter?.trim() || null;
+  const signerStorekeeper = payload.signerStorekeeper?.trim() || null;
   const signerApprover = payload.signerApprover?.trim() || null;
   const { buyerUserId, buyerDisplayName } = await resolveBuyerFields(payload, storageUnitId);
+  const receivedDateRaw =
+    payload.receivedDate != null && String(payload.receivedDate).trim() !== ""
+      ? String(payload.receivedDate).trim().slice(0, 10)
+      : null;
+  const receivedD = receivedDateRaw ? parseDateOnly(receivedDateRaw) : null;
 
   assertLttpPrismaDelegates();
 
@@ -1464,6 +1508,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
         where: { id: existing.id },
         data: {
           note: note?.trim() || null,
+          receivedDate: receivedD,
           recipientUnitId,
           recipientUserId,
           recipientDisplayName,
@@ -1472,6 +1517,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
           formMauSo,
           warehouseFrom,
           signerWriter,
+          signerStorekeeper,
           signerRecipient,
           signerApprover,
           buyerUserId,
@@ -1542,7 +1588,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope) 
  * Cập nhật lại đơn giá / TGSX / thành tiền từng dòng theo bảng giá hiệu lực tại **ngày phiếu** (giữ SL, đối tác, mặt hàng).
  * Không đổi schema — chỉ ghi đè cột snapshot trên `LttpIssueSlipLine`.
  */
-async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveUnitIds, dataScope) {
+async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveUnitIds, dataScope, callerUnitId) {
   const existing = await prisma.lttpIssueSlip.findFirst({
     where: { id },
     include: { lines: true },
@@ -1555,6 +1601,7 @@ async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveU
     });
   }
   assertCommodityRowStorage(existing.unitId, dataScope);
+  assertIssueSlipLogicalUnitIsCallerUnit(dataScope.logicalUnitId, callerUnitId);
   assertUnitIdInScope(dataScope.logicalUnitId, scope);
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
 
@@ -1889,6 +1936,19 @@ async function getDailyOrderSummary(payload, scope, effectiveUnitIds, dataScope)
   };
 }
 
+/** unitId kho của phiếu — dùng khi print-pdf thiếu X-Target-Unit-Id / user.unitId. */
+async function getIssueSlipUnitIdById(id) {
+  const slipId = Number(id);
+  if (!Number.isInteger(slipId) || slipId <= 0) {
+    return null;
+  }
+  const row = await prisma.lttpIssueSlip.findUnique({
+    where: { id: slipId },
+    select: { unitId: true },
+  });
+  return row?.unitId ?? null;
+}
+
 async function getIssueSlipById(id, scope, effectiveUnitIds, dataScope) {
   const slip = await prisma.lttpIssueSlip.findFirst({
     where: { id },
@@ -1930,7 +1990,7 @@ async function getIssueSlipById(id, scope, effectiveUnitIds, dataScope) {
   };
 }
 
-async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope) {
+async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope, callerUnitId) {
   const slip = await prisma.lttpIssueSlip.findFirst({ where: { id } });
   if (!slip) {
     throw new AppError({
@@ -1940,6 +2000,7 @@ async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope) {
     });
   }
   assertCommodityRowStorage(slip.unitId, dataScope);
+  assertIssueSlipLogicalUnitIsCallerUnit(dataScope.logicalUnitId, callerUnitId);
   assertUnitIdInScope(dataScope.logicalUnitId, scope);
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
   const recipientUnitId = slip.recipientUnitId;
@@ -2776,12 +2837,6 @@ async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope)
       printLine2: rest.printLine2?.trim() || null,
       formMauSo: rest.formMauSo?.trim() || null,
       warehouseFrom: rest.warehouseFrom?.trim() || null,
-      marginTopCm: rest.marginTopCm != null ? String(rest.marginTopCm) : null,
-      marginRightCm: rest.marginRightCm != null ? String(rest.marginRightCm) : null,
-      marginBottomCm: rest.marginBottomCm != null ? String(rest.marginBottomCm) : null,
-      marginLeftCm: rest.marginLeftCm != null ? String(rest.marginLeftCm) : null,
-      printFontId: rest.printFontId?.trim() || null,
-      printFontSizePt: rest.printFontSizePt != null ? String(rest.printFontSizePt) : null,
       signerWriter: rest.signerWriter?.trim() || null,
       signerApprover: rest.signerApprover?.trim() || null,
       defaultRecipientUnitId,
@@ -2793,12 +2848,6 @@ async function upsertIssueFormDefaults(body, scope, effectiveUnitIds, dataScope)
       printLine2: rest.printLine2?.trim() || null,
       formMauSo: rest.formMauSo?.trim() || null,
       warehouseFrom: rest.warehouseFrom?.trim() || null,
-      marginTopCm: rest.marginTopCm != null ? String(rest.marginTopCm) : null,
-      marginRightCm: rest.marginRightCm != null ? String(rest.marginRightCm) : null,
-      marginBottomCm: rest.marginBottomCm != null ? String(rest.marginBottomCm) : null,
-      marginLeftCm: rest.marginLeftCm != null ? String(rest.marginLeftCm) : null,
-      printFontId: rest.printFontId?.trim() || null,
-      printFontSizePt: rest.printFontSizePt != null ? String(rest.printFontSizePt) : null,
       signerWriter: rest.signerWriter?.trim() || null,
       signerApprover: rest.signerApprover?.trim() || null,
       defaultRecipientUnitId,
@@ -2971,13 +3020,19 @@ async function listRecipientUsers({ unitId }, scope, effectiveUnitIds) {
       deletedAt: null,
       isActive: true,
     },
-    select: { id: true, username: true, unitId: true, profile: { select: { fullName: true } } },
+    select: {
+      id: true,
+      username: true,
+      unitId: true,
+      profile: { select: { fullName: true, department: true } },
+    },
     orderBy: { id: "asc" },
   });
   return rows.map((u) => ({
     id: u.id,
     username: u.username,
     fullName: u.profile?.fullName ?? null,
+    department: u.profile?.department ?? null,
     unitId: u.unitId,
   }));
 }
@@ -3715,6 +3770,7 @@ export {
   getDailyOrderSummary,
   getIssueFormDefaults,
   getIssueSlipById,
+  getIssueSlipUnitIdById,
   getNextIssueSlipSerial,
   getPriceTableById,
   importPriceTableFromExcel,

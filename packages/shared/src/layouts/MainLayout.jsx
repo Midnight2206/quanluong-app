@@ -14,9 +14,17 @@ import { WorkingUnitScopeBar } from "@/layouts/components/WorkingUnitScopeBar";
 import { UnifiedPageScrollRoot } from "@/hocs/withUnifiedPageScroll";
 
 /**
- * @param {{ children: import('react').ReactNode, navItems?: typeof mainNavItems }} props
+ * @param {{
+ *   children: import('react').ReactNode,
+ *   navItems?: typeof mainNavItems,
+ *   showWorkingUnitScope?: boolean,
+ * }} props
  */
-export function MainLayout({ children, navItems: navItemsProp }) {
+export function MainLayout({
+  children,
+  navItems: navItemsProp,
+  showWorkingUnitScope = true,
+}) {
   const router = useRouter();
   const user = useCurrentUser();
   const isSuperadmin = user?.type?.name === "superadmin";
@@ -67,7 +75,7 @@ export function MainLayout({ children, navItems: navItemsProp }) {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AppHeader />
           <TargetUnitScopeProvider>
-            <WorkingUnitScopeBar />
+            {showWorkingUnitScope ? <WorkingUnitScopeBar /> : null}
             <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               <AppSidebar items={sidebarItems} />
               <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 pt-3 pb-[max(0.75rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] print:h-auto print:min-h-0 print:overflow-visible sm:px-4 sm:pt-4 sm:pb-[max(1rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] lg:px-6 lg:py-5 lg:pb-5">

@@ -1,6 +1,7 @@
 import importlib
 from io import BytesIO
 
+import pytest
 from pypdf import PdfReader
 
 from conftest import make_minimal_template
@@ -17,7 +18,10 @@ from app.render.demo_template import (
 )
 from app.render.draw import draw_table_header_frame
 from app.render.pdf_renderer import (
+    BELOW_TABLE_GAP_AFTER_AMOUNT_PT,
     _RenderColumn,
+    _below_table_cluster_span_pt,
+    _below_table_y_offset,
     _draw_table_header,
     _table_start_y,
     render_demo_pdf,
@@ -129,6 +133,62 @@ def test_pdf_draws_auto_amount_in_words_and_skips_manual_scalar_field():
     normalized = text.replace("\n", " ")
     assert "Tổng số tiền (Viết bằng chữ):" in normalized
     assert "SHOULD_NOT_APPEAR" not in normalized
+
+
+def test_below_table_y_offset_pins_cluster_under_amount():
+    fields = [
+        FieldMeta(
+            field_name="ngay_giao",
+            sheet_name="demo",
+            cell_ref="A22",
+            x=40,
+            y=200.0,
+            below_table=True,
+            height_pt=14.0,
+        ),
+        FieldMeta(
+            field_name="ngay_nhan",
+            sheet_name="demo",
+            cell_ref="D22",
+            x=200,
+            y=180.0,
+            below_table=True,
+            height_pt=14.0,
+        ),
+    ]
+    y_after_amount = 400.0
+    offset = _below_table_y_offset(fields, y_after_amount)
+    # cluster_top = 200 → target = 400 - 6 → offset = 194
+    assert offset == pytest.approx(y_after_amount - BELOW_TABLE_GAP_AFTER_AMOUNT_PT - 200.0)
+    assert _below_table_cluster_span_pt(fields) == pytest.approx(200.0 - (180.0 - 14.0))
+
+
+def test_below_table_fields_float_with_taller_table():
+    """FIELD below_table phải nằm sau tổng tiền bằng chữ — không kẹt tọa độ Excel cố định."""
+    metadata = build_demo_metadata()
+    # Đặt thấp trên trang (gần đáy) — nếu tuyệt đối sẽ đè/sai khi bảng dài.
+    metadata.fields.append(
+        FieldMeta(
+            field_name="ngay_giao",
+            sheet_name="demo",
+            cell_ref="A22",
+            x=metadata.page.margin_left,
+            y=90.0,
+            below_table=True,
+            width_pt=120.0,
+            height_pt=16.0,
+        )
+    )
+    fields = {**_sample_fields(), "ngay_giao": "Ngay giao 01/09/2026"}
+
+    short_pdf = render_pdf(metadata=metadata, fields=fields, rows=_sample_rows(2))
+    tall_pdf = render_pdf(metadata=metadata, fields=fields, rows=_sample_rows(18))
+
+    short_text = "".join(p.extract_text() or "" for p in PdfReader(BytesIO(short_pdf)).pages)
+    tall_text = "".join(p.extract_text() or "" for p in PdfReader(BytesIO(tall_pdf)).pages)
+    assert "Ngay giao 01/09/2026" in short_text.replace("\n", " ")
+    assert "Ngay giao 01/09/2026" in tall_text.replace("\n", " ")
+    assert len(PdfReader(BytesIO(tall_pdf)).pages) >= len(PdfReader(BytesIO(short_pdf)).pages)
 
 
 def test_multi_page_pdf_matches_first_page_plan():

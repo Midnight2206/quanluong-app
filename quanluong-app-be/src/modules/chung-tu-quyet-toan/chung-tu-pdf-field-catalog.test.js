@@ -43,6 +43,8 @@ test("catalog exposes shared unit/date fields as NL_FIELD only", () => {
   assert.equal(byRange.get("NL_FIELD_don_vi")?.fieldKey, "donVi");
   assert.equal(byRange.get("NL_FIELD_don_vi_cap_tren")?.fieldKey, "donViCapTren");
   assert.equal(byRange.get("NL_FIELD_ngay_thang_nam")?.fieldKey, "ngayThangNam");
+  assert.equal(byRange.get("FIELD_print_line_1")?.fieldKey, "donViCapTren");
+  assert.equal(byRange.get("FIELD_print_line_2")?.fieldKey, "donVi");
 });
 
 test("catalog includes PNK người giao scalar descriptions", () => {

@@ -15,3 +15,8 @@ test("category config exposes hasSummary by category", () => {
   assert.match(categoryConfigSource, /tab\.id === "phieu-xuat-kho"/);
   assert.match(categoryConfigSource, /hasSummary:/);
 });
+
+test("operational PDF template categories include LTTP phiếu xuất", () => {
+  assert.match(categoryConfigSource, /CHUNG_TU_OPERATIONAL_PDF_TEMPLATE_CATEGORIES/);
+  assert.match(categoryConfigSource, /categoryKey: "lttp-phieu-xuat"/);
+});
