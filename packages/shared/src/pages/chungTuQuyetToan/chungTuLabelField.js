@@ -9,6 +9,8 @@ const STATIC_ALIASES = Object.freeze({
   nguoi_mua: "hoTenNguoiMua",
   can_cu_pnk: "canCuPnk",
   ly_do_nhap_kho: "lyDoNhapKho",
+  print_line_1: "donViCapTren",
+  print_line_2: "donVi",
 });
 
 const SCALAR_ALIASES = Object.freeze({

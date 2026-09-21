@@ -2,7 +2,10 @@
 
 import { useMemo } from "react";
 import { TabPanel } from "@/components/common/TabPanel";
-import { CHUNG_TU_CATEGORY_CONFIG_LIST } from "@/pages/chungTuQuyetToan/chungTuCategoryConfig";
+import {
+  CHUNG_TU_CATEGORY_CONFIG_LIST,
+  CHUNG_TU_OPERATIONAL_PDF_TEMPLATE_CATEGORIES,
+} from "@/pages/chungTuQuyetToan/chungTuCategoryConfig";
 import { ChungTuPdfFieldCatalogPanel } from "@/pages/chungTuQuyetToan/ChungTuPdfFieldCatalogPanel";
 import { CHUNG_TU_DOC_TAB_STATUS } from "@/pages/chungTuQuyetToan/chungTuQuyetToanTabsMeta";
 import { SuperadminChungTuPdfCategoryTemplates } from "./SuperadminChungTuPdfCategoryTemplates";
@@ -13,6 +16,11 @@ export function SuperadminChungTuPdfTemplatesPanel() {
       ...CHUNG_TU_CATEGORY_CONFIG_LIST.filter(
         (c) => c.status === CHUNG_TU_DOC_TAB_STATUS.AVAILABLE,
       ).map((c) => ({
+        id: c.categoryKey,
+        label: c.label,
+        panel: <SuperadminChungTuPdfCategoryTemplates categoryKey={c.categoryKey} />,
+      })),
+      ...CHUNG_TU_OPERATIONAL_PDF_TEMPLATE_CATEGORIES.map((c) => ({
         id: c.categoryKey,
         label: c.label,
         panel: <SuperadminChungTuPdfCategoryTemplates categoryKey={c.categoryKey} />,

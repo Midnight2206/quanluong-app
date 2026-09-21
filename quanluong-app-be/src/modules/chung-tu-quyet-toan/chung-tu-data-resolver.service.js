@@ -167,8 +167,11 @@ export function resolvePdfHeaderSettings({
     const donViCapTren = normalizeText(profile.donViCapTren);
     const donVi = normalizeText(profile.donVi);
     // Always from creating user's profile (not unit profile / recipient unit).
+    // FIELD_print_line_1/2 alias cùng key — cùng giá trị.
     resolved.donViCapTren = donViCapTren;
     resolved.donVi = donVi;
+    resolved.printLine1 = donViCapTren;
+    resolved.printLine2 = donVi;
     if (donVi) {
       resolved.donViSo = donVi;
     }

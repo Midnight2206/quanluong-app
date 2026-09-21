@@ -5,7 +5,6 @@ import { IconButton } from "@/components/ui/IconButton";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { cn } from "@/utils/cn";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import httpClient from "@/services/httpClient";
 import {
   useDeleteLttpIssueSlipMutation,
   useGetLttpIssueSlipsQuery,
@@ -15,6 +14,10 @@ import { notifyError, notifySuccess } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { readLichSuFilters, writeLichSuFilters } from "./lttpNhapXuatSessionPersist";
 import { LttpLichSuXuatSlipCard } from "./LttpLichSuXuatSlipCard";
+import {
+  openLttpIssueSlipPdfInTab,
+  openLttpIssueSlipsMergedPdfInTab,
+} from "./lttpIssueSlipPdfOpen";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -38,23 +41,6 @@ function lastDayOfCurrentMonthYmd() {
 }
 
 const PAGE_SIZE = 20;
-
-async function formatBlobOrJsonError(err, fallback) {
-  if (err?.response?.data instanceof Blob) {
-    const text = await err.response.data.text().catch(() => "");
-    try {
-      const j = JSON.parse(text);
-      if (j && typeof j === "object" && j.message) {
-        return String(j.message);
-      }
-    } catch {
-      /* not JSON */
-    }
-    return text.trim() || fallback;
-  }
-  const m = err?.data?.message || err?.message;
-  return typeof m === "string" && m.trim() ? m : fallback;
-}
 
 /**
  * Lịch sử phiếu xuất theo kho (storage) + lọc + in / sửa / thu hồi / in hàng loạt.
@@ -162,22 +148,15 @@ export function LttpLichSuXuatTab({
   const openIssueSlipPdf = useCallback((slipId) => {
     const tab = window.open("about:blank", "_blank");
     if (!tab) {
-      notifyError("Trình duyệt chặn cửa sổ mới. Hãy cho phép popup cho trang này hoặc thử nút In trên thanh địa chỉ.");
+      notifyError(
+        "Trình duyệt chặn cửa sổ mới. Hãy cho phép popup cho trang này hoặc thử nút In trên thanh địa chỉ.",
+      );
       return;
     }
     setPrintingId(slipId);
     void (async () => {
       try {
-        const res = await httpClient.get(`/lttp/issue-slips/${slipId}/print-pdf`, {
-          responseType: "blob",
-        });
-        const blob = new Blob([res.data], { type: "application/pdf" });
-        const url = URL.createObjectURL(blob);
-        tab.location.href = url;
-        setTimeout(() => URL.revokeObjectURL(url), 120_000);
-      } catch (err) {
-        tab.close();
-        notifyError(await formatBlobOrJsonError(err, "Không tải được PDF phiếu xuất."));
+        await openLttpIssueSlipPdfInTab(slipId, { targetWindow: tab });
       } finally {
         setPrintingId(null);
       }
@@ -196,18 +175,10 @@ export function LttpLichSuXuatTab({
     setBatchPrintBusy(true);
     void (async () => {
       try {
-        const res = await httpClient.post(
-          "/lttp/issue-slips/print-pdfs",
-          { ids: slips.map((s) => s.id) },
-          { responseType: "blob" },
+        await openLttpIssueSlipsMergedPdfInTab(
+          slips.map((s) => s.id),
+          { targetWindow: tab },
         );
-        const blob = new Blob([res.data], { type: "application/pdf" });
-        const url = URL.createObjectURL(blob);
-        tab.location.href = url;
-        setTimeout(() => URL.revokeObjectURL(url), 120_000);
-      } catch (err) {
-        tab.close();
-        notifyError(await formatBlobOrJsonError(err, "Không gộp PDF các phiếu."));
       } finally {
         setBatchPrintBusy(false);
       }

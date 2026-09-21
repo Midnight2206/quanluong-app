@@ -163,6 +163,7 @@ model User {
   chungTuBkmhMonthlyUpdated              ChungTuBkmhMonthly[] @relation("ChungTuBkmhMonthlyUpdatedBy")
   chungTuBkmhHeaderSettingsUpdated       ChungTuBkmhHeaderSettings[] @relation("ChungTuBkmhHeaderSettingsUpdatedBy")
   chungTuSignatureSettingsUpdated        ChungTuSignatureSettings[] @relation("ChungTuSignatureSettingsUpdatedBy")
+  lttpIssueSlipSignatureSettingsUpdated  LttpIssueSlipSignatureSettings[] @relation("LttpIssueSlipSignatureSettingsUpdatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
 
@@ -640,6 +641,7 @@ model Unit {
   lttpIssueSlipSerials        LttpIssueSlipSerial[]
   lttpUnitIssueFormDefaults   LttpUnitIssueFormDefaults?   @relation("LttpIssueFormDefaultUnit")
   lttpIssueFormDefaultRecip   LttpUnitIssueFormDefaults[]  @relation("LttpIssueFormDefaultRecipUnit")
+  lttpIssueSlipSignatureSettings LttpIssueSlipSignatureSettings? @relation("LttpIssueSlipSignatureSettingsUnit")
   lttpRecipientDefaultUser   LttpRecipientUnitDefaultUser? @relation("LttpRecipientDefaultRecipientUnit")
   unitEntityForksSource  UnitEntityFork[] @relation("UnitEntityForkSource")
   unitEntityForksTarget  UnitEntityFork[] @relation("UnitEntityForkTarget")
@@ -848,8 +850,10 @@ model LttpCommodityDefaultSupplier {
 model LttpIssueSlip {
   id            Int       @id @default(autoincrement())
   unitId        Int
-  /// Ngày trên phiếu; giá tham chiếu theo bảng giá hiệu lực tại ngày này.
+  /// Ngày trên phiếu (= ngày giao khi in PDF); giá tham chiếu theo bảng giá hiệu lực tại ngày này.
   issueDate     DateTime  @db.Date
+  /// Ngày nhận trên PDF; null ⇒ dùng `issueDate`.
+  receivedDate  DateTime? @db.Date
   note          String?   @db.VarChar(500)
   createdById   Int
   createdAt     DateTime  @default(now())
@@ -868,6 +872,7 @@ model LttpIssueSlip {
   formMauSo     String?   @db.VarChar(64)
   warehouseFrom String?   @db.VarChar(128)
   signerWriter  String?   @db.VarChar(191)
+  signerStorekeeper String? @db.VarChar(191)
   signerRecipient String? @db.VarChar(191)
   signerApprover  String? @db.VarChar(191)
   /// User người mua hàng (BKMH / chứng từ quyết toán).
@@ -914,7 +919,23 @@ model LttpRecipientUnitDefaultUser {
   @@index([defaultUserId])
 }
 
-/// Mẫu in & chữ ký mặc định theo đơn vị dữ liệu (kho) — dùng khi mở form / lưu tùy chọn.
+/// Cấu hình khối chữ ký PDF phiếu xuất LTTP theo đơn vị kho (storage).
+model LttpIssueSlipSignatureSettings {
+  id                 Int      @id @default(autoincrement())
+  unitId             Int      @unique
+  signatureBlockJson Json
+  extraFieldsJson    Json?
+  updatedById        Int
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  unit               Unit     @relation("LttpIssueSlipSignatureSettingsUnit", fields: [unitId], references: [id], onDelete: Cascade)
+  updatedBy          User     @relation("LttpIssueSlipSignatureSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@index([updatedById])
+}
+
+/// Mẫu nội dung in & chữ ký mặc định theo đơn vị dữ liệu (kho) — dùng khi mở form / lưu tùy chọn.
+/// Layout PDF lấy từ mẫu Excel document-service (`lttp-phieu-xuat`); cột margin/font legacy không còn dùng.
 model LttpUnitIssueFormDefaults {
   id                     Int      @id @default(autoincrement())
   unitId                 Int      @unique

@@ -8,9 +8,15 @@ import {
   retireTemplate,
   uploadTemplate,
 } from "../../services/document-service.client.js";
-import { CHUNG_TU_CATEGORY_KEYS } from "./chung-tu-category.constants.js";
+import {
+  CHUNG_TU_CATEGORY_KEYS,
+  CHUNG_TU_OPERATIONAL_PDF_CATEGORY_KEYS,
+} from "./chung-tu-category.constants.js";
 
-const ALLOWED_CHUNG_TU_PDF_CATEGORIES = new Set(Object.values(CHUNG_TU_CATEGORY_KEYS));
+const ALLOWED_CHUNG_TU_PDF_CATEGORIES = new Set([
+  ...Object.values(CHUNG_TU_CATEGORY_KEYS),
+  ...CHUNG_TU_OPERATIONAL_PDF_CATEGORY_KEYS,
+]);
 
 function normalizeCategoryKey(value) {
   return String(value ?? "").trim();

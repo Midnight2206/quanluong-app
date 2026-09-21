@@ -11,7 +11,9 @@ export default function PrivateGroupLayout({ children }) {
     <Suspense fallback={null}>
       <PrivateRoute>
         <SuperadminOnlyRoute>
-          <MainLayout navItems={superadminPortalNavItems}>{children}</MainLayout>
+          <MainLayout navItems={superadminPortalNavItems} showWorkingUnitScope={false}>
+            {children}
+          </MainLayout>
         </SuperadminOnlyRoute>
       </PrivateRoute>
     </Suspense>

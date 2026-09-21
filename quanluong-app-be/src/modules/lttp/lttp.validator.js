@@ -115,6 +115,7 @@ const issueSlipLineInputSchema = z.object({
 const createIssueSlipBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+  receivedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional().nullable(),
   note: z.string().max(500).optional().nullable(),
   lines: z.array(issueSlipLineInputSchema).min(1).max(500),
   recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
@@ -125,6 +126,7 @@ const createIssueSlipBodySchema = z.object({
   formMauSo: z.string().max(64).optional().nullable(),
   warehouseFrom: z.string().max(128).optional().nullable(),
   signerWriter: z.string().max(191).optional().nullable(),
+  signerStorekeeper: z.string().max(191).optional().nullable(),
   signerRecipient: z.string().max(191).optional().nullable(),
   signerApprover: z.string().max(191).optional().nullable(),
   buyerUserId: z.coerce.number().int().positive().optional().nullable(),
@@ -133,6 +135,7 @@ const createIssueSlipBodySchema = z.object({
 
 const updateIssueSlipBodySchema = z.object({
   note: z.string().max(500).optional().nullable(),
+  receivedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional().nullable(),
   lines: z.array(issueSlipLineInputSchema).min(1).max(500),
   recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
   recipientUserId: z.coerce.number().int().positive().optional().nullable(),
@@ -142,6 +145,7 @@ const updateIssueSlipBodySchema = z.object({
   formMauSo: z.string().max(64).optional().nullable(),
   warehouseFrom: z.string().max(128).optional().nullable(),
   signerWriter: z.string().max(191).optional().nullable(),
+  signerStorekeeper: z.string().max(191).optional().nullable(),
   signerRecipient: z.string().max(191).optional().nullable(),
   signerApprover: z.string().max(191).optional().nullable(),
   buyerUserId: z.coerce.number().int().positive().optional().nullable(),
@@ -214,18 +218,29 @@ const issueFormDefaultsQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
 });
 
+const issueSlipSignatureSettingsQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+});
+
+const upsertIssueSlipSignatureSettingsBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  signatureBlock: z.any().optional().nullable(),
+  extraFields: z
+    .object({
+      lyDoSuDung: z.string().max(500).optional().nullable(),
+      nhanTaiKho: z.string().max(255).optional().nullable(),
+    })
+    .passthrough()
+    .optional()
+    .nullable(),
+});
+
 const upsertIssueFormDefaultsBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   printLine1: z.string().max(255).optional().nullable(),
   printLine2: z.string().max(128).optional().nullable(),
   formMauSo: z.string().max(64).optional().nullable(),
   warehouseFrom: z.string().max(128).optional().nullable(),
-  marginTopCm: z.coerce.number().finite().min(0).max(10).optional().nullable(),
-  marginRightCm: z.coerce.number().finite().min(0).max(10).optional().nullable(),
-  marginBottomCm: z.coerce.number().finite().min(0).max(10).optional().nullable(),
-  marginLeftCm: z.coerce.number().finite().min(0).max(10).optional().nullable(),
-  printFontId: z.string().max(32).optional().nullable(),
-  printFontSizePt: z.coerce.number().finite().min(8).max(18).optional().nullable(),
   signerWriter: z.string().max(191).optional().nullable(),
   signerApprover: z.string().max(191).optional().nullable(),
   defaultRecipientUnitId: z.coerce.number().int().positive().optional().nullable(),
@@ -297,6 +312,8 @@ export {
   issueSlipIdParamsSchema,
   issueSlipPrintBatchBodySchema,
   issueFormDefaultsQuerySchema,
+  issueSlipSignatureSettingsQuerySchema,
+  upsertIssueSlipSignatureSettingsBodySchema,
   issueSlipResolveQuerySchema,
   listIssueSlipsQuerySchema,
   lttpSupplierQuerySchema,

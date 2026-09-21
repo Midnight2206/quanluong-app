@@ -316,7 +316,10 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
     const el = orderCaptureRef.current;
     if (!el || pngExporting || isLoading || isFetching || !matrix?.rows?.length) return;
     setPngExporting(true);
+    setForceShowTableForCapture(true);
     try {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await new Promise((resolve) => setTimeout(resolve, 120));
       const blob = await captureElementToPngBlob(el, { qualityMode: "fast" });
       const filename = `dat-hang-lttp-${orderDate}.png`;
       const outcome = await shareOrDownloadPng(blob, filename);
@@ -335,17 +338,19 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
       const msg = typeof e?.message === "string" ? e.message : null;
       notifyError(msg || "Không tạo được ảnh. Thử đóng bớt cửa sổ và thử lại.");
     } finally {
+      setForceShowTableForCapture(false);
       setPngExporting(false);
     }
   }, [pngExporting, isLoading, isFetching, matrix?.rows?.length, orderDate]);
 
   const handleOpenTablePreview = useCallback(async () => {
-    const el = tableCardRef.current;
+    const el = orderCaptureRef.current || tableCardRef.current;
     if (!el || tablePreviewLoading || isLoading || isFetching || !matrix?.rows?.length) return;
     setTablePreviewLoading(true);
     setForceShowTableForCapture(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await new Promise((resolve) => setTimeout(resolve, 120));
       const blob = await captureElementToPngBlob(el, { qualityMode: "fast" });
       const nextUrl = URL.createObjectURL(blob);
       setTablePreviewImageUrl((prev) => {

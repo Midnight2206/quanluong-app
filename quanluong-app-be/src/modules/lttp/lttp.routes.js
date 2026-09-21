@@ -9,6 +9,7 @@ import { superadminMiddleware } from "../../middlewares/superadmin.middleware.js
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
 import { unitDataScopeMiddleware } from "../../middlewares/unit-data-scope.middleware.js";
 import { DATA_SCOPE_KINDS } from "../../shared/data-scope/data-scope.registry.js";
+import { getIssueSlipUnitIdById } from "./lttp.service.js";
 import {
   createCommodityController,
   createFoodGroupController,
@@ -26,6 +27,8 @@ import {
   exportIssueSlipsPdfMergedController,
   getCommodityController,
   getIssueFormDefaultsController,
+  getIssueSlipSignatureSettingsController,
+  putIssueSlipSignatureSettingsController,
   getDailyOrderSummaryController,
   getIssueSlipController,
   getNextIssueSlipSerialController,
@@ -66,6 +69,8 @@ import {
   effectiveQuerySchema,
   foodGroupIdParamsSchema,
   issueFormDefaultsQuerySchema,
+  issueSlipSignatureSettingsQuerySchema,
+  upsertIssueSlipSignatureSettingsBodySchema,
   issueSlipIdParamsSchema,
   issueSlipPrintBatchBodySchema,
   issueSlipResolveQuerySchema,
@@ -103,6 +108,18 @@ const routePermissions = Object.fromEntries(
 const LTTP_GROUP = DATA_SCOPE_KINDS.LTTP_FOOD_GROUP.code;
 const LTTP_COMM = DATA_SCOPE_KINDS.LTTP_COMMODITY.code;
 const LTTP_PRICE = DATA_SCOPE_KINDS.LTTP_PRICE_TABLE.code;
+
+/** Khi thiếu unitId / X-Target-Unit-Id: lấy unitId kho từ chính phiếu xuất. */
+async function resolveIssueSlipLogicalUnitFromParams(req) {
+  const id = req.validatedParams?.id ?? req.params?.id;
+  return getIssueSlipUnitIdById(id);
+}
+
+async function resolveIssueSlipLogicalUnitFromPrintBatch(req) {
+  const ids = req.validatedBody?.ids;
+  const first = Array.isArray(ids) ? ids[0] : null;
+  return getIssueSlipUnitIdById(first);
+}
 
 lttpRouter.use(authMiddleware);
 lttpRouter.use(unitScopeMiddleware);
@@ -218,6 +235,22 @@ lttpRouter.put(
 );
 
 lttpRouter.get(
+  "/issue-slip-signature-settings",
+  validateRequest({ query: issueSlipSignatureSettingsQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.getIssueSlipSignatureSettings]),
+  asyncHandler(getIssueSlipSignatureSettingsController),
+);
+
+lttpRouter.put(
+  "/issue-slip-signature-settings",
+  validateRequest({ body: upsertIssueSlipSignatureSettingsBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.putIssueSlipSignatureSettings]),
+  asyncHandler(putIssueSlipSignatureSettingsController),
+);
+
+lttpRouter.get(
   "/recipient-users",
   validateRequest({ query: listRecipientUsersQuerySchema }),
   permissionMiddleware([routePermissions.listRecipientUsers]),
@@ -268,7 +301,10 @@ lttpRouter.put(
 lttpRouter.post(
   "/issue-slips/print-pdfs",
   validateRequest({ body: issueSlipPrintBatchBodySchema }),
-  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  unitDataScopeMiddleware({
+    dataKind: LTTP_COMM,
+    resolveLogicalUnitFallback: resolveIssueSlipLogicalUnitFromPrintBatch,
+  }),
   permissionMiddleware([routePermissions.printIssueSlipsPdfMerged]),
   asyncHandler(exportIssueSlipsPdfMergedController),
 );
@@ -276,7 +312,11 @@ lttpRouter.post(
 lttpRouter.get(
   "/issue-slips/:id/print-pdf",
   validateRequest({ params: issueSlipIdParamsSchema }),
-  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  unitDataScopeMiddleware({
+    dataKind: LTTP_COMM,
+    recordIdParam: "id",
+    resolveLogicalUnitFallback: resolveIssueSlipLogicalUnitFromParams,
+  }),
   permissionMiddleware([routePermissions.printIssueSlipPdf]),
   asyncHandler(exportIssueSlipPdfController),
 );

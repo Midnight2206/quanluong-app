@@ -272,6 +272,37 @@ export function usePutLttpIssueFormDefaultsMutation() {
   });
 }
 
+export function useGetLttpIssueSlipSignatureSettingsQuery(unitId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.issueSlipSignatureSettings(unitId),
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp/issue-slip-signature-settings",
+        method: "get",
+        params: { unitId },
+      }),
+    enabled: skip !== true && unitId != null && unitId !== "",
+    ...rest,
+  });
+}
+
+export function usePutLttpIssueSlipSignatureSettingsMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/issue-slip-signature-settings", method: "put", data: body }),
+    onSuccess: (_data, variables) => {
+      if (variables?.unitId != null) {
+        qc.invalidateQueries({
+          queryKey: qk.lttp.issueSlipSignatureSettings(variables.unitId),
+        });
+      }
+      invalidateLttpData(qc);
+    },
+  });
+}
+
 export function useGetLttpNextIssueSlipSerialQuery(arg, options = {}) {
   const { unitId, date } = arg || {};
   const { skip, ...rest } = options;

@@ -101,5 +101,16 @@ export function listAvailableChungTuCategoryConfigs() {
   return CHUNG_TU_CATEGORY_CONFIG_LIST.filter((c) => c.status === CHUNG_TU_DOC_TAB_STATUS.AVAILABLE);
 }
 
+/**
+ * Category PDF upload/publish trên Superadmin — không hiện tab Chứng từ quyết toán.
+ * Khớp BE `CHUNG_TU_OPERATIONAL_PDF_CATEGORY_LIST`.
+ */
+export const CHUNG_TU_OPERATIONAL_PDF_TEMPLATE_CATEGORIES = Object.freeze([
+  Object.freeze({
+    categoryKey: "lttp-phieu-xuat",
+    label: "PXK nhập xuất LTTP",
+  }),
+]);
+
 export const DEFAULT_CHUNG_TU_CATEGORY_KEY =
   listAvailableChungTuCategoryConfigs()[0]?.categoryKey ?? "bang-ke-mua-hang";

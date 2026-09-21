@@ -8,16 +8,15 @@ import { Button } from "@/components/ui/Button";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
-import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
 import { TabPanel } from "@/components/common/TabPanel";
 import { useSyncPersistedNavTabFromRoute, writePersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { cn } from "@/utils/cn";
 import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpOrderingTab } from "./LttpOrderingTab";
+import { LttpSignatureSettingsTab } from "./LttpSignatureSettingsTab";
 import { LttpNguoiNhanBulkModal } from "./LttpNguoiNhanBulkModal";
 import { LttpNguoiMuaBulkModal } from "./LttpNguoiMuaBulkModal";
-import { readStoredManualUnitId, writeStoredManualUnitId } from "./lttpNhapXuatSessionPersist";
 
 const LTTP_TAB_PERSIST_ID = "lttp-nhap-xuat";
 /** Khớp thư mục `app/.../lttp-nhap-xuat/ordering-lttp/` */
@@ -58,7 +57,6 @@ export function LttpNhapXuatPage() {
     pathname === LTTP_ORDERING_ROUTE_PATH || pathname.endsWith(`/ordering-lttp`);
 
   const user = useCurrentUser();
-  const { workingUnitId, isPrivileged } = useTargetUnitScope();
   const canRead = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_READ);
   const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
   const canPickUnits = useHasPermission(PERMISSIONS.UNITS_READ);
@@ -67,67 +65,16 @@ export function LttpNhapXuatPage() {
   const units = unitsData ?? [];
   const sortedUnits = useMemo(() => sortUnitsByPath(units), [units]);
 
-  const defaultUnitId = user?.unit?.id != null ? Number(user.unit.id) : null;
+  /** Đơn vị cấp phát = đơn vị của user — không cho chọn / viết hộ cấp dưới. */
+  const ownUnitId = user?.unit?.id != null ? Number(user.unit.id) : null;
+  const effectiveUnitId = ownUnitId;
 
-  const selectedUnitId = useMemo(() => {
-    if (!canPickUnits) {
-      return defaultUnitId;
-    }
-    if (workingUnitId != null) {
-      return Number(workingUnitId);
-    }
-    /**
-     * User thường: mặc định kho = đơn vị gốc tài khoản — không fallback `sortedUnits[0]` (tránh lệch nhánh).
-     * Phạm vi API là SUBTREE (nhánh con); chọn kho con qua manualUnitId / session.
-     */
-    if (!isPrivileged && defaultUnitId != null) {
-      return defaultUnitId;
-    }
-    if (sortedUnits.length) {
-      return sortedUnits[0].id;
-    }
-    return defaultUnitId;
-  }, [canPickUnits, defaultUnitId, isPrivileged, workingUnitId, sortedUnits]);
-
-  const [manualUnitId, setManualUnitId] = useState(null);
   const [bulkRecipientOpen, setBulkRecipientOpen] = useState(false);
   const [bulkBuyerOpen, setBulkBuyerOpen] = useState(false);
   const [editingSlip, setEditingSlip] = useState(null);
   const [tabRemountKey, setTabRemountKey] = useState(0);
   const [isToolbarCompact, setIsToolbarCompact] = useState(false);
-  const effectiveUnitId = useMemo(
-    () => manualUnitId ?? selectedUnitId,
-    [manualUnitId, selectedUnitId],
-  );
-
-  const didRestoreManualUnitRef = useRef(false);
   const toolbarSentinelRef = useRef(null);
-  useEffect(() => {
-    didRestoreManualUnitRef.current = false;
-  }, [user?.id]);
-
-  /** Khôi phục nháp kho từ session nếu id vẫn nằm trong phạm vi (toàn tree hoặc nhánh user). */
-  useEffect(() => {
-    if (!canPickUnits || !sortedUnits.length || didRestoreManualUnitRef.current) {
-      return;
-    }
-    didRestoreManualUnitRef.current = true;
-    const allowed =
-      !isPrivileged && defaultUnitId != null
-        ? unitsWithinSubtree(sortedUnits, defaultUnitId)
-        : sortedUnits;
-    const allowedIds = new Set(allowed.map((u) => Number(u.id)));
-    const stored = readStoredManualUnitId();
-    if (stored != null && allowedIds.has(Number(stored))) {
-      setManualUnitId(stored);
-    }
-  }, [canPickUnits, sortedUnits, isPrivileged, defaultUnitId]);
-
-  useEffect(() => {
-    setManualUnitId(null);
-    writeStoredManualUnitId(null);
-    setEditingSlip(null);
-  }, [workingUnitId]);
 
   useEffect(() => {
     const sentinel = toolbarSentinelRef.current;
@@ -141,12 +88,7 @@ export function LttpNhapXuatPage() {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [canPickUnits, effectiveUnitId]);
-
-  const persistManualUnitId = useCallback((next) => {
-    setManualUnitId(next);
-    writeStoredManualUnitId(next);
-  }, []);
+  }, [effectiveUnitId]);
 
   const handleRequestEditSlip = useCallback((slip) => {
     if (!slip) {
@@ -180,28 +122,28 @@ export function LttpNhapXuatPage() {
     orderingRouteForced ? LTTP_ORDER_TAB_ID : undefined,
   );
 
-  /** Dropdown kho: user thường chỉ các đơn vị trong nhánh (path) của đơn vị gốc — khớp scope SUBTREE API. */
-  const unitsForKhoDropdown = useMemo(() => {
-    if (!isPrivileged && defaultUnitId != null) {
-      const rows = unitsWithinSubtree(sortedUnits, defaultUnitId);
-      const sorted = sortUnitsByPath(rows);
-      if (sorted.length > 0) {
-        return sorted;
-      }
-      return [{ id: defaultUnitId, name: user?.unit?.name ?? `Đơn vị #${defaultUnitId}` }];
+  /** Danh sách đơn vị nhận / bulk config: nhánh của đơn vị user (không dùng để chọn kho viết phiếu). */
+  const unitsInOwnSubtree = useMemo(() => {
+    if (ownUnitId == null) {
+      return [];
     }
-    return sortedUnits;
-  }, [defaultUnitId, isPrivileged, sortedUnits, user?.unit?.name]);
+    const rows = unitsWithinSubtree(sortedUnits, ownUnitId);
+    const sorted = sortUnitsByPath(rows);
+    if (sorted.length > 0) {
+      return sorted;
+    }
+    return [{ id: ownUnitId, name: user?.unit?.name ?? `Đơn vị #${ownUnitId}` }];
+  }, [ownUnitId, sortedUnits, user?.unit?.name]);
 
   const unitLabel = useMemo(() => {
     if (effectiveUnitId == null) {
       return null;
     }
-    if (!canPickUnits && user?.unit?.id != null && Number(user.unit.id) === Number(effectiveUnitId)) {
+    if (user?.unit?.id != null && Number(user.unit.id) === Number(effectiveUnitId)) {
       return user.unit.name ?? `#${effectiveUnitId}`;
     }
     return sortedUnits.find((u) => Number(u.id) === Number(effectiveUnitId))?.name ?? `#${effectiveUnitId}`;
-  }, [canPickUnits, effectiveUnitId, sortedUnits, user?.unit]);
+  }, [effectiveUnitId, sortedUnits, user?.unit]);
 
   if (!canRead) {
     return (
@@ -213,7 +155,7 @@ export function LttpNhapXuatPage() {
 
   return (
     <section className="min-w-0 pb-6 print:hidden">
-      {canPickUnits && unitsForKhoDropdown.length > 0 && effectiveUnitId != null ? (
+      {effectiveUnitId != null ? (
         <>
           <div ref={toolbarSentinelRef} className="h-px" aria-hidden />
           <div
@@ -226,65 +168,54 @@ export function LttpNhapXuatPage() {
                 : "p-3 sm:grid-cols-2 sm:items-end lg:grid-cols-[minmax(18rem,1fr)_auto]",
             )}
           >
-          <label
-            className={cn(
-              "min-w-0 space-y-1",
-              isToolbarCompact
-                ? "w-full sm:max-w-sm xl:max-w-md"
-                : "sm:col-span-2 lg:col-span-1 lg:max-w-md",
-            )}
-            htmlFor="lttp-io-unit"
-          >
-            <span
+            <div
               className={cn(
-                "text-[10px] font-semibold uppercase tracking-wide text-foreground",
-                isToolbarCompact && "sr-only",
+                "min-w-0 space-y-1",
+                isToolbarCompact
+                  ? "w-full sm:max-w-sm xl:max-w-md"
+                  : "sm:col-span-2 lg:col-span-1 lg:max-w-md",
               )}
             >
-              Đơn vị cấp phát (kho dữ liệu)
-            </span>
-            <select
-              id="lttp-io-unit"
-              aria-label={isToolbarCompact ? "Đơn vị cấp phát" : undefined}
-              className={cn(
-                "w-full rounded-lg border border-border bg-background px-3 text-sm font-medium outline-none transition-[height,padding] focus:border-primary focus:ring-2 focus:ring-ring/30",
-                isToolbarCompact ? "h-9 py-1.5" : "min-h-10 py-2",
-              )}
-              value={String(effectiveUnitId ?? "")}
-              onChange={(e) => {
-                const v = e.target.value;
-                persistManualUnitId(v === "" ? null : Number(v));
-              }}
-            >
-              {unitsForKhoDropdown.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name ?? `Đơn vị #${u.id}`}
-                </option>
-              ))}
-            </select>
-          </label>
-          {canWrite && !isToolbarCompact ? (
-            <div className="grid w-full grid-cols-1 gap-2 sm:col-span-2 sm:grid-cols-2 lg:col-span-1 lg:w-auto">
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-auto min-h-10 w-full gap-2 whitespace-normal px-3 py-2 text-xs leading-tight lg:w-auto xl:whitespace-nowrap"
-                onClick={() => setBulkBuyerOpen(true)}
+              <p
+                className={cn(
+                  "text-[10px] font-semibold uppercase tracking-wide text-foreground",
+                  isToolbarCompact && "sr-only",
+                )}
               >
-                <Users className="size-3.5" />
-                Cài người mua theo đơn vị kho
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-auto min-h-10 w-full gap-2 whitespace-normal px-3 py-2 text-xs leading-tight lg:w-auto xl:whitespace-nowrap"
-                onClick={() => setBulkRecipientOpen(true)}
+                Đơn vị cấp phát
+              </p>
+              <p
+                className={cn(
+                  "truncate rounded-lg border border-border/60 bg-muted/20 px-3 text-sm font-medium text-foreground",
+                  isToolbarCompact ? "h-9 py-1.5 leading-6" : "min-h-10 py-2",
+                )}
+                title={unitLabel ?? undefined}
               >
-                <Users className="size-3.5" />
-                Cài người nhận theo đơn vị nhận
-              </Button>
+                {unitLabel ?? `Đơn vị #${effectiveUnitId}`}
+              </p>
             </div>
-          ) : null}
+            {canWrite && !isToolbarCompact ? (
+              <div className="grid w-full grid-cols-1 gap-2 sm:col-span-2 sm:grid-cols-2 lg:col-span-1 lg:w-auto">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-auto min-h-10 w-full gap-2 whitespace-normal px-3 py-2 text-xs leading-tight lg:w-auto xl:whitespace-nowrap"
+                  onClick={() => setBulkBuyerOpen(true)}
+                >
+                  <Users className="size-3.5" />
+                  Cài người mua theo đơn vị kho
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-auto min-h-10 w-full gap-2 whitespace-normal px-3 py-2 text-xs leading-tight lg:w-auto xl:whitespace-nowrap"
+                  onClick={() => setBulkRecipientOpen(true)}
+                >
+                  <Users className="size-3.5" />
+                  Cài người nhận theo đơn vị nhận
+                </Button>
+              </div>
+            ) : null}
           </div>
         </>
       ) : null}
@@ -294,13 +225,13 @@ export function LttpNhapXuatPage() {
           <LttpNguoiMuaBulkModal
             open={bulkBuyerOpen}
             onClose={() => setBulkBuyerOpen(false)}
-            units={unitsForKhoDropdown}
+            units={unitsInOwnSubtree}
             canWrite={canWrite}
           />
           <LttpNguoiNhanBulkModal
             open={bulkRecipientOpen}
             onClose={() => setBulkRecipientOpen(false)}
-            units={unitsForKhoDropdown}
+            units={unitsInOwnSubtree}
             canWrite={canWrite}
           />
         </>
@@ -331,7 +262,7 @@ export function LttpNhapXuatPage() {
                       selectedUnitId={effectiveUnitId}
                       canWrite={canWrite}
                       unitLabel={unitLabel}
-                      units={unitsForKhoDropdown}
+                      units={unitsInOwnSubtree}
                       canPickUnits={canPickUnits}
                       editingSlip={editingSlip}
                       onCancelEdit={handleCancelEditSlip}
@@ -346,9 +277,19 @@ export function LttpNhapXuatPage() {
                     <LttpLichSuXuatTab
                       storageUnitId={effectiveUnitId}
                       storageUnitName={unitLabel}
-                      units={unitsForKhoDropdown}
+                      units={unitsInOwnSubtree}
                       canWrite={canWrite}
                       onRequestEdit={handleRequestEditSlip}
+                    />
+                  ),
+                },
+                {
+                  id: "chu-ky",
+                  label: "Cài đặt chữ ký",
+                  panel: (
+                    <LttpSignatureSettingsTab
+                      unitId={effectiveUnitId}
+                      canWrite={canWrite}
                     />
                   ),
                 },

@@ -20,6 +20,19 @@ const STATIC_ALIASES = Object.freeze({
   ho_ten_nguoi_mua: "hoTenNguoiMua",
   nguoi_mua: "hoTenNguoiMua",
   ly_do_nhap_kho: "lyDoNhapKho",
+  mua_tt: "muaTt",
+  quantity_market: "muaTt",
+  quantity_tgsx: "tgsx",
+  print_line_1: "donViCapTren",
+  print_line_2: "donVi",
+  form_mau_so: "formMauSo",
+  nhan_tai_kho: "nhanTaiKho",
+  ly_do_su_dung: "lyDoSuDung",
+  ngay_giao: "ngayGiao",
+  ngay_nhan: "ngayNhan",
+  bo_phan: "boPhan",
+  nguoi_viet_phieu: "nguoiVietPhieu",
+  nguoi_duyet: "nguoiDuyet",
 });
 
 /** Scalar-only: so/soPhieu template keys share soChungTu value + fieldLabels. */

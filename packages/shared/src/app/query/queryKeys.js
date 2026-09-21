@@ -40,6 +40,11 @@ export const qk = {
       String(pageSize ?? 20),
     ],
     issueFormDefaults: (unitId) => ["lttp", "issueFormDefaults", String(unitId)],
+    issueSlipSignatureSettings: (unitId) => [
+      "lttp",
+      "issueSlipSignatureSettings",
+      String(unitId),
+    ],
     nextIssueSlipSerial: (unitId, date) => ["lttp", "nextIssueSlipSerial", String(unitId), date ?? ""],
     recipientUsers: (unitId) => ["lttp", "recipientUsers", String(unitId)],
     receivingDefaultRecipient: (recipientUnitId) => [
