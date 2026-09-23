@@ -1841,7 +1841,7 @@ export function LttpPhieuXuatTab({
         ) : null}
 
         {wizardShowInfo ? (
-        <div className="space-y-3" data-local-unsaved-section="issue-info">
+        <div className="space-y-3" data-no-unsaved-mark="true">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
           <label className="min-w-0 space-y-0.5 text-xs sm:min-w-[10rem]">
             Ngày phiếu / giao{isEditMode ? " (không đổi)" : ""}
