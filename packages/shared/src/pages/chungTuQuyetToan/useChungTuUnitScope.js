@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
-import { readStoredManualUnitId, writeStoredManualUnitId } from "@/pages/lttpNhapXuat/lttpNhapXuatSessionPersist";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
+import {
+  readStoredManualUnitId,
+  writeStoredManualUnitId,
+} from "@/pages/lttpNhapXuat/lttpNhapXuatSessionPersist";
 import {
   resolveDefaultLttpStorageUnitId,
   unitsForLttpUnitPicker,
@@ -48,20 +52,65 @@ export function useChungTuUnitScope() {
   const [manualUnitId, setManualUnitId] = useState(null);
   const effectiveUnitId = manualUnitId ?? selectedUnitId;
 
-  useEffect(() => {
-    if (!canPickUnits || !unitsForDropdown.length) return;
-    const stored = readStoredManualUnitId();
-    if (stored == null) return;
+  const {
+    draft: manualUnitDraft,
+    setDraftPayload: persistManualUnitDraft,
+    ready: manualUnitPersistReady,
+  } = useDraftPersist({
+    draftType: "shared-manual-unit",
+    scopeId: "global",
+    enabled: canPickUnits,
+  });
+
+  const hydrateDoneRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!canPickUnits || !unitsForDropdown.length || !manualUnitPersistReady) {
+      return;
+    }
+    if (hydrateDoneRef.current) {
+      return;
+    }
+    hydrateDoneRef.current = true;
     const allowedIds = new Set(unitsForDropdown.map((u) => Number(u.id)));
-    if (allowedIds.has(Number(stored))) {
+    let stored =
+      manualUnitDraft?.manualUnitId != null ? Number(manualUnitDraft.manualUnitId) : null;
+    if (stored == null || !allowedIds.has(stored)) {
+      const sessionStored = readStoredManualUnitId();
+      if (sessionStored != null && allowedIds.has(Number(sessionStored))) {
+        stored = Number(sessionStored);
+        persistManualUnitDraft({ manualUnitId: stored });
+      }
+    }
+    try {
+      writeStoredManualUnitId(null);
+    } catch {
+      /* ignore */
+    }
+    if (stored != null && allowedIds.has(stored)) {
       setManualUnitId(stored);
     }
-  }, [canPickUnits, unitsForDropdown]);
+  }, [
+    canPickUnits,
+    unitsForDropdown,
+    manualUnitPersistReady,
+    manualUnitDraft,
+    persistManualUnitDraft,
+  ]);
 
-  const persistManualUnitId = useCallback((id) => {
-    setManualUnitId(id);
-    writeStoredManualUnitId(id);
-  }, []);
+  useEffect(() => {
+    hydrateDoneRef.current = false;
+  }, [user?.id]);
+
+  const persistManualUnitId = useCallback(
+    (id) => {
+      setManualUnitId(id);
+      if (id != null) {
+        persistManualUnitDraft({ manualUnitId: Number(id) });
+      }
+    },
+    [persistManualUnitDraft],
+  );
 
   return {
     canPickUnits,

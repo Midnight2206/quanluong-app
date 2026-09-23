@@ -5,12 +5,15 @@ import { apiRequest, withUnwrap } from "@/services/apiRequest";
 import { qk } from "@/app/query/queryKeys";
 import { mapPermissionsFromUser, useAuthStore } from "@/features/auth/model/authStore";
 import { clearTargetUnitId } from "@/services/targetUnitScope";
+import { wipeClientPersist } from "@/lib/clientPersist/wipeClientPersist.js";
 
 async function fetchCurrentUser() {
   const data = await apiRequest({ url: "/auth/current-user", method: "get" });
   if (data == null) {
+    const userId = useAuthStore.getState().user?.id ?? null;
     clearTargetUnitId();
     useAuthStore.getState().clearAuthState();
+    await wipeClientPersist(userId);
     return null;
   }
   useAuthStore.getState().setAuthState({ user: data, permissions: mapPermissionsFromUser(data) });
@@ -78,9 +81,18 @@ export function useLoginMutation() {
   const qc = useQueryClient();
   return useAuthMutation({
     mutationFn: (payload) => apiRequest({ url: "/auth/login", method: "post", data: payload }),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
+      const previousUserId = useAuthStore.getState().user?.id ?? null;
       clearTargetUnitId();
       useAuthStore.getState().setAuthState({ user: data, permissions: mapPermissionsFromUser(data) });
+      const nextUserId = data?.id ?? null;
+      if (
+        previousUserId != null &&
+        nextUserId != null &&
+        Number(previousUserId) !== Number(nextUserId)
+      ) {
+        await wipeClientPersist(previousUserId);
+      }
       qc.invalidateQueries({ queryKey: qk.auth.root });
     },
   });
@@ -105,9 +117,11 @@ export function useLogoutMutation() {
   const qc = useQueryClient();
   return useAuthMutation({
     mutationFn: () => apiRequest({ url: "/auth/logout", method: "post" }),
-    onSettled: () => {
+    onSettled: async () => {
+      const userId = useAuthStore.getState().user?.id ?? null;
       clearTargetUnitId();
       useAuthStore.getState().clearAuthState();
+      await wipeClientPersist(userId);
       qc.clear();
     },
   });

@@ -1,54 +1,36 @@
-# Task 3 Report: Strip dashboard tab strip + remove `/users` deep link
+# Task 3 Report: Controller proactive verify
 
-## Status: Complete
+## Status
 
-## Summary
-
-Removed the horizontal tab strip from `SuperadminDashboardLayout` (sidebar now owns navigation per Tasks 1–2). Simplified `DashboardUsersPage` to render only `SuperadminUsersPanel` — no Card link to `/users`.
-
-### Changes
-
-**`packages/shared/src/pages/dashboard/SuperadminDashboardLayout.jsx`**
-- Removed `ScrollableHorizontalStrip`, `GuardedNavLink`, `visibleTabs`, tablist/tabpanel ARIA.
-- Kept: superadmin auth guard, sticky header «Quản lý hệ thống», pathname → `writePersistedNavTab("dashboard.primary", …)`, `{children}` wrapper.
-
-**`packages/shared/src/pages/dashboard/DashboardTabPages.jsx`**
-- `DashboardUsersPage`: panel-only layout; removed `Link href="/users"` Card and unused `linkCardClass` / `Users` import.
-
-**`packages/shared/src/pages/dashboard/SuperadminDashboardLayout.test.js`** (new)
-- Source-assert: no `ScrollableHorizontalStrip` / `role="tablist"`; retains `writePersistedNavTab` and «Quản lý hệ thống».
-
-**`packages/shared/src/pages/dashboard/DashboardTabPages.test.js`** (new)
-- Source-assert on `DashboardUsersPage` region: no `/users` href or «Mở trang Người dùng»; file still imports `SuperadminUsersPanel`.
+**Done.** `OfflineSyncController.flush` calls injectable `verifySessionOrRefreshFn` before `flushOutboxImpl`; failed verify returns `{ ...EMPTY, authExpired: true }` without invoking the outbox processor.
 
 ## TDD
 
-| Step | Result |
-|------|--------|
-| Write failing tests | FAIL (2/2 — strip and deep link still present) |
-| Implement layout + users page | — |
-| Re-run tests | PASS (2/2) |
-
-```bash
-cd packages/shared && node --test \
-  src/pages/dashboard/SuperadminDashboardLayout.test.js \
-  src/pages/dashboard/DashboardTabPages.test.js
-# ✔ SuperadminDashboardLayout has header and persist without tab strip
-# ✔ DashboardUsersPage renders SuperadminUsersPanel without /users deep link
-```
+1. Extended `OfflineSyncController.selfcheck.mjs` with auth short-circuit case and full flush result shape (`authExpired`, `forbidden`).
+2. Ran selfcheck — **FAIL** (`authExpired` false, `flushCalls` 1) as expected before controller change.
+3. Implemented `verifySessionOrRefresh` wiring and `EMPTY` constant in `OfflineSyncController.js`.
+4. Ran selfcheck — **PASS** (`OfflineSyncController: ok`).
 
 ## Commit
 
 ```
-refactor(superadmin): remove dashboard horizontal tabs and users deep link
+feat(offline): verify session before outbox flush
 ```
 
-## Self-review
+Files: `OfflineSyncController.js`, `OfflineSyncController.selfcheck.mjs`
 
-- Did not delete `apps/superadmin` routes (Task 4 scope).
-- `Building2` import in `DashboardTabPages.jsx` was pre-existing unused import — left untouched.
-- Nav persistence unchanged: visiting `/dashboard/units` still writes `dashboard.primary`.
+## Test summary
+
+| Check | Result |
+|-------|--------|
+| `node packages/shared/src/offline/sync/OfflineSyncController.selfcheck.mjs` | PASS |
+| Concurrent flush dedupe (existing) | PASS |
+| Verify fail → no `_flushOutboxForTest`, `authExpired: true`, `flushed: 0` | PASS |
+
+## Out of scope (Task 6)
+
+- `OfflineProvider` does not inject `setAuthState` / auth store into `verifySessionOrRefreshFn` yet. Controller default uses `verifySessionOrRefresh` with `apiRequest` only (sufficient for selfcheck and flush gating).
 
 ## Concerns
 
-None. Sidebar navigation from Tasks 1–2 replaces the removed tab strip.
+- None blocking. Production flush still relies on default verify hitting `/auth/current-user`; Task 6 will wire persisted auth refresh semantics in the provider.

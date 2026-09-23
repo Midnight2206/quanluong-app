@@ -34,17 +34,14 @@ import {
   useResyncLttpIssueSlipPricesMutation,
   useUpdateLttpIssueSlipMutation,
 } from "@/features/lttp/api/lttpApi";
+import { useLttpIssueSlipOffline } from "@/offline/adapters/lttp/useLttpIssueSlipOffline.js";
 import { useGetLttpBuyerUsersQuery } from "@/features/lttp/api/lttpBuyerDefaultsApi";
 import { apiRequest } from "@/services/apiRequest";
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { vndToVietnameseDocumentLine } from "@/utils/vndVietnameseText";
 import { openLttpIssueSlipPdfInTab } from "./lttpIssueSlipPdfOpen";
-import {
-  clearIssueSlipDraft,
-  readIssueSlipDraft,
-  writeIssueSlipDraft,
-} from "./lttpNhapXuatSessionPersist";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import {
   LTTP_ISSUE_SLIP_PRICE_KIND,
   collectIssueSlipFormLineIssues,
@@ -492,8 +489,18 @@ export function LttpPhieuXuatTab({
   const rowQtyRefs = useRef({});
   const rowCodeRefs = useRef({});
 
-  /** Nháp phiếu xuất (sessionStorage): đổi kho hoặc F5 không mất nhập tay. Không áp vào chế độ sửa. */
+  /** Nháp phiếu xuất (IDB): đổi kho hoặc F5 không mất nhập tay. Không áp vào chế độ sửa. */
   const [draftNotice, setDraftNotice] = useState(false);
+  const {
+    draft: issueSlipDraft,
+    setDraftPayload: persistIssueSlipDraft,
+    clear: clearIssueSlipPersist,
+    ready: issueSlipPersistReady,
+  } = useDraftPersist({
+    draftType: "issue-slip",
+    unitId: selectedUnitId,
+    enabled: !isEditMode && selectedUnitId != null,
+  });
   const prevCreateUnitRef = useRef(null);
   const skipRecipientResetAfterDraftRef = useRef(false);
   const skipReceivingDefAfterDraftRef = useRef(false);
@@ -539,12 +546,16 @@ export function LttpPhieuXuatTab({
       draftPersistAllowedRef.current = false;
       return;
     }
+    if (!issueSlipPersistReady) {
+      draftPersistAllowedRef.current = false;
+      return;
+    }
 
     draftPersistAllowedRef.current = false;
 
     const prev = prevCreateUnitRef.current;
     const unitChanged = prev != null && Number(prev) !== Number(selectedUnitId);
-    const draft = readIssueSlipDraft(selectedUnitId);
+    const draft = issueSlipDraft;
 
     if (draft && Number(draft.unitId) === Number(selectedUnitId)) {
       const ymd =
@@ -616,6 +627,8 @@ export function LttpPhieuXuatTab({
 
       skipRecipientResetAfterDraftRef.current = true;
       defLoadedKey.current = selectedUnitId;
+      // Prevent API signature/defaults seed from overwriting restored draft on remount.
+      signatureSeedKey.current = selectedUnitId;
       setDraftNotice(true);
       prevCreateUnitRef.current = selectedUnitId;
       draftPersistAllowedRef.current = true;
@@ -632,7 +645,8 @@ export function LttpPhieuXuatTab({
 
     prevCreateUnitRef.current = selectedUnitId;
     draftPersistAllowedRef.current = true;
-  }, [selectedUnitId, isEditMode]);
+    // issueSlipDraft read once when persist ready / unit changes — not on each debounced write
+  }, [selectedUnitId, isEditMode, issueSlipPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
   const { data: formDefPayload } = useGetLttpIssueFormDefaultsQuery(
     selectedUnitId,
     { skip: !selectedUnitId },
@@ -934,6 +948,8 @@ export function LttpPhieuXuatTab({
     useCreateLttpIssueSlipMutation();
   const [updateSlip, { isLoading: updateBusy }] =
     useUpdateLttpIssueSlipMutation();
+  const { enqueueCreate, enqueueUpdate, isOfflineLikeError } =
+    useLttpIssueSlipOffline();
   const [resyncSlipPrices, { isLoading: resyncBusy }] =
     useResyncLttpIssueSlipPricesMutation();
   const [pdfBusy, setPdfBusy] = useState(false);
@@ -1040,50 +1056,50 @@ export function LttpPhieuXuatTab({
     setRows(lineRows.length ? lineRows : [newEmptyRow()]);
   }, [editingSlip, selectedUnitId]);
 
-  /** Ghi nháp vào sessionStorage (debounce) — chỉ tab tạo mới và khi được phép chỉnh. */
+  /** Ghi nháp vào IDB (debounce trong hook) — chỉ tab tạo mới và khi được phép chỉnh. */
   useEffect(() => {
     if (
       isEditMode ||
       !selectedUnitId ||
       !canWrite ||
+      !issueSlipPersistReady ||
       !draftPersistAllowedRef.current
     ) {
       return undefined;
     }
-    const handle = window.setTimeout(() => {
-      writeIssueSlipDraft(selectedUnitId, {
-        issueDate,
-        receivedDate,
-        printHeaderLine1,
-        printHeaderLine2,
-        formMauSo,
-        recipientName,
-        recipientUnitId,
-        recipientUserId,
-        buyerUserId,
-        buyerDisplayName,
-        warehouseFrom,
-        signerWriter,
-        signerStorekeeper,
-        signerRecipient,
-        signerApprover,
-        slipNote,
-        rows: rows.map((r) => ({
-          key: r.key,
-          commodityId: r.commodityId,
-          codeDraft: r.codeDraft,
-          lttpSupplierId: r.lttpSupplierId,
-          requiredQuantity: r.requiredQuantity,
-          quantity: r.quantity,
-          unitPrice: r.unitPrice,
-          tgsxPrice: r.tgsxPrice,
-          priceKind: r.priceKind,
-          lineNote: r.lineNote ?? "",
-        })),
-      });
-    }, 450);
-    return () => window.clearTimeout(handle);
+    persistIssueSlipDraft({
+      issueDate,
+      receivedDate,
+      printHeaderLine1,
+      printHeaderLine2,
+      formMauSo,
+      recipientName,
+      recipientUnitId,
+      recipientUserId,
+      buyerUserId,
+      buyerDisplayName,
+      warehouseFrom,
+      signerWriter,
+      signerStorekeeper,
+      signerRecipient,
+      signerApprover,
+      slipNote,
+      rows: rows.map((r) => ({
+        key: r.key,
+        commodityId: r.commodityId,
+        codeDraft: r.codeDraft,
+        lttpSupplierId: r.lttpSupplierId,
+        requiredQuantity: r.requiredQuantity,
+        quantity: r.quantity,
+        unitPrice: r.unitPrice,
+        tgsxPrice: r.tgsxPrice,
+        priceKind: r.priceKind,
+        lineNote: r.lineNote ?? "",
+      })),
+    });
   }, [
+    issueSlipPersistReady,
+    persistIssueSlipDraft,
     isEditMode,
     selectedUnitId,
     canWrite,
@@ -1110,7 +1126,7 @@ export function LttpPhieuXuatTab({
     if (selectedUnitId == null) {
       return;
     }
-    clearIssueSlipDraft(selectedUnitId);
+    void clearIssueSlipPersist();
     setDraftNotice(false);
     setIssueDate(localYmd());
     setRows([newEmptyRow()]);
@@ -1121,7 +1137,7 @@ export function LttpPhieuXuatTab({
     setSlipNote("");
     defLoadedKey.current = null;
     skipReceivingDefAfterDraftRef.current = false;
-  }, [selectedUnitId]);
+  }, [selectedUnitId, clearIssueSlipPersist]);
 
   const applyRowPatch = useCallback((key, patch) => {
     setRows((prev) => {
@@ -1458,11 +1474,30 @@ export function LttpPhieuXuatTab({
       if (created?.id != null) {
         openSavedSlipPdf(created.id);
       }
-      clearIssueSlipDraft(selectedUnitId);
+      void clearIssueSlipPersist();
       setDraftNotice(false);
       setRows([newEmptyRow()]);
       refetchNextSerial();
     } catch (err) {
+      if (user?.id != null && isOfflineLikeError(err)) {
+        try {
+          if (isEditMode) {
+            await enqueueUpdate(editingSlip, sharedPayload);
+          } else {
+            await enqueueCreate({
+              unitId: selectedUnitId,
+              issueDate,
+              ...sharedPayload,
+            });
+            void clearIssueSlipPersist();
+            setDraftNotice(false);
+          }
+          notifySuccess("Đã lưu hàng đợi, sẽ gửi khi có mạng");
+          return;
+        } catch {
+          /* fall through to error toast */
+        }
+      }
       notifyError(
         err?.data?.message || err?.message || "Lưu không thành công.",
       );
@@ -1537,15 +1572,14 @@ export function LttpPhieuXuatTab({
           </div>
         ) : null}
         {!isEditMode && draftNotice && canWrite ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-sky-400/50 bg-sky-500/10 px-3 py-2 text-[11px] text-sky-950 dark:border-sky-600/50 dark:bg-sky-950/35 dark:text-sky-50 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <p className="min-w-0">
-              <span className="font-medium">Đã khôi phục nháp phiếu</span> từ
-              phiên làm việc trước.
+              Đã khôi phục nháp từ máy này (chưa gửi máy chủ).
             </p>
             <Button
               type="button"
               variant="ghost"
-              className="h-8 shrink-0 text-xs text-sky-900 underline-offset-2 hover:underline dark:text-sky-100"
+              className="h-8 shrink-0 text-xs underline-offset-2 hover:underline"
               onClick={() => discardIssueSlipDraft()}
             >
               Xóa nháp
@@ -1791,6 +1825,11 @@ export function LttpPhieuXuatTab({
 
       <form
         id={formId}
+        data-local-commit-form="true"
+        data-local-unsaved-defaults={!isEditMode ? "true" : undefined}
+        data-local-draft-active={
+          !isEditMode && (draftNotice || issueSlipDraft) ? "true" : undefined
+        }
         className={cn(
           "print:hidden min-w-0 space-y-3",
           useWizardLayout && "pb-14",
@@ -1802,7 +1841,7 @@ export function LttpPhieuXuatTab({
         ) : null}
 
         {wizardShowInfo ? (
-        <div className="space-y-3">
+        <div className="space-y-3" data-local-unsaved-section="issue-info">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
           <label className="min-w-0 space-y-0.5 text-xs sm:min-w-[10rem]">
             Ngày phiếu / giao{isEditMode ? " (không đổi)" : ""}
@@ -1912,7 +1951,7 @@ export function LttpPhieuXuatTab({
         ) : null}
 
         {wizardShowLines ? (
-        <div className="space-y-3">
+        <div className="space-y-3" data-local-unsaved-section="issue-lines">
         <p className="text-[10px] text-muted-foreground">
           Bảng giá theo đơn vị cấp, tham chiếu ngày:{" "}
           {eff?.appliedEffectiveDate ?? "—"}{" "}

@@ -6,6 +6,7 @@ import { apiRequest, withUnwrap } from "@/services/apiRequest";
 import { useWrappedMutation } from "@/lib/useWrappedMutation";
 
 import { invalidateLttpData } from "./lttpApiInvalidate.js";
+export { isOutboxEligibleError } from "@/offline/adapters/lttp/lttpOutboxOps.js";
 
 export function useGetLttpFoodGroupsQuery(_arg, options = {}) {
   const { skip, ...rest } = options;

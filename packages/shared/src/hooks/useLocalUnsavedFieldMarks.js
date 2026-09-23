@@ -23,7 +23,10 @@ const SKIP_TYPES = new Set([
 ]);
 
 const MARK_CLASS = "ql-local-unsaved-mark";
+const SECTION_MARK_CLASS = "ql-local-unsaved-section-mark";
 const FIELD_CLASS = "ql-local-unsaved";
+const SECTION_SEL = "[data-local-unsaved-section]";
+const SECTION_KEY_PREFIX = "section:";
 
 /** Current route for mark/unmark from DOM handlers (updated by hook). */
 let routeKeyForRegistry = "";
@@ -36,17 +39,29 @@ function isMarkableControl(el) {
   if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") {
     return false;
   }
+  if (!el.closest?.("[data-local-commit-form='true']")) {
+    return false;
+  }
   if (el.closest?.("[data-no-persist-root='true']")) {
+    return false;
+  }
+  if (el.closest?.("[data-ui-preference='true']") || el.closest?.("[data-no-unsaved-mark='true']")) {
     return false;
   }
   if (el.dataset?.noPersist === "true" || el.dataset?.noUnsavedMark === "true") {
     return false;
   }
+  if (el.dataset?.localCommit === "false") {
+    return false;
+  }
   if (tag === "INPUT") {
     const type = String(el.type || "text").toLowerCase();
-    if (SKIP_TYPES.has(type)) {
+    if (SKIP_TYPES.has(type) || type === "search") {
       return false;
     }
+  }
+  if (el.getAttribute?.("role") === "searchbox") {
+    return false;
   }
   if (el.disabled) {
     return false;
@@ -70,7 +85,46 @@ function fieldHasValue(el) {
   return String(el.value ?? "").trim() !== "";
 }
 
-function ensureHost(el) {
+function fieldKey(el) {
+  return el.dataset.persistKey || el.name || el.id || "";
+}
+
+function nearestSection(el) {
+  return el.closest?.(SECTION_SEL) || null;
+}
+
+function sectionRegistryKey(section) {
+  if (!(section instanceof HTMLElement)) {
+    return "";
+  }
+  const raw = section.getAttribute("data-local-unsaved-section");
+  if (raw && raw !== "true") {
+    return `${SECTION_KEY_PREFIX}${raw}`;
+  }
+  if (section.id) {
+    return `${SECTION_KEY_PREFIX}${section.id}`;
+  }
+  return "";
+}
+
+function isSectionRegistryKey(key) {
+  return String(key).startsWith(SECTION_KEY_PREFIX);
+}
+
+function ensureRelativeHost(host) {
+  if (!host || host.dataset.qlUnsavedHost === "1") {
+    return host;
+  }
+  const pos = typeof window !== "undefined" ? window.getComputedStyle(host).position : "static";
+  if (pos === "static") {
+    host.style.position = "relative";
+    host.dataset.qlUnsavedPos = "1";
+  }
+  host.dataset.qlUnsavedHost = "1";
+  return host;
+}
+
+function ensureFieldHost(el) {
   let host =
     el.closest?.("[data-unsaved-mark-host]") ||
     el.closest?.("label") ||
@@ -78,22 +132,7 @@ function ensureHost(el) {
   if (!host || host === document.body) {
     host = el.parentElement;
   }
-  if (!host) {
-    return null;
-  }
-  if (host.dataset.qlUnsavedHost !== "1") {
-    const pos = typeof window !== "undefined" ? window.getComputedStyle(host).position : "static";
-    if (pos === "static") {
-      host.style.position = "relative";
-      host.dataset.qlUnsavedPos = "1";
-    }
-    host.dataset.qlUnsavedHost = "1";
-  }
-  return host;
-}
-
-function fieldKey(el) {
-  return el.dataset.persistKey || el.name || el.id || "";
+  return ensureRelativeHost(host);
 }
 
 function attrSelector(attr, value) {
@@ -102,7 +141,7 @@ function attrSelector(attr, value) {
 }
 
 function findControlInRoot(root, key) {
-  if (!root || !key) {
+  if (!root || !key || isSectionRegistryKey(key)) {
     return null;
   }
   const tries = [
@@ -124,28 +163,49 @@ function findControlInRoot(root, key) {
   return null;
 }
 
-function removeMark(el) {
-  const key = fieldKey(el);
-  if (key && routeKeyForRegistry) {
-    unmarkLocalUnsavedField(routeKeyForRegistry, key);
+function findSectionInRoot(root, registryKey) {
+  if (!root || !isSectionRegistryKey(registryKey)) {
+    return null;
   }
-  el.classList.remove(FIELD_CLASS);
-  delete el.dataset.localUnsaved;
+  const id = registryKey.slice(SECTION_KEY_PREFIX.length);
+  if (!id) {
+    return null;
+  }
+  return (
+    root.querySelector(attrSelector("data-local-unsaved-section", id)) ||
+    (typeof CSS !== "undefined" && CSS.escape
+      ? root.querySelector(`#${CSS.escape(id)}`)
+      : root.querySelector(`#${id}`))
+  );
+}
+
+function removeFieldIcon(el) {
+  const key = fieldKey(el);
   const host = el.closest?.("[data-ql-unsaved-host='1']") || el.parentElement;
   if (!host) {
     return;
   }
-  const mark = [...host.querySelectorAll(`:scope > .${MARK_CLASS}`)].find(
+  const mark = [...host.querySelectorAll(`:scope > .${MARK_CLASS}:not(.${SECTION_MARK_CLASS})`)].find(
     (m) => m.dataset.forField === key,
   );
   mark?.remove();
-  if (!host.querySelector(`.${FIELD_CLASS}`)) {
+  if (!host.querySelector(`.${FIELD_CLASS}`) && !host.querySelector(`.${SECTION_MARK_CLASS}`)) {
     if (host.dataset.qlUnsavedPos === "1") {
       host.style.position = "";
       delete host.dataset.qlUnsavedPos;
     }
     delete host.dataset.qlUnsavedHost;
   }
+}
+
+function removeFieldBorder(el) {
+  const key = fieldKey(el);
+  if (key && routeKeyForRegistry) {
+    unmarkLocalUnsavedField(routeKeyForRegistry, key);
+  }
+  el.classList.remove(FIELD_CLASS);
+  delete el.dataset.localUnsaved;
+  removeFieldIcon(el);
 }
 
 function triangleSvg() {
@@ -170,7 +230,7 @@ function triangleSvg() {
   return svg;
 }
 
-function placeMark(mark, el, host) {
+function placeFieldMark(mark, el, host) {
   const hostRect = host.getBoundingClientRect();
   const elRect = el.getBoundingClientRect();
   const top = elRect.top - hostRect.top + host.scrollTop + 2;
@@ -180,47 +240,192 @@ function placeMark(mark, el, host) {
   mark.style.right = "auto";
 }
 
-function ensureMark(el) {
-  const host = ensureHost(el);
+function makeTipButton({ forField, forSection }) {
+  const mark = document.createElement("button");
+  mark.type = "button";
+  mark.className = MARK_CLASS;
+  if (forSection) {
+    mark.classList.add(SECTION_MARK_CLASS);
+    mark.dataset.forSection = forSection;
+  }
+  if (forField) {
+    mark.dataset.forField = forField;
+  }
+  mark.dataset.tip = TIP;
+  mark.setAttribute("aria-label", TIP);
+  mark.tabIndex = 0;
+  mark.appendChild(triangleSvg());
+  mark.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  return mark;
+}
+
+/** Border only — used inside sections (icon lives on the section). */
+function ensureFieldBorder(el) {
+  el.classList.add(FIELD_CLASS);
+  el.dataset.localUnsaved = "true";
+  const key = fieldKey(el);
+  if (key && routeKeyForRegistry) {
+    markLocalUnsavedField(routeKeyForRegistry, key);
+  }
+  removeFieldIcon(el);
+}
+
+/** Border + corner tip — small forms without a section wrapper. */
+function ensureFieldMarkWithIcon(el) {
+  const host = ensureFieldHost(el);
   if (!host) {
     return;
   }
-  el.classList.add(FIELD_CLASS);
-  el.dataset.localUnsaved = "true";
+  ensureFieldBorder(el);
   const key = fieldKey(el) || String(Math.random());
-  if (fieldKey(el) && routeKeyForRegistry) {
-    markLocalUnsavedField(routeKeyForRegistry, fieldKey(el));
-  }
-  let mark = [...host.querySelectorAll(`:scope > .${MARK_CLASS}`)].find(
+  let mark = [...host.querySelectorAll(`:scope > .${MARK_CLASS}:not(.${SECTION_MARK_CLASS})`)].find(
     (m) => m.dataset.forField === key,
   );
   if (!mark) {
-    mark = document.createElement("button");
-    mark.type = "button";
-    mark.className = MARK_CLASS;
-    mark.dataset.forField = key;
-    mark.dataset.tip = TIP;
-    mark.setAttribute("aria-label", TIP);
-    mark.tabIndex = 0;
-    mark.appendChild(triangleSvg());
-    mark.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
+    mark = makeTipButton({ forField: key });
     host.appendChild(mark);
   } else {
     mark.dataset.tip = TIP;
   }
-  placeMark(mark, el, host);
+  placeFieldMark(mark, el, host);
+}
+
+function removeSectionMark(section) {
+  const sk = sectionRegistryKey(section);
+  if (sk && routeKeyForRegistry) {
+    unmarkLocalUnsavedField(routeKeyForRegistry, sk);
+  }
+  section.classList.remove("ql-local-unsaved-section");
+  const mark = [...section.querySelectorAll(`:scope > .${SECTION_MARK_CLASS}`)].find(
+    (m) => !sk || m.dataset.forSection === sk,
+  );
+  mark?.remove();
+  if (
+    section.dataset.qlUnsavedPos === "1" &&
+    !section.querySelector(`.${FIELD_CLASS}`) &&
+    !section.querySelector(`.${SECTION_MARK_CLASS}`)
+  ) {
+    section.style.position = "";
+    delete section.dataset.qlUnsavedPos;
+    delete section.dataset.qlUnsavedHost;
+  }
+}
+
+/** Hide tip while editing inside section; keep section border if fields still dirty. */
+function hideSectionTip(section) {
+  for (const mark of section.querySelectorAll(`:scope > .${SECTION_MARK_CLASS}`)) {
+    mark.remove();
+  }
+}
+
+function ensureSectionMark(section) {
+  const sk = sectionRegistryKey(section);
+  if (!sk) {
+    return;
+  }
+  ensureRelativeHost(section);
+  section.classList.add("ql-local-unsaved-section");
+  if (routeKeyForRegistry) {
+    markLocalUnsavedField(routeKeyForRegistry, sk);
+  }
+  let mark = [...section.querySelectorAll(`:scope > .${SECTION_MARK_CLASS}`)].find(
+    (m) => m.dataset.forSection === sk,
+  );
+  if (!mark) {
+    mark = makeTipButton({ forSection: sk });
+    section.appendChild(mark);
+  } else {
+    mark.dataset.tip = TIP;
+  }
+  mark.style.top = "0.35rem";
+  mark.style.right = "0.35rem";
+  mark.style.left = "auto";
+}
+
+function sectionHasDirtyFields(section) {
+  return Boolean(section.querySelector?.(`.${FIELD_CLASS}`));
+}
+
+function syncSectionMark(section) {
+  if (!section) {
+    return;
+  }
+  if (sectionHasDirtyFields(section)) {
+    ensureSectionMark(section);
+  } else {
+    removeSectionMark(section);
+  }
+}
+
+function formAllowsDefaultMarks(node) {
+  const form = node?.closest?.("[data-local-commit-form='true']");
+  if (!form) {
+    return false;
+  }
+  return (
+    form.getAttribute("data-local-unsaved-defaults") === "true" ||
+    form.getAttribute("data-local-draft-active") === "true"
+  );
+}
+
+function markFilledInSection(section) {
+  for (const el of section.querySelectorAll("input, textarea, select")) {
+    if (isMarkableControl(el) && fieldHasValue(el)) {
+      ensureFieldBorder(el);
+    }
+  }
+}
+
+/** Create-mode / restored-draft forms: mark every filled control (incl. defaults). */
+function markFilledInDefaultForms(root) {
+  const scope = root || document;
+  for (const form of scope.querySelectorAll('[data-local-commit-form="true"]')) {
+    if (
+      form.getAttribute("data-local-unsaved-defaults") !== "true" &&
+      form.getAttribute("data-local-draft-active") !== "true"
+    ) {
+      continue;
+    }
+    const nested = [...form.querySelectorAll(SECTION_SEL)];
+    const sections = form.matches?.(SECTION_SEL) ? [form, ...nested] : nested;
+    // de-dupe if form is also a section
+    const unique = [...new Set(sections)];
+    if (unique.length > 0) {
+      for (const section of unique) {
+        markFilledInSection(section);
+        syncSectionMark(section);
+      }
+    } else {
+      for (const el of form.querySelectorAll("input, textarea, select")) {
+        if (isMarkableControl(el) && fieldHasValue(el)) {
+          ensureFieldMarkWithIcon(el);
+        }
+      }
+    }
+  }
 }
 
 function clearAllMarks(root) {
   const scope = root || document;
   for (const el of scope.querySelectorAll?.(`.${FIELD_CLASS}`) ?? []) {
-    removeMark(el);
+    el.classList.remove(FIELD_CLASS);
+    delete el.dataset.localUnsaved;
+  }
+  for (const section of scope.querySelectorAll?.(".ql-local-unsaved-section") ?? []) {
+    section.classList.remove("ql-local-unsaved-section");
   }
   for (const mark of scope.querySelectorAll?.(`.${MARK_CLASS}`) ?? []) {
     mark.remove();
+  }
+  for (const host of scope.querySelectorAll?.("[data-ql-unsaved-host='1']") ?? []) {
+    if (host.dataset.qlUnsavedPos === "1") {
+      host.style.position = "";
+      delete host.dataset.qlUnsavedPos;
+    }
+    delete host.dataset.qlUnsavedHost;
   }
 }
 
@@ -228,26 +433,50 @@ function reapplyMarksForRoute() {
   const root =
     document.querySelector('[data-page-scroll-owner="true"]') || document;
   const keys = listLocalUnsavedFields(routeKeyForRegistry);
+  const sectionsToSync = new Set();
   for (const key of keys) {
+    if (isSectionRegistryKey(key)) {
+      const section = findSectionInRoot(root, key);
+      if (section) {
+        sectionsToSync.add(section);
+      }
+      continue;
+    }
     const el = findControlInRoot(root, key);
     if (el && fieldHasValue(el)) {
-      ensureMark(el);
+      const section = nearestSection(el);
+      if (section) {
+        ensureFieldBorder(el);
+        sectionsToSync.add(section);
+      } else {
+        ensureFieldMarkWithIcon(el);
+      }
     }
   }
+  for (const section of sectionsToSync) {
+    syncSectionMark(section);
+  }
+  // Defaults + restored drafts: fill marks even when registry was empty (new tab)
+  markFilledInDefaultForms(root);
 }
 
 function scheduleReapply() {
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       reapplyMarksForRoute();
+      // Draft hydrate may paint after first rAF — one more pass
+      window.setTimeout(() => {
+        reapplyMarksForRoute();
+      }, 80);
     });
   });
 }
 
 /**
- * After blur: mark user-edited local fields with warning ring + corner tip icon.
- * Registry survives route change; marks reapply after draft hydrate.
- * Dispatch `quanluong:clear-local-unsaved-marks` after server save.
+ * Inside `[data-local-unsaved-section]`: fields get border only; one tip icon on
+ * the section after focus leaves that section.
+ * Outside sections (small forms): field keeps border + corner tip.
+ * Only within `[data-local-commit-form]`.
  */
 export function useLocalUnsavedFieldMarks() {
   const pathname = usePathname() ?? "";
@@ -262,6 +491,14 @@ export function useLocalUnsavedFieldMarks() {
         return;
       }
       t.dataset.qlFocusSnapshot = snapshotValue(t);
+      const section = nearestSection(t);
+      if (section) {
+        // Working inside section — hide tip; keep border if still dirty
+        hideSectionTip(section);
+        if (sectionHasDirtyFields(section)) {
+          section.classList.add("ql-local-unsaved-section");
+        }
+      }
     };
 
     const onBlur = (e) => {
@@ -269,7 +506,8 @@ export function useLocalUnsavedFieldMarks() {
       if (!isMarkableControl(t)) {
         return;
       }
-      // defer so React controlled value is committed
+      const section = nearestSection(t);
+      const related = e.relatedTarget instanceof Node ? e.relatedTarget : null;
       window.setTimeout(() => {
         if (!t.isConnected) {
           return;
@@ -277,13 +515,29 @@ export function useLocalUnsavedFieldMarks() {
         const before = t.dataset.qlFocusSnapshot;
         delete t.dataset.qlFocusSnapshot;
         const edited = before != null && before !== snapshotValue(t);
-        if (!edited && !t.classList.contains(FIELD_CLASS)) {
-          return;
-        }
+        const leavingSection = Boolean(section && (!related || !section.contains(related)));
+
         if (edited && fieldHasValue(t)) {
-          ensureMark(t);
+          if (section) {
+            ensureFieldBorder(t);
+          } else {
+            ensureFieldMarkWithIcon(t);
+          }
         } else if (!fieldHasValue(t)) {
-          removeMark(t);
+          removeFieldBorder(t);
+        }
+
+        if (section && leavingSection) {
+          // Include defaults the user never touched
+          if (formAllowsDefaultMarks(section)) {
+            markFilledInSection(section);
+          }
+          syncSectionMark(section);
+        } else if (section && !leavingSection) {
+          hideSectionTip(section);
+          if (sectionHasDirtyFields(section)) {
+            section.classList.add("ql-local-unsaved-section");
+          }
         }
       }, 0);
     };

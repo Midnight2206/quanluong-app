@@ -11,7 +11,8 @@ import {
   Save,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -167,6 +168,42 @@ export function SuperadminUnitsPanel() {
   const [createDesc, setCreateDesc] = useState("");
   const [createParentId, setCreateParentId] = useState("");
 
+  const {
+    draft: unitsCreateDraft,
+    setDraftPayload: persistUnitsCreate,
+    clear: clearUnitsCreateDraft,
+    ready: unitsCreatePersistReady,
+  } = useDraftPersist({ draftType: "sa-units-create", scopeId: "global" });
+  const unitsCreateHydratedRef = useRef(false);
+  const unitsCreateReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!unitsCreatePersistReady || unitsCreateHydratedRef.current) {
+      return;
+    }
+    unitsCreateHydratedRef.current = true;
+    const s = unitsCreateDraft;
+    if (s) {
+      if (typeof s.createName === "string") {
+        setCreateName(s.createName);
+      }
+      if (typeof s.createDesc === "string") {
+        setCreateDesc(s.createDesc);
+      }
+      if (s.createParentId !== undefined) {
+        setCreateParentId(s.createParentId);
+      }
+    }
+    unitsCreateReadyRef.current = true;
+  }, [unitsCreatePersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!unitsCreateReadyRef.current || !unitsCreatePersistReady) {
+      return;
+    }
+    persistUnitsCreate({ createName, createDesc, createParentId });
+  }, [createName, createDesc, createParentId, unitsCreatePersistReady, persistUnitsCreate]);
+
   const [editId, setEditId] = useState(null);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -206,6 +243,7 @@ export function SuperadminUnitsPanel() {
       setCreateName("");
       setCreateDesc("");
       setCreateParentId("");
+      void clearUnitsCreateDraft();
     } catch (err) {
       notifyError(err?.data?.message || "Không tạo được đơn vị.");
     }
@@ -280,6 +318,7 @@ export function SuperadminUnitsPanel() {
     <Card className="shadow-soft">
       <CardContent className="flex min-h-0 flex-1 flex-col space-y-3 !p-3 sm:!p-4">
         <form
+          data-local-commit-form="true"
           onSubmit={onCreate}
           className="flex flex-col gap-2 p-2 border rounded-lg border-border/70 bg-card/40 sm:flex-row sm:flex-wrap sm:items-end"
         >
@@ -484,6 +523,7 @@ export function SuperadminUnitsPanel() {
 
         {editId ? (
           <form
+            data-local-commit-form="true"
             onSubmit={onSaveEdit}
             className="p-2 space-y-2 border rounded-lg border-primary/25 bg-secondary/20 sm:p-3"
           >

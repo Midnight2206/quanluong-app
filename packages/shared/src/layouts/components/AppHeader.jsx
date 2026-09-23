@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { startNavigationIntent } from "@/components/navigation/navigationIntentStore";
 import { AppBrand } from "@/components/common/AppBrand";
 import { Button } from "@/components/ui/Button";
-import { useLogoutMutation } from "@/features/auth/api/authApi";
+import { useLogoutWithDraftGuard } from "@/features/auth/hooks/useLogoutWithDraftGuard";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { cn } from "@/utils/cn";
 import { resolveMediaUrl } from "@/utils/runtimeEnv";
@@ -27,7 +27,7 @@ export function AppHeader() {
   const router = useRouter();
   const user = useCurrentUser();
   const chatDock = useChatDockOptional();
-  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
+  const { logoutWithDraftGuard, isLoggingOut } = useLogoutWithDraftGuard();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [theme, setTheme] = useState(() => getStoredTheme());
   const menuRef = useRef(null);
@@ -55,7 +55,7 @@ export function AppHeader() {
 
   const handleLogout = async () => {
     try {
-      await logout().unwrap();
+      await logoutWithDraftGuard();
     } finally {
       setIsMenuOpen(false);
     }

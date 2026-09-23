@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import {
   Download,
   Loader2,
@@ -339,7 +340,145 @@ export function AdminLttpPanel({
   const [impNote, setImpNote] = useState("");
   const [impTplLoading, setImpTplLoading] = useState(false);
 
+  const {
+    draft: lttpAdminDraft,
+    setDraftPayload: persistLttpAdminDraft,
+    ready: lttpAdminPersistReady,
+  } = useDraftPersist({
+    draftType: "admin-lttp",
+    unitId: selectedUnitId,
+    enabled: selectedUnitId != null && !groupsOnly,
+  });
+  const lttpAdminHydrateKey = useRef(null);
+  const lttpAdminReadyRef = useRef(false);
+  const skipPtGridBuildRef = useRef(false);
+
+  useLayoutEffect(() => {
+    lttpAdminReadyRef.current = false;
+    if (groupsOnly || selectedUnitId == null || !lttpAdminPersistReady) {
+      return;
+    }
+    const k = String(selectedUnitId);
+    if (lttpAdminHydrateKey.current === k) {
+      lttpAdminReadyRef.current = true;
+      return;
+    }
+    lttpAdminHydrateKey.current = k;
+    const s = lttpAdminDraft;
+    if (s) {
+      if (typeof s.effectiveDate === "string") {
+        setEffectiveDate(s.effectiveDate);
+      }
+      if (typeof s.ptDate === "string") {
+        setPtDate(s.ptDate);
+      }
+      if (typeof s.ptNote === "string") {
+        setPtNote(s.ptNote);
+      }
+      if (Array.isArray(s.ptRows)) {
+        skipPtGridBuildRef.current = true;
+        setPtRows(s.ptRows);
+      }
+      if (typeof s.newCode === "string") {
+        setNewCode(s.newCode);
+      }
+      if (typeof s.newName === "string") {
+        setNewName(s.newName);
+      }
+      if (typeof s.newDvt === "string") {
+        setNewDvt(s.newDvt);
+      }
+      if (s.newGroupId !== undefined) {
+        setNewGroupId(s.newGroupId);
+      }
+      if (s.newConv !== undefined) {
+        setNewConv(s.newConv);
+      }
+      if (typeof s.fgCode === "string") {
+        setFgCode(s.fgCode);
+      }
+      if (typeof s.fgName === "string") {
+        setFgName(s.fgName);
+      }
+      if (typeof s.newSupName === "string") {
+        setNewSupName(s.newSupName);
+      }
+      if (typeof s.newSupRep === "string") {
+        setNewSupRep(s.newSupRep);
+      }
+      if (typeof s.newSupAddr === "string") {
+        setNewSupAddr(s.newSupAddr);
+      }
+      if (typeof s.newSupGpkd === "string") {
+        setNewSupGpkd(s.newSupGpkd);
+      }
+      if (typeof s.newSupTax === "string") {
+        setNewSupTax(s.newSupTax);
+      }
+      if (typeof s.impDate === "string") {
+        setImpDate(s.impDate);
+      }
+      if (typeof s.impNote === "string") {
+        setImpNote(s.impNote);
+      }
+    }
+    lttpAdminReadyRef.current = true;
+  }, [selectedUnitId, lttpAdminPersistReady, groupsOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
+    if (groupsOnly || !lttpAdminReadyRef.current || !lttpAdminPersistReady || selectedUnitId == null) {
+      return;
+    }
+    persistLttpAdminDraft({
+      effectiveDate,
+      ptDate,
+      ptNote,
+      ptRows,
+      newCode,
+      newName,
+      newDvt,
+      newGroupId,
+      newConv,
+      fgCode,
+      fgName,
+      newSupName,
+      newSupRep,
+      newSupAddr,
+      newSupGpkd,
+      newSupTax,
+      impDate,
+      impNote,
+    });
+  }, [
+    groupsOnly,
+    selectedUnitId,
+    effectiveDate,
+    ptDate,
+    ptNote,
+    ptRows,
+    newCode,
+    newName,
+    newDvt,
+    newGroupId,
+    newConv,
+    fgCode,
+    fgName,
+    newSupName,
+    newSupRep,
+    newSupAddr,
+    newSupGpkd,
+    newSupTax,
+    impDate,
+    impNote,
+    lttpAdminPersistReady,
+    persistLttpAdminDraft,
+  ]);
+
+  useEffect(() => {
+    if (skipPtGridBuildRef.current) {
+      skipPtGridBuildRef.current = false;
+      return;
+    }
     if (!commodities.length) {
       setPtRows([]);
       priceGridUnitRef.current = null;
@@ -859,7 +998,7 @@ export function AdminLttpPanel({
                     Nhóm dùng chung toàn hệ thống. Mã nhóm là khóa kỹ thuật (vd. <span className="font-mono">gao</span>) — admin
                     chọn khi khai báo mặt hàng. Nhóm <span className="font-medium">Khác</span> không cần tỷ lệ quy đổi.
                   </p>
-                  <form
+                  <form data-local-commit-form="true"
                     onSubmit={onAddFoodGroup}
                     className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card/50 p-2"
                   >
@@ -939,7 +1078,7 @@ export function AdminLttpPanel({
                     mặc định (phiếu xuất) cấu hình từng dòng; chọn xong lưu ngay.
                   </p>
                   {canCWrite ? (
-                    <form
+                    <form data-local-commit-form="true"
                       onSubmit={onAddCommodity}
                       className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card/50 p-2"
                     >
@@ -1074,7 +1213,7 @@ export function AdminLttpPanel({
                     đơn vị quản lý riêng.
                   </p>
                   {canCWrite ? (
-                    <form
+                    <form data-local-commit-form="true"
                       onSubmit={onAddSupplier}
                       className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card/50 p-2"
                     >
@@ -1277,7 +1416,7 @@ export function AdminLttpPanel({
               ) : null}
 
               {sub === "newtable" && canPWrite ? (
-                <form onSubmit={onSavePriceTable} className="space-y-3">
+                <form data-local-commit-form="true" onSubmit={onSavePriceTable} className="space-y-3">
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     Mỗi lần lưu tạo hoặc ghi đè bảng giá cho <span className="font-medium text-foreground">một ngày áp dụng</span>.
                     Ngày không cập nhật vẫn dùng bản gần nhất trước đó.
@@ -1384,7 +1523,7 @@ export function AdminLttpPanel({
               ) : null}
 
               {sub === "import" && canPWrite ? (
-                <form onSubmit={onImport} className="max-w-xl space-y-3 text-xs">
+                <form data-local-commit-form="true" onSubmit={onImport} className="max-w-xl space-y-3 text-xs">
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     Một sheet «BangGia»: dòng 1 là tiêu đề; bắt buộc có cột <span className="font-medium">Mã</span> và{" "}
                     <span className="font-medium">Đơn giá</span>. Cột <span className="font-medium">Tên nhóm</span> có
@@ -1457,7 +1596,7 @@ export function AdminLttpPanel({
                       </p>
                       <p className="font-mono text-sm font-medium text-foreground">{editingCommodity.code}</p>
                     </div>
-                    <form
+                    <form data-local-commit-form="true"
                       onSubmit={onSaveEdit}
                       data-local-scroll="true"
                       className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"
@@ -1546,7 +1685,7 @@ export function AdminLttpPanel({
                       </p>
                       <p className="font-mono text-sm font-medium text-foreground">ID #{editingSupplier.id}</p>
                     </div>
-                    <form
+                    <form data-local-commit-form="true"
                       onSubmit={onSaveSupEdit}
                       data-local-scroll="true"
                       className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"

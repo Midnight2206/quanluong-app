@@ -14,7 +14,7 @@ After Docker UI rebuild (`:8080`), logged-in:
 Selfcheck: `node packages/shared/src/lib/clientPersist/db.selfcheck.mjs && node packages/shared/src/lib/clientPersist/drafts.selfcheck.mjs`
 
 9. **Reconnect gate** — Wi‑Fi back → overlay “Đang đồng bộ…” blocks interaction until outbox flush + active-query refetch succeed; API unreachable while Wi‑Fi on → stay offline/degraded, gate error + **Thử lại** (no skip).
-10. **Local unsaved marks** — offline edit → blur warning on field → change route → return → marks still visible after draft hydrate; discard draft or successful submit removes marks; login/password/`data-no-persist` fields never marked.
+10. **Local unsaved marks** — only inside `[data-local-commit-form]` (needs explicit save to server). Offline edit → blur warning → change route → return → marks still visible after draft hydrate; discard draft or successful submit removes marks. Filters / search / `[data-ui-preference]` / instant-save / login/password/`data-no-persist` never marked.
 
 Integration selfchecks (reconnect + marks):
 

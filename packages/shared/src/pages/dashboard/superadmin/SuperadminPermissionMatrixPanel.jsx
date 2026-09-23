@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, FolderClosed, FolderOpen, Loader2, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -42,6 +43,47 @@ export function SuperadminPermissionMatrixPanel() {
   const [selectedDepth, setSelectedDepth] = useState(null);
   const [selectedUnitId, setSelectedUnitId] = useState(null);
   const [localIds, setLocalIds] = useState(() => new Set());
+
+  const {
+    draft: matrixDraft,
+    setDraftPayload: persistMatrixDraft,
+    ready: matrixPersistReady,
+  } = useDraftPersist({ draftType: "sa-perm-matrix", scopeId: "global" });
+  const matrixHydratedRef = useRef(false);
+  const matrixReadyRef = useRef(false);
+  const skipDepthSyncRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!matrixPersistReady || matrixHydratedRef.current) {
+      return;
+    }
+    matrixHydratedRef.current = true;
+    const s = matrixDraft;
+    if (s) {
+      skipDepthSyncRef.current = true;
+      if (s.selectedDepth !== undefined && s.selectedDepth !== null) {
+        setSelectedDepth(s.selectedDepth);
+      }
+      if (s.selectedUnitId !== undefined) {
+        setSelectedUnitId(s.selectedUnitId);
+      }
+      if (Array.isArray(s.localIds)) {
+        setLocalIds(new Set(s.localIds));
+      }
+    }
+    matrixReadyRef.current = true;
+  }, [matrixPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!matrixReadyRef.current || !matrixPersistReady) {
+      return;
+    }
+    persistMatrixDraft({
+      selectedDepth,
+      selectedUnitId,
+      localIds: [...localIds],
+    });
+  }, [selectedDepth, selectedUnitId, localIds, matrixPersistReady, persistMatrixDraft]);
 
   const [expandedUnitIds, setExpandedUnitIds] = useState(() => new Set());
   const [expandedModules, setExpandedModules] = useState(() => new Set());
@@ -95,6 +137,10 @@ export function SuperadminPermissionMatrixPanel() {
   }, [depths, selectedDepth]);
 
   useEffect(() => {
+    if (skipDepthSyncRef.current) {
+      skipDepthSyncRef.current = false;
+      return;
+    }
     const row = depths.find((d) => d.depth === selectedDepth);
     if (!row) {
       setLocalIds((prev) => (prev.size === 0 ? prev : new Set()));
@@ -233,14 +279,20 @@ export function SuperadminPermissionMatrixPanel() {
 
   return (
     <Card className="shadow-soft flex min-h-0 flex-1 flex-col overflow-hidden">
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !px-0 !py-3 sm:!p-4">
+      <CardContent
+        className="flex min-h-0 flex-1 flex-col gap-3 !px-0 !py-3 sm:!p-4"
+        data-local-commit-form="true"
+      >
         <div className="shrink-0 px-3 sm:px-0">
           <p className="text-xs font-medium sm:text-sm">Ma trận quyền theo depth đơn vị</p>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3 lg:flex-row lg:gap-4 lg:px-0">
           {/* Cây đơn vị — desktop/tablet; mobile chỉ dùng select depth */}
-          <div className="hidden max-h-[min(36vh,20rem)] shrink-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-muted/15 md:flex lg:max-h-none lg:w-[min(100%,280px)] lg:shrink-0">
+          <div
+            className="hidden max-h-[min(36vh,20rem)] shrink-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-muted/15 md:flex lg:max-h-none lg:w-[min(100%,280px)] lg:shrink-0"
+            data-ui-preference="true"
+          >
             <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border/60 px-2 py-1.5">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Đơn vị

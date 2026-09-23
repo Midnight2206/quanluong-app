@@ -1,36 +1,21 @@
-# Task 7–8 Report — service + HTTP routes
+# Task 7 Report: Outbox create-only + flush (P3, X1)
 
-**Status:** DONE (controller committed after implementer forgot commit)
+## Done
 
-**Commits:**
-- `1883e27` feat(chung-tu): PDF template publish retire preview service
-- `b6abf1d` feat(chung-tu): PDF template lifecycle HTTP routes
+- `packages/shared/src/lib/clientPersist/outbox.js`: `OUTBOX_KIND_CREATE`, `assertCreateOnlyKind` (X1), `enqueueOutbox`, `flushOutbox` (pending→sending→done|failed; 4xx no retry; 5xx/network retries max 5), `isOutboxEligibleError`, `setOutboxStoreForTest`.
+- `outbox.selfcheck.mjs`: X1 asserts + mock IDB flush — pass.
+- `lttpApi.js`: `enqueueLttpIssueSlipCreateOffline`, re-export `isOutboxEligibleError` / `OUTBOX_KIND_CREATE` (update mutation unchanged).
+- `LttpPhieuXuatTab.jsx`: create submit catch enqueues on network/offline + `notifySuccess` queue message (sonner via existing notify).
+- `ClientPersistenceProvider.jsx`: `online` listener + initial flush when ready; `invalidateLttpData` after any flush; clears issue-slip draft per flushed create.
 
-## Delivered
-- Service: status-based list (`includeNonPublished`), publish/retire/preview, fields allowNonPublished
-- Export services require `status: "published"`
-- Routes: preview GET, publish POST, retire POST; DELETE maps to retire
-- Validator: `includeNonPublished`
-- Tests: template + export suites pass (14+ in combined run)
+## Verification
 
-## Tests
-```
-node --experimental-test-module-mocks --test \
-  chung-tu-pdf-template.service.test.js \
-  chung-tu-pdf-export.service.test.js \
-  chung-tu-pdf-export-batch.service.test.js
-→ pass
-```
-
-## Follow-up Fix
-- Preview proxy now streams the document-service response through `pipeDocumentServiceResponse` instead of buffering the PDF in the controller/service path.
-- Added `previewTemplatePdfResponse(templateId)` in the document-service client and a fallback `inline; filename="preview-<templateId>.pdf"` header when upstream omits `Content-Disposition`.
-- List query now accepts both canonical `includeNonPublished` and legacy `includeInactive`, normalizing to `includeNonPublished` so the current Superadmin frontend keeps working until Task 9.
-
-### Verification
 ```bash
-node --experimental-test-module-mocks --test \
-  src/modules/chung-tu-quyet-toan/chung-tu-pdf-template.validator.test.js \
-  src/modules/chung-tu-quyet-toan/chung-tu-pdf-template.service.test.js \
-  src/services/document-service.client.test.js
+node packages/shared/src/lib/clientPersist/outbox.selfcheck.mjs
 ```
+
+## Manual (Step 5)
+
+DevTools offline → new phiếu xuất → toast queue → online → flush POST → list refetch; update path never enqueues.
+
+## Not committed (per task override).

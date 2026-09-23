@@ -12,7 +12,8 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import Cropper from "react-easy-crop";
 import { useForm } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
@@ -151,8 +152,19 @@ export function ProfilePage() {
     register: regProfile,
     handleSubmit: handleProfileSubmit,
     reset: resetProfile,
+    watch: watchProfile,
     formState: { errors: profileErrors },
   } = profileForm;
+
+  const {
+    draft: profileEditDraft,
+    setDraftPayload: persistProfileEdit,
+    clear: clearProfileEditDraft,
+    ready: profileEditPersistReady,
+  } = useDraftPersist({ draftType: "profile-edit", scopeId: "global" });
+  const profileHydratedRef = useRef(false);
+  const profilePersistReadyRef = useRef(false);
+  const profileFormValues = watchProfile();
 
   const {
     register: regPwd,
@@ -173,9 +185,15 @@ export function ProfilePage() {
     return () => clearInterval(id);
   }, [pwdLockoutUntil]);
 
-  useEffect(() => {
-    if (!user?.profile && !user?.username) return;
-    resetProfile({
+  useLayoutEffect(() => {
+    if (!user?.profile && !user?.username) {
+      return;
+    }
+    if (!profileEditPersistReady || profileHydratedRef.current) {
+      return;
+    }
+    profileHydratedRef.current = true;
+    const fromUser = {
       fullName: user.profile?.fullName || user.username || "",
       phoneNumber: user.profile?.phoneNumber || "",
       address: user.profile?.address || "",
@@ -187,8 +205,21 @@ export function ProfilePage() {
       donViCapTren: user.profile?.donViCapTren || "",
       donVi: user.profile?.donVi || "",
       birthday: formatDateForInput(user.profile?.birthday),
-    });
-  }, [user, resetProfile]);
+    };
+    if (profileEditDraft?.form && typeof profileEditDraft.form === "object") {
+      resetProfile({ ...fromUser, ...profileEditDraft.form });
+    } else {
+      resetProfile(fromUser);
+    }
+    profilePersistReadyRef.current = true;
+  }, [user, profileEditPersistReady, resetProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!profilePersistReadyRef.current || !profileEditPersistReady) {
+      return;
+    }
+    persistProfileEdit({ form: profileFormValues });
+  }, [profileFormValues, profileEditPersistReady, persistProfileEdit]);
 
   useEffect(() => {
     return () => {
@@ -284,6 +315,7 @@ export function ProfilePage() {
         birthday: values.birthday ? values.birthday : null,
       }).unwrap();
       notifySuccess("Đã lưu hồ sơ.");
+      void clearProfileEditDraft();
     } catch (error) {
       notifyError(error?.data?.message || "Không lưu được hồ sơ.");
     }
@@ -407,7 +439,12 @@ export function ProfilePage() {
           <Card className="border-border/80 shadow-soft">
             <CardContent className={cn(cardBody, "pt-5")}>
               <SectionHeader icon={Contact} title="Thông tin liên hệ" />
-              <form className="space-y-4" onSubmit={handleProfileSubmit(onSaveProfile)} noValidate>
+              <form
+                data-local-commit-form="true"
+                className="space-y-4"
+                onSubmit={handleProfileSubmit(onSaveProfile)}
+                noValidate
+              >
                 <label className="block space-y-2">
                   <span className="text-sm font-medium">Họ và tên</span>
                   <input className={fieldClass} {...regProfile("fullName")} />

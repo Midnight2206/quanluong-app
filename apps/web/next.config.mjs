@@ -2,6 +2,14 @@ import path from "path";
 import { existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { createRequire } from "module";
+import withSerwistInit from "@serwist/next";
+
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.js",
+  swDest: "public/sw.js",
+  disable: process.env.NODE_ENV === "development",
+  register: false,
+});
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = path.join(__dirname, "../..");
@@ -83,4 +91,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

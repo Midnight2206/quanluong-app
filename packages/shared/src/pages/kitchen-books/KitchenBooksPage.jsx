@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { useSearchParams } from "next/navigation";
 import { TabPanel } from "@/components/common/TabPanel";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
@@ -24,6 +25,9 @@ import {
   writeStoredKitchenMenuDate,
   writeStoredKitchenYearMonth,
 } from "./kitchenBooksSessionPersist.js";
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+const YM_RE = /^\d{4}-\d{2}$/;
 
 function localDateStr(d = new Date()) {
   const y = d.getFullYear();
@@ -72,21 +76,80 @@ export function KitchenBooksPage() {
   const [manualUnitId, setManualUnitIdState] = useState(null);
   const didRestoreManualUnitRef = useRef(false);
 
+  const {
+    draft: shellDraft,
+    setDraftPayload: persistShellDraft,
+    ready: shellPersistReady,
+  } = useDraftPersist({
+    draftType: "kitchen-shell",
+    scopeId: "global",
+  });
+
+  const shellHydrateKeyRef = useRef(null);
+  const shellPersistReadyRef = useRef(false);
+
   useEffect(() => {
+    shellHydrateKeyRef.current = null;
+    shellPersistReadyRef.current = false;
     didRestoreManualUnitRef.current = false;
   }, [user?.id]);
 
-  useEffect(() => {
-    if (!canPickUnits || !sortedUnits.length || didRestoreManualUnitRef.current) {
+  useLayoutEffect(() => {
+    shellPersistReadyRef.current = false;
+    if (!shellPersistReady) {
       return;
     }
-    didRestoreManualUnitRef.current = true;
-    const allowedIds = new Set(sortedUnits.map((u) => Number(u.id)));
-    const stored = readStoredKitchenManualUnitId();
-    if (stored != null && allowedIds.has(Number(stored))) {
-      setManualUnitIdState(stored);
+    if (canPickUnits && !sortedUnits.length) {
+      return;
     }
-  }, [canPickUnits, sortedUnits]);
+    const k = `${user?.id ?? ""}:global`;
+    if (shellHydrateKeyRef.current === k) {
+      shellPersistReadyRef.current = true;
+      return;
+    }
+    shellHydrateKeyRef.current = k;
+
+    let manual =
+      shellDraft?.manualUnitId != null ? Number(shellDraft.manualUnitId) : null;
+    let ym =
+      typeof shellDraft?.yearMonth === "string" && YM_RE.test(shellDraft.yearMonth)
+        ? shellDraft.yearMonth
+        : null;
+    let md =
+      typeof shellDraft?.menuDate === "string" && YMD_RE.test(shellDraft.menuDate)
+        ? shellDraft.menuDate
+        : null;
+
+    if (manual == null) {
+      manual = readStoredKitchenManualUnitId();
+    }
+    if (ym == null) {
+      ym = readStoredKitchenYearMonth();
+    }
+    if (md == null) {
+      md = readStoredKitchenMenuDate();
+    }
+
+    try {
+      writeStoredKitchenManualUnitId(null);
+      writeStoredKitchenYearMonth(null);
+      writeStoredKitchenMenuDate(null);
+    } catch {
+      /* ignore */
+    }
+
+    if (canPickUnits && sortedUnits.length && manual != null && !didRestoreManualUnitRef.current) {
+      const allowedIds = new Set(sortedUnits.map((u) => Number(u.id)));
+      if (allowedIds.has(Number(manual))) {
+        setManualUnitIdState(Number(manual));
+        didRestoreManualUnitRef.current = true;
+      }
+    }
+
+    setYearMonthState(ym ?? localYearMonth());
+    setMenuDateState(md ?? localDateStr());
+    shellPersistReadyRef.current = true;
+  }, [shellPersistReady, canPickUnits, sortedUnits.length, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- shellDraft once when ready
 
   const prevWorkingUnitIdRef = useRef(undefined);
   useEffect(() => {
@@ -100,7 +163,6 @@ export function KitchenBooksPage() {
       return;
     }
     setManualUnitIdState(null);
-    writeStoredKitchenManualUnitId(null);
     didRestoreManualUnitRef.current = false;
   }, [workingUnitId]);
 
@@ -108,26 +170,30 @@ export function KitchenBooksPage() {
     const id = next == null || next === "" ? null : Number(next);
     const safe = Number.isInteger(id) && id > 0 ? id : null;
     setManualUnitIdState(safe);
-    writeStoredKitchenManualUnitId(safe);
   }, []);
 
   const selectedUnitId = manualUnitId ?? scopeUnitId;
-  const [yearMonth, setYearMonthState] = useState(
-    () => readStoredKitchenYearMonth() ?? localYearMonth(),
-  );
-  const [menuDate, setMenuDateState] = useState(
-    () => readStoredKitchenMenuDate() ?? localDateStr(),
-  );
+  const [yearMonth, setYearMonthState] = useState(() => localYearMonth());
+  const [menuDate, setMenuDateState] = useState(() => localDateStr());
 
   const setYearMonth = useCallback((next) => {
     setYearMonthState(next);
-    writeStoredKitchenYearMonth(next);
   }, []);
 
   const setMenuDate = useCallback((next) => {
     setMenuDateState(next);
-    writeStoredKitchenMenuDate(next);
   }, []);
+
+  useEffect(() => {
+    if (!shellPersistReadyRef.current || !shellPersistReady) {
+      return;
+    }
+    persistShellDraft({
+      manualUnitId,
+      yearMonth,
+      menuDate,
+    });
+  }, [manualUnitId, yearMonth, menuDate, shellPersistReady, persistShellDraft]);
 
   const unitShellProps = {
     selectedUnitId,

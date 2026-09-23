@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
@@ -23,19 +24,15 @@ import { Ban, Pencil, Plus, RotateCcw, Save, ShieldCheck } from "lucide-react";
 
 const JT_UI_STORAGE = "admin-job-titles.v1";
 
-function readJtUiField(key, fallback) {
+function readLegacyJtUiSession() {
   try {
     const raw = sessionStorage.getItem(JT_UI_STORAGE);
     if (!raw) {
-      return fallback;
+      return null;
     }
-    const p = JSON.parse(raw);
-    if (p[key] === undefined || p[key] === null) {
-      return fallback;
-    }
-    return p[key];
+    return JSON.parse(raw);
   } catch {
-    return fallback;
+    return null;
   }
 }
 
@@ -198,28 +195,97 @@ export function AdminJobTitlesPanel() {
     return s;
   }, [users]);
 
-  const [createName, setCreateName] = useState(() => readJtUiField("createName", ""));
-  const [createDesc, setCreateDesc] = useState(() => readJtUiField("createDesc", ""));
-
-  const [permEditorId, setPermEditorId] = useState(() => readJtUiField("permEditorId", null));
+  const [createName, setCreateName] = useState("");
+  const [createDesc, setCreateDesc] = useState("");
+  const [permEditorId, setPermEditorId] = useState(null);
   const [permDraft, setPermDraft] = useState(() => new Set());
-  const [userJobPicks, setUserJobPicks] = useState(() => readJtUiField("userJobPicks", {}));
+  const [userJobPicks, setUserJobPicks] = useState({});
+
+  const {
+    draft: jtDraft,
+    setDraftPayload: persistJtDraft,
+    ready: jtPersistReady,
+  } = useDraftPersist({
+    draftType: "admin-job-titles",
+    unitId: createTargetUnitId,
+    enabled: createTargetUnitId != null && canJtRead,
+  });
+  const jtHydrateKey = useRef(null);
+  const jtReadyRef = useRef(false);
+  const skipPermSyncRef = useRef(false);
+
+  useLayoutEffect(() => {
+    jtReadyRef.current = false;
+    if (createTargetUnitId == null || !jtPersistReady) {
+      return;
+    }
+    const k = String(createTargetUnitId);
+    if (jtHydrateKey.current === k) {
+      jtReadyRef.current = true;
+      return;
+    }
+    jtHydrateKey.current = k;
+    let stored = jtDraft;
+    if (!stored) {
+      const legacy = readLegacyJtUiSession();
+      if (legacy) {
+        stored = legacy;
+        persistJtDraft({
+          createName: legacy.createName ?? "",
+          createDesc: legacy.createDesc ?? "",
+          userJobPicks: legacy.userJobPicks ?? {},
+          permEditorId: legacy.permEditorId ?? null,
+          permDraftIds: Array.isArray(legacy.permDraftIds) ? legacy.permDraftIds : undefined,
+        });
+      }
+      try {
+        sessionStorage.removeItem(JT_UI_STORAGE);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (stored) {
+      if (typeof stored.createName === "string") {
+        setCreateName(stored.createName);
+      }
+      if (typeof stored.createDesc === "string") {
+        setCreateDesc(stored.createDesc);
+      }
+      if (stored.userJobPicks && typeof stored.userJobPicks === "object") {
+        setUserJobPicks(stored.userJobPicks);
+      }
+      if (stored.permEditorId !== undefined) {
+        setPermEditorId(stored.permEditorId);
+      }
+      if (Array.isArray(stored.permDraftIds)) {
+        skipPermSyncRef.current = true;
+        setPermDraft(new Set(stored.permDraftIds));
+      }
+    }
+    jtReadyRef.current = true;
+  }, [createTargetUnitId, jtPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem(
-        JT_UI_STORAGE,
-        JSON.stringify({
-          createName,
-          createDesc,
-          userJobPicks,
-          permEditorId,
-        }),
-      );
-    } catch {
-      /* ignore */
+    if (!jtReadyRef.current || !jtPersistReady || createTargetUnitId == null) {
+      return;
     }
-  }, [createName, createDesc, userJobPicks, permEditorId]);
+    persistJtDraft({
+      createName,
+      createDesc,
+      userJobPicks,
+      permEditorId,
+      permDraftIds: [...permDraft],
+    });
+  }, [
+    createTargetUnitId,
+    createName,
+    createDesc,
+    userJobPicks,
+    permEditorId,
+    permDraft,
+    jtPersistReady,
+    persistJtDraft,
+  ]);
 
   const editingRow = useMemo(
     () => jobTitles.find((j) => j.id === permEditorId),
@@ -234,6 +300,10 @@ export function AdminJobTitlesPanel() {
   }, [editingRow, permDraft]);
 
   useEffect(() => {
+    if (skipPermSyncRef.current) {
+      skipPermSyncRef.current = false;
+      return;
+    }
     if (!editingRow?.permissionIds) {
       setPermDraft(new Set());
       return;
@@ -449,6 +519,7 @@ export function AdminJobTitlesPanel() {
 
           {canJtCreate ? (
             <form
+              data-local-commit-form="true"
               onSubmit={onCreateJobTitle}
               className="shrink-0 space-y-2 rounded-lg border border-border/70 bg-muted/10 p-2 sm:flex sm:flex-wrap sm:items-end sm:gap-2"
             >
@@ -623,7 +694,7 @@ export function AdminJobTitlesPanel() {
 
       {canUsRead && canUsPatch ? (
         <Card className="shadow-soft">
-          <CardContent className="flex flex-col gap-2 !p-3 sm:!p-4">
+          <CardContent className="flex flex-col gap-2 !p-3 sm:!p-4" data-local-commit-form="true">
             <p className="shrink-0 text-xs font-medium sm:text-sm">Gán chức danh cho nhân sự (nhận gói phân quyền)</p>
             
             <StickyResponsiveTable stickyLevel={1} className="border-border/60">

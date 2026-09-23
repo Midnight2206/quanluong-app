@@ -1,12 +1,42 @@
 "use client";
 
 import { BookOpen, Loader2, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useChungTuPdfFieldCatalogQuery } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 
 export function ChungTuPdfFieldCatalogPanel() {
   const [query, setQuery] = useState("");
+  const {
+    draft: catalogDraft,
+    setDraftPayload: persistCatalogDraft,
+    ready: catalogPersistReady,
+  } = useDraftPersist({
+    draftType: "chungtu-field-catalog",
+    scopeId: "global",
+  });
+  const catalogHydratedRef = useRef(false);
+  const catalogDraftReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    catalogDraftReadyRef.current = false;
+    if (!catalogPersistReady || catalogHydratedRef.current) {
+      return;
+    }
+    catalogHydratedRef.current = true;
+    if (typeof catalogDraft?.query === "string") {
+      setQuery(catalogDraft.query);
+    }
+    catalogDraftReadyRef.current = true;
+  }, [catalogPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps -- catalogDraft once when ready
+
+  useEffect(() => {
+    if (!catalogDraftReadyRef.current || !catalogPersistReady) {
+      return;
+    }
+    persistCatalogDraft({ query });
+  }, [query, catalogPersistReady, persistCatalogDraft]);
   const { data: fieldCatalog, isLoading: fieldCatalogLoading } =
     useChungTuPdfFieldCatalogQuery();
   const scalarFields = fieldCatalog?.scalarFields ?? [];

@@ -1,7 +1,8 @@
 "use client";
 
 import { Archive, Download, Eye, FolderOpen, Loader2, Printer, RefreshCw, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
@@ -80,6 +81,20 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   const [selectedMonthly, setSelectedMonthly] = useState(null);
   const [selectedPnkBatch, setSelectedPnkBatch] = useState(null);
   const [reExportTarget, setReExportTarget] = useState(null);
+
+  const {
+    draft: historyDraft,
+    setDraftPayload: persistHistoryDraft,
+    ready: historyPersistReady,
+  } = useDraftPersist({
+    draftType: "chungtu-history",
+    unitId: effectiveUnitId,
+    enabled: effectiveUnitId != null,
+  });
+  const historyHydrateKey = useRef(null);
+  const historyDraftReadyRef = useRef(false);
+  const pendingHistoryBatchKeyRef = useRef(null);
+
   const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
   const isPnkCategory = categoryKey === "phieu-nhap-kho";
   const isPxkCategory = categoryKey === "phieu-xuat-kho";
@@ -313,6 +328,69 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const expandedLayout = true;
+
+  useLayoutEffect(() => {
+    historyDraftReadyRef.current = false;
+    if (!effectiveUnitId || !historyPersistReady) {
+      return;
+    }
+    const k = String(effectiveUnitId);
+    if (historyHydrateKey.current === k) {
+      historyDraftReadyRef.current = true;
+      return;
+    }
+    historyHydrateKey.current = k;
+
+    const stored = historyDraft;
+    if (stored?.selectedMonthlyId != null) {
+      setSelectedMonthly({
+        id: stored.selectedMonthlyId,
+        aggregationMode: stored.selectedMonthlyAggregationMode ?? "",
+      });
+    } else {
+      setSelectedMonthly(null);
+    }
+    if (stored?.selectedPnkBatchKey) {
+      pendingHistoryBatchKeyRef.current = String(stored.selectedPnkBatchKey);
+      const batch =
+        pdfExportBatches.find(
+          (item) => String(item.batchKey) === pendingHistoryBatchKeyRef.current,
+        ) ?? null;
+      setSelectedPnkBatch(batch);
+    } else {
+      pendingHistoryBatchKeyRef.current = null;
+      setSelectedPnkBatch(null);
+    }
+    historyDraftReadyRef.current = true;
+  }, [effectiveUnitId, historyPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps -- historyDraft once per unit when ready
+
+  useEffect(() => {
+    const key = pendingHistoryBatchKeyRef.current;
+    if (!key || String(selectedPnkBatch?.batchKey) === key) {
+      return;
+    }
+    const batch = pdfExportBatches.find((item) => String(item.batchKey) === key) ?? null;
+    if (batch) {
+      setSelectedPnkBatch(batch);
+    }
+  }, [pdfExportBatches, selectedPnkBatch?.batchKey]);
+
+  useEffect(() => {
+    if (!historyDraftReadyRef.current || !historyPersistReady || effectiveUnitId == null) {
+      return;
+    }
+    persistHistoryDraft({
+      selectedMonthlyId: selectedMonthly?.id ?? null,
+      selectedMonthlyAggregationMode: selectedMonthly?.aggregationMode ?? null,
+      selectedPnkBatchKey: selectedPnkBatch?.batchKey ?? null,
+    });
+  }, [
+    effectiveUnitId,
+    historyPersistReady,
+    persistHistoryDraft,
+    selectedMonthly,
+    selectedPnkBatch,
+  ]);
 
   return (
     <>

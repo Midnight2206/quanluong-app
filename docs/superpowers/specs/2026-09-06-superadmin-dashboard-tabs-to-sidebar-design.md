@@ -25,7 +25,7 @@
 | 5 | **Không** link sidebar về app chính; vào cổng từ app chính (`superadminNavItems` external) |
 | 6 | Sidebar: **section** + `shortLabel` + `icon`; `title`/hover = label đầy đủ |
 | 7 | Bỏ hoàn toàn horizontal tab strip trong `SuperadminDashboardLayout` |
-| 8 | `WorkingUnitScopeBar` giữ nguyên |
+| 8 | `WorkingUnitScopeBar` **ẩn trên cổng** Superadmin (`showWorkingUnitScope={false}`) — app chính vẫn hiện khi privileged |
 | 9 | Ngoài scope: redesign AppHeader; đụng dashboard tabs `apps/web`; đổi path URL |
 
 ---

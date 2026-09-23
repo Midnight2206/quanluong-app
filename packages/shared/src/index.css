@@ -121,6 +121,95 @@
   [data-local-scroll="true"] {
     overscroll-behavior: contain;
   }
+
+  /* Local-only field warning (after blur) — not yet on server */
+  .ql-local-unsaved {
+    border-color: hsl(38 92% 45% / 0.85) !important;
+    box-shadow:
+      0 0 0 1px hsl(38 92% 50% / 0.35),
+      0 0 0 3px hsl(38 92% 50% / 0.12);
+  }
+
+  /* Section wrapper when it contains local-unsaved fields */
+  .ql-local-unsaved-section {
+    border: 1px solid hsl(38 92% 45% / 0.55);
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0 3px hsl(38 92% 50% / 0.1);
+    padding: 0.65rem 0.75rem 0.75rem;
+    background: hsl(40 96% 97% / 0.55);
+  }
+
+  .dark .ql-local-unsaved-section {
+    background: hsl(38 30% 14% / 0.35);
+    border-color: hsl(38 70% 42% / 0.55);
+  }
+
+  .ql-local-unsaved-mark {
+    position: absolute;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 0.15rem;
+    background: hsl(40 96% 92% / 0.95);
+    color: hsl(32 95% 38%);
+    cursor: help;
+    line-height: 0;
+    box-shadow: 0 0 0 1px hsl(38 92% 50% / 0.35);
+    /* field marks: top/left set in JS; section marks: top/right */
+  }
+
+  .ql-local-unsaved-section-mark {
+    top: 0.35rem;
+    right: 0.35rem;
+    left: auto;
+  }
+
+  .ql-local-unsaved-mark:hover,
+  .ql-local-unsaved-mark:focus-visible {
+    outline: 2px solid hsl(38 92% 40%);
+    outline-offset: 1px;
+  }
+
+  .ql-local-unsaved-mark-icon {
+    display: block;
+    pointer-events: none;
+  }
+
+  .ql-local-unsaved-mark::after {
+    content: attr(data-tip);
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.35rem);
+    z-index: 30;
+    width: max-content;
+    max-width: min(16rem, 70vw);
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.4rem;
+    background: hsl(30 10% 12% / 0.96);
+    color: hsl(40 20% 96%);
+    font-size: 0.65rem;
+    font-weight: 500;
+    line-height: 1.35;
+    text-align: left;
+    white-space: normal;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-2px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    box-shadow: 0 4px 14px hsl(0 0% 0% / 0.25);
+  }
+
+  .ql-local-unsaved-mark:hover::after,
+  .ql-local-unsaved-mark:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /*

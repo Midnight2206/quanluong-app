@@ -1,62 +1,68 @@
-# Task 6 Report — Integration smoke checklist
+# Task 6 Report: Wire OfflineProvider + queue flush path
 
-**Status:** DONE
+## Status
 
-## Selfchecks (Step 1)
+**DONE** — `OfflineProvider` wires reauth overlay, AUTH_EXPIRED handling, forbidden toast, and `verifySessionOrRefresh`; `useOfflineQueue` prefers provider flush.
 
-| Script | Result |
-|--------|--------|
-| `probeReachability.selfcheck.mjs` | PASS (`ok`) |
-| `networkStatus.selfcheck.mjs` | PASS (`ok`) |
-| `OfflineSyncController.selfcheck.mjs` | PASS (`ok`) |
-| `runReconnectSync.selfcheck.mjs` | PASS (`ok`) |
-| `localUnsavedFieldRegistry.selfcheck.mjs` | PASS (`ok`) |
-| `useDraftPersist.behavior.selfcheck.mjs` | PASS (`ok`) |
+## Changes
 
-## Browser checklist — spec §6 (Step 2)
+### `OfflineProvider.jsx`
 
-| # | Scenario | Result |
-|---|----------|--------|
-| 1 | Offline → edit → blur mark → navigate → return → marks after hydrate | **SKIPPED** — Chrome DevTools MCP unavailable (`Transport closed`) |
-| 2 | Online → overlay blocks → then usable | **SKIPPED** — same |
-| 3 | API down, Wi‑Fi on → offline/gate + Thử lại | **SKIPPED** — same |
-| 4 | After gate, active LTTP queries refetch (Network tab) | **SKIPPED** — same |
-| 5 | Discard/submit → marks gone | **SKIPPED** — same |
-| 6 | Password fields never marked | **SKIPPED** — same |
+- Added `reauthRequired` state; cleared on `userId` change alongside reconnect flags.
+- Injected `verifySessionOrRefreshFn` into `createOfflineSyncController` with auth store `setAuthState` + `mapPermissionsFromUser`.
+- Flush wrapper: `authExpired` → `setReauthRequired(true)`; `forbidden > 0` → `notifyWarning("Bạn không có quyền thực hiện thao tác này")`.
+- `runGate` catch: `AUTH_EXPIRED` → `setReauthRequired(true)`, return (keeps `reconnectBlocking`, no `reconnectError`).
+- `handleReauthSuccess`: verify session → clear reauth → `runGate()` if saw offline else `flushOutboxFn()`.
+- UI: `ReauthOverlay` when `reauthRequired`; reconnect overlay when `reconnectBlocking && !reauthRequired`; pointer-events block when either.
 
-Manual: Docker UI `:8080`, logged-in; use items 9–10 in `docs/superpowers/specs/2026-09-23-app-wide-draft-persist-smoke.md`.
+### `useOfflineQueue.js`
 
-## Doc update (Step 3)
+- Primary flush/reapply path uses `flushFromProvider()` when `ready && db && userId`.
+- Guarded direct `flushOutbox` only before sync controller mounts (`ready` false but `db` present).
 
-Appended reconnect gate + local unsaved marks bullets and integration selfcheck block to `docs/superpowers/specs/2026-09-23-app-wide-draft-persist-smoke.md`.
+### `OfflineProvider.reauth.contract.selfcheck.mjs`
+
+- Static contract asserts required strings in provider source.
+
+## Tests (Step 8)
+
+| Selfcheck | Result |
+|-----------|--------|
+| `outbox/errors.selfcheck.mjs` | ok |
+| `outbox/outbox.selfcheck.mjs` | ok |
+| `auth/verifySessionOrRefresh.selfcheck.mjs` | ok |
+| `sync/OfflineSyncController.selfcheck.mjs` | ok |
+| `runReconnectSync.selfcheck.mjs` | ok |
+| `ui/ReauthOverlay.contract.selfcheck.mjs` | ok |
+| `OfflineProvider.reauth.contract.selfcheck.mjs` | ok |
+
+TDD: contract selfcheck run before implementation (FAIL), after implementation (ok).
+
+## Manual smoke (Step 9)
+
+**SKIP** — no browser session in this run.
+
+Recommended manual checks:
+
+1. Expire session with pending outbox → `ReauthOverlay` (`Phiên hết hạn, đăng nhập lại`); items stay `pending`.
+2. Login same user → overlay closes; flush/reconnect resumes.
+3. Mixed 403 + OK → one forbidden toast; no reauth modal.
+
+## Spec coverage (this task)
+
+| Requirement | Covered |
+|-------------|---------|
+| Resume after login | yes (`handleReauthSuccess`) |
+| 403 toast once | yes (provider flush wrapper) |
+| No wipe on AUTH_EXPIRED | yes (no draft/outbox clear on auth expired) |
 
 ## Commit
 
-`57f8cfa` — docs(smoke): reconnect gate and local unsaved marks checklist (smoke doc only).
+```
+feat(offline): reauth overlay and forbidden toast on flush
+```
 
 ## Concerns
 
-- All §6 browser acceptance still unverified in this session; run manual smoke before release.
-- Probe/auth edge (401 during gate) not exercised here.
-
----
-
-## Final whole-branch review — reconnect gate fixes
-
-**Status:** DONE
-
-### Fixes
-
-1. **Partial outbox flush** — `runReconnectSync` throws when `flushOutbox` returns `failed > 0`; gate catch keeps `reconnectBlocking` true and shows overlay + Thử lại. `needsReview` alone still completes the gate (conflict dock).
-2. **userId change reset** — `OfflineProvider` clears `sawOfflineRef`, `reconnectBlocking`, `reconnectError`, and bumps `runIdRef` on every `userId` change (including logout).
-3. **45s timeout** — `runGate` races `runReconnectSync` against 45_000 ms; timeout shows Vietnamese error + Thử lại.
-
-### Selfchecks
-
-| Script | Result |
-|--------|--------|
-| `runReconnectSync.selfcheck.mjs` | PASS (`ok`) — includes partial-flush throw + needsReview unlock cases |
-
-### Remaining concerns
-
-- Timeout does not abort in-flight flush/refetch (overlay dismisses on timeout while work may continue in background).
+- Pre-controller window: `useOfflineQueue` may still call direct `flushOutbox` without verify/toast until `ready`; narrow race only.
+- `handleReauthSuccess` calls `runGate()` which sets `reconnectBlocking` again — intended for offline→online path.

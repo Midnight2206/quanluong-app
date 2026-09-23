@@ -1,7 +1,8 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Check, X } from "lucide-react";
 import { qk } from "@/app/query/queryKeys";
 import { IconButton } from "@/components/ui/IconButton";
@@ -31,6 +32,29 @@ export function AdminPendingRegistrationsPanel() {
   const [approve, { isLoading: approving }] = useApproveRegistrationMutation();
   const [reject, { isLoading: rejecting }] = useRejectRegistrationMutation();
   const [rejectNotes, setRejectNotes] = useState({});
+  const { draft: rejectDraft, setDraftPayload: persistRejectNotes, ready: rejectPersistReady } =
+    useDraftPersist({ draftType: "reject-notes", scopeId: "global", enabled: canRead });
+  const rejectHydratedRef = useRef(false);
+  const rejectReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!canRead || !rejectPersistReady || rejectHydratedRef.current) {
+      return;
+    }
+    rejectHydratedRef.current = true;
+    if (rejectDraft?.rejectNotes && typeof rejectDraft.rejectNotes === "object") {
+      setRejectNotes(rejectDraft.rejectNotes);
+    }
+    rejectReadyRef.current = true;
+  }, [canRead, rejectPersistReady, rejectDraft]);
+
+  useEffect(() => {
+    if (!canRead || !rejectReadyRef.current || !rejectPersistReady) {
+      return;
+    }
+    persistRejectNotes({ rejectNotes });
+  }, [canRead, rejectNotes, rejectPersistReady, persistRejectNotes]);
+
   const [processingId, setProcessingId] = useState(null);
 
   if (!canRead) {
@@ -84,7 +108,7 @@ export function AdminPendingRegistrationsPanel() {
 
   return (
     <Card className="shadow-soft">
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !px-0 !py-3 sm:!p-4">
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !px-0 !py-3 sm:!p-4" data-local-commit-form="true">
         <div className="px-3 sm:px-0">
           <p className="text-xs font-medium sm:text-sm">Đăng ký chờ duyệt</p>
           <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">

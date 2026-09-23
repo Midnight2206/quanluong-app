@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -14,7 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { IssueSlipCommoditySearch } from "@/components/lttp/IssueSlipCommoditySearch";
 import { StickyHorizontalTable } from "@/components/common/StickyHorizontalTable";
-import { readPersistedNavTab } from "@/hooks/usePersistedNavTab";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { cn } from "@/utils/cn";
 import {
   useGetKitchenReceiptSlipByDayQuery,
@@ -59,6 +60,37 @@ import {
   writeStoredKitchenReceiptDate,
 } from "./kitchenBooksSessionPersist.js";
 
+function normalizeStoredReceiptDraftRows(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return [newReceiptSlipEmptyRow()];
+  }
+  return raw.map((r, i) => ({
+    key:
+      typeof r?.key === "string" && String(r.key).trim()
+        ? r.key
+        : `r${Date.now()}_${i}_${Math.random().toString(36).slice(2, 9)}`,
+    commodityId: (() => {
+      if (r?.commodityId === "" || r?.commodityId == null) {
+        return "";
+      }
+      const n = Number(r.commodityId);
+      return Number.isInteger(n) && n > 0 ? n : "";
+    })(),
+    codeDraft: r?.codeDraft != null ? String(r.codeDraft) : "",
+    quantity:
+      r?.quantity !== "" && r?.quantity != null && String(r.quantity).trim() !== ""
+        ? String(r.quantity)
+        : "1",
+    unitPrice:
+      typeof r?.unitPrice === "number" && Number.isFinite(r.unitPrice) ? r.unitPrice : null,
+    tgsxPrice:
+      typeof r?.tgsxPrice === "number" && Number.isFinite(r.tgsxPrice) ? r.tgsxPrice : null,
+    priceKind: normalizeIssueSlipPriceKind(r?.priceKind),
+    guaranteeAppliedPrice: null,
+    lineNote: r?.lineNote != null ? String(r.lineNote) : "",
+  }));
+}
+
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
 
@@ -68,7 +100,6 @@ const tableInputClass =
 const tableQtyDisplayClass =
   "flex h-7 w-full min-w-0 items-center justify-center rounded-md border border-border bg-muted/35 px-0.5 text-center text-[10px] tabular-nums text-muted-foreground";
 
-const RECEIPT_SUB_TAB_PERSIST = "kitchen-receipt-slip-sub";
 const RECEIPT_SUB_TAB_IDS = ["mua-tt", "tgsx", "tong-hop"];
 
 /**
@@ -79,22 +110,27 @@ export function KitchenReceiptSlipWorkspace({
   canWrite,
   onSaved,
 }) {
-  const [receiptDate, setReceiptDateState] = useState(
-    () => readStoredKitchenReceiptDate() ?? localYmd(),
-  );
-  const setReceiptDate = useCallback((next) => {
-    setReceiptDateState(next);
-    writeStoredKitchenReceiptDate(next);
-  }, []);
+  const [receiptDate, setReceiptDateState] = useState(() => localYmd());
   const [slipNote, setSlipNote] = useState("");
   const [rows, setRows] = useState(() => [newReceiptSlipEmptyRow()]);
-  const [activeSubTab, setActiveSubTab] = useState(
-    () => readPersistedNavTab(RECEIPT_SUB_TAB_PERSIST, RECEIPT_SUB_TAB_IDS) ?? "mua-tt",
-  );
+  const [activeSubTab, setActiveSubTab] = useState("mua-tt");
+  const [receiptDirty, setReceiptDirty] = useState(false);
   const rowQtyRefs = useRef({});
   const rowCodeRefs = useRef({});
   const seededDayKeyRef = useRef("");
+  const receiptHydrateKeyRef = useRef(null);
+  const receiptPersistReadyRef = useRef(false);
   const isTongHopTab = activeSubTab === "tong-hop";
+
+  const {
+    draft: receiptDraft,
+    setDraftPayload: persistReceiptDraft,
+    ready: receiptPersistReady,
+  } = useDraftPersist({
+    draftType: "kitchen-receipt",
+    unitId: selectedUnitId,
+    enabled: selectedUnitId != null,
+  });
 
   const { data: commodities = [], isLoading: cLoad } = useGetLttpCommoditiesQuery(
     selectedUnitId,
@@ -138,7 +174,97 @@ export function KitchenReceiptSlipWorkspace({
 
   useEffect(() => {
     seededDayKeyRef.current = "";
+    receiptHydrateKeyRef.current = null;
+    receiptPersistReadyRef.current = false;
   }, [selectedUnitId]);
+
+  useLayoutEffect(() => {
+    receiptPersistReadyRef.current = false;
+    if (selectedUnitId == null || !receiptPersistReady) {
+      return;
+    }
+    const k = `${selectedUnitId}`;
+    if (receiptHydrateKeyRef.current === k) {
+      receiptPersistReadyRef.current = true;
+      return;
+    }
+    receiptHydrateKeyRef.current = k;
+
+    const draft = receiptDraft;
+    let ymd = localYmd();
+    if (
+      draft &&
+      typeof draft.receiptDate === "string" &&
+      /^\d{4}-\d{2}-\d{2}/.test(draft.receiptDate)
+    ) {
+      ymd = draft.receiptDate;
+    } else {
+      const migrated = readStoredKitchenReceiptDate();
+      if (migrated) {
+        ymd = migrated;
+        try {
+          writeStoredKitchenReceiptDate(null);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    setReceiptDateState(ymd);
+
+    const tab =
+      draft?.activeSubTab != null && RECEIPT_SUB_TAB_IDS.includes(String(draft.activeSubTab))
+        ? String(draft.activeSubTab)
+        : "mua-tt";
+    setActiveSubTab(tab);
+
+    const dayKey = `${selectedUnitId}:${ymd}`;
+    if (draft?.dirty === true && draft.receiptDate === ymd) {
+      setSlipNote(draft.slipNote != null ? String(draft.slipNote) : "");
+      setRows(normalizeStoredReceiptDraftRows(draft.rows));
+      setReceiptDirty(true);
+      seededDayKeyRef.current = dayKey;
+    } else {
+      setReceiptDirty(false);
+      seededDayKeyRef.current = "";
+    }
+
+    receiptPersistReadyRef.current = true;
+  }, [selectedUnitId, receiptPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps -- receiptDraft once per unit when ready
+
+  useEffect(() => {
+    if (
+      !receiptPersistReadyRef.current ||
+      !receiptPersistReady ||
+      selectedUnitId == null
+    ) {
+      return;
+    }
+    persistReceiptDraft({
+      receiptDate,
+      slipNote,
+      rows: rows.map((r) => ({
+        key: r.key,
+        commodityId: r.commodityId,
+        codeDraft: r.codeDraft,
+        quantity: r.quantity,
+        unitPrice: r.unitPrice,
+        tgsxPrice: r.tgsxPrice,
+        priceKind: r.priceKind,
+        lineNote: r.lineNote ?? "",
+      })),
+      activeSubTab,
+      dirty: receiptDirty,
+    });
+  }, [
+    receiptDate,
+    slipNote,
+    rows,
+    activeSubTab,
+    receiptDirty,
+    receiptPersistReady,
+    selectedUnitId,
+    persistReceiptDraft,
+  ]);
 
   /** Nạp dòng unit_self từ phiếu ngày khi đổi đơn vị / ngày (hoặc sau khi ép reload). */
   useEffect(() => {
@@ -201,6 +327,7 @@ export function KitchenReceiptSlipWorkspace({
   }, [effPrices?.items, priceByCommodityId, receiptDate]);
 
   const applyRowPatch = useCallback((key, patch) => {
+    setReceiptDirty(true);
     setRows((prev) => {
       const idx = prev.findIndex((r) => r.key === key);
       if (idx < 0) {
@@ -242,6 +369,7 @@ export function KitchenReceiptSlipWorkspace({
         return;
       }
       flushSync(() => {
+        setReceiptDirty(true);
         setRows((prev) => {
           const idx = prev.findIndex((r) => r.key === key);
           if (idx < 0) {
@@ -304,6 +432,7 @@ export function KitchenReceiptSlipWorkspace({
           return;
         }
         flushSync(() => {
+          setReceiptDirty(true);
           setRows((prev) => {
             const idx = prev.findIndex((r) => r.key === key);
             if (idx < 0) {
@@ -372,6 +501,7 @@ export function KitchenReceiptSlipWorkspace({
   const slipNoPreview = daySlip?.slipNo ?? serialData?.nextSlipNo ?? "—";
 
   const removeRow = useCallback((key) => {
+    setReceiptDirty(true);
     setRows((prev) => {
       if (prev.length <= 1) {
         return [newReceiptSlipEmptyRow()];
@@ -438,6 +568,7 @@ export function KitchenReceiptSlipWorkspace({
         lines: toPayloadLines(LTTP_ISSUE_SLIP_PRICE_KIND.TGSX),
       }).unwrap();
       notifySuccess("Đã lưu phiếu nhập kho trong ngày.");
+      setReceiptDirty(false);
       seededDayKeyRef.current = "";
       await refetchDaySlip();
       onSaved?.();
@@ -763,7 +894,13 @@ export function KitchenReceiptSlipWorkspace({
   ];
 
   return (
-    <form className="flex min-h-0 flex-col gap-3" onSubmit={(e) => void onSubmit(e)}>
+    <form
+      data-local-commit-form="true"
+      data-local-unsaved-section="kitchen-receipt"
+      data-local-unsaved-defaults="true"
+      className="flex min-h-0 flex-col gap-3"
+      onSubmit={(e) => void onSubmit(e)}
+    >
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/70 bg-card/40 p-3">
         <label className="space-y-0.5 text-xs">
           <span className="text-muted-foreground">Ngày phiếu</span>
@@ -774,7 +911,8 @@ export function KitchenReceiptSlipWorkspace({
             disabled={!canWrite}
             onChange={(e) => {
               seededDayKeyRef.current = "";
-              setReceiptDate(e.target.value);
+              setReceiptDirty(false);
+              setReceiptDateState(e.target.value);
             }}
           />
         </label>
@@ -790,7 +928,10 @@ export function KitchenReceiptSlipWorkspace({
             className={inputClass}
             value={slipNote}
             disabled={!canWrite}
-            onChange={(e) => setSlipNote(e.target.value)}
+            onChange={(e) => {
+              setReceiptDirty(true);
+              setSlipNote(e.target.value);
+            }}
             placeholder="Tuỳ chọn"
           />
         </label>
@@ -811,8 +952,8 @@ export function KitchenReceiptSlipWorkspace({
         stickyTabListLevel={1}
         scrollableTabList
         equalWidthTabs={false}
-        persistId={RECEIPT_SUB_TAB_PERSIST}
         defaultTabId="mua-tt"
+        forcedActiveTabId={activeSubTab}
         onTabSelect={(id) => {
           setActiveSubTab(id);
           if (id === "tong-hop") {

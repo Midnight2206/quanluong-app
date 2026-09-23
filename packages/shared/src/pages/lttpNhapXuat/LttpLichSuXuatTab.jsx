@@ -12,7 +12,7 @@ import {
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
-import { readLichSuFilters, writeLichSuFilters } from "./lttpNhapXuatSessionPersist";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { LttpLichSuXuatSlipCard } from "./LttpLichSuXuatSlipCard";
 import {
   openLttpIssueSlipPdfInTab,
@@ -59,12 +59,22 @@ export function LttpLichSuXuatTab({
   const [filterRecipientId, setFilterRecipientId] = useState("");
   const [page, setPage] = useState(1);
 
+  const {
+    draft: storedFilters,
+    setDraftPayload: persistHistoryFilters,
+    ready: historyFiltersPersistReady,
+  } = useDraftPersist({
+    draftType: "lich-su-filters",
+    unitId: storageUnitId,
+    enabled: storageUnitId != null,
+  });
+
   const historyHydrateKey = useRef(null);
-  /** Tránh ghi sessionStorage với state mặc định trước khi hydrate xong (layout chạy trước passive effect). */
+  /** Tránh ghi IDB với state mặc định trước khi hydrate xong (layout chạy trước passive effect). */
   const historyFiltersReadyRef = useRef(false);
   useLayoutEffect(() => {
     historyFiltersReadyRef.current = false;
-    if (!storageUnitId || !units.length) {
+    if (!storageUnitId || !units.length || !historyFiltersPersistReady) {
       return;
     }
     const k = `${storageUnitId}`;
@@ -74,7 +84,7 @@ export function LttpLichSuXuatTab({
     }
     historyHydrateKey.current = k;
 
-    const stored = readLichSuFilters(storageUnitId);
+    const stored = storedFilters;
     if (
       stored &&
       stored.filterRecipientId &&
@@ -101,14 +111,32 @@ export function LttpLichSuXuatTab({
       return String(units[0].id);
     });
     historyFiltersReadyRef.current = true;
-  }, [storageUnitId, units]);
+  }, [storageUnitId, units, historyFiltersPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps -- storedFilters once per unit when ready
 
   useEffect(() => {
-    if (!historyFiltersReadyRef.current || !storageUnitId || filterRecipientId === "") {
+    if (
+      !historyFiltersReadyRef.current ||
+      !historyFiltersPersistReady ||
+      !storageUnitId ||
+      filterRecipientId === ""
+    ) {
       return;
     }
-    writeLichSuFilters(storageUnitId, { listFrom, listTo, filterRecipientId, page });
-  }, [storageUnitId, listFrom, listTo, filterRecipientId, page]);
+    persistHistoryFilters({
+      listFrom,
+      listTo,
+      filterRecipientId: filterRecipientId != null ? String(filterRecipientId) : "",
+      page: Number(page) >= 1 ? Number(page) : 1,
+    });
+  }, [
+    storageUnitId,
+    listFrom,
+    listTo,
+    filterRecipientId,
+    page,
+    historyFiltersPersistReady,
+    persistHistoryFilters,
+  ]);
 
   useEffect(() => {
     setPage(1);

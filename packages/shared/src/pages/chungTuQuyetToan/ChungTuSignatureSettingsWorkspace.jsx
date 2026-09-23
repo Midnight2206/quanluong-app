@@ -2,8 +2,9 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { useHasPermission } from "@/features/auth/model/authSlice";
@@ -313,6 +314,25 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
   const [saveSettings, { isLoading: saving }] = useUpsertChungTuSignatureSettingsMutation();
 
   const {
+    draft: sigDraft,
+    setDraftPayload: persistSigDraft,
+    clear: clearSigDraft,
+    ready: sigPersistReady,
+  } = useDraftPersist({
+    draftType: "chungtu-signature",
+    scopeId: `cat:${categoryKey}`,
+    enabled: Boolean(categoryKey),
+  });
+
+  const defaultFormValues = useMemo(
+    () => ({
+      signatureBlock: cloneDefaultSignatureBlock({ isPnkCategory, isPxkCategory }),
+      extraFields: normalizeExtraFields(),
+    }),
+    [isPnkCategory, isPxkCategory],
+  );
+
+  const {
     control,
     register,
     handleSubmit,
@@ -322,26 +342,89 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
     formState: { errors: signatureErrors, isDirty: isSignatureDirty },
   } = useForm({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      signatureBlock: cloneDefaultSignatureBlock({ isPnkCategory, isPxkCategory }),
-      extraFields: normalizeExtraFields(),
-    },
+    defaultValues: defaultFormValues,
   });
   const { fields, append, remove } = useFieldArray({
     control,
     name: "signatureBlock.slots",
   });
 
+  const sigHydrateKey = useRef(null);
+  const sigPersistAllowedRef = useRef(false);
+  const usedLocalSigDraftRef = useRef(false);
+
+  useLayoutEffect(() => {
+    sigPersistAllowedRef.current = false;
+    usedLocalSigDraftRef.current = false;
+    if (!categoryKey || !sigPersistReady) {
+      return;
+    }
+    const k = String(categoryKey);
+    if (sigHydrateKey.current === k) {
+      sigPersistAllowedRef.current = true;
+      return;
+    }
+    sigHydrateKey.current = k;
+
+    if (sigDraft?.signatureBlock && sigDraft?.extraFields) {
+      reset({
+        signatureBlock: isPnkCategory
+          ? ensurePnkSignatureBlock(sigDraft.signatureBlock)
+          : isPxkCategory
+            ? ensurePxkSignatureBlock(sigDraft.signatureBlock)
+            : normalizeSignatureBlock(sigDraft.signatureBlock, { isPnkCategory, isPxkCategory }),
+        extraFields: normalizeExtraFields(sigDraft.extraFields),
+      });
+      usedLocalSigDraftRef.current = true;
+      sigPersistAllowedRef.current = true;
+      return;
+    }
+  }, [categoryKey, sigPersistReady, isPnkCategory, isPxkCategory]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
+    if (!categoryKey || !sigPersistReady) {
+      return;
+    }
+    if (usedLocalSigDraftRef.current) {
+      return;
+    }
+    if (sigHydrateKey.current !== String(categoryKey)) {
+      return;
+    }
+    if (!savedSettings && isLoading) {
+      return;
+    }
     reset({
       signatureBlock: isPnkCategory
         ? ensurePnkSignatureBlock(savedSettings?.signatureBlock)
         : isPxkCategory
           ? ensurePxkSignatureBlock(savedSettings?.signatureBlock)
-          : normalizeSignatureBlock(savedSettings?.signatureBlock),
+          : normalizeSignatureBlock(savedSettings?.signatureBlock, { isPnkCategory, isPxkCategory }),
       extraFields: normalizeExtraFields(savedSettings?.extraFields),
     });
-  }, [isPnkCategory, isPxkCategory, reset, savedSettings]);
+    sigPersistAllowedRef.current = true;
+  }, [
+    categoryKey,
+    sigPersistReady,
+    savedSettings,
+    isLoading,
+    isPnkCategory,
+    isPxkCategory,
+    reset,
+  ]);
+
+  useEffect(() => {
+    if (!sigPersistAllowedRef.current || !sigPersistReady || !categoryKey || !canWrite) {
+      return undefined;
+    }
+    const sub = watch((values) => {
+      persistSigDraft({
+        signatureBlock: values.signatureBlock,
+        extraFields: values.extraFields,
+      });
+    });
+    return () => sub.unsubscribe();
+  }, [watch, persistSigDraft, sigPersistReady, categoryKey, canWrite]);
 
   const slotValues = watch("signatureBlock.slots");
   const availableCatalogNodes = savedSettings?.availableCatalogNodes ?? [];
@@ -366,6 +449,8 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
         signatureBlock: payload,
         extraFields: nextExtraFields,
       }).unwrap();
+      await clearSigDraft();
+      usedLocalSigDraftRef.current = false;
       reset({ signatureBlock: payload, extraFields: nextExtraFields });
       notifySuccess("Đã lưu cài đặt chữ ký.");
     } catch (error) {
@@ -390,7 +475,11 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
         title="Khối chữ ký"
         description="Cấu hình số cột, khoảng cách và các vị trí ký dùng chung cho loại chứng từ này."
       >
-        <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+        <form
+          data-local-commit-form="true"
+          className="space-y-4"
+          onSubmit={handleSubmit(onSubmit)}
+        >
           {isPnkCategory ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-1">

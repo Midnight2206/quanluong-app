@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
@@ -51,6 +52,49 @@ export function SuperadminMealAllowanceRatesPanel() {
   const [draft, setDraft] = useState(emptyDraft);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(null);
+
+  const {
+    draft: mealDraft,
+    setDraftPayload: persistMealDraft,
+    ready: mealPersistReady,
+  } = useDraftPersist({ draftType: "sa-meal-rates", scopeId: "global" });
+  const mealHydratedRef = useRef(false);
+  const mealReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!mealPersistReady || mealHydratedRef.current) {
+      return;
+    }
+    mealHydratedRef.current = true;
+    const s = mealDraft;
+    if (s) {
+      if (typeof s.filterType === "string") {
+        setFilterType(s.filterType);
+      }
+      if (s.addDraft && typeof s.addDraft === "object") {
+        setDraft({ ...emptyDraft(), ...s.addDraft });
+      }
+      if (s.editForm && typeof s.editForm === "object") {
+        setEditForm(s.editForm);
+        if (s.editingId != null) {
+          setEditingId(s.editingId);
+        }
+      }
+    }
+    mealReadyRef.current = true;
+  }, [mealPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!mealReadyRef.current || !mealPersistReady) {
+      return;
+    }
+    persistMealDraft({
+      filterType,
+      addDraft: draft,
+      editingId,
+      editForm,
+    });
+  }, [filterType, draft, editingId, editForm, mealPersistReady, persistMealDraft]);
 
   const filtered = useMemo(() => {
     if (filterType === "all") {
@@ -313,6 +357,7 @@ export function SuperadminMealAllowanceRatesPanel() {
               </button>
             </div>
             <form
+              data-local-commit-form="true"
               onSubmit={onCreate}
               data-local-scroll="true"
               className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5"
@@ -400,6 +445,7 @@ export function SuperadminMealAllowanceRatesPanel() {
               </button>
             </div>
             <form
+              data-local-commit-form="true"
               onSubmit={(e) => {
                 e.preventDefault();
                 void saveEdit();

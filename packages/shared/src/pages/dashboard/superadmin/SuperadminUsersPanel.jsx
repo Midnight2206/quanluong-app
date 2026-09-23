@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Loader2, Power, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
@@ -50,6 +51,62 @@ export function SuperadminUsersPanel() {
   const [patchUser, { isLoading: isPatching }] = usePatchUserMutation();
   const [togglingUserId, setTogglingUserId] = useState(null);
 
+  const {
+    draft: createUserDraft,
+    setDraftPayload: persistCreateUser,
+    clear: clearCreateUserDraft,
+    ready: createUserPersistReady,
+  } = useDraftPersist({ draftType: "sa-users-create", scopeId: "global" });
+  const createUserHydratedRef = useRef(false);
+  const createUserReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!createUserPersistReady || createUserHydratedRef.current) {
+      return;
+    }
+    createUserHydratedRef.current = true;
+    const s = createUserDraft;
+    if (s) {
+      if (typeof s.username === "string") {
+        setUsername(s.username);
+      }
+      if (typeof s.email === "string") {
+        setEmail(s.email);
+      }
+      if (typeof s.fullName === "string") {
+        setFullName(s.fullName);
+      }
+      if (s.typeId !== undefined) {
+        setTypeId(s.typeId);
+      }
+      if (s.unitId !== undefined) {
+        setUnitId(s.unitId);
+      }
+    }
+    createUserReadyRef.current = true;
+  }, [createUserPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!createUserReadyRef.current || !createUserPersistReady) {
+      return;
+    }
+    persistCreateUser({
+      username,
+      email,
+      fullName,
+      typeId,
+      unitId,
+    });
+  }, [
+    username,
+    email,
+    fullName,
+    typeId,
+    unitId,
+    createUserPersistReady,
+    persistCreateUser,
+  ]);
+
   async function onCreateUser(e) {
     e.preventDefault();
     if (
@@ -78,6 +135,7 @@ export function SuperadminUsersPanel() {
       setFullName("");
       setTypeId("");
       setUnitId("");
+      void clearCreateUserDraft();
     } catch (err) {
       notifyError(err?.data?.message || "Không tạo được người dùng.");
     }
@@ -103,6 +161,7 @@ export function SuperadminUsersPanel() {
     <Card className="shadow-soft min-w-0">
       <CardContent className="min-w-0 space-y-3 !p-3 sm:!p-4">
         <form
+          data-local-commit-form="true"
           onSubmit={onCreateUser}
           className="grid shrink-0 gap-2 rounded-lg border border-border/70 bg-card/40 p-2 sm:grid-cols-2 lg:grid-cols-3"
         >

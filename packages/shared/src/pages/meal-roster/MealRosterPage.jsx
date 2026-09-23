@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { TabPanel } from "@/components/common/TabPanel";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { MealRosterGuarantyTab } from "./MealRosterGuarantyTab.jsx";
 import { MealRosterLedgerTab } from "./MealRosterLedgerTab.jsx";
 
@@ -52,6 +53,56 @@ export function MealRosterPage() {
   const selectedUnitId = manualUnitId ?? scopeUnitId;
 
   const [yearMonth, setYearMonth] = useState(() => localYearMonth());
+
+  const {
+    draft: shellDraft,
+    setDraftPayload: persistShellDraft,
+    ready: shellPersistReady,
+  } = useDraftPersist({
+    draftType: "meal-roster-shell",
+    scopeId: "global",
+    enabled: canAccess,
+  });
+  const shellHydratedRef = useRef(false);
+  const shellReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    shellReadyRef.current = false;
+    if (!canAccess || !shellPersistReady) {
+      return;
+    }
+    if (shellHydratedRef.current) {
+      shellReadyRef.current = true;
+      return;
+    }
+    shellHydratedRef.current = true;
+    const stored = shellDraft;
+    if (typeof stored?.yearMonth === "string" && /^\d{4}-\d{2}$/.test(stored.yearMonth)) {
+      setYearMonth(stored.yearMonth);
+    }
+    if (canPickUnits && stored?.manualUnitId != null && sortedUnits.length) {
+      const id = Number(stored.manualUnitId);
+      const allowed = sortedUnits.some((u) => Number(u.id) === id);
+      if (allowed) {
+        setManualUnitId(id);
+      }
+    }
+    shellReadyRef.current = true;
+  }, [canAccess, canPickUnits, shellPersistReady, sortedUnits]); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once when ready
+
+  useEffect(() => {
+    shellHydratedRef.current = false;
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!shellReadyRef.current || !shellPersistReady || !canAccess) {
+      return;
+    }
+    persistShellDraft({
+      yearMonth,
+      manualUnitId: manualUnitId != null ? Number(manualUnitId) : null,
+    });
+  }, [yearMonth, manualUnitId, shellPersistReady, canAccess, persistShellDraft]);
 
   const tabProps = {
     selectedUnitId,

@@ -1,7 +1,8 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
 import { notifyError, notifySuccess } from "@/services/notify";
@@ -293,6 +294,18 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   const { canPickUnits, unitsForDropdown, effectiveUnitId, persistManualUnitId } =
     useChungTuUnitScope();
 
+  const {
+    draft: exportDraft,
+    setDraftPayload: persistExportDraft,
+    ready: exportPersistReady,
+  } = useDraftPersist({
+    draftType: "chungtu-export",
+    unitId: effectiveUnitId,
+    enabled: effectiveUnitId != null,
+  });
+  const exportHydrateKey = useRef(null);
+  const exportDraftReadyRef = useRef(false);
+
   const isMonthly = exportKind === CHUNG_TU_EXPORT_KIND.MONTHLY;
   const isBySlip = exportKind === CHUNG_TU_EXPORT_KIND.BY_SLIP;
   const isBkmhMonthly = categoryKey === "bang-ke-mua-hang" && isMonthly;
@@ -368,7 +381,16 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
     });
   }, [allowedUnitIds, effectiveUnitId, isMonthly, isPnkMonthly]);
 
+  const prevExportCategoryRef = useRef(null);
   useEffect(() => {
+    if (prevExportCategoryRef.current === null) {
+      prevExportCategoryRef.current = categoryKey;
+      return;
+    }
+    if (prevExportCategoryRef.current === categoryKey) {
+      return;
+    }
+    prevExportCategoryRef.current = categoryKey;
     setWizardStep(0);
     setSelectedTemplateId("");
     setSignatures({});
@@ -385,6 +407,100 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         : CHUNG_TU_AGGREGATION_MODES.BY_DAY,
     );
   }, [categoryKey]);
+
+  useLayoutEffect(() => {
+    exportDraftReadyRef.current = false;
+    if (!effectiveUnitId || !exportPersistReady) {
+      return;
+    }
+    const k = String(effectiveUnitId);
+    if (exportHydrateKey.current === k) {
+      exportDraftReadyRef.current = true;
+      return;
+    }
+    exportHydrateKey.current = k;
+
+    const stored = exportDraft;
+    if (stored) {
+      const step = Number(stored.wizardStep);
+      if (step === 0 || step === 1) {
+        setWizardStep(step);
+      }
+      if (typeof stored.periodMonth === "string" && /^\d{4}-\d{2}/.test(stored.periodMonth)) {
+        setPeriodMonth(stored.periodMonth.slice(0, 7));
+      }
+      if (typeof stored.periodDate === "string" && /^\d{4}-\d{2}-\d{2}/.test(stored.periodDate)) {
+        setPeriodDate(stored.periodDate);
+      }
+      if (typeof stored.dateFrom === "string" && /^\d{4}-\d{2}-\d{2}/.test(stored.dateFrom)) {
+        setDateFrom(stored.dateFrom);
+      }
+      if (typeof stored.dateTo === "string" && /^\d{4}-\d{2}-\d{2}/.test(stored.dateTo)) {
+        setDateTo(stored.dateTo);
+      }
+      if (stored.issueSlipId != null) {
+        setIssueSlipId(String(stored.issueSlipId));
+      }
+      if (Array.isArray(stored.selectedDataUnitIds)) {
+        const ids = stored.selectedDataUnitIds
+          .map((id) => Number(id))
+          .filter(Number.isFinite);
+        if (ids.length) {
+          setSelectedDataUnitIds(ids);
+        }
+      }
+      if (
+        typeof stored.aggregationMode === "string" &&
+        Object.values(CHUNG_TU_AGGREGATION_MODES).includes(stored.aggregationMode)
+      ) {
+        setAggregationMode(stored.aggregationMode);
+      }
+      if (stored.selectedTemplateId != null) {
+        setSelectedTemplateId(String(stored.selectedTemplateId));
+      }
+      if (stored.signatures && typeof stored.signatures === "object") {
+        setSignatures(stored.signatures);
+      }
+      if (stored.signatureDates && typeof stored.signatureDates === "object") {
+        setSignatureDates(stored.signatureDates);
+      }
+    }
+    exportDraftReadyRef.current = true;
+  }, [effectiveUnitId, exportPersistReady, categoryKey]); // eslint-disable-line react-hooks/exhaustive-deps -- exportDraft once per unit when ready
+
+  useEffect(() => {
+    if (!exportDraftReadyRef.current || !exportPersistReady || effectiveUnitId == null) {
+      return;
+    }
+    persistExportDraft({
+      wizardStep,
+      periodMonth,
+      periodDate,
+      dateFrom,
+      dateTo,
+      issueSlipId,
+      selectedDataUnitIds,
+      aggregationMode,
+      selectedTemplateId,
+      signatures,
+      signatureDates,
+    });
+  }, [
+    effectiveUnitId,
+    exportPersistReady,
+    persistExportDraft,
+    wizardStep,
+    periodMonth,
+    periodDate,
+    dateFrom,
+    dateTo,
+    issueSlipId,
+    selectedDataUnitIds,
+    aggregationMode,
+    selectedTemplateId,
+    signatures,
+    signatureDates,
+  ]);
 
   const { data: templates = [], isLoading: templatesLoading } = useChungTuPdfTemplatesQuery(categoryKey, {
     skip: !categoryKey,
@@ -1131,6 +1247,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
   return (
     <div
+      data-local-commit-form="true"
       className={cn(
         useWizardLayout ? "space-y-3 px-0 py-3 sm:p-4" : "space-y-3 p-3 sm:p-4",
         useWizardLayout && wizardStep === 1 && "pb-36",

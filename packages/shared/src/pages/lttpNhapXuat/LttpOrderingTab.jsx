@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useCallback, useState, useEffect, useRef, memo } from "react";
+import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, memo } from "react";
 import { ClipboardCopy, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { useGetLttpDailyOrderSummaryQuery } from "@/features/lttp/api/lttpApi";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { captureElementToPngBlob, shareOrDownloadPng } from "@/utils/captureElementToPng";
 import { cn } from "@/utils/cn";
@@ -233,6 +234,57 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   const [tablePreviewLoading, setTablePreviewLoading] = useState(false);
   const [tablePreviewSharing, setTablePreviewSharing] = useState(false);
   const [forceShowTableForCapture, setForceShowTableForCapture] = useState(false);
+
+  const {
+    draft: orderingDraft,
+    setDraftPayload: persistOrderingFilters,
+    ready: orderingPersistReady,
+  } = useDraftPersist({
+    draftType: "ordering-filters",
+    unitId: effectiveUnitId,
+    enabled: effectiveUnitId != null,
+  });
+  const orderingHydrateKey = useRef(null);
+  const orderingReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    orderingReadyRef.current = false;
+    if (effectiveUnitId == null || !orderingPersistReady) {
+      return;
+    }
+    const k = String(effectiveUnitId);
+    if (orderingHydrateKey.current === k) {
+      orderingReadyRef.current = true;
+      return;
+    }
+    orderingHydrateKey.current = k;
+    const stored = orderingDraft;
+    if (stored) {
+      if (typeof stored.orderDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(stored.orderDate)) {
+        setOrderDate(stored.orderDate);
+      }
+      if (
+        typeof stored.supplierFilterKey === "string" &&
+        stored.supplierFilterKey !== ""
+      ) {
+        setSupplierFilterKey(stored.supplierFilterKey);
+      }
+    }
+    orderingReadyRef.current = true;
+  }, [effectiveUnitId, orderingPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once per unit
+
+  useEffect(() => {
+    if (!orderingReadyRef.current || !orderingPersistReady || effectiveUnitId == null) {
+      return;
+    }
+    persistOrderingFilters({ orderDate, supplierFilterKey });
+  }, [
+    effectiveUnitId,
+    orderDate,
+    supplierFilterKey,
+    orderingPersistReady,
+    persistOrderingFilters,
+  ]);
 
   const { data: summary, isLoading, isFetching, error } = useGetLttpDailyOrderSummaryQuery(
     { unitId: effectiveUnitId, date: orderDate, supplierFilter: supplierFilterKey },

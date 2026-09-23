@@ -1,7 +1,8 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { Button } from "@/components/ui/Button";
 import { CHUNG_TU_AGGREGATION_MODE_OPTIONS } from "@/features/chung-tu-quyet-toan/api/chungTuDocumentApi";
@@ -50,6 +51,19 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
     useChungTuUnitScope();
   const [selectedMonthly, setSelectedMonthly] = useState(null);
   const [selectedBatch, setSelectedBatch] = useState(null);
+
+  const {
+    draft: summaryDraft,
+    setDraftPayload: persistSummaryDraft,
+    ready: summaryPersistReady,
+  } = useDraftPersist({
+    draftType: "chungtu-summary",
+    unitId: effectiveUnitId,
+    enabled: effectiveUnitId != null,
+  });
+  const summaryHydrateKey = useRef(null);
+  const summaryDraftReadyRef = useRef(false);
+  const pendingSummaryBatchKeyRef = useRef(null);
   const isBkmhCategory = categoryKey === "bang-ke-mua-hang";
   const isPnkCategory = categoryKey === "phieu-nhap-kho";
   const isPxkCategory = categoryKey === "phieu-xuat-kho";
@@ -71,6 +85,69 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
   );
 
   const expandedLayout = true;
+
+  useLayoutEffect(() => {
+    summaryDraftReadyRef.current = false;
+    if (!effectiveUnitId || !summaryPersistReady) {
+      return;
+    }
+    const k = String(effectiveUnitId);
+    if (summaryHydrateKey.current === k) {
+      summaryDraftReadyRef.current = true;
+      return;
+    }
+    summaryHydrateKey.current = k;
+
+    const stored = summaryDraft;
+    if (stored?.selectedMonthlyId != null) {
+      setSelectedMonthly({
+        id: stored.selectedMonthlyId,
+        aggregationMode: stored.selectedMonthlyAggregationMode ?? "",
+      });
+    } else {
+      setSelectedMonthly(null);
+    }
+    if (stored?.selectedBatchKey) {
+      pendingSummaryBatchKeyRef.current = String(stored.selectedBatchKey);
+      const batch =
+        pdfExportBatches.find(
+          (item) => String(item.batchKey) === pendingSummaryBatchKeyRef.current,
+        ) ?? null;
+      setSelectedBatch(batch);
+    } else {
+      pendingSummaryBatchKeyRef.current = null;
+      setSelectedBatch(null);
+    }
+    summaryDraftReadyRef.current = true;
+  }, [effectiveUnitId, summaryPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps -- summaryDraft once per unit when ready
+
+  useEffect(() => {
+    const key = pendingSummaryBatchKeyRef.current;
+    if (!key || String(selectedBatch?.batchKey) === key) {
+      return;
+    }
+    const batch = pdfExportBatches.find((item) => String(item.batchKey) === key) ?? null;
+    if (batch) {
+      setSelectedBatch(batch);
+    }
+  }, [pdfExportBatches, selectedBatch?.batchKey]);
+
+  useEffect(() => {
+    if (!summaryDraftReadyRef.current || !summaryPersistReady || effectiveUnitId == null) {
+      return;
+    }
+    persistSummaryDraft({
+      selectedMonthlyId: selectedMonthly?.id ?? null,
+      selectedMonthlyAggregationMode: selectedMonthly?.aggregationMode ?? null,
+      selectedBatchKey: selectedBatch?.batchKey ?? null,
+    });
+  }, [
+    effectiveUnitId,
+    summaryPersistReady,
+    persistSummaryDraft,
+    selectedMonthly,
+    selectedBatch,
+  ]);
 
   return (
     <>

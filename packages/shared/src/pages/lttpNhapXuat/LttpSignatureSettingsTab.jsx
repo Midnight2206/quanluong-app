@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/Button";
 import {
   useGetLttpIssueSlipSignatureSettingsQuery,
   usePutLttpIssueSlipSignatureSettingsMutation,
 } from "@/features/lttp/api/lttpApi";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 
@@ -87,6 +88,42 @@ function defaultFormValues() {
   };
 }
 
+function formFromServer(data, defaults) {
+  if (!data) {
+    return defaults;
+  }
+  const block = data.signatureBlock?.slots?.length
+    ? data.signatureBlock
+    : defaults.signatureBlock;
+  return {
+    signatureBlock: {
+      columns: Number(block.columns) || 4,
+      gap_pt: (() => {
+        const raw = Number(block.gap_pt);
+        return Number.isFinite(raw) && raw >= 20 ? raw : 40;
+      })(),
+      date_line_gap_pt: Number(block.date_line_gap_pt) || 4,
+      slots: (block.slots ?? defaults.signatureBlock.slots).map((s, i) => {
+        const base = DEFAULT_SLOTS[i % DEFAULT_SLOTS.length];
+        const key = s.key || base.key;
+        const locked = LOCKED_SLOT_KEYS.has(key) || Boolean(s.locked) || base.locked;
+        return {
+          ...base,
+          ...s,
+          key,
+          locked,
+          source: locked ? "dynamic" : s.source || base.source,
+          static_name: locked ? "" : s.static_name ?? "",
+        };
+      }),
+    },
+    extraFields: {
+      lyDoSuDung: data.extraFields?.lyDoSuDung ?? "",
+      nhanTaiKho: data.extraFields?.nhanTaiKho ?? "",
+    },
+  };
+}
+
 /**
  * Cài đặt chữ ký phiếu xuất LTTP theo đơn vị kho (layout + lý do / nhận tại kho).
  */
@@ -97,48 +134,80 @@ export function LttpSignatureSettingsTab({ unitId, canWrite = false }) {
   const [saveSettings, { isLoading: saving }] =
     usePutLttpIssueSlipSignatureSettingsMutation();
 
+  const {
+    draft: sigDraft,
+    setDraftPayload: persistSigDraft,
+    clear: clearSigDraft,
+    ready: sigPersistReady,
+  } = useDraftPersist({
+    draftType: "issue-slip-signature",
+    unitId,
+    enabled: unitId != null,
+  });
+
   const defaults = useMemo(() => defaultFormValues(), []);
   const { register, control, handleSubmit, reset, watch } = useForm({
     defaultValues: defaults,
   });
   const { fields } = useFieldArray({ control, name: "signatureBlock.slots" });
 
-  useEffect(() => {
-    if (!data) {
-      reset(defaults);
+  const hydrateKey = useRef(null);
+  const persistAllowedRef = useRef(false);
+  const usedLocalDraftRef = useRef(false);
+
+  useLayoutEffect(() => {
+    persistAllowedRef.current = false;
+    usedLocalDraftRef.current = false;
+    if (unitId == null || !sigPersistReady) {
       return;
     }
-    const block = data.signatureBlock?.slots?.length
-      ? data.signatureBlock
-      : defaults.signatureBlock;
-    reset({
-      signatureBlock: {
-        columns: Number(block.columns) || 4,
-        gap_pt: (() => {
-          const raw = Number(block.gap_pt);
-          return Number.isFinite(raw) && raw >= 20 ? raw : 40;
-        })(),
-        date_line_gap_pt: Number(block.date_line_gap_pt) || 4,
-        slots: (block.slots ?? defaults.signatureBlock.slots).map((s, i) => {
-          const base = DEFAULT_SLOTS[i % DEFAULT_SLOTS.length];
-          const key = s.key || base.key;
-          const locked = LOCKED_SLOT_KEYS.has(key) || Boolean(s.locked) || base.locked;
-          return {
-            ...base,
-            ...s,
-            key,
-            locked,
-            source: locked ? "dynamic" : s.source || base.source,
-            static_name: locked ? "" : s.static_name ?? "",
-          };
-        }),
-      },
-      extraFields: {
-        lyDoSuDung: data.extraFields?.lyDoSuDung ?? "",
-        nhanTaiKho: data.extraFields?.nhanTaiKho ?? "",
-      },
+    const k = String(unitId);
+    if (hydrateKey.current === k) {
+      return;
+    }
+    hydrateKey.current = k;
+
+    if (sigDraft?.signatureBlock && sigDraft?.extraFields) {
+      reset({
+        signatureBlock: sigDraft.signatureBlock,
+        extraFields: sigDraft.extraFields,
+      });
+      usedLocalDraftRef.current = true;
+      persistAllowedRef.current = true;
+      return;
+    }
+    // Wait for server data in the other effect.
+  }, [unitId, sigPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (unitId == null || !sigPersistReady) {
+      return;
+    }
+    if (usedLocalDraftRef.current) {
+      return;
+    }
+    if (hydrateKey.current !== String(unitId)) {
+      return;
+    }
+    if (!data && isLoading) {
+      return;
+    }
+    reset(formFromServer(data, defaults));
+    persistAllowedRef.current = true;
+  }, [data, defaults, reset, unitId, sigPersistReady, isLoading]);
+
+  useEffect(() => {
+    if (!persistAllowedRef.current || !sigPersistReady || unitId == null || !canWrite) {
+      return undefined;
+    }
+    const sub = watch((values) => {
+      persistSigDraft({
+        signatureBlock: values.signatureBlock,
+        extraFields: values.extraFields,
+      });
     });
-  }, [data, defaults, reset]);
+    return () => sub.unsubscribe();
+  }, [watch, persistSigDraft, sigPersistReady, unitId, canWrite]);
 
   const onSubmit = async (values) => {
     if (unitId == null) return;
@@ -156,6 +225,8 @@ export function LttpSignatureSettingsTab({ unitId, canWrite = false }) {
         },
         extraFields: values.extraFields,
       });
+      await clearSigDraft();
+      usedLocalDraftRef.current = false;
       notifySuccess("Đã lưu cài đặt chữ ký.");
     } catch (e) {
       notifyError(e?.data?.message || e?.message || "Không lưu được cài đặt chữ ký.");
@@ -167,7 +238,7 @@ export function LttpSignatureSettingsTab({ unitId, canWrite = false }) {
   }
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+    <form data-local-commit-form="true" className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
       <p className="text-xs text-muted-foreground">
         Cấu hình theo đơn vị kho đang chọn.{" "}
         <span className="font-medium text-foreground">Người viết phiếu</span> và{" "}

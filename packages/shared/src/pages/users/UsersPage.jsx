@@ -1,7 +1,8 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { qk } from "@/app/query/queryKeys";
@@ -68,6 +69,28 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
   const [reject, { isLoading: rejecting }] = useRejectRegistrationMutation();
   const [processingId, setProcessingId] = useState(null);
   const [rejectNotes, setRejectNotes] = useState({});
+  const { draft: rejectDraft, setDraftPayload: persistRejectNotes, ready: rejectPersistReady } =
+    useDraftPersist({ draftType: "reject-notes", scopeId: "global" });
+  const rejectHydratedRef = useRef(false);
+  const rejectReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!rejectPersistReady || rejectHydratedRef.current) {
+      return;
+    }
+    rejectHydratedRef.current = true;
+    if (rejectDraft?.rejectNotes && typeof rejectDraft.rejectNotes === "object") {
+      setRejectNotes(rejectDraft.rejectNotes);
+    }
+    rejectReadyRef.current = true;
+  }, [rejectPersistReady, rejectDraft]);
+
+  useEffect(() => {
+    if (!rejectReadyRef.current || !rejectPersistReady) {
+      return;
+    }
+    persistRejectNotes({ rejectNotes });
+  }, [rejectNotes, rejectPersistReady, persistRejectNotes]);
 
   function refetchListsAfterRegistrationReview() {
     if (hydrateFromServer) {
@@ -132,7 +155,7 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
       </div>
 
       <Card>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3" data-local-commit-form="true">
           {isLoading ? <p className="text-sm text-muted-foreground">Đang tải người dùng...</p> : null}
           {!isLoading && !isError ? (
             <div className="space-y-3">

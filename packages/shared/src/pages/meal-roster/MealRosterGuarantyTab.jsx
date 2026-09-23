@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { ClipboardPaste, Download, Eye, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
@@ -50,8 +51,22 @@ export function MealRosterGuarantyTab({
 }) {
   const { confirm } = useConfirm();
   const [drafts, setDrafts] = useState({});
+  const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(false);
   const fileRef = useRef(null);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
+  const {
+    draft: guarantyDraft,
+    setDraftPayload: persistGuarantyDraft,
+    ready: guarantyPersistReady,
+  } = useDraftPersist({
+    draftType: "meal-roster-guaranty",
+    unitId: selectedUnitId,
+    enabled: Boolean(selectedUnitId && canAccess),
+  });
+  const guarantyHydrateKeyRef = useRef(null);
+  const guarantyReadyRef = useRef(false);
 
   const skipQuery = !selectedUnitId || !yearMonth || !canAccess;
   const skipMeta = !selectedUnitId || !canAccess;
@@ -77,6 +92,39 @@ export function MealRosterGuarantyTab({
   );
   const rows = rosterData ?? EMPTY_MEAL_ROSTER_ROWS;
 
+  useLayoutEffect(() => {
+    guarantyReadyRef.current = false;
+    if (!selectedUnitId || !canAccess || !guarantyPersistReady) {
+      return;
+    }
+    const k = `${selectedUnitId}:${yearMonth}`;
+    if (guarantyHydrateKeyRef.current === k) {
+      guarantyReadyRef.current = true;
+      return;
+    }
+    guarantyHydrateKeyRef.current = k;
+    dirtyRef.current = false;
+    setDirty(false);
+
+    const stored = guarantyDraft;
+    if (stored?.dirty && stored.yearMonth === yearMonth) {
+      if (stored.drafts && typeof stored.drafts === "object") {
+        setDrafts(stored.drafts);
+      }
+      if (stored.newRow && typeof stored.newRow === "object") {
+        setNewRow({
+          fullName: stored.newRow.fullName ?? "",
+          rank: stored.newRow.rank ?? "",
+          mealAllowanceRateId: stored.newRow.mealAllowanceRateId ?? "",
+          unitDisplay: stored.newRow.unitDisplay ?? "",
+        });
+      }
+      dirtyRef.current = true;
+      setDirty(true);
+    }
+    guarantyReadyRef.current = true;
+  }, [selectedUnitId, yearMonth, canAccess, guarantyPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once per unit+month
+
   useEffect(() => {
     const next = {};
     for (const r of rows) {
@@ -87,6 +135,9 @@ export function MealRosterGuarantyTab({
           r.mealAllowanceRateId != null ? String(r.mealAllowanceRateId) : "",
         unitDisplay: r.unitDisplay,
       };
+    }
+    if (dirtyRef.current) {
+      return;
     }
     setDrafts(next);
   }, [rows]);
@@ -141,12 +192,21 @@ export function MealRosterGuarantyTab({
     }
   }, [selectedUnitId]);
 
-  const updateDraft = useCallback((id, field, value) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], [field]: value },
-    }));
+  const markGuarantyDirty = useCallback(() => {
+    dirtyRef.current = true;
+    setDirty(true);
   }, []);
+
+  const updateDraft = useCallback(
+    (id, field, value) => {
+      markGuarantyDirty();
+      setDrafts((prev) => ({
+        ...prev,
+        [id]: { ...prev[id], [field]: value },
+      }));
+    },
+    [markGuarantyDirty],
+  );
 
   const handleSaveRow = useCallback(
     async (id) => {
@@ -214,6 +274,29 @@ export function MealRosterGuarantyTab({
     mealAllowanceRateId: "",
     unitDisplay: "",
   });
+
+  const patchNewRow = useCallback(
+    (patch) => {
+      markGuarantyDirty();
+      setNewRow((p) => ({ ...p, ...patch }));
+    },
+    [markGuarantyDirty],
+  );
+
+  useEffect(() => {
+    if (!guarantyReadyRef.current || !guarantyPersistReady || !selectedUnitId || !dirty) {
+      return;
+    }
+    persistGuarantyDraft({ yearMonth, drafts, newRow, dirty: true });
+  }, [
+    yearMonth,
+    drafts,
+    newRow,
+    dirty,
+    guarantyPersistReady,
+    selectedUnitId,
+    persistGuarantyDraft,
+  ]);
 
   const handleAddRow = useCallback(async () => {
     if (!selectedUnitId) {
@@ -307,7 +390,10 @@ export function MealRosterGuarantyTab({
 
   return (
     <div className="min-w-0 space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+      <div
+        className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end"
+        data-ui-preference="true"
+      >
         {canPickUnits ? (
           <label
             className="flex min-w-[12rem] flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground"
@@ -425,6 +511,12 @@ export function MealRosterGuarantyTab({
         </p>
       ) : null}
 
+      <div
+        data-local-commit-form="true"
+        data-local-unsaved-section="meal-guaranty"
+        data-local-unsaved-defaults="true"
+        className="space-y-4"
+      >
       <StickyResponsiveTable stickyLevel={1} ariaLabel="Danh sách bảo đảm">
         <table className="w-full min-w-[720px] table-auto border-collapse text-sm">
           <thead>
@@ -582,7 +674,7 @@ export function MealRosterGuarantyTab({
             placeholder="Họ và tên"
             autoComplete="name"
             value={newRow.fullName}
-            onChange={(e) => setNewRow((p) => ({ ...p, fullName: e.target.value }))}
+            onChange={(e) => patchNewRow({ fullName: e.target.value })}
             disabled={!canAccess || busy || !selectedUnitId}
           />
           <input
@@ -592,7 +684,7 @@ export function MealRosterGuarantyTab({
             placeholder="Cấp bậc"
             title="Cấp bậc"
             value={newRow.rank}
-            onChange={(e) => setNewRow((p) => ({ ...p, rank: e.target.value }))}
+            onChange={(e) => patchNewRow({ rank: e.target.value })}
             disabled={!canAccess || busy || !selectedUnitId}
           />
           <select
@@ -600,7 +692,7 @@ export function MealRosterGuarantyTab({
             name="mealGuarantyNewMealAllowanceRateId"
             className={cn(inputClass, "lg:col-span-4")}
             value={newRow.mealAllowanceRateId}
-            onChange={(e) => setNewRow((p) => ({ ...p, mealAllowanceRateId: e.target.value }))}
+            onChange={(e) => patchNewRow({ mealAllowanceRateId: e.target.value })}
             disabled={!canAccess || busy || !selectedUnitId || metaRates.length === 0}
           >
             <option value="">Chọn mức ăn tiêu chuẩn (tập đã chọn)…</option>
@@ -615,7 +707,7 @@ export function MealRosterGuarantyTab({
             name="mealGuarantyNewUnitDisplay"
             className={cn(inputClass, "lg:col-span-2")}
             value={newRow.unitDisplay}
-            onChange={(e) => setNewRow((p) => ({ ...p, unitDisplay: e.target.value }))}
+            onChange={(e) => patchNewRow({ unitDisplay: e.target.value })}
             disabled={!canAccess || busy || !selectedUnitId || metaUnitOptions.length === 0}
           >
             <option value="">Đơn vị…</option>
@@ -636,6 +728,7 @@ export function MealRosterGuarantyTab({
             Thêm
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

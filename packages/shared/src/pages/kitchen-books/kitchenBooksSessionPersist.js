@@ -1,5 +1,8 @@
 /**
  * SessionStorage UI state cho /so-sach-bep-an — không chứa bí mật.
+ *
+ * @deprecated Prefer IDB `useDraftPersist` (kitchen-shell / kitchen-receipt / kitchen-menu).
+ * Read/write helpers remain only for one-shot migrate → clear.
  */
 
 const KEYS = {

@@ -8,9 +8,11 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
 import { DASHBOARD_LTTP_SUB_ACCESS_KEY } from "@/features/route-access/routeAccessRegistry";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
+import { useClientPersist } from "@/lib/clientPersist/ClientPersistenceProvider.jsx";
 import {
   readPersistedNavTab,
   readRawPersistedNavTab,
+  resolveRawPersistedNavTab,
   useSyncPersistedNavTabFromRoute,
 } from "@/hooks/usePersistedNavTab";
 import { RouteApiGuard } from "@/hocs/RouteApiGuard";
@@ -37,19 +39,43 @@ const LTTP_SUB_ORDER = [
   "import",
 ];
 
+function dashboardPrimaryRedirectTarget(raw) {
+  const isValid = raw && /^[a-z0-9-]+$/.test(raw) && raw.length <= 64;
+  // Vào `/dashboard` gốc: không khôi phục thẳng tab «Bảng giá LTTP» (lttp) — tránh nhầm với màn Nhập xuất LTTP trên menu.
+  return isValid && raw !== "lttp" ? raw : "units";
+}
+
 /** Khôi phục tab dashboard cấp 1 đã lưu (mặc định «units»). */
 export function DashboardIndexRedirect() {
   const router = useRouter();
+  const { userId, ready: persistReady } = useClientPersist();
 
   useEffect(() => {
-    const raw = readRawPersistedNavTab("dashboard.primary");
-    const isValid = raw && /^[a-z0-9-]+$/.test(raw) && raw.length <= 64;
-    // Vào `/dashboard` gốc: không khôi phục thẳng tab «Bảng giá LTTP» (lttp) — tránh nhầm với màn Nhập xuất LTTP trên menu.
-    const safe = isValid && raw !== "lttp" ? raw : "units";
-    startNavigationIntent();
-    router.replace(`/dashboard/${safe}`);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- một lần khi mount; router không đưa vào deps
-  }, []);
+    const persistId = "dashboard.primary";
+    let cancelled = false;
+
+    const go = (raw) => {
+      if (cancelled) {
+        return;
+      }
+      startNavigationIntent();
+      router.replace(`/dashboard/${dashboardPrimaryRedirectTarget(raw)}`);
+    };
+
+    const sessionRaw = readRawPersistedNavTab(persistId);
+    if (sessionRaw != null && sessionRaw !== "") {
+      go(sessionRaw);
+      return undefined;
+    }
+    if (!persistReady) {
+      return undefined;
+    }
+
+    void resolveRawPersistedNavTab(persistId, userId).then((raw) => go(raw));
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, persistReady, router]);
 
   return <p className="text-xs text-muted-foreground">Đang mở bảng điều khiển…</p>;
 }

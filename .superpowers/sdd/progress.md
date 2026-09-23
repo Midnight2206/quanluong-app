@@ -151,3 +151,93 @@ Spec: docs/superpowers/specs/2026-09-07-chung-tu-doc-number-and-reexport-design.
 - Deploy needs `prisma migrate deploy` for doc-number tables + `contextJson`
 - Manual UI smoke still useful: History → Xuất lại trên BKMH/PNK/PXK
 - Task tool blocked mid-run; Tasks 2–8 continued inline with controller self-review
+# SDD Progress — superadmin-post-login-portal-chooser (2026-09-07)
+
+Plan: docs/superpowers/plans/2026-09-07-superadmin-post-login-portal-chooser.md
+Spec: docs/superpowers/specs/2026-09-07-superadmin-post-login-portal-chooser-design.md
+
+## Tasks
+
+Task 1: complete (commits 309fb51..7185162, controller self-review — Task reviewer billing blocked)
+Task 2: complete (commits 7185162..8e07fe5, controller self-review — Task reviewer billing blocked)
+Task 3: complete (commits 8e07fe5..ca0a283, controller self-review — Task reviewer billing blocked)
+Task 4: complete (commits ca0a283..7ba0d34, controller self-review — Task reviewer billing blocked)
+Task 5: complete (automated suite 7/7 pass; controller smoke; Task reviewer billing blocked)
+Final review: portal-chooser Tasks 1–5 complete (7185162..7ba0d34); automated 7/7; per-task Task reviewers skipped (billing)
+
+# SDD Progress — client-indexeddb-persistence (2026-09-22)
+
+Plan: docs/superpowers/plans/2026-09-22-client-indexeddb-persistence.md
+Spec: docs/superpowers/specs/2026-09-22-client-indexeddb-persistence-design.md
+Branch: feat/document-service-p4 (in-place; no commits until user asks)
+BASE_AT_START: 1c0b99c2ffea1d7e49c6ea5b58ad81863c47761f
+
+## Tasks
+
+- Task 1: complete (uncommitted working tree, review clean) — keys.js, db.js, clearClientDb, idb-keyval dep; Minors: lockfile churn, clear onblocked, no package export yet
+- Task 2: complete (uncommitted, review clean) — pageUi/drafts + migrate; Minors: lich-su selfcheck, migrate validation, setDraft spread overwrite
+- Task 3: complete (uncommitted, review clean after debounce fix) — useDraftPersist + LTTP tabs + provider stub; Step 4 smoke → Task 9
+- Task 4: complete (uncommitted, review clean) — usePageUiPersist + LTTP scroll; Minors: debounce flush on leave, restore timing
+- Task 5: complete (uncommitted, review clean) — logout await clearClientDb; Minor: session-expiry no wipe
+- Task 6: complete (uncommitted, review clean) — RQ catalog persist allowlist; Minors: superadmin deps, session-expiry RQ clear
+- Task 7: complete (uncommitted, review clean X1) — create-only outbox; Minors: backoff, stuck sending recovery
+- Task 8: complete (uncommitted, review clean after dashboard IDB hydrate fix) — nav dual-write + MainLayout scroll; Minor: superadmin no provider
+- Task 9: complete (uncommitted) — selfchecks green; manual browser smoke SKIP (needs user)
+- Final review: Ready with follow-ups → fixed Important (sending recovery, wipeClientPersist on logout/session/user-switch, superadmin provider+deps); remaining Minors deferred; manual browser smoke still SKIP
+
+# SDD Progress — offline-first-architecture (2026-09-23)
+
+Plan: docs/superpowers/plans/2026-09-23-offline-first-architecture.md
+Spec: docs/superpowers/specs/2026-09-23-offline-first-architecture-design.md
+Branch: feat/client-indexeddb-persistence (in-place; no commits until user asks)
+BASE_AT_START: 1c0b99c2ffea1d7e49c6ea5b58ad81863c47761f
+
+## Tasks
+
+- Task 1: complete (uncommitted, review clean) — Dexie schema/open; Important for T2: clearOfflineDb(userId), close on switch
+- Task 2: complete (uncommitted, review clean) — OfflineProvider + wipe clearOfflineDb(userId); Minor: selfcheck coverage
+- Task 3: complete (uncommitted, review clean) — SWR httpCache + prefetch; Minors: fetcher deps, stale flag on error
+- Task 4: complete (uncommitted, controller accept) — OfflineBanner + useNetworkStatus
+- Task 5: complete (uncommitted, controller accept) — Serwist apps/web; SW off in next dev; register post-login
+- Task 6: complete (uncommitted, controller accept) — outbox processor + sync controller + useOfflineQueue
+- Task 7: complete (uncommitted, controller accept) — blob quota + upload/import + OutboxBadge
+- Task 8: complete (uncommitted, controller accept) — ConflictReviewDialog + keepServer/reapply
+- Task 9: complete (uncommitted, review clean after baseVersion fix) — LTTP Dexie outbox; Minor: orphan X1 IDB rows not migrated
+- Task 10: complete (uncommitted) — 7/7 selfchecks; manual browser smoke SKIP; Docker UI rebuild needed
+- Final review: Ready with follow-ups; fixed enqueue→offline-outbox-changed; remaining: Docker UI rebuild, manual smoke, RQ→SWR hook migrate, orphan X1 rows
+
+
+# SDD Progress — reconnect-gate-and-field-marks (2026-09-23)
+
+Plan: docs/superpowers/plans/2026-09-23-reconnect-gate-and-field-marks.md
+Spec: docs/superpowers/specs/2026-09-23-reconnect-gate-and-field-marks-design.md
+BASE_BEFORE_T1: c353bcafb5a3fdec8cbb0dedf0e6cf6b33be8f83
+
+## Tasks
+
+- Task 1: complete (commits c353bca..4411638, review clean)
+- Task 2: complete (commits 4411638..ca75c4d, review clean)
+- Task 3: complete (commits ca75c4d..2eea439, review clean)
+- Task 4: complete (commits 2eea439..6af671b, review clean; minor: partial flush unlock / sawOffline user switch)
+- Task 5: complete (commits 6af671b..3710106, review clean; minor: manual navigate smoke pending)
+- Task 6: complete (commits 3710106..57f8cfa, selfchecks 6/6; browser smoke SKIPPED)
+- Final review: Ready with follow-ups; Important fixed in 3566d74 (partial flush / userId reset / 45s timeout). Browser §6 still manual.
+- Final fix: 3566d74 (failed flush blocks gate; userId reset; 45s timeout). All 6 selfchecks ok.
+
+
+# SDD Progress — outbox-auth-expired-reauth (2026-09-23)
+
+Plan: docs/superpowers/plans/2026-09-23-outbox-auth-expired-reauth.md
+Spec: docs/superpowers/specs/2026-09-23-outbox-auth-expired-reauth-design.md
+Branch: feat/client-indexeddb-persistence
+BASE_BEFORE_T1: da7f8b864ef796f052fc1a348e15b12cc73f7fee
+
+## Tasks
+
+- Task 1: complete (commits da7f8b8..6916f3f, review clean; minors: 403 fallback string untested, 401/403 on non-create-like thinner)
+- Task 2: complete (commits 6916f3f..c9551e1, review clean; minors: setAuthState coverage, missing apiRequest TypeError)
+- Task 3: complete (commits c9551e1..1c949a3, review clean; minors: concurrent test implicit verify)
+- Task 4: complete (commits 1c949a3..17346d9, review clean)
+- Task 5: complete (commits 17346d9..7cfccf3, review clean; minors: contract coverage, a11y)
+- Task 6: complete (commits 7cfccf3..9049f75, review Approved; Important notes deferred: pre-ready bypass per plan, manual smoke SKIP)
+- Final review: Ready with follow-ups (manual browser smoke SKIP; non-401 verify→AUTH_EXPIRED accepted per spec; minors deferred)

@@ -1,9 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useClientPersist } from "@/lib/clientPersist/ClientPersistenceProvider.jsx";
+import { getNavTab, getNavTabPersistUserId, setNavTab } from "@/lib/clientPersist/pageUi.js";
 
 const STORAGE_PREFIX = "quanluong:navTab:";
 
 function storageKey(persistId) {
   return `${STORAGE_PREFIX}${persistId}`;
+}
+
+function writeSessionNavTab(persistId, value) {
+  if (!persistId || typeof sessionStorage === "undefined" || value == null || value === "") {
+    return;
+  }
+  try {
+    sessionStorage.setItem(storageKey(persistId), String(value));
+  } catch {
+    /* ignore */
+  }
+}
+
+function mirrorNavTabToIdb(persistId, value) {
+  const userId = getNavTabPersistUserId();
+  if (userId == null || !persistId || value == null || value === "") {
+    return;
+  }
+  void setNavTab({ userId, persistId, navTab: String(value) }).catch(() => {});
 }
 
 /**
@@ -32,14 +53,8 @@ export function readPersistedNavTab(persistId, validIds) {
  * @param {string} value
  */
 export function writePersistedNavTab(persistId, value) {
-  if (!persistId || typeof sessionStorage === "undefined" || value == null || value === "") {
-    return;
-  }
-  try {
-    sessionStorage.setItem(storageKey(persistId), String(value));
-  } catch {
-    /* ignore */
-  }
+  writeSessionNavTab(persistId, value);
+  mirrorNavTabToIdb(persistId, value);
 }
 
 /** Đọc chuỗi đã lưu (không lọc) — dùng redirect khi đã validate tay. */
@@ -54,6 +69,27 @@ export function readRawPersistedNavTab(persistId) {
   }
 }
 
+/** Session trước; nếu trống thì đọc IDB và ghi session (cold start redirect). */
+export async function resolveRawPersistedNavTab(persistId, userId) {
+  const fromSession = readRawPersistedNavTab(persistId);
+  if (fromSession != null && fromSession !== "") {
+    return fromSession;
+  }
+  if (userId == null) {
+    return null;
+  }
+  try {
+    const fromIdb = await getNavTab({ userId, persistId });
+    if (fromIdb) {
+      writeSessionNavTab(persistId, fromIdb);
+      return fromIdb;
+    }
+  } catch {
+    /* ponytail: fail-soft hydrate */
+  }
+  return null;
+}
+
 /**
  * State tab cục bộ + ghi sessionStorage khi đổi (dùng cho TabPanel hoặc tab không gắn URL).
  *
@@ -63,6 +99,7 @@ export function readRawPersistedNavTab(persistId) {
  * @returns {[string, (id: string) => void]}
  */
 export function usePersistedNavTabSelection(persistId, validIds, fallbackId) {
+  const { userId, ready: persistReady } = useClientPersist();
   const first = fallbackId ?? validIds[0] ?? "";
   const validIdsKey = validIds.join("|");
   // validIdsKey thay cho tham chiếu mảng (tránh mảng mới mỗi render → effect lặp / setState vô hạn)
@@ -77,6 +114,41 @@ export function usePersistedNavTabSelection(persistId, validIds, fallbackId) {
     }
     return first;
   });
+
+  useEffect(() => {
+    if (!persistId || userId == null || !persistReady || !stableValid.length) {
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const fromSession = readPersistedNavTab(persistId, stableValid);
+        const fromIdbRaw = await getNavTab({ userId, persistId });
+        const fromIdb =
+          fromIdbRaw && stableValid.includes(fromIdbRaw) ? fromIdbRaw : null;
+
+        if (!fromSession && fromIdb) {
+          writeSessionNavTab(persistId, fromIdb);
+          if (!cancelled) {
+            setActiveIdInternal(fromIdb);
+          }
+          return;
+        }
+        if (fromSession && !fromIdb) {
+          await setNavTab({ userId, persistId, navTab: fromSession });
+          return;
+        }
+        if (fromSession && fromIdb && fromSession !== fromIdb) {
+          await setNavTab({ userId, persistId, navTab: fromSession });
+        }
+      } catch {
+        /* ponytail: fail-soft hydrate */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [persistId, userId, persistReady, validIdsKey, stableValid]);
 
   useEffect(() => {
     if (!stableValid.length) {

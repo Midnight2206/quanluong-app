@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { createPortal } from "react-dom";
 import { AlertTriangle, Loader2, Settings2 } from "lucide-react";
 import { TabPanel } from "@/components/common/TabPanel";
@@ -459,8 +460,83 @@ export function MealRosterLedgerTab({
   const [localExtra, setLocalExtra] = useState({});
   /** @type {Record<number, string[]>} day -> periods */
   const [localSplits, setLocalSplits] = useState({});
+  const [ledgerDirty, setLedgerDirty] = useState(false);
+  const ledgerDirtyRef = useRef(false);
+
+  const {
+    draft: ledgerDraft,
+    setDraftPayload: persistLedgerDraft,
+    ready: ledgerPersistReady,
+  } = useDraftPersist({
+    draftType: "meal-roster-ledger",
+    unitId: selectedUnitId,
+    enabled: Boolean(selectedUnitId && canAccess),
+  });
+  const ledgerHydrateKeyRef = useRef(null);
+  const ledgerReadyRef = useRef(false);
+
+  const markLedgerDirty = useCallback(() => {
+    ledgerDirtyRef.current = true;
+    setLedgerDirty(true);
+  }, []);
+
+  useLayoutEffect(() => {
+    ledgerReadyRef.current = false;
+    if (!selectedUnitId || !canAccess || !ledgerPersistReady) {
+      return;
+    }
+    const k = `${selectedUnitId}:${yearMonth}`;
+    if (ledgerHydrateKeyRef.current === k) {
+      ledgerReadyRef.current = true;
+      return;
+    }
+    ledgerHydrateKeyRef.current = k;
+    ledgerDirtyRef.current = false;
+    setLedgerDirty(false);
+
+    const stored = ledgerDraft;
+    if (stored?.dirty && stored.yearMonth === yearMonth) {
+      if (stored.localStandard && typeof stored.localStandard === "object") {
+        setLocalStandard(stored.localStandard);
+      }
+      if (stored.localExtra && typeof stored.localExtra === "object") {
+        setLocalExtra(stored.localExtra);
+      }
+      if (stored.localSplits && typeof stored.localSplits === "object") {
+        setLocalSplits(stored.localSplits);
+      }
+      ledgerDirtyRef.current = true;
+      setLedgerDirty(true);
+    }
+    ledgerReadyRef.current = true;
+  }, [selectedUnitId, yearMonth, canAccess, ledgerPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate once per unit+month
 
   useEffect(() => {
+    if (!ledgerReadyRef.current || !ledgerPersistReady || !selectedUnitId || !ledgerDirty) {
+      return;
+    }
+    persistLedgerDraft({
+      yearMonth,
+      localStandard,
+      localExtra,
+      localSplits,
+      dirty: true,
+    });
+  }, [
+    yearMonth,
+    localStandard,
+    localExtra,
+    localSplits,
+    ledgerDirty,
+    ledgerPersistReady,
+    selectedUnitId,
+    persistLedgerDraft,
+  ]);
+
+  useEffect(() => {
+    if (ledgerDirtyRef.current) {
+      return;
+    }
     const nextStd = {};
     for (const m of marksFromApi) {
       if (m.mealAllowanceRateId != null) {
@@ -550,6 +626,7 @@ export function MealRosterLedgerTab({
     if (standardRateIds.length === 0) {
       return;
     }
+    markLedgerDirty();
     const key = `${entryId}:${day}:${mealPeriod}`;
     setLocalStandard((prev) => {
       const lockedRate = lockedStandardRateForDay(prev, entryId, day, mealPeriod);
@@ -588,9 +665,10 @@ export function MealRosterLedgerTab({
       }
       return n;
     });
-  }, [standardRateIds]);
+  }, [standardRateIds, markLedgerDirty]);
 
   const toggleExtra = useCallback((entryId, day, rateId) => {
+    markLedgerDirty();
     const key = `${entryId}:${day}`;
     setLocalExtra((prev) => {
       const cur = prev[key] ?? [];
@@ -604,7 +682,7 @@ export function MealRosterLedgerTab({
       }
       return n;
     });
-  }, []);
+  }, [markLedgerDirty]);
 
   const [putMarks, { isLoading: savingMarks }] = usePutMealRosterDayMarksMutation();
 
@@ -663,6 +741,8 @@ export function MealRosterLedgerTab({
     }
     try {
       await putMarks({ unitId: selectedUnitId, yearMonth, marks, extraMarks, extraSplits }).unwrap();
+      ledgerDirtyRef.current = false;
+      setLedgerDirty(false);
       notifySuccess("Đã lưu sổ chấm cơm");
     } catch (e) {
       notifyError(e?.data?.message || "Không lưu được sổ");
@@ -684,6 +764,7 @@ export function MealRosterLedgerTab({
     if (!opt) {
       return;
     }
+    markLedgerDirty();
     setLocalSplits((prev) => {
       const next = { ...prev };
       if (isDefaultExtraSplitPeriods(opt.periods)) {
@@ -693,7 +774,7 @@ export function MealRosterLedgerTab({
       }
       return next;
     });
-  }, []);
+  }, [markLedgerDirty]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const { data: catalogPayload, isFetching: loadingCatalog } = useGetMealRateCatalogQuery(undefined, {
@@ -874,7 +955,10 @@ export function MealRosterLedgerTab({
 
   return (
     <div className="min-w-0 space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+      <div
+        className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end"
+        data-ui-preference="true"
+      >
         {canPickUnits ? (
           <label
             className="flex min-w-[12rem] flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground"
@@ -956,6 +1040,12 @@ export function MealRosterLedgerTab({
         </p>
       ) : null}
 
+      <div
+        data-local-commit-form="true"
+        data-local-unsaved-section="meal-ledger"
+        data-local-unsaved-defaults="true"
+        className="space-y-4"
+      >
       <TabPanel
         persistId="meal-roster-ledger-marks"
         defaultTabId="standard"
@@ -990,6 +1080,7 @@ export function MealRosterLedgerTab({
           },
         ]}
       />
+      </div>
 
       {pickerOpen && typeof document !== "undefined"
         ? createPortal(

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { RotateCcw, Save } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -23,12 +24,53 @@ export function SuperadminPermissionDescriptionsPanel() {
   const [drafts, setDrafts] = useState({});
   const [savingId, setSavingId] = useState(null);
 
-  useEffect(() => {
-    const next = {};
-    for (const r of rows) {
-      next[r.id] = r.description ?? "";
+  const {
+    draft: permDescDraft,
+    setDraftPayload: persistPermDesc,
+    ready: permDescPersistReady,
+  } = useDraftPersist({ draftType: "sa-perm-desc", scopeId: "global" });
+  const permDescHydratedRef = useRef(false);
+  const permDescReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!permDescPersistReady || !rows.length || permDescHydratedRef.current) {
+      return;
     }
-    setDrafts(next);
+    permDescHydratedRef.current = true;
+    if (permDescDraft?.drafts && typeof permDescDraft.drafts === "object") {
+      setDrafts(permDescDraft.drafts);
+    } else {
+      const next = {};
+      for (const r of rows) {
+        next[r.id] = r.description ?? "";
+      }
+      setDrafts(next);
+    }
+    permDescReadyRef.current = true;
+  }, [permDescPersistReady, rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!permDescReadyRef.current || !permDescPersistReady) {
+      return;
+    }
+    persistPermDesc({ drafts });
+  }, [drafts, permDescPersistReady, persistPermDesc]);
+
+  useEffect(() => {
+    if (!permDescHydratedRef.current || !rows.length) {
+      return;
+    }
+    setDrafts((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const r of rows) {
+        if (!(r.id in next)) {
+          next[r.id] = r.description ?? "";
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, [rows]);
 
   const byModule = useMemo(() => {
@@ -65,7 +107,10 @@ export function SuperadminPermissionDescriptionsPanel() {
 
   return (
     <Card className="shadow-soft">
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !p-3 sm:!p-4">
+      <CardContent
+        className="flex min-h-0 flex-1 flex-col gap-3 !p-3 sm:!p-4"
+        data-local-commit-form="true"
+      >
         <div>
           <p className="text-xs font-medium sm:text-sm">Mô tả quyền (dùng chung toàn hệ thống)</p>
         </div>

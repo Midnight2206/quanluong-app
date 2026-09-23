@@ -1,7 +1,8 @@
 "use client";
 
 import { FileUp, Loader2, X } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
@@ -96,6 +97,64 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
   const [previewingId, setPreviewingId] = useState("");
   const [fieldLabelsModalOpen, setFieldLabelsModalOpen] = useState(false);
   const [fieldLabelsDraft, setFieldLabelsDraft] = useState({});
+
+  const {
+    draft: ctPdfDraft,
+    setDraftPayload: persistCtPdfDraft,
+    ready: ctPdfPersistReady,
+  } = useDraftPersist({ draftType: "sa-ct-pdf-templates", scopeId: "global" });
+  const ctPdfHydrateKey = useRef(null);
+  const ctPdfReadyRef = useRef(false);
+
+  useLayoutEffect(() => {
+    ctPdfReadyRef.current = false;
+    if (!ctPdfPersistReady) {
+      return;
+    }
+    const k = categoryKey;
+    if (ctPdfHydrateKey.current === k) {
+      ctPdfReadyRef.current = true;
+      return;
+    }
+    ctPdfHydrateKey.current = k;
+    const s = ctPdfDraft;
+    if (s && s.categoryKey === categoryKey) {
+      if (s.selectedId !== undefined) {
+        setSelectedId(s.selectedId);
+      }
+      if (s.fieldLabelsDraft && typeof s.fieldLabelsDraft === "object") {
+        setFieldLabelsDraft(s.fieldLabelsDraft);
+      }
+      if (typeof s.uploadDisplayName === "string") {
+        setUploadDisplayName(s.uploadDisplayName);
+      }
+      if (s.uploadVersion !== undefined) {
+        setUploadVersion(s.uploadVersion);
+      }
+    }
+    ctPdfReadyRef.current = true;
+  }, [categoryKey, ctPdfPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!ctPdfReadyRef.current || !ctPdfPersistReady) {
+      return;
+    }
+    persistCtPdfDraft({
+      categoryKey,
+      selectedId,
+      fieldLabelsDraft,
+      uploadDisplayName,
+      uploadVersion,
+    });
+  }, [
+    categoryKey,
+    selectedId,
+    fieldLabelsDraft,
+    uploadDisplayName,
+    uploadVersion,
+    ctPdfPersistReady,
+    persistCtPdfDraft,
+  ]);
 
   const { data: templates = [], isLoading: templatesLoading } = useChungTuPdfTemplatesQuery(
     categoryKey,
@@ -372,7 +431,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-local-commit-form="true">
       <Card className="shadow-soft">
         <CardContent className="space-y-3 !p-3 sm:!p-4">
           <div className="space-y-1">

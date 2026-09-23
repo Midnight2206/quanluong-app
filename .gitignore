@@ -7,3 +7,7 @@ dist/
 *.log
 .env*.local
 .superpowers/
+
+# Serwist build output (@quanluong/web)
+apps/web/public/sw*
+apps/web/public/swe-worker*

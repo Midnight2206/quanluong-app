@@ -74,7 +74,15 @@ export function LttpNhapXuatPage() {
   const [editingSlip, setEditingSlip] = useState(null);
   const [tabRemountKey, setTabRemountKey] = useState(0);
   const [isToolbarCompact, setIsToolbarCompact] = useState(false);
+  /** Đang rời /ordering-lttp → nhả forcedActiveTabId + dừng sync route ghi đè tab đích. */
+  const [leavingOrderingRoute, setLeavingOrderingRoute] = useState(false);
   const toolbarSentinelRef = useRef(null);
+
+  useEffect(() => {
+    if (!orderingRouteForced) {
+      setLeavingOrderingRoute(false);
+    }
+  }, [orderingRouteForced]);
 
   useEffect(() => {
     const sentinel = toolbarSentinelRef.current;
@@ -108,18 +116,27 @@ export function LttpNhapXuatPage() {
   const handleNhapXuatTabNavigate = useCallback(
     (id) => {
       if (id === LTTP_ORDER_TAB_ID) {
-        router.push(LTTP_ORDERING_ROUTE_PATH);
+        setLeavingOrderingRoute(false);
+        if (!orderingRouteForced) {
+          router.push(LTTP_ORDERING_ROUTE_PATH);
+        }
         return;
       }
-      router.push("/lttp-nhap-xuat");
+      // Từ /ordering-lttp → tab khác: ghi tab đích trước, nhả force, rồi mới đổi URL.
+      // Không làm vậy thì forcedActiveTabId + sync route giữ ordering → phải bấm 2 lần.
+      if (orderingRouteForced) {
+        setLeavingOrderingRoute(true);
+        writePersistedNavTab(LTTP_TAB_PERSIST_ID, id);
+        router.push("/lttp-nhap-xuat");
+      }
     },
-    [router],
+    [router, orderingRouteForced],
   );
 
   useSyncPersistedNavTabFromRoute(
     LTTP_TAB_PERSIST_ID,
     ["phieu-xuat", "lich-su", LTTP_ORDER_TAB_ID],
-    orderingRouteForced ? LTTP_ORDER_TAB_ID : undefined,
+    orderingRouteForced && !leavingOrderingRoute ? LTTP_ORDER_TAB_ID : undefined,
   );
 
   /** Danh sách đơn vị nhận / bulk config: nhánh của đơn vị user (không dùng để chọn kho viết phiếu). */
@@ -250,7 +267,9 @@ export function LttpNhapXuatPage() {
               equalWidthTabs
               persistId={LTTP_TAB_PERSIST_ID}
               defaultTabId="phieu-xuat"
-              forcedActiveTabId={orderingRouteForced ? LTTP_ORDER_TAB_ID : undefined}
+              forcedActiveTabId={
+                orderingRouteForced && !leavingOrderingRoute ? LTTP_ORDER_TAB_ID : undefined
+              }
               onTabSelect={handleNhapXuatTabNavigate}
               tabs={[
                 {

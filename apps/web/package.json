@@ -12,9 +12,14 @@
     "@floating-ui/react": "^0.27.16",
     "@hookform/resolvers": "^5.0.1",
     "@quanluong/shared": "*",
+    "@serwist/next": "^9.5.12",
+    "@tanstack/query-async-storage-persister": "^5.66.0",
     "@tanstack/react-query": "^5.66.0",
+    "@tanstack/react-query-persist-client": "^5.66.0",
     "axios": "^1.8.4",
+    "dexie": "^4.4.6",
     "html-to-image": "^1.11.13",
+    "idb-keyval": "^6.3.0",
     "lucide-react": "^0.511.0",
     "next": "^15.2.4",
     "react": "^19.0.0",
@@ -31,6 +36,7 @@
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.2.4",
     "postcss": "^8.5.3",
+    "serwist": "^9.5.12",
     "tailwindcss": "^3.4.17"
   }
 }

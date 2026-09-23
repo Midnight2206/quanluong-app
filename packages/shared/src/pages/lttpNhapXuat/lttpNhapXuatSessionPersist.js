@@ -1,5 +1,8 @@
 /**
  * SessionStorage helpers cho /lttp-nhap-xuat — không chứa bí mật, chỉ UI state.
+ *
+ * @deprecated Drafts/filters live in IDB via `useDraftPersist`.
+ * `read/writeStoredManualUnitId` remain for one-shot migrate → clear (ChungTu unit scope).
  */
 
 const KEYS = {
@@ -9,6 +12,15 @@ const KEYS = {
   /** @param {number|string} unitId — bộ lọc tab lịch sử theo từng kho */
   historyFilters: (unitId) => `quanluong:lttp:nhap-xuat:lich-su-filters:v1:${unitId}`,
 };
+
+/** Session keys migrated to IDB drafts (Task 2); prefixes must match KEYS above. */
+export const LTTP_MIGRATE_SESSION_PREFIXES = [
+  { prefix: "quanluong:lttp:issue-slip-draft:v1:", draftType: "issue-slip" },
+  {
+    prefix: "quanluong:lttp:nhap-xuat:lich-su-filters:v1:",
+    draftType: "lich-su-filters",
+  },
+];
 
 function safeJsonParse(raw) {
   if (raw == null || typeof raw !== "string") {

@@ -1,18 +1,24 @@
-# Task 5 Report — Node client preview / publish / retire + 409
+# Task 5 Report: `ReauthOverlay` UI
 
-**STATUS:** completed
+## Status
+**Complete**
 
-## Delivered
+## Changes
+- `packages/shared/src/offline/ui/ReauthOverlay.jsx`: Modal overlay (`z-[70]`, `role="alertdialog"`) with headline `Phiên hết hạn, đăng nhập lại`; identifier/password form mirroring `LoginPage.jsx`; `useForm` + `zodResolver(loginSchema)` + `useLoginMutation`; on success `notifySuccess` then `await onSuccess?.()`; footer link to `/login` for Google (no authorize API).
+- `packages/shared/src/offline/ui/ReauthOverlay.contract.selfcheck.mjs`: Static contract checks (headline, hooks/schema, `onSuccess`, no `google/login`).
 
-- Updated `requestDocument()` to preserve upstream HTTP `409` as `AppError` `statusCode: 409` with `ERROR_CODES.CONFLICT`.
-- Added and exported `previewTemplatePdf(templateId)`, `publishTemplate(templateId)`, and `retireTemplate(templateId)` in `src/services/document-service.client.js`.
-- Extended the existing lightweight client test file with focused coverage for the new methods and the `TEMPLATE_NOT_PUBLISHED` conflict path.
+## TDD
+1. Added contract selfcheck → `node …/ReauthOverlay.contract.selfcheck.mjs` → ENOENT (expected).
+2. Implemented component → same command → `ReauthOverlay contract: ok`.
 
-## Verification
+## Test summary
+| Command | Result |
+|---------|--------|
+| `node packages/shared/src/offline/ui/ReauthOverlay.contract.selfcheck.mjs` | PASS (`ReauthOverlay contract: ok`) |
 
-- `node --test quanluong-app-be/src/services/document-service.client.test.js` — pass (`22` tests, `0` failures).
-- `ReadLints` on touched files — no errors.
+## Concerns
+- Not wired into `OfflineProvider` (Task 6); overlay is unused until then.
+- Reauth uses same login mutation as full page (no superadmin portal redirect); acceptable for in-place session refresh per spec v1.
 
 ## Commit
-
-- `feat(be): document-service client preview publish retire + 409`
+`feat(offline): add ReauthOverlay for expired session`

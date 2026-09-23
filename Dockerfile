@@ -111,6 +111,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends nginx \
 WORKDIR /app
 COPY --from=next-web-built /app/apps/web/.next/standalone ./
 COPY --from=next-web-built /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=next-web-built /app/apps/web/public ./apps/web/public
 
 COPY docker/nginx/next-spa-api.conf /etc/nginx/conf.d/default.conf
 COPY docker/docker-entrypoint-next-ui.sh /entrypoint.sh

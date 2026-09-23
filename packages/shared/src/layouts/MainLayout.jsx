@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { usePrivateDomUiPersist } from "@/hooks/usePrivateDomUiPersist";
+import { useLocalUnsavedFieldMarks } from "@/hooks/useLocalUnsavedFieldMarks";
 import { TargetUnitScopeProvider } from "@/contexts/TargetUnitScopeContext";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { mainNavItems, superadminNavItems } from "@/features/navigation/navConfig";
@@ -29,6 +31,9 @@ export function MainLayout({
   const user = useCurrentUser();
   const isSuperadmin = user?.type?.name === "superadmin";
   const sidebarItems = navItemsProp ?? (isSuperadmin ? superadminNavItems : mainNavItems);
+
+  usePrivateDomUiPersist();
+  useLocalUnsavedFieldMarks();
 
   useEffect(() => {
     let cancelled = false;
