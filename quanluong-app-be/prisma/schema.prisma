@@ -561,6 +561,8 @@ model Profile {
   fullName    String
   birthday    DateTime?
   avatarUrl   String?
+  /// Ảnh chữ ký PNG (ký số dạng ảnh) — public URL dưới /media/signatures/
+  signatureUrl String?
   description String?   @db.Text
   jobTitle    String?
   rankFull     String?  @db.VarChar(128)

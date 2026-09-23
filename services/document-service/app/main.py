@@ -316,12 +316,18 @@ class DocumentBody(BaseModel):
     signatures: dict[str, str] = {}
     signature_dates: dict[str, str] = {}
     signature_block: Optional[SignatureBlockBody] = None
+    # slot_key → data URL / base64 PNG; thiếu slot = không vẽ ảnh
+    signature_images: dict[str, str] = {}
+    # widthPt, heightPt, offsetYFromTitlePt, centerHorizontally
+    signature_image_layout: Optional[dict] = None
 
 
 class StoredPdfBody(BaseModel):
     signatures: dict[str, str] = {}
     signature_dates: dict[str, str] = {}
     signature_block: Optional[SignatureBlockBody] = None
+    signature_images: dict[str, str] = {}
+    signature_image_layout: Optional[dict] = None
 
 
 class FolderBody(BaseModel):
@@ -394,6 +400,8 @@ def add_folder_document_route(
                         "signatures",
                         "signature_dates",
                         "signature_block",
+                        "signature_images",
+                        "signature_image_layout",
                     }
                 ),
                 body.file_name,
@@ -592,6 +600,8 @@ async def create_document(
             rows=body.rows,
             signatures=body.signatures,
             signature_dates=body.signature_dates,
+            signature_images=body.signature_images or None,
+            signature_image_layout=body.signature_image_layout,
         )
     except PaginationError as exc:
         raise HTTPException(
@@ -768,6 +778,11 @@ async def render_document_pdf(
             rows=payload["rows"],
             signatures=body.signatures or payload.get("signatures") or {},
             signature_dates=body.signature_dates or payload.get("signature_dates") or {},
+            signature_images=body.signature_images
+            or payload.get("signature_images")
+            or None,
+            signature_image_layout=body.signature_image_layout
+            or payload.get("signature_image_layout"),
         )
     except PaginationError as exc:
         raise HTTPException(

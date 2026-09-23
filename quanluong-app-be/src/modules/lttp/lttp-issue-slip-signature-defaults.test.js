@@ -66,3 +66,39 @@ test("normalize lifts legacy tiny gap_pt to CTQT signing space", () => {
   assert.equal(normalizeLttpIssueSlipSignatureBlock({ gap_pt: 40, slots: [] }).gap_pt, 40);
   assert.equal(normalizeLttpIssueSlipSignatureBlock({ gap_pt: 56, slots: [] }).gap_pt, 56);
 });
+
+test("normalize: linked nguoi_duyet forces source dynamic (user-resolved)", () => {
+  const block = normalizeLttpIssueSlipSignatureBlock({
+    slots: [
+      { key: "nguoi_viet_phieu", source: "dynamic", locked: true },
+      { key: "thu_kho", source: "static", static_name: "Kho" },
+      { key: "nguoi_nhan", source: "dynamic", locked: true },
+      {
+        key: "nguoi_duyet",
+        source: "static",
+        static_name: "1// stale",
+        approverUserId: 4,
+        useDigitalSignature: true,
+      },
+    ],
+  });
+  const duyet = block.slots.find((s) => s.key === "nguoi_duyet");
+  assert.equal(duyet.source, "dynamic");
+  assert.equal(duyet.approverUserId, 4);
+  assert.equal(duyet.static_name, "1// stale"); // preview kept; PDF ignores when dynamic
+});
+
+test("normalize: unlinked nguoi_duyet may stay static", () => {
+  const block = normalizeLttpIssueSlipSignatureBlock({
+    slots: [
+      { key: "nguoi_viet_phieu", locked: true },
+      { key: "thu_kho", source: "static", static_name: "Kho" },
+      { key: "nguoi_nhan", locked: true },
+      { key: "nguoi_duyet", source: "static", static_name: "Trung tá A" },
+    ],
+  });
+  const duyet = block.slots.find((s) => s.key === "nguoi_duyet");
+  assert.equal(duyet.source, "static");
+  assert.equal(duyet.approverUserId, null);
+  assert.equal(duyet.static_name, "Trung tá A");
+});

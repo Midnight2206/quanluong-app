@@ -31,7 +31,13 @@ test("signature settings tab posts lyDoSuDung and nhanTaiKho", () => {
   assert.match(sigSource, /nguoi_viet_phieu[\s\S]*locked:\s*true/);
   assert.match(sigSource, /nguoi_nhan[\s\S]*locked:\s*true/);
   assert.match(sigSource, /Chỉ xem/);
+  assert.match(sigSource, /Bản thân/);
+  assert.match(sigSource, /useDigitalSignature/);
+  assert.match(sigSource, /Dùng chữ ký số/);
+  assert.match(sigSource, /canEditApprover/);
   assert.match(apiSource, /\/lttp\/issue-slip-signature-settings/);
+  assert.match(apiSource, /\/lttp\/issue-slip-approver-admins/);
+  assert.match(pageSource, /canEditApprover/);
 });
 
 test("phiếu xuất has receivedDate and signerStorekeeper", () => {

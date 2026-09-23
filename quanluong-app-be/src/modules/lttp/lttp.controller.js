@@ -411,6 +411,7 @@ async function exportIssueSlipPdfController(req, res) {
   );
   const { buffer, fileName } = await buildIssueSlipDocumentPdfBuffer(row, {
     exportingUserProfile: req.user?.profile ?? null,
+    exportingUserId: req.user?.id ?? null,
   });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
@@ -429,9 +430,13 @@ async function exportIssueSlipsPdfMergedController(req, res) {
   }
   const buffers = [];
   const exportingUserProfile = req.user?.profile ?? null;
+  const exportingUserId = req.user?.id ?? null;
   for (const id of ids) {
     const row = await getIssueSlipById(id, req.unitScope, req.effectiveUnitIds, req.dataScope);
-    const { buffer } = await buildIssueSlipDocumentPdfBuffer(row, { exportingUserProfile });
+    const { buffer } = await buildIssueSlipDocumentPdfBuffer(row, {
+      exportingUserProfile,
+      exportingUserId,
+    });
     buffers.push(buffer);
   }
   const merged = await mergePdfBuffers(buffers);
@@ -546,12 +551,32 @@ async function putIssueSlipSignatureSettingsController(req, res) {
     "./lttp-issue-slip-signature-settings.service.js"
   );
   const data = await upsertLttpIssueSlipSignatureSettings(
-    { ...req.validatedBody, updatedById: req.user.id },
+    {
+      ...req.validatedBody,
+      updatedById: req.user.id,
+      actorUser: req.user,
+    },
     req.unitScope,
     req.effectiveUnitIds,
     req.dataScope,
   );
   return respondSuccess(res, { message: "Đã lưu cài đặt chữ ký", data });
+}
+
+async function listIssueSlipApproverAdminsController(req, res) {
+  const { listIssueSlipApproverAdmins } = await import(
+    "./lttp-issue-slip-signature-settings.service.js"
+  );
+  const data = await listIssueSlipApproverAdmins(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Danh sách admin đơn vị (ứng viên người duyệt)",
+    data,
+  });
 }
 
 async function listBuyerUsersController(req, res) {
@@ -629,6 +654,7 @@ export {
   getIssueFormDefaultsController,
   getIssueSlipSignatureSettingsController,
   putIssueSlipSignatureSettingsController,
+  listIssueSlipApproverAdminsController,
   getDailyOrderSummaryController,
   getRecipientDefaultUserByUnitController,
   getIssueSlipController,

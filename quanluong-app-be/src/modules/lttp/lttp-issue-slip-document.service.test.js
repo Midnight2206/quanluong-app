@@ -76,3 +76,41 @@ test("merge signatures: writer/recipient fixed; thu_kho/duyet slip>static", () =
   assert.equal(sig.nguoi_nhan, "Nguyễn Văn R");
   assert.equal(sig.nguoi_duyet, "Duyệt ĐV");
 });
+
+test("merge signatures: linked approver uses live rankFull only (dynamic)", () => {
+  const sig = mergeIssueSlipSignatures(
+    {
+      signerApprover: "Th/tá Trần Khánh",
+      recipientDisplayName: "R",
+    },
+    {
+      slots: [
+        {
+          key: "nguoi_duyet",
+          source: "dynamic",
+          approverUserId: 4,
+          static_name: "1// stale preview ignored when linked",
+        },
+      ],
+    },
+    {
+      exportingUserProfile: { fullName: "Viết", rankAbbr: "Đ/c" },
+      resolvedApproverName: "Thiếu tá Trần Khánh",
+      approverLinked: true,
+    },
+  );
+  assert.equal(sig.nguoi_duyet, "Thiếu tá Trần Khánh");
+});
+
+test("merge signatures: linked but empty live name does not fall back to abbr", () => {
+  const sig = mergeIssueSlipSignatures(
+    { signerApprover: "Th/tá X", recipientDisplayName: "R" },
+    {
+      slots: [
+        { key: "nguoi_duyet", source: "dynamic", approverUserId: 9, static_name: "Th/tá X" },
+      ],
+    },
+    { resolvedApproverName: "", approverLinked: true },
+  );
+  assert.equal(sig.nguoi_duyet, "");
+});

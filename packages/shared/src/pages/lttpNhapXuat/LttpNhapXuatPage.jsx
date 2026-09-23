@@ -59,6 +59,8 @@ export function LttpNhapXuatPage() {
   const user = useCurrentUser();
   const canRead = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_READ);
   const canWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
+  const canEditApprover =
+    user?.type?.name === "admin" || user?.type?.name === "superadmin";
   const canPickUnits = useHasPermission(PERMISSIONS.UNITS_READ);
 
   const { data: unitsData } = useGetUnitsQuery(undefined, { skip: !canPickUnits });
@@ -309,6 +311,7 @@ export function LttpNhapXuatPage() {
                     <LttpSignatureSettingsTab
                       unitId={effectiveUnitId}
                       canWrite={canWrite}
+                      canEditApprover={canEditApprover}
                     />
                   ),
                 },

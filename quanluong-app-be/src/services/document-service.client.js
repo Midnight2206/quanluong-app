@@ -190,9 +190,17 @@ async function renderDocumentPdf(templateId, body = {}) {
     signatures = {},
     signature_dates = {},
     signature_block,
+    signature_images,
+    signature_image_layout,
   } = body;
   const payload = { fields, rows, signatures, signature_dates };
   if (signature_block) payload.signature_block = signature_block;
+  if (signature_images && typeof signature_images === "object") {
+    payload.signature_images = signature_images;
+  }
+  if (signature_image_layout && typeof signature_image_layout === "object") {
+    payload.signature_image_layout = signature_image_layout;
+  }
   const response = await requestDocument(`/v1/templates/${templateId}/documents`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

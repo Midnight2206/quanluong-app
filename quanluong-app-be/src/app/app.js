@@ -73,11 +73,17 @@ function createApp(options = {}) {
   app.use(cookieParser());
 
   const avatarsDir = path.join(config.media.root, "avatars");
+  const signaturesDir = path.join(config.media.root, "signatures");
   fs.mkdirSync(avatarsDir, { recursive: true });
+  fs.mkdirSync(signaturesDir, { recursive: true });
   fs.mkdirSync(path.join(config.media.root, "staging"), { recursive: true });
   app.use(
     `${config.media.publicPath}/avatars`,
     express.static(avatarsDir, { index: false, fallthrough: false }),
+  );
+  app.use(
+    `${config.media.publicPath}/signatures`,
+    express.static(signaturesDir, { index: false, fallthrough: false }),
   );
 
   const sessionOptions = {

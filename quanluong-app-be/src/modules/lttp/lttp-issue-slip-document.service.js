@@ -18,7 +18,13 @@ import {
   getDefaultLttpIssueSlipSignatureBlock,
   normalizeLttpIssueSlipExtraFields,
   normalizeLttpIssueSlipSignatureBlock,
+  pickNguoiDuyetSlot,
 } from "./lttp-issue-slip-signature-defaults.js";
+import {
+  LTTP_ISSUE_SLIP_SIGNATURE_IMAGE_LAYOUT,
+  LTTP_ISSUE_SLIP_SIGNATURE_IMAGE_SLOT_SOURCES,
+} from "./lttp-issue-slip-signature-image-layout.js";
+import { loadUserSignatureDataUrl } from "../auth/signature.service.js";
 
 const LTTP_PHIEU_XUAT_CATEGORY_KEY = CHUNG_TU_CATEGORY_KEYS.LTTP_PHIEU_XUAT;
 
@@ -115,8 +121,12 @@ function pickStaticSlotName(signatureBlock, key) {
 }
 
 /**
- * nguoi_viet_phieu / nguoi_nhan cố định (user đang làm việc / người nhận).
- * thu_kho / nguoi_duyet: slip override > settings static.
+ * nguoi_viet_phieu / nguoi_nhan: dynamic — tên từ signatures (user đang làm việc / người nhận).
+ * thu_kho: slip override > settings static_name.
+ * nguoi_duyet:
+ *   - linked (approverUserId): source=dynamic; tên = live rankFull+fullName trong signatures.
+ *   - unlinked: source=static; slip text > settings static_name.
+ * Doc-service: static → static_name; dynamic → signatures[key] (không patch static_name).
  */
 function mergeIssueSlipSignatures(slip, signatureBlock, options = {}) {
   const recipientName = resolveRecipientName(slip);
@@ -125,11 +135,21 @@ function mergeIssueSlipSignatures(slip, signatureBlock, options = {}) {
     normalizeProfileText(slip?.signerWriter);
   const slipStorekeeper = normalizeProfileText(slip?.signerStorekeeper);
   const slipApprover = normalizeProfileText(slip?.signerApprover);
+  const liveApprover = normalizeProfileText(options.resolvedApproverName);
+  const settingsApprover = pickStaticSlotName(signatureBlock, "nguoi_duyet");
+  const approverLinked = Boolean(options.approverLinked);
+  let nguoiDuyetName = "";
+  if (approverLinked) {
+    // Dynamic slot: chỉ tên live (rankFull). Không lấy abbr từ slip/static.
+    nguoiDuyetName = liveApprover;
+  } else {
+    nguoiDuyetName = slipApprover || settingsApprover;
+  }
   return {
     nguoi_viet_phieu: writerName,
     thu_kho: slipStorekeeper || pickStaticSlotName(signatureBlock, "thu_kho"),
     nguoi_nhan: recipientName,
-    nguoi_duyet: slipApprover || pickStaticSlotName(signatureBlock, "nguoi_duyet"),
+    nguoi_duyet: nguoiDuyetName,
   };
 }
 
@@ -256,6 +276,68 @@ async function resolvePublishedLttpPhieuXuatTemplate() {
  * @param {{ exportingUserProfile?: object | null }} [options]
  * @returns {Promise<{ buffer: Buffer, fileName: string }>}
  */
+
+/**
+ * Map slot key → data-URL ảnh chữ ký (thiếu thì bỏ qua).
+ * @param {object} slip
+ * @param {{ exportingUserId?: number | null }} [options]
+ */
+/** Người duyệt (ký): rankFull + fullName (không dùng rankAbbr như các ô khác). */
+async function resolveApproverDisplayName(approverUserId) {
+  const uid = Number(approverUserId);
+  if (!Number.isInteger(uid) || uid <= 0) return "";
+  const u = await prisma.user.findFirst({
+    where: { id: uid, deletedAt: null },
+    select: {
+      username: true,
+      profile: { select: { fullName: true, rankFull: true } },
+    },
+  });
+  if (!u) return "";
+  const full = normalizeProfileText(u.profile?.fullName) || normalizeProfileText(u.username);
+  if (!full) return "";
+  const rankFull = normalizeProfileText(u.profile?.rankFull);
+  return [rankFull, full].filter(Boolean).join(" ");
+}
+
+async function resolveIssueSlipSignatureImages(slip, options = {}) {
+  const images = {};
+  const exportingUserId = options.exportingUserId != null ? Number(options.exportingUserId) : null;
+  const recipientUserId =
+    slip?.recipientUserId != null
+      ? Number(slip.recipientUserId)
+      : slip?.recipientUser?.id != null
+        ? Number(slip.recipientUser.id)
+        : null;
+
+  const sourceToUserId = {
+    exporting_user: exportingUserId,
+    recipient_user: recipientUserId,
+  };
+
+  for (const [slotKey, source] of Object.entries(LTTP_ISSUE_SLIP_SIGNATURE_IMAGE_SLOT_SOURCES)) {
+    const uid = sourceToUserId[source];
+    if (uid == null || !Number.isInteger(uid) || uid <= 0) continue;
+    const dataUrl = await loadUserSignatureDataUrl(uid);
+    if (dataUrl) {
+      images[slotKey] = dataUrl;
+    }
+  }
+
+  // Người duyệt: ảnh từ admin đã chọn trong settings (khi bật dùng chữ ký số).
+  const duyet = pickNguoiDuyetSlot(options.signatureBlock);
+  if (duyet && duyet.useDigitalSignature !== false && duyet.approverUserId != null) {
+    const uid = Number(duyet.approverUserId);
+    if (Number.isInteger(uid) && uid > 0) {
+      const dataUrl = await loadUserSignatureDataUrl(uid);
+      if (dataUrl) {
+        images.nguoi_duyet = dataUrl;
+      }
+    }
+  }
+  return images;
+}
+
 async function buildIssueSlipDocumentPdfBuffer(slip, options = {}) {
   const template = await resolvePublishedLttpPhieuXuatTemplate();
   const fieldsPayload = await getTemplateFields(template.documentServiceTemplateId);
@@ -272,11 +354,30 @@ async function buildIssueSlipDocumentPdfBuffer(slip, options = {}) {
         )
       : {};
   const signatureSettings = await loadSignatureSettingsForUnit(slip?.unitId);
+  const duyetSlot = pickNguoiDuyetSlot(signatureSettings.signatureBlock);
+  const approverLinked = duyetSlot?.approverUserId != null;
+  const resolvedApproverName = approverLinked
+    ? await resolveApproverDisplayName(duyetSlot.approverUserId)
+    : "";
+  // Linked duyệt: slot source=dynamic → doc-service lấy signatures.nguoi_duyet
+  // (rankFull + fullName). Không ghi đè static_name.
+  const signatureBlockForPdf = signatureSettings.signatureBlock;
   const context = buildLttpIssueSlipDocumentContext(slip, {
     ...options,
     signatureSettings,
   });
-  const signatures = mergeIssueSlipSignatures(slip, signatureSettings.signatureBlock, options);
+  const signatures = mergeIssueSlipSignatures(slip, signatureBlockForPdf, {
+    ...options,
+    resolvedApproverName,
+    approverLinked,
+  });
+  if (signatures.nguoi_duyet) {
+    context.nguoiDuyet = signatures.nguoi_duyet;
+  }
+  const signatureImages = await resolveIssueSlipSignatureImages(slip, {
+    ...options,
+    signatureBlock: signatureSettings.signatureBlock,
+  });
   const payload = buildDocumentServicePayload({
     categoryKey: LTTP_PHIEU_XUAT_CATEGORY_KEY,
     context,
@@ -284,7 +385,9 @@ async function buildIssueSlipDocumentPdfBuffer(slip, options = {}) {
     columnKeys,
     fieldLabels,
     signatures,
-    signatureBlock: signatureSettings.signatureBlock,
+    signatureBlock: signatureBlockForPdf,
+    signatureImages,
+    signatureImageLayout: LTTP_ISSUE_SLIP_SIGNATURE_IMAGE_LAYOUT,
   });
   const buffer = await renderDocumentPdf(template.documentServiceTemplateId, payload);
   const safeBook = slip?.bookMmyy ? String(slip.bookMmyy) : "book";
@@ -300,5 +403,6 @@ export {
   buildIssueSlipDocumentPdfBuffer,
   buildLttpIssueSlipDocumentContext,
   mergeIssueSlipSignatures,
+  resolveIssueSlipSignatureImages,
   resolveWriterDonVi,
 };

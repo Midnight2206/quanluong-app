@@ -24,6 +24,10 @@ function slot(key, label, col, { locked = false } = {}) {
     catalogNodeId: "",
     locked,
     show_date_line: false,
+    // Chỉ dùng cho nguoi_duyet — các slot khác bỏ qua khi normalize.
+    approverUserId: null,
+    approverIsSelf: false,
+    useDigitalSignature: true,
   };
 }
 
@@ -64,11 +68,22 @@ export function normalizeLttpIssueSlipSignatureBlock(input) {
       ? slotsIn.map((s, index) => {
           const key = String(s?.key ?? "").trim() || `slot_${index}`;
           const isLocked = lockedKeys.has(key) || Boolean(s?.locked);
-          const source = isLocked
-            ? "dynamic"
-            : s?.source === "static" || s?.source === "system"
-              ? s.source
-              : "dynamic";
+          const isApprover = key === "nguoi_duyet";
+          let approverUserId = null;
+          if (isApprover && s?.approverUserId != null && s?.approverUserId !== "") {
+            const n = Number(s.approverUserId);
+            if (Number.isInteger(n) && n > 0) approverUserId = n;
+          }
+          // Linked duyệt = dynamic (user-resolved via signatures + approverUserId),
+          // cùng pattern người viết / người nhận — không dùng static_name khi in.
+          let source;
+          if (isLocked || (isApprover && approverUserId != null)) {
+            source = "dynamic";
+          } else if (s?.source === "static" || s?.source === "system") {
+            source = s.source;
+          } else {
+            source = "dynamic";
+          }
           return {
             key,
             label: String(s?.label ?? "").trim(),
@@ -76,11 +91,18 @@ export function normalizeLttpIssueSlipSignatureBlock(input) {
             col_span: Number.isFinite(Number(s?.col_span)) ? Number(s.col_span) : 1,
             source,
             static_name:
-              !isLocked && source === "static" ? String(s?.static_name ?? "").trim() : "",
+              !isLocked && (source === "static" || isApprover)
+                ? String(s?.static_name ?? "").trim()
+                : "",
             catalogNodeId:
               !isLocked && source === "system" ? String(s?.catalogNodeId ?? "").trim() : "",
             show_date_line: Boolean(s?.show_date_line),
             locked: isLocked,
+            approverUserId: isApprover ? approverUserId : null,
+            approverIsSelf: isApprover ? Boolean(s?.approverIsSelf) : false,
+            useDigitalSignature: isApprover
+              ? s?.useDigitalSignature !== false && s?.useDigitalSignature !== "false"
+              : true,
           };
         })
       : fallback.slots;
@@ -97,4 +119,10 @@ export function normalizeLttpIssueSlipSignatureBlock(input) {
       : fallback.date_line_gap_pt,
     slots,
   };
+}
+
+/** Lấy slot nguoi_duyet từ block đã normalize. */
+export function pickNguoiDuyetSlot(signatureBlock) {
+  const slots = Array.isArray(signatureBlock?.slots) ? signatureBlock.slots : [];
+  return slots.find((s) => String(s?.key ?? "") === "nguoi_duyet") ?? null;
 }

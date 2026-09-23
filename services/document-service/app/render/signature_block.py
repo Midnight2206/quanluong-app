@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from io import BytesIO
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from app.render.fonts import FONT_BOLD, FONT_ITALIC, FONT_REGULAR
@@ -19,6 +21,10 @@ COLUMN_GAP_PT = 8.0
 # Khoảng trống dọc giữa các hàng khung ký khi wrap.
 ROW_GAP_PT = 16.0
 SLOT_INNER_PAD_PT = 4.0
+# Ảnh chữ ký (PNG) trong khoảng title → tên — chỉnh mặc định tại đây.
+DEFAULT_SIGNATURE_IMAGE_WIDTH_PT = 120.0
+DEFAULT_SIGNATURE_IMAGE_HEIGHT_PT = 34.0
+DEFAULT_SIGNATURE_IMAGE_OFFSET_Y_FROM_TITLE_PT = 2.0
 BASE_TITLE_FONT_SIZE = 11.0
 BASE_NAME_FONT_SIZE = 11.0
 BASE_DATE_FONT_SIZE = 11.0
@@ -274,6 +280,112 @@ def _draw_centered(
     canvas.drawCentredString(center_x, y, text)
 
 
+
+def normalize_signature_image_layout(layout: dict | None) -> dict[str, float | bool]:
+    """Merge payload layout với mặc định (một chỗ tweak từ BE)."""
+    src = layout if isinstance(layout, dict) else {}
+    def _num(key: str, default: float) -> float:
+        raw = src.get(key)
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            return default
+        return val if val > 0 else default
+    center = src.get("centerHorizontally", src.get("center_horizontally", True))
+    fit_raw = src.get("fitToHeight", src.get("fit_to_height", True))
+    return {
+        "width_pt": _num("widthPt", _num("width_pt", DEFAULT_SIGNATURE_IMAGE_WIDTH_PT)),
+        "height_pt": _num("heightPt", _num("height_pt", DEFAULT_SIGNATURE_IMAGE_HEIGHT_PT)),
+        "offset_y_from_title_pt": float(
+            src.get(
+                "offsetYFromTitlePt",
+                src.get(
+                    "offset_y_from_title_pt",
+                    DEFAULT_SIGNATURE_IMAGE_OFFSET_Y_FROM_TITLE_PT,
+                ),
+            )
+            or DEFAULT_SIGNATURE_IMAGE_OFFSET_Y_FROM_TITLE_PT
+        ),
+        "center_horizontally": bool(center) if center is not None else True,
+        "fit_to_height": bool(fit_raw) if fit_raw is not None else True,
+    }
+
+
+def _decode_signature_image(raw: str | None) -> ImageReader | None:
+    """Nhận data URL (data:image/png;base64,...) hoặc raw base64 → ImageReader."""
+    if not raw or not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    if text.startswith("data:"):
+        comma = text.find(",")
+        if comma < 0:
+            return None
+        text = text[comma + 1 :]
+    try:
+        import base64
+
+        data = base64.b64decode(text, validate=False)
+    except Exception:
+        return None
+    if not data:
+        return None
+    try:
+        return ImageReader(BytesIO(data))
+    except Exception:
+        return None
+
+
+def _draw_signature_image(
+    canvas,
+    *,
+    center_x: float,
+    slot_x: float,
+    slot_width: float,
+    image_top_y: float,
+    image_reader: ImageReader,
+    layout: dict[str, float | bool],
+) -> None:
+    max_width = float(layout["width_pt"])
+    target_height = float(layout["height_pt"])
+    fit_to_height = bool(layout.get("fit_to_height", True))
+
+    try:
+        iw, ih = image_reader.getSize()
+    except Exception:
+        iw, ih = max_width, target_height
+    iw = float(iw) or 1.0
+    ih = float(ih) or 1.0
+    aspect = iw / ih
+
+    if fit_to_height:
+        height = target_height
+        width = height * aspect
+        if width > max_width:
+            width = max_width
+            height = width / aspect
+    else:
+        width = max_width
+        height = target_height
+
+    if layout.get("center_horizontally", True):
+        x = center_x - width / 2
+    else:
+        x = slot_x + SLOT_INNER_PAD_PT
+    # image_top_y = đỉnh ảnh; reportlab drawImage dùng góc dưới-trái.
+    y = image_top_y - height
+    canvas.drawImage(
+        image_reader,
+        x,
+        y,
+        width=width,
+        height=height,
+        preserveAspectRatio=True,
+        mask="auto",
+    )
+
+
 def draw_signature_block(
     canvas,
     config: SignatureBlockConfig,
@@ -285,9 +397,13 @@ def draw_signature_block(
     font_name_bold: str = FONT_BOLD,
     font_name_italic: str = FONT_ITALIC,
     body_font_size: float | None = None,
+    signature_images: dict[str, str] | None = None,
+    signature_image_layout: dict | None = None,
 ) -> None:
     signatures = signatures or {}
     signature_dates = signature_dates or {}
+    signature_images = signature_images or {}
+    image_layout = normalize_signature_image_layout(signature_image_layout)
     body_size = float(body_font_size or BASE_TITLE_FONT_SIZE)
     font_size = shared_signature_font_size(
         config,
@@ -343,6 +459,19 @@ def draw_signature_block(
             )
 
         name_y = title_top - title_band - config.gap_pt
+        image_raw = signature_images.get(slot.key) if signature_images else None
+        image_reader = _decode_signature_image(image_raw) if image_raw else None
+        if image_reader is not None:
+            image_top = title_top - title_band - float(image_layout["offset_y_from_title_pt"])
+            _draw_signature_image(
+                canvas,
+                center_x=center_x,
+                slot_x=x,
+                slot_width=width,
+                image_top_y=image_top,
+                image_reader=image_reader,
+                layout=image_layout,
+            )
         name = resolve_signature_name(slot, signatures)
         if name:
             _draw_centered(
@@ -369,6 +498,10 @@ __all__ = [
     "compute_signature_block_anchor_y",
     "default_signature_block",
     "draw_signature_block",
+    "normalize_signature_image_layout",
+    "DEFAULT_SIGNATURE_IMAGE_WIDTH_PT",
+    "DEFAULT_SIGNATURE_IMAGE_HEIGHT_PT",
+    "DEFAULT_SIGNATURE_IMAGE_OFFSET_Y_FROM_TITLE_PT",
     "fit_font_size",
     "layout_signature_slots",
     "parse_signature_block_config",

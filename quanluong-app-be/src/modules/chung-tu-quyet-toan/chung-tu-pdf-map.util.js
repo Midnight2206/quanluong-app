@@ -69,6 +69,8 @@ export function buildDocumentServicePayload({
   signatures = {},
   signatureDates = {},
   signatureBlock,
+  signatureImages,
+  signatureImageLayout,
 }) {
   const payload = {
     fields: pickMappedFields(context ?? {}, fieldKeys ?? [], {
@@ -80,5 +82,11 @@ export function buildDocumentServicePayload({
     signature_dates: signatureDates ?? {},
   };
   if (signatureBlock) payload.signature_block = signatureBlock;
+  if (signatureImages && typeof signatureImages === "object") {
+    payload.signature_images = signatureImages;
+  }
+  if (signatureImageLayout && typeof signatureImageLayout === "object") {
+    payload.signature_image_layout = signatureImageLayout;
+  }
   return payload;
 }

@@ -46,6 +46,7 @@ function mapUser(user) {
           fullName: user.profile.fullName,
           birthday: user.profile.birthday,
           avatarUrl: user.profile.avatarUrl,
+          signatureUrl: user.profile.signatureUrl ?? null,
           description: user.profile.description,
           jobTitle: user.profile.jobTitle,
           rank: user.profile.rank,

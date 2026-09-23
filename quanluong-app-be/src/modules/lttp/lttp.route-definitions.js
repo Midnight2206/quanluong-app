@@ -374,6 +374,18 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "listIssueSlipApproverAdmins",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slip-approver-admins",
+    pathRoute: "/api/lttp/issue-slip-approver-admins",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "Danh sách admin người duyệt phiếu xuất LTTP",
+      description: "Gợi ý chọn người duyệt (chỉ tài khoản admin đơn vị trong nhánh kho).",
+    },
+  },
+  {
     key: "listRecipientUsers",
     method: "GET",
     module: LTTP_MODULE_NAME,

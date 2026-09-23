@@ -29,6 +29,7 @@ import {
   getIssueFormDefaultsController,
   getIssueSlipSignatureSettingsController,
   putIssueSlipSignatureSettingsController,
+  listIssueSlipApproverAdminsController,
   getDailyOrderSummaryController,
   getIssueSlipController,
   getNextIssueSlipSerialController,
@@ -248,6 +249,14 @@ lttpRouter.put(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   permissionMiddleware([routePermissions.putIssueSlipSignatureSettings]),
   asyncHandler(putIssueSlipSignatureSettingsController),
+);
+
+lttpRouter.get(
+  "/issue-slip-approver-admins",
+  validateRequest({ query: issueSlipSignatureSettingsQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.listIssueSlipApproverAdmins]),
+  asyncHandler(listIssueSlipApproverAdminsController),
 );
 
 lttpRouter.get(

@@ -20,6 +20,10 @@ import {
   runAvatarProcessingSync,
 } from "../../infra/media/avatar-processing.dispatcher.js";
 import { removeOwnAvatar } from "./avatar.service.js";
+import {
+  removeOwnSignature,
+  setOwnSignatureFromStaging,
+} from "./signature.service.js";
 import { updateOwnProfile } from "./me-profile.service.js";
 import {
   changePasswordForUser,
@@ -630,6 +634,38 @@ async function deleteAvatarController(req, res) {
   });
 }
 
+async function uploadSignatureController(req, res) {
+  if (!req.file) {
+    throw new AppError({
+      message: "Chọn file ảnh chữ ký PNG nền trong suốt (tối đa 2MB, khuyến nghị dưới 500KB).",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+
+  try {
+    await setOwnSignatureFromStaging(req.user.id, req.file.path);
+  } catch (err) {
+    await fs.unlink(req.file.path).catch(() => {});
+    throw err;
+  }
+
+  const user = await getCurrentUser(req.user);
+  return respondSuccess(res, {
+    message: "Đã cập nhật ảnh chữ ký.",
+    data: await mapAuthUserResponse(user),
+  });
+}
+
+async function deleteSignatureController(req, res) {
+  await removeOwnSignature(req.user.id);
+  const user = await getCurrentUser(req.user);
+  return respondSuccess(res, {
+    message: "Đã xóa ảnh chữ ký.",
+    data: await mapAuthUserResponse(user),
+  });
+}
+
 async function patchMeProfileController(req, res) {
   await updateOwnProfile(req.user.id, req.validatedBody);
   const user = await getCurrentUser(req.user);
@@ -643,6 +679,7 @@ export {
   changePasswordController,
   currentUserController,
   deleteAvatarController,
+  deleteSignatureController,
   forgotPasswordController,
   getAvatarJobController,
   googleDriveAuthorizeUrlController,
@@ -663,5 +700,6 @@ export {
   requestVerificationEmailPublicController,
   resetPasswordController,
   uploadAvatarController,
+  uploadSignatureController,
   verifyEmailController,
 };

@@ -395,6 +395,8 @@ def _draw_page(
     amount_in_words_text: str,
     fields: dict[str, str],
     content_width: float,
+    signature_images: dict[str, str] | None = None,
+    signature_image_layout: dict | None = None,
 ) -> None:
     table = metadata.table
     table_left = _table_left(metadata, columns)
@@ -502,6 +504,8 @@ def _draw_page(
             font_name_bold=FONT_BOLD,
             font_name_italic=FONT_ITALIC,
             body_font_size=row_font_size,
+            signature_images=signature_images,
+            signature_image_layout=signature_image_layout,
         )
 
 
@@ -512,6 +516,8 @@ def render_pdf(
     rows: list[dict[str, str]],
     signatures: dict[str, str] | None = None,
     signature_dates: dict[str, str] | None = None,
+    signature_images: dict[str, str] | None = None,
+    signature_image_layout: dict | None = None,
 ) -> bytes:
     if not isinstance(rows, list):
         raise TypeError("rows phải là list")
@@ -623,6 +629,8 @@ def render_pdf(
             amount_in_words_text=amount_in_words_text,
             fields=fields,
             content_width=content_width,
+            signature_images=signature_images,
+            signature_image_layout=signature_image_layout,
         )
         pdf.showPage()
     pdf.save()

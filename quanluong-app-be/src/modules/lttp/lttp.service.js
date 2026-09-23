@@ -942,7 +942,7 @@ const issueSlipInclude = {
     select: {
       id: true,
       username: true,
-      profile: { select: { fullName: true, department: true } },
+      profile: { select: { fullName: true, department: true, signatureUrl: true } },
     },
   },
   buyerUser: { select: { id: true, username: true, profile: { select: { fullName: true } } } },

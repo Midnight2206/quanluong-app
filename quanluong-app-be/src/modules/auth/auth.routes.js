@@ -28,9 +28,12 @@ import {
   requestVerificationEmailPublicController,
   resetPasswordController,
   uploadAvatarController,
+  uploadSignatureController,
+  deleteSignatureController,
   verifyEmailController,
 } from "./auth.controller.js";
 import { uploadAvatarMiddleware } from "./avatar-upload.middleware.js";
+import { uploadSignatureMiddleware } from "./signature-upload.middleware.js";
 import {
   avatarJobParamsSchema,
   changePasswordBodySchema,
@@ -103,6 +106,14 @@ authRouter.post(
   uploadAvatarMiddleware,
   asyncHandler(uploadAvatarController),
 );
+authRouter.delete("/me/signature", authMiddleware, asyncHandler(deleteSignatureController));
+authRouter.post(
+  "/me/signature",
+  authMiddleware,
+  uploadSignatureMiddleware,
+  asyncHandler(uploadSignatureController),
+);
+
 authRouter.post(
   "/request-verification-email/public",
   sensitiveAuthEndpointRateLimit,

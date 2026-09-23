@@ -229,3 +229,33 @@ export function useUploadAvatarMutation() {
     },
   });
 }
+
+export function useDeleteSignatureMutation() {
+  const qc = useQueryClient();
+  return useAuthMutation({
+    mutationFn: () => apiRequest({ url: "/auth/me/signature", method: "delete" }),
+    onSuccess: (data) => {
+      if (data?.id != null) {
+        useAuthStore.getState().setAuthState({ user: data, permissions: mapPermissionsFromUser(data) });
+      }
+      qc.invalidateQueries({ queryKey: qk.auth.currentUser() });
+    },
+  });
+}
+
+export function useUploadSignatureMutation() {
+  const qc = useQueryClient();
+  return useAuthMutation({
+    mutationFn: ({ file }) => {
+      const body = new FormData();
+      body.append("signature", file);
+      return apiRequest({ url: "/auth/me/signature", method: "post", data: body });
+    },
+    onSuccess: (data) => {
+      if (data?.id != null) {
+        useAuthStore.getState().setAuthState({ user: data, permissions: mapPermissionsFromUser(data) });
+      }
+      qc.invalidateQueries({ queryKey: qk.auth.currentUser() });
+    },
+  });
+}

@@ -304,6 +304,22 @@ export function usePutLttpIssueSlipSignatureSettingsMutation() {
   });
 }
 
+
+export function useGetLttpIssueSlipApproverAdminsQuery(unitId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: [...qk.lttp.issueSlipSignatureSettings(unitId), "approver-admins"],
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp/issue-slip-approver-admins",
+        method: "get",
+        params: { unitId },
+      }),
+    enabled: skip !== true && unitId != null && unitId !== "",
+    ...rest,
+  });
+}
+
 export function useGetLttpNextIssueSlipSerialQuery(arg, options = {}) {
   const { unitId, date } = arg || {};
   const { skip, ...rest } = options;

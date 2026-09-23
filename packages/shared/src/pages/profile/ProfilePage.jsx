@@ -8,6 +8,7 @@ import {
   EyeOff,
   KeyRound,
   Loader2,
+  PenLine,
   Shield,
   Trash2,
   UserRound,
@@ -24,17 +25,23 @@ import { qk } from "@/app/query/queryKeys";
 import {
   useChangePasswordMutation,
   useDeleteAvatarMutation,
+  useDeleteSignatureMutation,
   useLogoutMutation,
   usePatchMeProfileMutation,
   useUploadAvatarMutation,
+  useUploadSignatureMutation,
 } from "@/features/auth/api/authApi";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { apiRequest } from "@/services/apiRequest";
 import { changePasswordSchema, meProfileFormSchema } from "@/features/auth/schemas/authSchemas";
-import { notifyError, notifySuccess } from "@/services/notify";
+import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { cn } from "@/utils/cn";
 import { resolveMediaUrl } from "@/utils/runtimeEnv";
+import {
+  precheckSignatureFile,
+  readImageDimensions,
+} from "@/features/auth/lib/signatureUploadRules";
 
 const cardBody = "space-y-2 !p-3 sm:!p-4";
 
@@ -99,6 +106,8 @@ export function ProfilePage() {
   const user = useCurrentUser();
   const avatarUrl = user?.profile?.avatarUrl;
   const avatarDisplaySrc = avatarUrl ? resolveMediaUrl(avatarUrl) : null;
+  const signatureUrl = user?.profile?.signatureUrl;
+  const signatureDisplaySrc = signatureUrl ? resolveMediaUrl(signatureUrl) : null;
   const displayEmail = user?.email ?? "";
 
   const [showCrop, setShowCrop] = useState(false);
@@ -119,6 +128,9 @@ export function ProfilePage() {
   const [patchProfile, { isLoading: savingProfile }] = usePatchMeProfileMutation();
   const [uploadAvatar, { isLoading: uploading }] = useUploadAvatarMutation();
   const [deleteAvatar, { isLoading: deleting }] = useDeleteAvatarMutation();
+  const [uploadSignature, { isLoading: uploadingSig }] = useUploadSignatureMutation();
+  const [deleteSignature, { isLoading: deletingSig }] = useDeleteSignatureMutation();
+  const signatureFileRef = useRef(null);
   const [changePassword, { isLoading: changingPassword }] = useChangePasswordMutation();
   const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
 
@@ -164,6 +176,8 @@ export function ProfilePage() {
   } = useDraftPersist({ draftType: "profile-edit", scopeId: "global" });
   const profileHydratedRef = useRef(false);
   const profilePersistReadyRef = useRef(false);
+  /** Tránh loop: watch() có thể trả object mới mỗi render dù nội dung giống. */
+  const lastPersistedProfileFormJsonRef = useRef("");
   const profileFormValues = watchProfile();
 
   const {
@@ -218,6 +232,16 @@ export function ProfilePage() {
     if (!profilePersistReadyRef.current || !profileEditPersistReady) {
       return;
     }
+    let json;
+    try {
+      json = JSON.stringify(profileFormValues ?? {});
+    } catch {
+      json = "";
+    }
+    if (json === lastPersistedProfileFormJsonRef.current) {
+      return;
+    }
+    lastPersistedProfileFormJsonRef.current = json;
     persistProfileEdit({ form: profileFormValues });
   }, [profileFormValues, profileEditPersistReady, persistProfileEdit]);
 
@@ -355,7 +379,53 @@ export function ProfilePage() {
     }
   }
 
+
+  async function onPickSignature(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      let dims = null;
+      try {
+        dims = await readImageDimensions(file);
+      } catch (dimErr) {
+        notifyError(dimErr?.message || "Không đọc được ảnh PNG.");
+        return;
+      }
+      const check = precheckSignatureFile(file, dims);
+      if (!check.ok) {
+        notifyError(check.message);
+        return;
+      }
+      for (const w of check.softWarnings || []) {
+        notifyWarning(w);
+      }
+      await uploadSignature({ file }).unwrap();
+      notifySuccess("Đã cập nhật ảnh chữ ký (đã cắt lề trong suốt nếu cần).");
+    } catch (error) {
+      notifyError(error?.data?.message || error?.message || "Không tải được ảnh chữ ký.");
+    }
+  }
+
+  async function onDeleteSignature() {
+    if (!signatureUrl) return;
+    const ok = await confirm({
+      title: "Xóa ảnh chữ ký?",
+      message: "Ảnh chữ ký sẽ bị gỡ khỏi hồ sơ. Phiếu PDF sẽ in không có ảnh ký cho bạn.",
+      confirmLabel: "Xóa",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await deleteSignature().unwrap();
+      notifySuccess("Đã xóa ảnh chữ ký.");
+    } catch (error) {
+      notifyError(error?.data?.message || "Không xóa được ảnh chữ ký.");
+    }
+  }
+
   const busyMedia = uploading || deleting;
+  const busySignature = uploadingSig || deletingSig;
   const busyPassword = changingPassword || isLoggingOut;
   const pwdLocked = pwdLockoutUntil != null && nowTick < pwdLockoutUntil;
   const pwdLockoutRemainingSec =
@@ -369,8 +439,7 @@ export function ProfilePage() {
       >
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Trang cá nhân</h1>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Cập nhật ảnh đại diện, thông tin liên hệ và mật khẩu. Ảnh đại diện được xử lý qua hàng đợi khi có
-          Redis và worker-media.
+          Cập nhật ảnh đại diện, ảnh chữ ký (ký số trên PDF), thông tin liên hệ và mật khẩu. Ảnh đại diện được xử lý qua hàng đợi khi có Redis và worker-media.
         </p>
         {displayEmail ? (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -423,6 +492,69 @@ export function ProfilePage() {
                         className="rounded-2xl text-destructive hover:text-destructive"
                         disabled={busyMedia}
                         onClick={onDeleteAvatar}
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                        <span className="ml-2">Xóa</span>
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-5 border-border/80 shadow-soft">
+            <CardContent className={cn(cardBody, "pt-5")}>
+              <SectionHeader icon={PenLine} title="Ảnh chữ ký (ký số)" />
+              <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start lg:flex-col lg:items-center">
+                <div className="relative flex h-28 w-full max-w-[14rem] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-border bg-muted/60 px-3">
+                  {signatureDisplaySrc ? (
+                    <img
+                      src={signatureDisplaySrc}
+                      alt="Ảnh chữ ký"
+                      className="max-h-24 w-full object-contain"
+                    />
+                  ) : (
+                    <span className="px-2 text-center text-xs text-muted-foreground">
+                      Chưa có ảnh chữ ký
+                    </span>
+                  )}
+                </div>
+                <div className="flex w-full flex-col gap-2 text-center sm:text-left lg:text-center">
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    PNG nền trong suốt (có alpha), khuyến nghị rộng 500–1000px và dưới 500&nbsp;KB
+                    (tối đa 2&nbsp;MB). Server tự cắt lề trong suốt thừa. Ảnh hiện trên phiếu xuất LTTP
+                    (ô người viết phiếu / người nhận khi có).
+                  </p>
+                  <input
+                    ref={signatureFileRef}
+                    type="file"
+                    accept="image/png"
+                    className="sr-only"
+                    onChange={onPickSignature}
+                  />
+                  <div className="flex flex-wrap justify-center gap-2 sm:justify-start lg:justify-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-2xl"
+                      disabled={busySignature}
+                      onClick={() => signatureFileRef.current?.click()}
+                    >
+                      {uploadingSig ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                      <span className={cn(uploadingSig && "ml-2")}>
+                        {signatureUrl ? "Thay ảnh chữ ký" : "Tải ảnh chữ ký"}
+                      </span>
+                    </Button>
+                    {signatureUrl ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-2xl text-destructive hover:text-destructive"
+                        disabled={busySignature}
+                        onClick={onDeleteSignature}
                       >
                         <Trash2 className="size-4" aria-hidden />
                         <span className="ml-2">Xóa</span>

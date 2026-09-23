@@ -57,6 +57,7 @@ export function useDraftPersist({
   const suppressWritesRef = useRef(false);
   const suppressGenRef = useRef(0);
   const suppressTimerRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null));
+  const draftSnapshotRef = useRef("");
   const trackUnsaved = !PREFERENCE_DRAFT_TYPES.has(draftType);
 
   const clearSuppressTimer = useCallback(() => {
@@ -102,6 +103,7 @@ export function useDraftPersist({
     suppressWritesRef.current = false;
     setLoaded(false);
     setDraftState(null);
+    draftSnapshotRef.current = "";
     if (!enabled) {
       setLoaded(true);
       return undefined;
@@ -118,6 +120,15 @@ export function useDraftPersist({
         });
         if (!cancelled) {
           setDraftState(record);
+          try {
+            draftSnapshotRef.current = record ? JSON.stringify({
+              version: record.version ?? 1,
+              scopeId: resolvedScope,
+              ...record,
+            }) : "";
+          } catch {
+            draftSnapshotRef.current = "";
+          }
           setLoaded(true);
           beginSuppressWindow();
           if (record && trackUnsaved) {
@@ -166,6 +177,17 @@ export function useDraftPersist({
         ...(numeric ? { unitId: Number(resolvedScope) } : {}),
         ...payload,
       };
+      let snapshot = "";
+      try {
+        snapshot = JSON.stringify(next);
+      } catch {
+        snapshot = "";
+      }
+      // Tránh vòng setState khi caller truyền payload equivalent mỗi render (RHF watch()).
+      if (snapshot && snapshot === draftSnapshotRef.current) {
+        return;
+      }
+      draftSnapshotRef.current = snapshot;
       setDraftState((prev) => ({
         ...(prev ?? {}),
         ...next,
@@ -193,6 +215,7 @@ export function useDraftPersist({
         /* ignore */
       }
     }
+    draftSnapshotRef.current = "";
     setDraftState(null);
   }, [userId, draftType, resolvedScope, clearSuppressTimer, unmarkUnsaved]);
 
