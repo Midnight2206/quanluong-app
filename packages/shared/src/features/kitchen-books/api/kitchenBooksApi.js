@@ -19,6 +19,10 @@ function invalidateKitchenBooks(qc, unitId, date, yearMonth) {
   }
 }
 
+function invalidateMenuSamples(qc) {
+  qc.invalidateQueries({ queryKey: ["kitchenBooks", "menuSamples"] });
+}
+
 export function useGetKitchenCatalogQuery(arg, options = {}) {
   const { unitId, q } = arg || {};
   const { skip, ...rest } = options;
@@ -80,6 +84,80 @@ export function useGetKitchenMenuMonthMarkersQuery(arg, options = {}) {
       }),
     enabled: skip !== true && unitId != null && yearMonth != null && yearMonth !== "",
     ...rest,
+  });
+}
+
+export function useGetKitchenMenuSamplesQuery(arg, options = {}) {
+  const { unitId, mealPeriod, rateId } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.menuSamples(unitId, mealPeriod, rateId),
+    queryFn: () =>
+      apiRequest({
+        url: "/kitchen-books/menu-samples",
+        method: "get",
+        params: {
+          unitId,
+          mealPeriod: mealPeriod || undefined,
+          rateId: rateId || undefined,
+        },
+      }),
+    enabled: skip !== true && unitId != null,
+    ...rest,
+  });
+}
+
+export function useCreateKitchenMenuSampleMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/menu-samples", method: "post", data: body }),
+    onSuccess: () => {
+      invalidateMenuSamples(qc);
+    },
+  });
+}
+
+export function useUpdateKitchenMenuSampleMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) =>
+      apiRequest({ url: `/kitchen-books/menu-samples/${id}`, method: "put", data: body }),
+    onSuccess: () => {
+      invalidateMenuSamples(qc);
+    },
+  });
+}
+
+export function useDeleteKitchenMenuSampleMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, unitId }) =>
+      apiRequest({
+        url: `/kitchen-books/menu-samples/${id}`,
+        method: "delete",
+        params: { unitId },
+      }),
+    onSuccess: () => {
+      invalidateMenuSamples(qc);
+    },
+  });
+}
+
+export function useApplyKitchenMenuSampleMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) =>
+      apiRequest({
+        url: `/kitchen-books/menu-samples/${id}/apply`,
+        method: "post",
+        data: body,
+      }),
+    onSuccess: (_d, vars) => {
+      invalidateMenuSamples(qc);
+      const ym = vars?.date ? String(vars.date).slice(0, 7) : null;
+      invalidateKitchenBooks(qc, vars?.unitId, vars?.date, ym);
+    },
   });
 }
 

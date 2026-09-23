@@ -47,10 +47,33 @@ function scheduleMenuDayVectorUpsert(payload) {
   });
 }
 
+/**
+ * Upsert one menu sample into Qdrant. Safe to call fire-and-forget.
+ * @param {{ sampleId: number, unitId: number, mealPeriod: string, mealAllowanceRateId: number, mucTienAn: number, text: string }} _payload
+ */
+async function upsertMenuSampleVector(_payload) {
+  if (!isQdrantEnabled()) {
+    return { ok: true, skipped: true, reason: "qdrant_disabled" };
+  }
+  // ponytail: real embed later
+  return { ok: true, skipped: true, reason: "scaffold_pending_embed" };
+}
+
+/** Non-blocking; never throws to callers of sample save. */
+function scheduleMenuSampleVectorUpsert(payload) {
+  setImmediate(() => {
+    upsertMenuSampleVector(payload).catch(() => {
+      /* swallow — index must not break sample save */
+    });
+  });
+}
+
 export {
   isQdrantEnabled,
   getQdrantConfig,
   upsertMenuDayVector,
   searchSimilarMenuDays,
   scheduleMenuDayVectorUpsert,
+  upsertMenuSampleVector,
+  scheduleMenuSampleVectorUpsert,
 };

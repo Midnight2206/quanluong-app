@@ -50,6 +50,7 @@ model MealAllowanceRate {
   unitMealPeriodSplits      UnitMealPeriodSplit[]
   mealRosterDayMarks        MealRosterDayMark[]
   mealRosterDayExtraMarks   MealRosterDayExtraMark[]
+  kitchenMenuSamples        KitchenMenuSample[]
 
   @@index([type, sortOrder])
 }
@@ -166,6 +167,7 @@ model User {
   lttpIssueSlipSignatureSettingsUpdated  LttpIssueSlipSignatureSettings[] @relation("LttpIssueSlipSignatureSettingsUpdatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
+  kitchenMenuSamplesCreated              KitchenMenuSample[] @relation("KitchenMenuSampleCreatedBy")
 
   @@index([typeId])
   @@index([unitId])
@@ -663,6 +665,7 @@ model Unit {
   kitchenMenuDays           KitchenMenuDay[]
   kitchenReceiptSlips       KitchenReceiptSlip[]
   kitchenReceiptSlipSerials KitchenReceiptSlipSerial[]
+  kitchenMenuSamples        KitchenMenuSample[]
 
   @@index([parentId])
   @@index([path])
@@ -1095,6 +1098,24 @@ model KitchenMenuDishLine {
 
   @@index([dishId])
   @@index([commodityId])
+}
+
+model KitchenMenuSample {
+  id                   Int                   @id @default(autoincrement())
+  unitId               Int
+  mealPeriod           KitchenMenuMealPeriod
+  mealAllowanceRateId  Int
+  dishesJson           Json
+  createdById          Int
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  unit                 Unit                  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  mealAllowanceRate    MealAllowanceRate     @relation(fields: [mealAllowanceRateId], references: [id], onDelete: Restrict)
+  createdBy            User                  @relation("KitchenMenuSampleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([unitId, mealPeriod])
+  @@index([mealAllowanceRateId])
+  @@index([createdById])
 }
 
 /// Nguồn dòng phiếu nhập kho: trên cấp (phiếu xuất LTTP) hoặc đơn vị tự bảo đảm.

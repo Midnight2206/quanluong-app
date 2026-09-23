@@ -82,6 +82,13 @@ export const qk = {
       String(unitId),
       String(yearMonth),
     ],
+    menuSamples: (unitId, mealPeriod, rateId) => [
+      "kitchenBooks",
+      "menuSamples",
+      String(unitId),
+      mealPeriod ?? "",
+      rateId != null ? String(rateId) : "",
+    ],
     receiptSlips: (unitId, date) => [
       "kitchenBooks",
       "receiptSlips",

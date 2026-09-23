@@ -16,6 +16,13 @@ import {
 } from "./kitchen-books-menu.service.js";
 import { applyMenuDayAi, suggestMenuDay } from "./kitchen-books-menu-ai.service.js";
 import {
+  applyMenuSample,
+  createMenuSample,
+  deleteMenuSample,
+  listMenuSamples,
+  updateMenuSample,
+} from "./kitchen-books-menu-sample.service.js";
+import {
   createKitchenReceiptSlip,
   deleteKitchenReceiptSlip,
   getKitchenReceiptGuaranteeFromIssueSlips,
@@ -162,6 +169,63 @@ async function deleteMenuDishController(req, res) {
   return respondSuccess(res, { message: "Đã xóa món khỏi thực đơn", data });
 }
 
+async function listMenuSamplesController(req, res) {
+  const data = await listMenuSamples(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã tải thực đơn mẫu", data });
+}
+
+async function createMenuSampleController(req, res) {
+  const { rateId, ...payload } = req.validatedBody;
+  const data = await createMenuSample(
+    { ...payload, mealAllowanceRateId: rateId },
+    req.user.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondCreated(res, { message: "Đã tạo thực đơn mẫu", data });
+}
+
+async function updateMenuSampleController(req, res) {
+  const { rateId, ...payload } = req.validatedBody;
+  const data = await updateMenuSample(
+    req.validatedParams.id,
+    { ...payload, mealAllowanceRateId: rateId },
+    req.user.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã cập nhật thực đơn mẫu", data });
+}
+
+async function deleteMenuSampleController(req, res) {
+  const data = await deleteMenuSample(
+    req.validatedParams.id,
+    req.validatedQuery.unitId,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã xóa thực đơn mẫu", data });
+}
+
+async function applyMenuSampleController(req, res) {
+  const data = await applyMenuSample(
+    req.validatedParams.id,
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã áp dụng thực đơn mẫu", data });
+}
+
 async function listReceiptSlipsController(req, res) {
   const data = await listKitchenReceiptSlips(
     req.validatedQuery,
@@ -285,6 +349,11 @@ export {
   importCatalogController,
   monthMarkersController,
   deleteMenuDishController,
+  listMenuSamplesController,
+  createMenuSampleController,
+  updateMenuSampleController,
+  deleteMenuSampleController,
+  applyMenuSampleController,
   listReceiptSlipsController,
   getReceiptSlipByDayController,
   upsertReceiptSlipUnitSelfController,

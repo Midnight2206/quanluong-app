@@ -1,0 +1,47 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const source = readFileSync(new URL("./KitchenMenuTab.jsx", import.meta.url), "utf8");
+
+test("saving a sample refreshes its filtered list before counting", () => {
+  assert.match(source, /import \{ useQueryClient \} from "@tanstack\/react-query";/);
+  assert.match(
+    source,
+    /await queryClient\.refetchQueries\(\{\s*queryKey: qk\.kitchenBooks\.menuSamples\(selectedUnitId, mealPeriod, rateId\),\s*\}\);/,
+  );
+  assert.match(
+    source,
+    /const refreshedSamples = queryClient\.getQueryData\(qk\.kitchenBooks\.menuSamples\(selectedUnitId, mealPeriod, rateId\)\) \?\? \[\];/,
+  );
+  assert.match(source, /Hiện có \$\{refreshedSamples\.length\} mẫu cho buổi và mức này\./);
+});
+
+test("changing units or loading an invalid rate clears the selected rate", () => {
+  assert.match(source, /import \{ useEffect, useRef, useState \} from "react";/);
+  assert.match(source, /const previousUnitId = useRef\(selectedUnitId\);/);
+  assert.match(source, /previousUnitId\.current !== selectedUnitId/);
+  assert.match(source, /previousUnitId\.current == null/);
+  assert.match(source, /setRateId\(null\);/);
+  assert.match(source, /needsMealRateSelection \|\| !mealMeta\.rates\.some\(\(rate\) => rate\.id === rateId\)/);
+});
+
+test("blocks saving incomplete sample dishes and protects the final line", () => {
+  assert.match(source, /Cần thêm ít nhất một món có tên trước khi lưu mẫu/);
+  assert.match(source, /Mỗi món cần ít nhất một dòng LTTP hợp lệ/);
+  assert.match(source, /disabled=\{dish\.lines\.length === 1\}/);
+});
+
+test("explains unavailable meal allowance rates", () => {
+  assert.match(source, /Đơn vị cần chọn mức tiền ăn trong Sổ chấm cơm trước khi lập thực đơn mẫu\./);
+  assert.match(source, /mealRoster\.access/);
+});
+
+test("lists filtered samples and wires editing, deletion, and application", () => {
+  assert.match(source, /useGetKitchenMenuSamplesQuery\(\s*\{ unitId: selectedUnitId, mealPeriod, rateId \},/);
+  assert.match(source, /useDeleteKitchenMenuSampleMutation/);
+  assert.match(source, /setDraftDishes\(\(sample\.dishes \?\? \[\]\)\.map\(toDraftDish\)\);/);
+  assert.match(source, /setEditingSampleId\(sample\.id\);/);
+  assert.match(source, /deleteSample\(\{ id: sample\.id, unitId: selectedUnitId \}\)\.unwrap\(\)/);
+  assert.match(source, /<KitchenMenuSampleApplyDialog/);
+});
