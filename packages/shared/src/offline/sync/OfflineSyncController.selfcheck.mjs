@@ -17,7 +17,7 @@ const controller = createOfflineSyncController({
   _flushOutboxForTest: async () => {
     calls += 1;
     await gate;
-    return { flushed: 2, failed: 0, needsReview: 0 };
+    return { flushed: 2, failed: 0, needsReview: 0, authExpired: false, forbidden: 0 };
   },
   // ponytail: probe-gated getNetworkOnline is false in Node until async probe; noop subscribe avoids extra flush
   getNetworkOnlineFn: () => true,
@@ -33,4 +33,25 @@ const [a, b] = await Promise.all([p1, p2]);
 assert.equal(a.flushed, 2);
 assert.equal(b.flushed, 2);
 assert.equal(calls, 1);
+
+let flushCalls = 0;
+const ctrlAuth = createOfflineSyncController({
+  db: {},
+  userId: 1,
+  apiRequest: async () => ({}),
+  getNetworkOnlineFn: () => true,
+  subscribeNetworkStatusFn: () => () => {},
+  verifySessionOrRefreshFn: async () => ({ ok: false, reason: "AUTH_EXPIRED" }),
+  _flushOutboxForTest: async () => {
+    flushCalls += 1;
+    return { flushed: 9, failed: 0, needsReview: 0, authExpired: false, forbidden: 0 };
+  },
+});
+ctrlAuth.start();
+const denied = await ctrlAuth.flush();
+assert.equal(denied.authExpired, true);
+assert.equal(denied.flushed, 0);
+assert.equal(flushCalls, 0);
+ctrlAuth.stop();
+
 console.log("OfflineSyncController: ok");

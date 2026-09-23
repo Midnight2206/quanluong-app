@@ -1,5 +1,14 @@
+import { verifySessionOrRefresh as defaultVerify } from "../auth/verifySessionOrRefresh.js";
 import { flushOutbox } from "../outbox/processor.js";
 import { getNetworkOnline, subscribeNetworkStatus } from "./networkStatus.js";
+
+const EMPTY = {
+  flushed: 0,
+  failed: 0,
+  needsReview: 0,
+  authExpired: false,
+  forbidden: 0,
+};
 
 /**
  * @param {{
@@ -14,6 +23,7 @@ import { getNetworkOnline, subscribeNetworkStatus } from "./networkStatus.js";
  *   _flushOutboxForTest?: typeof flushOutbox;
  *   getNetworkOnlineFn?: typeof getNetworkOnline;
  *   subscribeNetworkStatusFn?: typeof subscribeNetworkStatus;
+ *   verifySessionOrRefreshFn?: typeof defaultVerify;
  * }} opts
  */
 export function createOfflineSyncController({
@@ -25,26 +35,30 @@ export function createOfflineSyncController({
   _flushOutboxForTest,
   getNetworkOnlineFn = getNetworkOnline,
   subscribeNetworkStatusFn = subscribeNetworkStatus,
+  verifySessionOrRefreshFn = defaultVerify,
 }) {
   const flushOutboxImpl = _flushOutboxForTest ?? flushOutboxFn;
   let running = false;
-  /** @type {Promise<{ flushed: number; failed: number; needsReview: number }> | null} */
+  /** @type {Promise<{ flushed: number; failed: number; needsReview: number; authExpired: boolean; forbidden: number }> | null} */
   let inFlight = null;
   /** @type {(() => void) | null} */
   let unsub = null;
 
-  /** @returns {Promise<{ flushed: number; failed: number; needsReview: number }>} */
+  /** @returns {Promise<{ flushed: number; failed: number; needsReview: number; authExpired: boolean; forbidden: number }>} */
   function flush() {
-    const empty = { flushed: 0, failed: 0, needsReview: 0 };
     if (!running || db == null || userId == null) {
-      return Promise.resolve(empty);
+      return Promise.resolve({ ...EMPTY });
     }
     if (!getNetworkOnlineFn()) {
-      return Promise.resolve(empty);
+      return Promise.resolve({ ...EMPTY });
     }
     if (inFlight) return inFlight;
     inFlight = (async () => {
       try {
+        const session = await verifySessionOrRefreshFn({ apiRequest });
+        if (!session?.ok) {
+          return { ...EMPTY, authExpired: true };
+        }
         return await flushOutboxImpl(db, {
           userId,
           apiRequest,
