@@ -55,4 +55,29 @@ await runReconnectSync({
 });
 assert.ok(log.includes("invalidate-needsReview"));
 
+let authThrown = false;
+let invalidateAfterAuth = 0;
+try {
+  await runReconnectSync({
+    flushOutbox: async () => ({
+      flushed: 0,
+      failed: 0,
+      needsReview: 0,
+      authExpired: true,
+      forbidden: 0,
+    }),
+    invalidate: () => {
+      invalidateAfterAuth += 1;
+    },
+    refetchActive: async () => {},
+    prefetchBoot: async () => {},
+  });
+} catch (e) {
+  authThrown = true;
+  assert.equal(e.message, "AUTH_EXPIRED");
+  assert.equal(e.code, "AUTH_EXPIRED");
+}
+assert.equal(authThrown, true);
+assert.equal(invalidateAfterAuth, 0);
+
 console.log("runReconnectSync: ok");

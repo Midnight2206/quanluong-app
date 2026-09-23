@@ -8,6 +8,11 @@ export async function runReconnectSync({
   prefetchBoot,
 }) {
   const flushResult = await flushOutbox();
+  if (flushResult?.authExpired) {
+    const err = new Error("AUTH_EXPIRED");
+    err.code = "AUTH_EXPIRED";
+    throw err;
+  }
   if (flushResult?.failed > 0) {
     throw new Error(OUTBOX_PARTIAL_FLUSH_MSG);
   }
