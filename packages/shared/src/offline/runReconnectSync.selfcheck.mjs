@@ -31,4 +31,28 @@ try {
   failed = true;
 }
 assert.equal(failed, true);
+
+let partialFlushBlocked = false;
+try {
+  await runReconnectSync({
+    flushOutbox: async () => ({ flushed: 1, failed: 1, needsReview: 0 }),
+    invalidate: () => log.push("invalidate-after-fail"),
+    refetchActive: async () => {},
+    prefetchBoot: async () => {},
+  });
+} catch (e) {
+  partialFlushBlocked = true;
+  assert.match(e.message, /Không gửi hết thao tác/);
+}
+assert.equal(partialFlushBlocked, true);
+assert.equal(log.filter((x) => x === "invalidate-after-fail").length, 0);
+
+await runReconnectSync({
+  flushOutbox: async () => ({ flushed: 0, failed: 0, needsReview: 2 }),
+  invalidate: () => log.push("invalidate-needsReview"),
+  refetchActive: async () => {},
+  prefetchBoot: async () => {},
+});
+assert.ok(log.includes("invalidate-needsReview"));
+
 console.log("runReconnectSync: ok");

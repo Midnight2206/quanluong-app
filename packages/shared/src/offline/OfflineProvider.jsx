@@ -26,6 +26,10 @@ import { OfflineChromeOffset } from "./ui/OfflineChromeOffset.jsx";
 import { ReconnectSyncOverlay } from "./ui/ReconnectSyncOverlay.jsx";
 import { clearLocalDraftRegistry } from "@/lib/clientPersist/localDraftRegistry.js";
 
+const RECONNECT_SYNC_TIMEOUT_MS = 45_000;
+const RECONNECT_SYNC_TIMEOUT_MSG =
+  "Đồng bộ quá lâu (hơn 45 giây). Kiểm tra mạng và thử lại.";
+
 const Ctx = createContext({
   userId: null,
   ready: false,
@@ -77,6 +81,13 @@ export function OfflineProvider({ children }) {
       sawOfflineRef.current = true;
     }
   }, [online]);
+
+  useEffect(() => {
+    sawOfflineRef.current = false;
+    setReconnectBlocking(false);
+    setReconnectError(null);
+    runIdRef.current += 1;
+  }, [userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,14 +173,23 @@ export function OfflineProvider({ children }) {
     const id = ++runIdRef.current;
     setReconnectBlocking(true);
     setReconnectError(null);
+    let timeoutId;
     try {
-      await runReconnectSync({
-        flushOutbox: () => flushOutboxFn(),
-        invalidate: () => invalidateLttpData(qc),
-        refetchActive: () => qc.refetchQueries({ type: "active" }),
-        prefetchBoot: () =>
-          db ? prefetchBoot({ db, apiRequest }) : Promise.resolve(),
-      });
+      await Promise.race([
+        runReconnectSync({
+          flushOutbox: () => flushOutboxFn(),
+          invalidate: () => invalidateLttpData(qc),
+          refetchActive: () => qc.refetchQueries({ type: "active" }),
+          prefetchBoot: () =>
+            db ? prefetchBoot({ db, apiRequest }) : Promise.resolve(),
+        }),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(RECONNECT_SYNC_TIMEOUT_MSG)),
+            RECONNECT_SYNC_TIMEOUT_MS,
+          );
+        }),
+      ]);
       if (id === runIdRef.current) {
         setReconnectBlocking(false);
       }
@@ -179,6 +199,8 @@ export function OfflineProvider({ children }) {
           e?.message || "Không đồng bộ được. Kiểm tra mạng và thử lại.",
         );
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [userId, ready, db, qc, flushOutboxFn]);
 
