@@ -10,8 +10,14 @@ import {
   useState,
 } from "react";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
+import {
+  mapPermissionsFromUser,
+  useAuthStore,
+} from "@/features/auth/model/authStore";
 import { invalidateLttpData } from "@/features/lttp/api/lttpApiInvalidate.js";
 import { apiRequest } from "@/services/apiRequest";
+import { notifyWarning } from "@/services/notify";
+import { verifySessionOrRefresh } from "./auth/verifySessionOrRefresh.js";
 import { createLttpOutboxHandlers } from "./adapters/lttp/lttpOutboxOps.js";
 import { prefetchBoot } from "./cache/prefetch.js";
 import { openOfflineDb } from "./db/openOfflineDb.js";
@@ -23,6 +29,7 @@ import { setNetworkProbe } from "./sync/networkStatus.js";
 import { OfflineConflictDock } from "./ui/ConflictReviewDialog.jsx";
 import { OfflineBanner } from "./ui/OfflineBanner.jsx";
 import { OfflineChromeOffset } from "./ui/OfflineChromeOffset.jsx";
+import { ReauthOverlay } from "./ui/ReauthOverlay.jsx";
 import { ReconnectSyncOverlay } from "./ui/ReconnectSyncOverlay.jsx";
 import { clearLocalDraftRegistry } from "@/lib/clientPersist/localDraftRegistry.js";
 
@@ -38,7 +45,13 @@ const Ctx = createContext({
   reconnectBlocking: false,
   reconnectError: null,
   retryReconnect: () => {},
-  flushOutbox: async () => ({ flushed: 0, failed: 0, needsReview: 0 }),
+  flushOutbox: async () => ({
+    flushed: 0,
+    failed: 0,
+    needsReview: 0,
+    authExpired: false,
+    forbidden: 0,
+  }),
 });
 
 export function useOffline() {
@@ -55,13 +68,20 @@ export function OfflineProvider({ children }) {
   const { online } = useNetworkStatus();
   const [reconnectBlocking, setReconnectBlocking] = useState(false);
   const [reconnectError, setReconnectError] = useState(null);
+  const [reauthRequired, setReauthRequired] = useState(false);
   const sawOfflineRef = useRef(false);
   const runIdRef = useRef(0);
   /** @type {React.MutableRefObject<ReturnType<typeof createOfflineSyncController> | null>} */
   const syncRef = useRef(null);
   const [flushOutboxFn, setFlushOutboxFn] = useState(
     /** @type {() => Promise<{ flushed: number; failed: number; needsReview: number }>} */ (
-      async () => ({ flushed: 0, failed: 0, needsReview: 0 })
+      async () => ({
+        flushed: 0,
+        failed: 0,
+        needsReview: 0,
+        authExpired: false,
+        forbidden: 0,
+      })
     ),
   );
 
@@ -86,6 +106,7 @@ export function OfflineProvider({ children }) {
     sawOfflineRef.current = false;
     setReconnectBlocking(false);
     setReconnectError(null);
+    setReauthRequired(false);
     runIdRef.current += 1;
   }, [userId]);
 
@@ -135,7 +156,15 @@ export function OfflineProvider({ children }) {
   useEffect(() => {
     syncRef.current?.stop();
     syncRef.current = null;
-    setFlushOutboxFn(async () => ({ flushed: 0, failed: 0, needsReview: 0 }));
+    setFlushOutboxFn(
+      async () => ({
+        flushed: 0,
+        failed: 0,
+        needsReview: 0,
+        authExpired: false,
+        forbidden: 0,
+      }),
+    );
     if (userId == null || !ready || db == null) {
       return undefined;
     }
@@ -145,10 +174,22 @@ export function OfflineProvider({ children }) {
       userId,
       apiRequest,
       getHandlers: () => lttpHandlers,
+      verifySessionOrRefreshFn: (opts) =>
+        verifySessionOrRefresh({
+          ...opts,
+          setAuthState: (p) => useAuthStore.getState().setAuthState(p),
+          mapPermissionsFromUser,
+        }),
     });
     syncRef.current = controller;
     setFlushOutboxFn(() => async () => {
       const result = await controller.flush();
+      if (result.authExpired) {
+        setReauthRequired(true);
+      }
+      if (result.forbidden > 0) {
+        notifyWarning("Bạn không có quyền thực hiện thao tác này");
+      }
       if (result.flushed > 0) {
         invalidateLttpData(qc);
       }
@@ -194,11 +235,14 @@ export function OfflineProvider({ children }) {
         setReconnectBlocking(false);
       }
     } catch (e) {
-      if (id === runIdRef.current) {
-        setReconnectError(
-          e?.message || "Không đồng bộ được. Kiểm tra mạng và thử lại.",
-        );
+      if (id !== runIdRef.current) return;
+      if (e?.code === "AUTH_EXPIRED" || e?.message === "AUTH_EXPIRED") {
+        setReauthRequired(true);
+        return;
       }
+      setReconnectError(
+        e?.message || "Không đồng bộ được. Kiểm tra mạng và thử lại.",
+      );
     } finally {
       clearTimeout(timeoutId);
     }
@@ -213,6 +257,23 @@ export function OfflineProvider({ children }) {
   const retryReconnect = useCallback(() => {
     void runGate();
   }, [runGate]);
+
+  const handleReauthSuccess = useCallback(async () => {
+    const session = await verifySessionOrRefresh({
+      apiRequest,
+      setAuthState: (p) => useAuthStore.getState().setAuthState(p),
+      mapPermissionsFromUser,
+    });
+    if (!session.ok) return;
+    setReauthRequired(false);
+    if (sawOfflineRef.current) {
+      void runGate();
+    } else {
+      void flushOutboxFn();
+    }
+  }, [runGate, flushOutboxFn]);
+
+  const uiBlocking = reconnectBlocking || reauthRequired;
 
   return (
     <Ctx.Provider
@@ -229,13 +290,16 @@ export function OfflineProvider({ children }) {
     >
       <OfflineBanner online={online} />
       <OfflineChromeOffset />
-      {reconnectBlocking ? (
+      {reauthRequired ? (
+        <ReauthOverlay onSuccess={handleReauthSuccess} />
+      ) : null}
+      {reconnectBlocking && !reauthRequired ? (
         <ReconnectSyncOverlay error={reconnectError} onRetry={retryReconnect} />
       ) : null}
       <div
-        aria-busy={reconnectBlocking || undefined}
+        aria-busy={uiBlocking || undefined}
         className={
-          reconnectBlocking ? "pointer-events-none select-none" : undefined
+          uiBlocking ? "pointer-events-none select-none" : undefined
         }
       >
         <OfflineConflictDock />
