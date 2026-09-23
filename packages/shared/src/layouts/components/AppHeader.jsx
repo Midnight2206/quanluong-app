@@ -22,11 +22,13 @@ import { cn } from "@/utils/cn";
 import { resolveMediaUrl } from "@/utils/runtimeEnv";
 import { getStoredTheme, toggleTheme } from "@/utils/theme";
 import { useChatDockOptional } from "@/contexts/ChatDockContext";
+import { useNetworkStatus } from "@/offline/hooks/useNetworkStatus.js";
 
 export function AppHeader() {
   const router = useRouter();
   const user = useCurrentUser();
   const chatDock = useChatDockOptional();
+  const { online } = useNetworkStatus();
   const { logoutWithDraftGuard, isLoggingOut } = useLogoutWithDraftGuard();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [theme, setTheme] = useState(() => getStoredTheme());
@@ -111,12 +113,21 @@ export function AppHeader() {
             className="flex items-center gap-2 px-1 py-1 pr-3 transition border rounded-full bg-background shadow-soft hover:border-primary/30"
             onClick={() => setIsMenuOpen((value) => !value)}
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-accent-foreground">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <UserRound className="w-5 h-5" />
-              )}
+            <div className="relative shrink-0">
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-accent text-accent-foreground">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <UserRound className="w-5 h-5" />
+                )}
+              </div>
+              {online ? (
+                <span
+                  className="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-card"
+                  title="Đang online"
+                  aria-label="Đang online"
+                />
+              ) : null}
             </div>
             <ChevronDown className="hidden w-4 h-4 text-muted-foreground sm:block" />
           </button>
@@ -147,12 +158,21 @@ export function AppHeader() {
           )}
         >
           <div className="flex items-center gap-3 pb-4 border-b">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent text-accent-foreground">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <UserRound className="h-7 w-7" />
-              )}
+            <div className="relative shrink-0">
+              <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-accent text-accent-foreground">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <UserRound className="h-7 w-7" />
+                )}
+              </div>
+              {online ? (
+                <span
+                  className="absolute bottom-0.5 right-0.5 size-2.5 rounded-full bg-emerald-500 ring-2 ring-card"
+                  title="Đang online"
+                  aria-label="Đang online"
+                />
+              ) : null}
             </div>
             <div className="min-w-0">
               <p className="text-lg font-semibold truncate">{displayName}</p>
