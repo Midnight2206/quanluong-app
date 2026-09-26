@@ -448,6 +448,13 @@ export function useCreateLttpIssueSlipMutation() {
   });
 }
 
+export function useSuggestLttpIssueSlipAiMutation() {
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/issue-slips/ai-suggest", method: "post", data: body }),
+  });
+}
+
 export function useUpdateLttpIssueSlipMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
