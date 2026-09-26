@@ -142,6 +142,15 @@ async function loadDefaultSuppliers(storageUnitId) {
   return new Map(rows.map((r) => [r.commodityId, r.lttpSupplierId]));
 }
 
+function resolveIssueSlipAiEffDate(...candidates) {
+  for (const candidate of candidates) {
+    if (candidate != null && String(candidate).trim() !== "") {
+      return String(candidate).trim().slice(0, 10);
+    }
+  }
+  return new Date().toISOString().slice(0, 10);
+}
+
 function mergeHeaderFromRequest(headerDraft, body) {
   const issueDate = body.issueDate != null ? String(body.issueDate).trim() : "";
   const receivedDate = body.receivedDate != null ? String(body.receivedDate).trim() : "";
@@ -169,10 +178,7 @@ async function suggestIssueSlipAi(
   const sessionId = (opts.randomUUID ?? randomUUID)();
 
   const storageUnitId = dataScope.storageUnitId;
-  const effDate =
-    issueDate != null && String(issueDate).trim() !== ""
-      ? String(issueDate).trim().slice(0, 10)
-      : new Date().toISOString().slice(0, 10);
+  const effDate = resolveIssueSlipAiEffDate(issueDate);
 
   const loadCatalogFn = opts.loadCatalog ?? loadCatalog;
   const loadHistoryFn = opts.loadHistorySamples ?? loadHistorySamples;
@@ -182,7 +188,7 @@ async function suggestIssueSlipAi(
 
   await prismaClient.lttpIssueSlipAiMemory.create({
     data: {
-      unitId,
+      unitId: storageUnitId,
       sessionId,
       prompt: String(prompt ?? "").trim(),
       turns: [],
@@ -199,7 +205,7 @@ async function suggestIssueSlipAi(
     defaultSupplierByCid,
   ] = await Promise.all([
       loadCatalogFn(storageUnitId),
-      loadMemoriesFn(unitId, { limit: 20 }),
+      loadMemoriesFn(storageUnitId, { limit: 20 }),
       loadHistoryFn(storageUnitId, { recipientUnitId }),
       getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
       loadSuppliersFn(storageUnitId),
@@ -274,7 +280,7 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
   const memory = await prismaClient.lttpIssueSlipAiMemory.findUnique({
     where: { sessionId },
   });
-  requireMemoryBelongsToUnit(memory, unitId);
+  requireMemoryBelongsToUnit(memory, storageUnitId);
 
   const turns = Array.isArray(memory.turns) ? memory.turns : [];
   if (turns.length >= 20) {
@@ -289,10 +295,11 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
   const loadMemoriesFn = opts.loadMemories ?? ((targetUnitId, args) => loadMemories(targetUnitId, args, prismaClient));
   const loadSuppliersFn = opts.loadDefaultSuppliers ?? loadDefaultSuppliers;
   const getEffectiveFn = opts.getEffectivePrices ?? getEffectivePrices;
+  const effDate = resolveIssueSlipAiEffDate(currentPreview?.headerDraft?.issueDate, payload?.issueDate);
   const [{ commodities, catalogText }, { memoryText }, eff, defaultSupplierByCid] = await Promise.all([
     loadCatalogFn(storageUnitId),
-    loadMemoriesFn(unitId, { limit: 20 }),
-    getEffectiveFn({ unitId, date: new Date().toISOString().slice(0, 10) }, scope, effectiveUnitIds, dataScope),
+    loadMemoriesFn(storageUnitId, { limit: 20 }),
+    getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
     loadSuppliersFn(storageUnitId),
   ]);
 
@@ -367,8 +374,9 @@ async function commitIssueSlipAiMemory(
 ) {
   assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId);
   const prismaClient = getPrismaClient(opts);
+  const storageUnitId = dataScope.storageUnitId;
   const result = await prismaClient.lttpIssueSlipAiMemory.updateMany({
-    where: { sessionId, unitId },
+    where: { sessionId, unitId: storageUnitId },
     data: {
       finalPreview,
       updatedById: userId ?? null,
@@ -393,6 +401,7 @@ async function linkIssueSlipAiMemory(
 ) {
   assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId);
   const prismaClient = getPrismaClient(opts);
+  const storageUnitId = dataScope.storageUnitId;
   const [memory, issueSlip] = await Promise.all([
     prismaClient.lttpIssueSlipAiMemory.findUnique({ where: { sessionId } }),
     prismaClient.lttpIssueSlip.findUnique({
@@ -400,8 +409,8 @@ async function linkIssueSlipAiMemory(
       select: { id: true, unitId: true },
     }),
   ]);
-  requireMemoryBelongsToUnit(memory, unitId);
-  requireIssueSlipBelongsToUnit(issueSlip, unitId);
+  requireMemoryBelongsToUnit(memory, storageUnitId);
+  requireIssueSlipBelongsToUnit(issueSlip, storageUnitId);
 
   await prismaClient.lttpIssueSlipAiMemory.update({
     where: { sessionId },

@@ -36,11 +36,12 @@ test("buildIssueSlipAiHistoryWhere adds recipientUnitId when provided", async ()
 test("suggestIssueSlipAi returns headerDraft, lines, warnings, meta without DB write", async () => {
   const { suggestIssueSlipAi } = await import("./lttp-issue-slip-ai.service.js");
   let createdPayload = null;
+  let memoryArgs = null;
   const result = await suggestIssueSlipAi(
     { unitId: 1, prompt: "Xuất 5 kg gạo tẻ", issueDate: "2026-09-26" },
     { unitIds: [1] },
     [1],
-    { logicalUnitId: 1, storageUnitId: 1 },
+    { logicalUnitId: 1, storageUnitId: 9 },
     1,
     {
       configOverride: { apiKey: "test-key", provider: "openai", model: "gpt-test" },
@@ -57,10 +58,13 @@ test("suggestIssueSlipAi returns headerDraft, lines, warnings, meta without DB w
         commodities: [{ id: 10, name: "Gạo tẻ", code: "GAO" }],
         catalogText: "danh muc LTTP",
       }),
-      loadMemories: async () => ({
+      loadMemories: async (targetUnitId, args) => {
+        memoryArgs = { targetUnitId, args };
+        return {
         memoryText: "memory mau",
         memorySampleCount: 4,
-      }),
+        };
+      },
       loadHistorySamples: async () => ({
         historyText: "Phieu mau",
         historySampleCount: 8,
@@ -87,8 +91,12 @@ test("suggestIssueSlipAi returns headerDraft, lines, warnings, meta without DB w
   assert.equal(result.meta.memorySampleCount, 4);
   assert.equal(result.meta.model, "gpt-test");
   assert.ok(Array.isArray(result.warnings));
+  assert.deepEqual(memoryArgs, {
+    targetUnitId: 9,
+    args: { limit: 20 },
+  });
   assert.deepEqual(createdPayload, {
-    unitId: 1,
+    unitId: 9,
     sessionId: "11111111-1111-4111-8111-111111111111",
     prompt: "Xuất 5 kg gạo tẻ",
     turns: [],
@@ -188,22 +196,24 @@ test("chatIssueSlipAi appends user and assistant turns and returns sessionId", a
   const { chatIssueSlipAi } = await import("./lttp-issue-slip-ai.service.js");
   const memory = {
     sessionId: "44444444-4444-4444-8444-444444444444",
-    unitId: 1,
+    unitId: 9,
     prompt: "Xuat gao",
     turns: [{ role: "user", text: "turn cu" }],
   };
   let updatedPayload = null;
+  let memoryArgs = null;
+  let effectivePriceArgs = null;
 
   const result = await chatIssueSlipAi(
     {
       sessionId: memory.sessionId,
       unitId: 1,
       message: "doi thanh gao nep",
-      currentPreview: { headerDraft: { slipNote: "cu" }, lines: [] },
+      currentPreview: { headerDraft: { slipNote: "cu", issueDate: "2026-10-03" }, lines: [] },
     },
     { unitIds: [1] },
     [1],
-    { logicalUnitId: 1, storageUnitId: 1 },
+    { logicalUnitId: 1, storageUnitId: 9 },
     1,
     {
       configOverride: { apiKey: "test-key", provider: "openai", model: "gpt-test" },
@@ -220,11 +230,17 @@ test("chatIssueSlipAi appends user and assistant turns and returns sessionId", a
         commodities: [{ id: 10, name: "Gạo nếp", code: "GNEP" }],
         catalogText: "cat",
       }),
-      loadMemories: async () => ({ memoryText: "memory", memorySampleCount: 2 }),
+      loadMemories: async (targetUnitId, args) => {
+        memoryArgs = { targetUnitId, args };
+        return { memoryText: "memory", memorySampleCount: 2 };
+      },
       loadDefaultSuppliers: async () => new Map([[10, 99]]),
-      getEffectivePrices: async () => ({
-        items: [{ commodity: { id: 10 }, unitPrice: 12, tgsxPrice: 9 }],
-      }),
+      getEffectivePrices: async (args) => {
+        effectivePriceArgs = args;
+        return {
+          items: [{ commodity: { id: 10 }, unitPrice: 12, tgsxPrice: 9 }],
+        };
+      },
       completeMenuJson: async () => ({
         header: { slipNote: "  da doi  " },
         lines: [{ commodityName: "Gạo nếp", quantity: 1, priceKind: "market" }],
@@ -237,6 +253,11 @@ test("chatIssueSlipAi appends user and assistant turns and returns sessionId", a
   assert.equal(result.headerDraft.slipNote, "da doi");
   assert.equal(result.lines.length, 1);
   assert.equal(updatedPayload.turns.length, 3);
+  assert.deepEqual(memoryArgs, {
+    targetUnitId: 9,
+    args: { limit: 20 },
+  });
+  assert.deepEqual(effectivePriceArgs, { unitId: 1, date: "2026-10-03" });
   assert.deepEqual(updatedPayload.turns[1], {
     role: "user",
     text: "doi thanh gao nep",
@@ -303,7 +324,7 @@ test("commitIssueSlipAiMemory sets finalPreview for the session", async () => {
     },
     { unitIds: [1] },
     [1],
-    { logicalUnitId: 1, storageUnitId: 1 },
+    { logicalUnitId: 1, storageUnitId: 9 },
     1,
     {
       prismaClient: {
@@ -320,7 +341,7 @@ test("commitIssueSlipAiMemory sets finalPreview for the session", async () => {
   assert.deepEqual(updatedArgs, {
     where: {
       sessionId: "66666666-6666-4666-8666-666666666666",
-      unitId: 1,
+      unitId: 9,
     },
     data: {
       finalPreview,
@@ -342,14 +363,14 @@ test("linkIssueSlipAiMemory links issueSlipId only when session belongs to unit"
     },
     { unitIds: [1] },
     [1],
-    { logicalUnitId: 1, storageUnitId: 1 },
+    { logicalUnitId: 1, storageUnitId: 9 },
     1,
     {
       prismaClient: {
         lttpIssueSlipAiMemory: {
           findUnique: async () => ({
             sessionId: "77777777-7777-4777-8777-777777777777",
-            unitId: 1,
+            unitId: 9,
           }),
           update: async (args) => {
             updatedArgs = args;
@@ -357,7 +378,7 @@ test("linkIssueSlipAiMemory links issueSlipId only when session belongs to unit"
           },
         },
         lttpIssueSlip: {
-          findUnique: async () => ({ id: 123, unitId: 1 }),
+          findUnique: async () => ({ id: 123, unitId: 9 }),
         },
       },
     },

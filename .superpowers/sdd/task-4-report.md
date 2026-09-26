@@ -134,3 +134,27 @@ ReadLints(paths=[edited Task 4 files]) -> No linter errors found.
 
 - `commit`/`link` endpoints intentionally return `data: null`; if Task 5 wants richer client UX, that response shape may need expansion.
 - Reused permission code `lttp.issue-slips.write`, so no new `permission-catalog.vi.js` entry was needed.
+
+## Follow-up Fixes
+
+### Review findings addressed
+
+- Memory rows now use `dataScope.storageUnitId` consistently in `suggestIssueSlipAi(...)`, `chatIssueSlipAi(...)`, `commitIssueSlipAiMemory(...)`, `linkIssueSlipAiMemory(...)`, and `loadMemories(...)`.
+- Session ownership checks now compare the stored memory `unitId` against `storageUnitId`; linked issue slips are validated against the same storage unit.
+- `chatIssueSlipAi(...)` now resolves effective prices using `currentPreview.headerDraft.issueDate` first, then payload `issueDate`, and only falls back to today when both are missing.
+- Service tests now cover logical-vs-storage unit mismatches and assert that chat passes the preview draft date into `getEffectivePrices(...)`.
+
+### Fresh verification
+
+```text
+$ node --test quanluong-app-be/src/modules/lttp/lttp-issue-slip-ai*.test.js
+
+ℹ pass 23
+ℹ fail 0
+```
+
+Lint verification:
+
+```text
+ReadLints(paths=[lttp-issue-slip-ai.service.js, lttp-issue-slip-ai.service.test.js]) -> No linter errors found.
+```
