@@ -8,13 +8,18 @@ import { permissionMiddleware } from "../../middlewares/permission.middleware.js
 import { superadminMiddleware } from "../../middlewares/superadmin.middleware.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
 import { unitDataScopeMiddleware } from "../../middlewares/unit-data-scope.middleware.js";
-import { lttpIssueSlipAiSuggestRateLimit } from "../../middlewares/lttp-issue-slip-ai-rate-limit.middleware.js";
+import {
+  lttpIssueSlipAiChatRateLimit,
+  lttpIssueSlipAiSuggestRateLimit,
+} from "../../middlewares/lttp-issue-slip-ai-rate-limit.middleware.js";
 import { DATA_SCOPE_KINDS } from "../../shared/data-scope/data-scope.registry.js";
 import { getIssueSlipUnitIdById } from "./lttp.service.js";
 import {
   createCommodityController,
   createFoodGroupController,
   createIssueSlipController,
+  chatIssueSlipAiController,
+  commitIssueSlipAiMemoryController,
   createLttpSupplierController,
   createPriceTableController,
   deleteCommodityController,
@@ -58,6 +63,7 @@ import {
   resolveIssueSlipLineController,
   resyncIssueSlipPricesController,
   suggestIssueSlipAiController,
+  linkIssueSlipAiMemoryController,
   updateIssueSlipController,
 } from "./lttp.controller.js";
 import { LTTP_ROUTE_DEFINITIONS } from "./lttp.route-definitions.js";
@@ -67,6 +73,9 @@ import {
   createCommodityBodySchema,
   createLttpSupplierBodySchema,
   createFoodGroupBodySchema,
+  aiChatIssueSlipBodySchema,
+  aiMemoryCommitBodySchema,
+  aiMemoryLinkBodySchema,
   aiSuggestIssueSlipBodySchema,
   createIssueSlipBodySchema,
   createPriceTableBodySchema,
@@ -221,6 +230,33 @@ lttpRouter.post(
   permissionMiddleware([routePermissions.aiSuggestIssueSlip]),
   lttpIssueSlipAiSuggestRateLimit,
   asyncHandler(suggestIssueSlipAiController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-chat",
+  validateRequest({ body: aiChatIssueSlipBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.aiChatIssueSlip]),
+  lttpIssueSlipAiChatRateLimit,
+  asyncHandler(chatIssueSlipAiController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-memory/commit",
+  validateRequest({ body: aiMemoryCommitBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.aiMemoryCommitIssueSlip]),
+  lttpIssueSlipAiChatRateLimit,
+  asyncHandler(commitIssueSlipAiMemoryController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-memory/link",
+  validateRequest({ body: aiMemoryLinkBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.aiMemoryLinkIssueSlip]),
+  lttpIssueSlipAiChatRateLimit,
+  asyncHandler(linkIssueSlipAiMemoryController),
 );
 
 lttpRouter.get(

@@ -1,10 +1,19 @@
+import { randomUUID } from "node:crypto";
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { config } from "../../config/config.js";
+import { AppError } from "../../errors/app-error.js";
+import { ERROR_CODES } from "../../errors/error-codes.js";
 import { formatLocalCatalogForPrompt } from "../kitchen-books/kitchen-books-menu-ai-history.js";
 import { assertMenuAiConfigured, completeMenuJson } from "../kitchen-books/kitchen-books-menu-ai-llm.js";
 import { enrichLlmIssueSlipDraft } from "./lttp-issue-slip-ai-enrich.js";
 import { scopeSanitizeIssueSlipAiHeaderDraft } from "./lttp-issue-slip-ai-header-scope.js";
-import { buildIssueSlipAiPrompt, formatIssueSlipHistoryForPrompt } from "./lttp-issue-slip-ai.prompt.js";
+import { formatMemoriesForPrompt } from "./lttp-issue-slip-ai-memory.js";
+import { dropTgsxUnlessSignaled } from "./lttp-issue-slip-ai-tgsx.js";
+import {
+  buildIssueSlipAiChatPrompt,
+  buildIssueSlipAiPrompt,
+  formatIssueSlipHistoryForPrompt,
+} from "./lttp-issue-slip-ai.prompt.js";
 import {
   assertIssueSlipWriteAccess,
   assertBuyerUserAllowedForStorage,
@@ -19,6 +28,42 @@ const defaultIssueSlipAiHeaderScopeDeps = {
   assertBuyer: assertBuyerUserAllowedForStorage,
   assertRecipientUser: assertRecipientUserAllowedForUnit,
 };
+
+function getPrismaClient(opts) {
+  return opts.prismaClient ?? prisma;
+}
+
+function buildAssistantTurnText(headerDraft, lines) {
+  // ponytail: store a short JSON snapshot, not the full preview; upgrade to richer summaries if chat quality suffers.
+  const text = JSON.stringify({
+    headerDraft,
+    lines: (Array.isArray(lines) ? lines : []).map((line) => line?.commodityName || line?.code || "?"),
+  });
+  if (!text) {
+    return "{}";
+  }
+  return text.length <= 500 ? text : `${text.slice(0, 497)}...`;
+}
+
+function requireMemoryBelongsToUnit(memory, unitId) {
+  if (!memory || Number(memory.unitId) !== Number(unitId)) {
+    throw new AppError({
+      message: "Không tìm thấy phiên AI phiếu xuất cho đơn vị này.",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+}
+
+function requireIssueSlipBelongsToUnit(issueSlip, unitId) {
+  if (!issueSlip || Number(issueSlip.unitId) !== Number(unitId)) {
+    throw new AppError({
+      message: "Không tìm thấy phiếu xuất thuộc phiên AI này.",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+}
 
 async function loadCatalog(storageUnitId) {
   const commodities = await prisma.lttpCommodity.findMany({
@@ -66,6 +111,29 @@ async function loadHistorySamples(storageUnitId, { recipientUnitId, limit = 20 }
   };
 }
 
+async function loadMemories(unitId, { limit = 20 } = {}, prismaClient = prisma) {
+  const take = Math.min(Math.max(Number(limit) || 20, 1), 20);
+  const rows = await prismaClient.lttpIssueSlipAiMemory.findMany({
+    where: {
+      unitId,
+      finalPreview: { not: null },
+    },
+    orderBy: { updatedAt: "desc" },
+    take,
+    select: {
+      issueSlipId: true,
+      prompt: true,
+      turns: true,
+      finalPreview: true,
+      updatedAt: true,
+    },
+  });
+  return {
+    memoryText: formatMemoriesForPrompt(rows),
+    memorySampleCount: rows.length,
+  };
+}
+
 async function loadDefaultSuppliers(storageUnitId) {
   const rows = await prisma.lttpCommodityDefaultSupplier.findMany({
     where: { commodity: { unitId: storageUnitId, isActive: true } },
@@ -97,6 +165,8 @@ async function suggestIssueSlipAi(
 
   const menuAiCfg = opts.configOverride ?? config.menuAi;
   assertMenuAiConfigured(menuAiCfg);
+  const prismaClient = getPrismaClient(opts);
+  const sessionId = (opts.randomUUID ?? randomUUID)();
 
   const storageUnitId = dataScope.storageUnitId;
   const effDate =
@@ -106,12 +176,30 @@ async function suggestIssueSlipAi(
 
   const loadCatalogFn = opts.loadCatalog ?? loadCatalog;
   const loadHistoryFn = opts.loadHistorySamples ?? loadHistorySamples;
+  const loadMemoriesFn = opts.loadMemories ?? ((targetUnitId, args) => loadMemories(targetUnitId, args, prismaClient));
   const loadSuppliersFn = opts.loadDefaultSuppliers ?? loadDefaultSuppliers;
   const getEffectiveFn = opts.getEffectivePrices ?? getEffectivePrices;
 
-  const [{ commodities, catalogText }, { historyText, historySampleCount }, eff, defaultSupplierByCid] =
-    await Promise.all([
+  await prismaClient.lttpIssueSlipAiMemory.create({
+    data: {
+      unitId,
+      sessionId,
+      prompt: String(prompt ?? "").trim(),
+      turns: [],
+      finalPreview: null,
+      createdById: opts.actorUserId ?? null,
+    },
+  });
+
+  const [
+    { commodities, catalogText },
+    { memoryText, memorySampleCount },
+    { historyText, historySampleCount },
+    eff,
+    defaultSupplierByCid,
+  ] = await Promise.all([
       loadCatalogFn(storageUnitId),
+      loadMemoriesFn(unitId, { limit: 20 }),
       loadHistoryFn(storageUnitId, { recipientUnitId }),
       getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
       loadSuppliersFn(storageUnitId),
@@ -123,6 +211,7 @@ async function suggestIssueSlipAi(
     prompt: String(prompt ?? "").trim(),
     issueDate: effDate,
     catalogText,
+    memoryText,
     historyText,
     context: { receivedDate, recipientUnitId },
   });
@@ -140,6 +229,11 @@ async function suggestIssueSlipAi(
     resolveLine: ({ commodityId, priceKind }) =>
       resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid),
   });
+  const tgsxFiltered = dropTgsxUnlessSignaled({
+    lines,
+    signalTexts: [String(prompt ?? "").trim()],
+    warnings,
+  });
 
   const mergedHeader = mergeHeaderFromRequest(rawHeader, { issueDate, receivedDate });
   const scopeSanitize =
@@ -148,23 +242,181 @@ async function suggestIssueSlipAi(
     effectiveUnitIds,
     storageUnitId,
     requestRecipientUnitId: recipientUnitId,
-    warnings,
+    warnings: tgsxFiltered.warnings,
     deps: opts.headerScopeDeps ?? defaultIssueSlipAiHeaderScopeDeps,
   });
 
   if (historySampleCount < 3) {
-    warnings.unshift("Ít dữ liệu phiếu xuất gần đây — gợi ý có thể kém ổn định.");
+    tgsxFiltered.warnings.unshift("Ít dữ liệu phiếu xuất gần đây — gợi ý có thể kém ổn định.");
   }
 
   return {
     headerDraft,
-    lines,
-    warnings,
+    lines: tgsxFiltered.lines,
+    warnings: tgsxFiltered.warnings,
+    sessionId,
     meta: {
       historySampleCount,
+      memorySampleCount,
       model: menuAiCfg.model,
     },
   };
 }
 
-export { buildIssueSlipAiHistoryWhere, buildIssueSlipAiPrompt, suggestIssueSlipAi };
+async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, callerUnitId, opts = {}) {
+  const { sessionId, unitId, message, currentPreview } = payload;
+  assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId);
+
+  const menuAiCfg = opts.configOverride ?? config.menuAi;
+  assertMenuAiConfigured(menuAiCfg);
+  const prismaClient = getPrismaClient(opts);
+  const storageUnitId = dataScope.storageUnitId;
+  const memory = await prismaClient.lttpIssueSlipAiMemory.findUnique({
+    where: { sessionId },
+  });
+  requireMemoryBelongsToUnit(memory, unitId);
+
+  const turns = Array.isArray(memory.turns) ? memory.turns : [];
+  if (turns.length >= 20) {
+    throw new AppError({
+      message: "Phiên AI đã đủ 20 lượt trao đổi. Hãy tạo gợi ý mới.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+
+  const loadCatalogFn = opts.loadCatalog ?? loadCatalog;
+  const loadMemoriesFn = opts.loadMemories ?? ((targetUnitId, args) => loadMemories(targetUnitId, args, prismaClient));
+  const loadSuppliersFn = opts.loadDefaultSuppliers ?? loadDefaultSuppliers;
+  const getEffectiveFn = opts.getEffectivePrices ?? getEffectivePrices;
+  const [{ commodities, catalogText }, { memoryText }, eff, defaultSupplierByCid] = await Promise.all([
+    loadCatalogFn(storageUnitId),
+    loadMemoriesFn(unitId, { limit: 20 }),
+    getEffectiveFn({ unitId, date: new Date().toISOString().slice(0, 10) }, scope, effectiveUnitIds, dataScope),
+    loadSuppliersFn(storageUnitId),
+  ]);
+
+  const llmPrompt = buildIssueSlipAiChatPrompt({
+    message: String(message ?? "").trim(),
+    currentPreview,
+    turns,
+    catalogText,
+    memoryText,
+  });
+
+  const complete = opts.completeMenuJson ?? completeMenuJson;
+  const llmJson = await complete(llmPrompt, {
+    configOverride: menuAiCfg,
+    fetchImpl: opts.fetchImpl,
+    retryUserHint: "Hay tra lai dung schema header va lines[] (phieu xuat LTTP).",
+  });
+
+  const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
+  const enriched = enrichLlmIssueSlipDraft({
+    llm: llmJson,
+    commodities,
+    resolveLine: ({ commodityId, priceKind }) =>
+      resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid),
+  });
+  const tgsxFiltered = dropTgsxUnlessSignaled({
+    lines: enriched.lines,
+    warnings: enriched.warnings,
+    signalTexts: [memory.prompt, ...turns.map((turn) => turn?.text), String(message ?? "").trim()],
+  });
+
+  const scopeSanitize =
+    opts.scopeSanitizeIssueSlipAiHeaderDraft ?? scopeSanitizeIssueSlipAiHeaderDraft;
+  const headerDraft = await scopeSanitize(enriched.headerDraft, {
+    effectiveUnitIds,
+    storageUnitId,
+    requestRecipientUnitId: currentPreview?.headerDraft?.recipientUnitId ?? null,
+    warnings: tgsxFiltered.warnings,
+    deps: opts.headerScopeDeps ?? defaultIssueSlipAiHeaderScopeDeps,
+  });
+
+  const at = (opts.now ? opts.now() : new Date()).toISOString();
+  const nextTurns = [
+    ...turns,
+    { role: "user", text: String(message ?? "").trim(), at },
+    { role: "assistant", text: buildAssistantTurnText(headerDraft, tgsxFiltered.lines), at },
+  ];
+  await prismaClient.lttpIssueSlipAiMemory.update({
+    where: { sessionId },
+    data: { turns: nextTurns },
+  });
+
+  return {
+    headerDraft,
+    lines: tgsxFiltered.lines,
+    warnings: tgsxFiltered.warnings,
+    sessionId,
+    meta: {
+      memorySampleCount: turns.length,
+      model: menuAiCfg.model,
+    },
+  };
+}
+
+async function commitIssueSlipAiMemory(
+  { sessionId, unitId, finalPreview, userId },
+  scope,
+  effectiveUnitIds,
+  dataScope,
+  callerUnitId,
+  opts = {},
+) {
+  assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId);
+  const prismaClient = getPrismaClient(opts);
+  const result = await prismaClient.lttpIssueSlipAiMemory.updateMany({
+    where: { sessionId, unitId },
+    data: {
+      finalPreview,
+      updatedById: userId ?? null,
+    },
+  });
+  if (!result?.count) {
+    throw new AppError({
+      message: "Không tìm thấy phiên AI để lưu preview cuối.",
+      statusCode: 404,
+      code: ERROR_CODES.NOT_FOUND,
+    });
+  }
+}
+
+async function linkIssueSlipAiMemory(
+  { sessionId, unitId, issueSlipId, userId },
+  scope,
+  effectiveUnitIds,
+  dataScope,
+  callerUnitId,
+  opts = {},
+) {
+  assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId);
+  const prismaClient = getPrismaClient(opts);
+  const [memory, issueSlip] = await Promise.all([
+    prismaClient.lttpIssueSlipAiMemory.findUnique({ where: { sessionId } }),
+    prismaClient.lttpIssueSlip.findUnique({
+      where: { id: issueSlipId },
+      select: { id: true, unitId: true },
+    }),
+  ]);
+  requireMemoryBelongsToUnit(memory, unitId);
+  requireIssueSlipBelongsToUnit(issueSlip, unitId);
+
+  await prismaClient.lttpIssueSlipAiMemory.update({
+    where: { sessionId },
+    data: {
+      issueSlipId,
+      updatedById: userId ?? null,
+    },
+  });
+}
+
+export {
+  buildIssueSlipAiHistoryWhere,
+  buildIssueSlipAiPrompt,
+  chatIssueSlipAi,
+  commitIssueSlipAiMemory,
+  linkIssueSlipAiMemory,
+  suggestIssueSlipAi,
+};

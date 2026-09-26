@@ -45,7 +45,12 @@ import {
   updateIssueSlip,
   upsertIssueFormDefaults,
 } from "./lttp.service.js";
-import { suggestIssueSlipAi } from "./lttp-issue-slip-ai.service.js";
+import {
+  chatIssueSlipAi,
+  commitIssueSlipAiMemory,
+  linkIssueSlipAiMemory,
+  suggestIssueSlipAi,
+} from "./lttp-issue-slip-ai.service.js";
 import { buildIssueSlipDocumentPdfBuffer } from "./lttp-issue-slip-document.service.js";
 import { mergePdfBuffers } from "./lttp-pdf-merge.js";
 
@@ -453,8 +458,48 @@ async function suggestIssueSlipAiController(req, res) {
     req.effectiveUnitIds,
     req.dataScope,
     req.user.unitId,
+    { actorUserId: req.user.id },
   );
   return respondSuccess(res, { message: "Đã tạo gợi ý phiếu xuất", data });
+}
+
+async function chatIssueSlipAiController(req, res) {
+  const data = await chatIssueSlipAi(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+    req.user.unitId,
+  );
+  return respondSuccess(res, { message: "Đã cập nhật gợi ý phiếu xuất", data });
+}
+
+async function commitIssueSlipAiMemoryController(req, res) {
+  await commitIssueSlipAiMemory(
+    {
+      ...req.validatedBody,
+      userId: req.user.id,
+    },
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+    req.user.unitId,
+  );
+  return respondSuccess(res, { message: "Đã lưu preview AI phiếu xuất", data: null });
+}
+
+async function linkIssueSlipAiMemoryController(req, res) {
+  await linkIssueSlipAiMemory(
+    {
+      ...req.validatedBody,
+      userId: req.user.id,
+    },
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+    req.user.unitId,
+  );
+  return respondSuccess(res, { message: "Đã liên kết memory AI với phiếu xuất", data: null });
 }
 
 async function createIssueSlipController(req, res) {
@@ -651,9 +696,12 @@ async function putBuyerDefaultForUnitController(req, res) {
 }
 
 export {
+  chatIssueSlipAiController,
+  commitIssueSlipAiMemoryController,
   createCommodityController,
   createFoodGroupController,
   suggestIssueSlipAiController,
+  linkIssueSlipAiMemoryController,
   createIssueSlipController,
   createPriceTableController,
   deleteCommodityController,

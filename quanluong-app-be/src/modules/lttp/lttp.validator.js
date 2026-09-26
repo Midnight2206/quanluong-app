@@ -120,6 +120,25 @@ const aiSuggestIssueSlipBodySchema = z.object({
   recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
 });
 
+const aiChatIssueSlipBodySchema = z.object({
+  sessionId: z.string().uuid(),
+  unitId: z.coerce.number().int().positive(),
+  message: z.string().trim().min(1).max(2000),
+  currentPreview: z.record(z.any()).optional(),
+});
+
+const aiMemoryCommitBodySchema = z.object({
+  sessionId: z.string().uuid(),
+  unitId: z.coerce.number().int().positive(),
+  finalPreview: z.record(z.any()),
+});
+
+const aiMemoryLinkBodySchema = z.object({
+  sessionId: z.string().uuid(),
+  unitId: z.coerce.number().int().positive(),
+  issueSlipId: z.coerce.number().int().positive(),
+});
+
 const createIssueSlipBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
@@ -315,6 +334,9 @@ export {
   createFoodGroupBodySchema,
   dailyOrderSummaryQuerySchema,
   aiSuggestIssueSlipBodySchema,
+  aiChatIssueSlipBodySchema,
+  aiMemoryCommitBodySchema,
+  aiMemoryLinkBodySchema,
   createIssueSlipBodySchema,
   createPriceTableBodySchema,
   effectiveQuerySchema,

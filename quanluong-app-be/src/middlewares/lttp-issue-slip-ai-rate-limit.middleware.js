@@ -17,4 +17,20 @@ const lttpIssueSlipAiSuggestRateLimit = rateLimit({
   },
 });
 
-export { lttpIssueSlipAiSuggestRateLimit };
+const lttpIssueSlipAiChatRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const uid = req.user?.id != null ? String(req.user.id) : "anon";
+    const ip = req.ip ?? req.socket?.remoteAddress ?? "unknown";
+    return `lttp-issue-ai-chat:${uid}:${ip}`;
+  },
+  message: {
+    success: false,
+    message: "Quá nhiều yêu cầu AI chat phiếu xuất. Thử lại sau 15 phút.",
+  },
+});
+
+export { lttpIssueSlipAiChatRateLimit, lttpIssueSlipAiSuggestRateLimit };

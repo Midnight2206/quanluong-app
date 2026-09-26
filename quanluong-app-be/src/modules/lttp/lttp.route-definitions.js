@@ -510,6 +510,45 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "aiChatIssueSlip",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-chat",
+    pathRoute: "/api/lttp/issue-slips/ai-chat",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "AI chat chỉnh gợi ý phiếu xuất LTTP",
+      description:
+        "Trao đổi tiếp với AI trên một phiên gợi ý phiếu xuất LTTP để chỉnh header và dòng hàng trước khi lưu.",
+    },
+  },
+  {
+    key: "aiMemoryCommitIssueSlip",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-memory/commit",
+    pathRoute: "/api/lttp/issue-slips/ai-memory/commit",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Lưu preview AI phiếu xuất LTTP",
+      description:
+        "Lưu preview cuối của một phiên AI phiếu xuất LTTP để làm memory tham chiếu cho các gợi ý sau.",
+    },
+  },
+  {
+    key: "aiMemoryLinkIssueSlip",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-memory/link",
+    pathRoute: "/api/lttp/issue-slips/ai-memory/link",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Liên kết memory AI với phiếu xuất LTTP",
+      description:
+        "Gắn một phiên AI phiếu xuất LTTP với phiếu đã lưu để tăng chất lượng memory theo đơn vị.",
+    },
+  },
+  {
     key: "getIssueSlip",
     method: "GET",
     module: LTTP_MODULE_NAME,
