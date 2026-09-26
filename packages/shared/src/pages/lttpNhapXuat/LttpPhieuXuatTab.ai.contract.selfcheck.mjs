@@ -16,6 +16,10 @@ assert.match(tabSrc, /aiSessionId/);
 assert.match(tabSrc, /useLinkLttpIssueSlipAiMemoryMutation|ai-memory\/link/);
 assert.match(tabSrc, /handleApplyIssueSlipAiPreview = useCallback\(\s*\(preview,\s*meta\)/);
 assert.match(tabSrc, /setAiSessionId\(meta\?\.sessionId \?\? null\)/);
+assert.match(
+  tabSrc,
+  /await enqueueCreate\([\s\S]*?void clearIssueSlipPersist\(\);[\s\S]*?setAiSessionId\(null\)/,
+);
 assert.match(tabSrc, /!isEditMode/);
 assert.match(tabSrc, /headerTouched/);
 assert.match(

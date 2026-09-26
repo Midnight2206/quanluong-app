@@ -41,3 +41,18 @@ feat(lttp): wire AI memory link after save
 ## Concerns
 
 - Offline/outbox-created slips still do not link AI memory automatically because the tab does not receive the eventual server-created slip id during flush. This is documented inline and left intentionally out of scope for this task.
+
+## Follow-up fix (Important finding)
+
+After offline enqueue create succeeds, the tab now calls `setAiSessionId(null)` alongside `clearIssueSlipPersist()` so a subsequent online create cannot mis-link a stale AI session. The inline `ponytail:` note that offline memory link stays deferred until flush is unchanged on the online reset path and mirrored on the offline enqueue branch.
+
+### Checks (re-run)
+
+- `node packages/shared/src/pages/lttpNhapXuat/LttpPhieuXuatTab.ai.contract.selfcheck.mjs` -> ok (includes offline enqueue clears `aiSessionId`)
+- `node packages/shared/src/features/lttp/api/lttpIssueSlipAi.api.selfcheck.mjs` -> ok
+
+### Commit
+
+```text
+fix(lttp): clear aiSessionId after offline enqueue create
+```

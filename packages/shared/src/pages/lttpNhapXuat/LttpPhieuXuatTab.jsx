@@ -1591,6 +1591,8 @@ export function LttpPhieuXuatTab({
             });
             void clearIssueSlipPersist();
             setDraftNotice(false);
+            setAiSessionId(null);
+            // ponytail: offline link deferred until outbox flush returns server id to the tab.
           }
           notifySuccess("Đã lưu hàng đợi, sẽ gửi khi có mạng");
           return;
