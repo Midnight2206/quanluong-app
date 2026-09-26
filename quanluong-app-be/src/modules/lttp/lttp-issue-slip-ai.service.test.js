@@ -17,9 +17,19 @@ test("buildIssueSlipAiPrompt system mentions JSON schema; user has prompt and ca
   assert.match(system, /JSON/i);
   assert.match(system, /header/i);
   assert.match(system, /lines/i);
+  assert.match(system, /Mac dinh priceKind=market/);
   assert.match(user, /Xuất 10kg gạo cho bếp/);
   assert.match(user, /LTTP catalog block/);
   assert.match(user, /2026-09-26/);
+});
+
+test("buildIssueSlipAiHistoryWhere adds recipientUnitId when provided", async () => {
+  const { buildIssueSlipAiHistoryWhere } = await import("./lttp-issue-slip-ai.service.js");
+  assert.deepEqual(buildIssueSlipAiHistoryWhere(7, {}), { unitId: 7 });
+  assert.deepEqual(buildIssueSlipAiHistoryWhere(7, { recipientUnitId: 33 }), {
+    unitId: 7,
+    recipientUnitId: 33,
+  });
 });
 
 test("suggestIssueSlipAi returns headerDraft, lines, warnings, meta without DB write", async () => {

@@ -32,14 +32,23 @@ async function loadCatalog(storageUnitId) {
   };
 }
 
-async function loadHistorySamples(storageUnitId, limit = 20) {
+function buildIssueSlipAiHistoryWhere(storageUnitId, { recipientUnitId } = {}) {
+  const where = { unitId: storageUnitId };
+  if (recipientUnitId != null) {
+    where.recipientUnitId = recipientUnitId;
+  }
+  return where;
+}
+
+async function loadHistorySamples(storageUnitId, { recipientUnitId, limit = 20 } = {}) {
   const take = Math.min(Math.max(Number(limit) || 20, 1), 20);
   const slips = await prisma.lttpIssueSlip.findMany({
-    where: { unitId: storageUnitId },
+    where: buildIssueSlipAiHistoryWhere(storageUnitId, { recipientUnitId }),
     orderBy: [{ issueDate: "desc" }, { id: "desc" }],
     take,
     select: {
       issueDate: true,
+      recipientUnitId: true,
       note: true,
       lines: {
         orderBy: { id: "asc" },
@@ -103,7 +112,7 @@ async function suggestIssueSlipAi(
   const [{ commodities, catalogText }, { historyText, historySampleCount }, eff, defaultSupplierByCid] =
     await Promise.all([
       loadCatalogFn(storageUnitId),
-      loadHistoryFn(storageUnitId),
+      loadHistoryFn(storageUnitId, { recipientUnitId }),
       getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
       loadSuppliersFn(storageUnitId),
     ]);
@@ -158,4 +167,4 @@ async function suggestIssueSlipAi(
   };
 }
 
-export { buildIssueSlipAiPrompt, suggestIssueSlipAi };
+export { buildIssueSlipAiHistoryWhere, buildIssueSlipAiPrompt, suggestIssueSlipAi };
