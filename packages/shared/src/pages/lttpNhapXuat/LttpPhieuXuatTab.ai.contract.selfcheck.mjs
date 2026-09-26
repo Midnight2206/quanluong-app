@@ -12,6 +12,10 @@ const tabSrc = readFileSync(join(here, "LttpPhieuXuatTab.jsx"), "utf8");
 assert.match(tabSrc, /AI gợi ý phiếu/);
 assert.match(tabSrc, /LttpIssueSlipAiSuggestDialog/);
 assert.match(tabSrc, /applyIssueSlipAiPreview/);
+assert.match(tabSrc, /aiSessionId/);
+assert.match(tabSrc, /useLinkLttpIssueSlipAiMemoryMutation|ai-memory\/link/);
+assert.match(tabSrc, /handleApplyIssueSlipAiPreview = useCallback\(\s*\(preview,\s*meta\)/);
+assert.match(tabSrc, /setAiSessionId\(meta\?\.sessionId \?\? null\)/);
 assert.match(tabSrc, /!isEditMode/);
 assert.match(tabSrc, /headerTouched/);
 assert.match(

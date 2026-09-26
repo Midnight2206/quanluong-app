@@ -30,6 +30,7 @@ import {
   useGetLttpNextIssueSlipSerialQuery,
   useGetLttpRecipientUsersQuery,
   useGetLttpReceivingDefaultRecipientQuery,
+  useLinkLttpIssueSlipAiMemoryMutation,
   usePutLttpIssueFormDefaultsMutation,
   useResyncLttpIssueSlipPricesMutation,
   useUpdateLttpIssueSlipMutation,
@@ -498,6 +499,7 @@ export function LttpPhieuXuatTab({
   const [slipNote, setSlipNote] = useState("");
   const [headerTouched, setHeaderTouched] = useState(emptyHeaderTouched);
   const [aiSuggestOpen, setAiSuggestOpen] = useState(false);
+  const [aiSessionId, setAiSessionId] = useState(null);
 
   const [rows, setRows] = useState(() => [newEmptyRow()]);
   const rowQtyRefs = useRef({});
@@ -570,6 +572,10 @@ export function LttpPhieuXuatTab({
     const prev = prevCreateUnitRef.current;
     const unitChanged = prev != null && Number(prev) !== Number(selectedUnitId);
     const draft = issueSlipDraft;
+
+    if (unitChanged) {
+      setAiSessionId(null);
+    }
 
     if (draft && Number(draft.unitId) === Number(selectedUnitId)) {
       const ymd =
@@ -963,6 +969,7 @@ export function LttpPhieuXuatTab({
     useCreateLttpIssueSlipMutation();
   const [updateSlip, { isLoading: updateBusy }] =
     useUpdateLttpIssueSlipMutation();
+  const [linkIssueSlipAiMemory] = useLinkLttpIssueSlipAiMemoryMutation();
   const { enqueueCreate, enqueueUpdate, isOfflineLikeError } =
     useLttpIssueSlipOffline();
   const [resyncSlipPrices, { isLoading: resyncBusy }] =
@@ -1150,6 +1157,7 @@ export function LttpPhieuXuatTab({
     setSignerRecipient("");
     setRecipientUnitId(Number(selectedUnitId));
     setSlipNote("");
+    setAiSessionId(null);
     setHeaderTouched(emptyHeaderTouched());
     defLoadedKey.current = null;
     skipReceivingDefAfterDraftRef.current = false;
@@ -1162,7 +1170,7 @@ export function LttpPhieuXuatTab({
   }, []);
 
   const handleApplyIssueSlipAiPreview = useCallback(
-    (preview) => {
+    (preview, meta) => {
       const { headerPatch, nextRows, appliedCount, skippedCount } =
         applyIssueSlipAiPreview({
           header: {
@@ -1198,6 +1206,7 @@ export function LttpPhieuXuatTab({
       if (headerPatch.slipNote != null) {
         setSlipNote(String(headerPatch.slipNote));
       }
+      setAiSessionId(meta?.sessionId ?? null);
       setRows(nextRows);
       notifySuccess(
         `Đã áp dụng ${appliedCount} dòng; bỏ qua ${skippedCount} dòng chưa khớp LTTP`,
@@ -1545,12 +1554,29 @@ export function LttpPhieuXuatTab({
         ...sharedPayload,
       });
       notifySuccess("Đã lưu phiếu xuất.");
+      if (created?.id != null && aiSessionId) {
+        try {
+          await linkIssueSlipAiMemory({
+            sessionId: aiSessionId,
+            unitId: selectedUnitId,
+            issueSlipId: created.id,
+          }).unwrap();
+        } catch (linkErr) {
+          notifyError(
+            linkErr?.data?.message ||
+              linkErr?.message ||
+              "Đã lưu phiếu, nhưng chưa liên kết được ghi nhớ AI.",
+          );
+        }
+      }
       if (created?.id != null) {
         openSavedSlipPdf(created.id);
       }
       void clearIssueSlipPersist();
       setDraftNotice(false);
       setRows([newEmptyRow()]);
+      setAiSessionId(null);
+      // ponytail: offline link deferred until outbox flush returns server id to the tab.
       refetchNextSerial();
     } catch (err) {
       if (user?.id != null && isOfflineLikeError(err)) {

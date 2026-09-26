@@ -1,21 +1,43 @@
-# Task 7 Report: Outbox create-only + flush (P3, X1)
+# Task 7 Report: Wire `aiSessionId` on tab + link after save
 
-## Done
+## Status
 
-- `packages/shared/src/lib/clientPersist/outbox.js`: `OUTBOX_KIND_CREATE`, `assertCreateOnlyKind` (X1), `enqueueOutbox`, `flushOutbox` (pending→sending→done|failed; 4xx no retry; 5xx/network retries max 5), `isOutboxEligibleError`, `setOutboxStoreForTest`.
-- `outbox.selfcheck.mjs`: X1 asserts + mock IDB flush — pass.
-- `lttpApi.js`: `enqueueLttpIssueSlipCreateOffline`, re-export `isOutboxEligibleError` / `OUTBOX_KIND_CREATE` (update mutation unchanged).
-- `LttpPhieuXuatTab.jsx`: create submit catch enqueues on network/offline + `notifySuccess` queue message (sonner via existing notify).
-- `ClientPersistenceProvider.jsx`: `online` listener + initial flush when ready; `invalidateLttpData` after any flush; clears issue-slip draft per flushed create.
+**DONE** — `LttpPhieuXuatTab` now keeps the AI `sessionId` after Apply, links it to the created issue slip on successful online save, and clears the session on the same reset/unit-change paths as the form.
 
-## Verification
+## Changes
 
-```bash
-node packages/shared/src/lib/clientPersist/outbox.selfcheck.mjs
+### `packages/shared/src/pages/lttpNhapXuat/LttpPhieuXuatTab.jsx`
+
+- Added local `aiSessionId` state in create mode.
+- Updated `handleApplyIssueSlipAiPreview(preview, meta)` to accept dialog metadata and store `meta.sessionId`.
+- Added `useLinkLttpIssueSlipAiMemoryMutation`.
+- On successful online create, when `created.id` and `aiSessionId` are present, now calls `POST /lttp/issue-slips/ai-memory/link` with `{ sessionId, unitId, issueSlipId }`.
+- Link failure now shows a soft `notifyError(...)` and does not roll back or block the created slip.
+- Cleared `aiSessionId` on unit switch, draft discard/reset, and post-save form reset.
+- Added a `ponytail:` comment documenting that offline/outbox linking is intentionally deferred for now.
+
+### `packages/shared/src/pages/lttpNhapXuat/LttpPhieuXuatTab.ai.contract.selfcheck.mjs`
+
+- Extended the static contract to assert:
+  - `aiSessionId` state exists
+  - the tab references the AI memory link hook/route
+  - the apply handler accepts `(preview, meta)`
+  - the tab stores `meta.sessionId`
+
+## Checks
+
+Verified:
+
+- `node packages/shared/src/pages/lttpNhapXuat/LttpPhieuXuatTab.ai.contract.selfcheck.mjs` -> ok
+- `node packages/shared/src/features/lttp/api/lttpIssueSlipAi.api.selfcheck.mjs` -> ok
+- IDE lints on edited files -> no errors
+
+## Commit
+
+```text
+feat(lttp): wire AI memory link after save
 ```
 
-## Manual (Step 5)
+## Concerns
 
-DevTools offline → new phiếu xuất → toast queue → online → flush POST → list refetch; update path never enqueues.
-
-## Not committed (per task override).
+- Offline/outbox-created slips still do not link AI memory automatically because the tab does not receive the eventual server-created slip id during flush. This is documented inline and left intentionally out of scope for this task.
