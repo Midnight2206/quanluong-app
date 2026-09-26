@@ -8,6 +8,7 @@ import { permissionMiddleware } from "../../middlewares/permission.middleware.js
 import { superadminMiddleware } from "../../middlewares/superadmin.middleware.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
 import { unitDataScopeMiddleware } from "../../middlewares/unit-data-scope.middleware.js";
+import { lttpIssueSlipAiSuggestRateLimit } from "../../middlewares/lttp-issue-slip-ai-rate-limit.middleware.js";
 import { DATA_SCOPE_KINDS } from "../../shared/data-scope/data-scope.registry.js";
 import { getIssueSlipUnitIdById } from "./lttp.service.js";
 import {
@@ -56,6 +57,7 @@ import {
   putBuyerDefaultForUnitController,
   resolveIssueSlipLineController,
   resyncIssueSlipPricesController,
+  suggestIssueSlipAiController,
   updateIssueSlipController,
 } from "./lttp.controller.js";
 import { LTTP_ROUTE_DEFINITIONS } from "./lttp.route-definitions.js";
@@ -65,6 +67,7 @@ import {
   createCommodityBodySchema,
   createLttpSupplierBodySchema,
   createFoodGroupBodySchema,
+  aiSuggestIssueSlipBodySchema,
   createIssueSlipBodySchema,
   createPriceTableBodySchema,
   effectiveQuerySchema,
@@ -209,6 +212,15 @@ lttpRouter.post(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   permissionMiddleware([routePermissions.createIssueSlip]),
   asyncHandler(createIssueSlipController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-suggest",
+  validateRequest({ body: aiSuggestIssueSlipBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.aiSuggestIssueSlip]),
+  lttpIssueSlipAiSuggestRateLimit,
+  asyncHandler(suggestIssueSlipAiController),
 );
 
 lttpRouter.get(

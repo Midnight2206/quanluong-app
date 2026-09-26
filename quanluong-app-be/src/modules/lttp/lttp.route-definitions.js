@@ -497,6 +497,19 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "aiSuggestIssueSlip",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-suggest",
+    pathRoute: "/api/lttp/issue-slips/ai-suggest",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "AI suggest LTTP issue slip draft",
+      description:
+        "Gợi ý header và dòng hàng phiếu xuất LTTP từ mô tả ngôn ngữ tự nhiên (không ghi DB).",
+    },
+  },
+  {
     key: "getIssueSlip",
     method: "GET",
     module: LTTP_MODULE_NAME,

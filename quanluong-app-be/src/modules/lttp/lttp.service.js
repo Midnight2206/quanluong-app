@@ -167,6 +167,13 @@ function assertIssueSlipLogicalUnitIsCallerUnit(logicalUnitId, callerUnitId) {
   }
 }
 
+function assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId) {
+  assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertIssueSlipLogicalUnitIsCallerUnit(unitId, callerUnitId);
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+}
+
 function assertCommodityRowStorage(rowUnitId, dataScope) {
   if (rowUnitId !== dataScope.storageUnitId) {
     throw new AppError({
@@ -850,6 +857,17 @@ function resolveIssueSlipLinePriceSnapshot(hit, priceKind, commodityIdForMessage
     tgsxPrice,
     appliedPrice: marketPrice,
   };
+}
+
+function resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid) {
+  const cid = Number(commodityId);
+  const hit = priceByCid.get(cid);
+  const snap = resolveIssueSlipLinePriceSnapshot(hit, priceKind, cid);
+  const lttpSupplierId = defaultSupplierByCid.get(cid) ?? null;
+  if (!snap.ok) {
+    return { lttpSupplierId, unitPrice: null };
+  }
+  return { lttpSupplierId, unitPrice: snap.appliedPrice };
 }
 
 function mapIssueSlipLinePriceFields(r) {
@@ -3797,6 +3815,8 @@ export {
   putRecipientDefaultUser,
   putBuyerDefaultForUnit,
   resolveIssueSlipLine,
+  resolveIssueSlipAiSuggestLine,
+  assertIssueSlipWriteAccess,
   resyncIssueSlipLinePricesFromEffectiveTable,
   updateIssueSlip,
   upsertIssueFormDefaults,

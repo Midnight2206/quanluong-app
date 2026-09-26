@@ -45,6 +45,7 @@ import {
   updateIssueSlip,
   upsertIssueFormDefaults,
 } from "./lttp.service.js";
+import { suggestIssueSlipAi } from "./lttp-issue-slip-ai.service.js";
 import { buildIssueSlipDocumentPdfBuffer } from "./lttp-issue-slip-document.service.js";
 import { mergePdfBuffers } from "./lttp-pdf-merge.js";
 
@@ -445,6 +446,17 @@ async function exportIssueSlipsPdfMergedController(req, res) {
   res.send(merged);
 }
 
+async function suggestIssueSlipAiController(req, res) {
+  const data = await suggestIssueSlipAi(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+    req.user.unitId,
+  );
+  return respondSuccess(res, { message: "Đã tạo gợi ý phiếu xuất", data });
+}
+
 async function createIssueSlipController(req, res) {
   const row = await createIssueSlip(
     req.validatedBody,
@@ -641,6 +653,7 @@ async function putBuyerDefaultForUnitController(req, res) {
 export {
   createCommodityController,
   createFoodGroupController,
+  suggestIssueSlipAiController,
   createIssueSlipController,
   createPriceTableController,
   deleteCommodityController,

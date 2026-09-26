@@ -112,6 +112,14 @@ const issueSlipLineInputSchema = z.object({
   ),
 });
 
+const aiSuggestIssueSlipBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  prompt: z.string().trim().min(3).max(2000),
+  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
+  receivedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
+  recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
+});
+
 const createIssueSlipBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
@@ -306,6 +314,7 @@ export {
   createCommodityBodySchema,
   createFoodGroupBodySchema,
   dailyOrderSummaryQuerySchema,
+  aiSuggestIssueSlipBodySchema,
   createIssueSlipBodySchema,
   createPriceTableBodySchema,
   effectiveQuerySchema,
