@@ -1,68 +1,45 @@
-# Task 6 Report: Wire OfflineProvider + queue flush path
+# Task 6 Report: FE dialog chat + commit on Apply
 
 ## Status
 
-**DONE** — `OfflineProvider` wires reauth overlay, AUTH_EXPIRED handling, forbidden toast, and `verifySessionOrRefresh`; `useOfflineQueue` prefers provider flush.
+**DONE** — `LttpIssueSlipAiSuggestDialog` now keeps the AI `sessionId`, supports follow-up chat against the current preview, commits AI memory on Apply, and resets all local state on close.
 
 ## Changes
 
-### `OfflineProvider.jsx`
+### `packages/shared/src/pages/lttpNhapXuat/LttpIssueSlipAiSuggestDialog.jsx`
 
-- Added `reauthRequired` state; cleared on `userId` change alongside reconnect flags.
-- Injected `verifySessionOrRefreshFn` into `createOfflineSyncController` with auth store `setAuthState` + `mapPermissionsFromUser`.
-- Flush wrapper: `authExpired` → `setReauthRequired(true)`; `forbidden > 0` → `notifyWarning("Bạn không có quyền thực hiện thao tác này")`.
-- `runGate` catch: `AUTH_EXPIRED` → `setReauthRequired(true)`, return (keeps `reconnectBlocking`, no `reconnectError`).
-- `handleReauthSuccess`: verify session → clear reauth → `runGate()` if saw offline else `flushOutboxFn()`.
-- UI: `ReauthOverlay` when `reauthRequired`; reconnect overlay when `reconnectBlocking && !reauthRequired`; pointer-events block when either.
+- Added `useChatLttpIssueSlipAiMutation` and `useCommitLttpIssueSlipAiMemoryMutation`.
+- Stored `sessionId` separately from the preview payload after `ai-suggest`.
+- Added chat UI/state (`chatMessage`, local `turns`) shown only after a preview exists.
+- Wired chat submit to `POST /lttp/issue-slips/ai-chat` with `{ sessionId, unitId, message, currentPreview }`, then replaced the preview with the returned draft.
+- Changed Apply flow to `await commit({ sessionId, unitId, finalPreview: preview })` before calling `onApply(preview, { sessionId })`.
+- Commit failure now shows `notifyError(...)` and does not apply/close.
+- Close path now clears prompt, preview, session, chat input, and local turns.
 
-### `useOfflineQueue.js`
+### `packages/shared/src/pages/lttpNhapXuat/LttpIssueSlipAiSuggestDialog.contract.selfcheck.mjs`
 
-- Primary flush/reapply path uses `flushFromProvider()` when `ready && db && userId`.
-- Guarded direct `flushOutbox` only before sync controller mounts (`ready` false but `db` present).
+- Extended the static contract to require `sessionId`, chat wiring, and commit wiring in the dialog source and matching hooks/routes in `lttpApi.js`.
 
-### `OfflineProvider.reauth.contract.selfcheck.mjs`
+## Checks
 
-- Static contract asserts required strings in provider source.
+TDD sequence:
 
-## Tests (Step 8)
+- `node packages/shared/src/pages/lttpNhapXuat/LttpIssueSlipAiSuggestDialog.contract.selfcheck.mjs` → **FAIL** before implementation
+- `node packages/shared/src/pages/lttpNhapXuat/LttpIssueSlipAiSuggestDialog.contract.selfcheck.mjs` → **ok** after implementation
 
-| Selfcheck | Result |
-|-----------|--------|
-| `outbox/errors.selfcheck.mjs` | ok |
-| `outbox/outbox.selfcheck.mjs` | ok |
-| `auth/verifySessionOrRefresh.selfcheck.mjs` | ok |
-| `sync/OfflineSyncController.selfcheck.mjs` | ok |
-| `runReconnectSync.selfcheck.mjs` | ok |
-| `ui/ReauthOverlay.contract.selfcheck.mjs` | ok |
-| `OfflineProvider.reauth.contract.selfcheck.mjs` | ok |
+Final verification:
 
-TDD: contract selfcheck run before implementation (FAIL), after implementation (ok).
-
-## Manual smoke (Step 9)
-
-**SKIP** — no browser session in this run.
-
-Recommended manual checks:
-
-1. Expire session with pending outbox → `ReauthOverlay` (`Phiên hết hạn, đăng nhập lại`); items stay `pending`.
-2. Login same user → overlay closes; flush/reconnect resumes.
-3. Mixed 403 + OK → one forbidden toast; no reauth modal.
-
-## Spec coverage (this task)
-
-| Requirement | Covered |
-|-------------|---------|
-| Resume after login | yes (`handleReauthSuccess`) |
-| 403 toast once | yes (provider flush wrapper) |
-| No wipe on AUTH_EXPIRED | yes (no draft/outbox clear on auth expired) |
+- `node packages/shared/src/pages/lttpNhapXuat/LttpIssueSlipAiSuggestDialog.contract.selfcheck.mjs` → ok
+- `node packages/shared/src/features/lttp/api/lttpIssueSlipAi.api.selfcheck.mjs` → ok
+- IDE lints on edited dialog/selfcheck files → no errors
 
 ## Commit
 
-```
-feat(offline): reauth overlay and forbidden toast on flush
+```text
+feat(lttp): add AI issue slip chat apply flow
 ```
 
 ## Concerns
 
-- Pre-controller window: `useOfflineQueue` may still call direct `flushOutbox` without verify/toast until `ready`; narrow race only.
-- `handleReauthSuccess` calls `runGate()` which sets `reconnectBlocking` again — intended for offline→online path.
+- `LttpPhieuXuatTab` still ignores the second `onApply` argument for now, which matches the task brief; Task 7 needs to persist/link `sessionId` after create.
+- Chat history shown in the dialog is local UI feedback only; the backend remains the source of truth for stored turns.

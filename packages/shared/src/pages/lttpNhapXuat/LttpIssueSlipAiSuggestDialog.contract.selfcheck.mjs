@@ -18,8 +18,17 @@ assert.match(dialogSrc, /onApply/);
 assert.match(dialogSrc, /Áp dụng/);
 assert.match(dialogSrc, /Gợi ý/);
 assert.match(dialogSrc, /useSuggestLttpIssueSlipAiMutation/);
+assert.match(dialogSrc, /useChatLttpIssueSlipAiMutation/);
+assert.match(dialogSrc, /useCommitLttpIssueSlipAiMemoryMutation/);
 assert.match(dialogSrc, /notifyError/);
+assert.match(dialogSrc, /sessionId/);
+assert.match(dialogSrc, /ai-chat|Chat|chat/);
+assert.match(dialogSrc, /ai-memory\/commit|commit/);
 assert.match(apiSrc, /useSuggestLttpIssueSlipAiMutation/);
+assert.match(apiSrc, /useChatLttpIssueSlipAiMutation/);
+assert.match(apiSrc, /useCommitLttpIssueSlipAiMemoryMutation/);
 assert.match(apiSrc, /\/lttp\/issue-slips\/ai-suggest/);
+assert.match(apiSrc, /\/lttp\/issue-slips\/ai-chat/);
+assert.match(apiSrc, /\/lttp\/issue-slips\/ai-memory\/commit/);
 
 console.log("LttpIssueSlipAiSuggestDialog contract: ok");

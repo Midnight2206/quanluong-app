@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { useSuggestLttpIssueSlipAiMutation } from "@/features/lttp/api/lttpApi";
+import {
+  useChatLttpIssueSlipAiMutation,
+  useCommitLttpIssueSlipAiMemoryMutation,
+  useSuggestLttpIssueSlipAiMutation,
+} from "@/features/lttp/api/lttpApi";
 import { notifyError } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { issueSlipPriceKindLabel } from "./lttpIssueSlipPriceKind.js";
@@ -23,6 +27,18 @@ function headerField(label, value) {
   );
 }
 
+function normalizePreview(data) {
+  if (!data) {
+    return null;
+  }
+  return {
+    headerDraft: data.headerDraft ?? null,
+    lines: Array.isArray(data.lines) ? data.lines : [],
+    warnings: Array.isArray(data.warnings) ? data.warnings : [],
+    meta: data.meta ?? null,
+  };
+}
+
 export function LttpIssueSlipAiSuggestDialog({
   open,
   onClose,
@@ -34,12 +50,24 @@ export function LttpIssueSlipAiSuggestDialog({
 }) {
   const [prompt, setPrompt] = useState("");
   const [preview, setPreview] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
+  const [chatMessage, setChatMessage] = useState("");
+  const [turns, setTurns] = useState([]);
   const [suggestAi, { isLoading: suggesting }] = useSuggestLttpIssueSlipAiMutation();
+  const [chatAi, { isLoading: chatting }] = useChatLttpIssueSlipAiMutation();
+  const [commitAi, { isLoading: committing }] = useCommitLttpIssueSlipAiMemoryMutation();
+
+  function resetDialog() {
+    setPrompt("");
+    setPreview(null);
+    setSessionId(null);
+    setChatMessage("");
+    setTurns([]);
+  }
 
   useEffect(() => {
     if (!open) {
-      setPrompt("");
-      setPreview(null);
+      resetDialog();
     }
   }, [open]);
 
@@ -47,7 +75,9 @@ export function LttpIssueSlipAiSuggestDialog({
     return null;
   }
 
+  const busy = suggesting || chatting || committing;
   const historyCount = preview?.meta?.historySampleCount ?? 0;
+  const memoryCount = preview?.meta?.memorySampleCount ?? 0;
   const unmapped =
     preview?.lines?.filter((l) => !l?.mapped).length ?? 0;
 
@@ -67,17 +97,68 @@ export function LttpIssueSlipAiSuggestDialog({
           ? { recipientUnitId: Number(recipientUnitId) }
           : {}),
       }).unwrap();
-      setPreview(data);
+      setSessionId(data?.sessionId ?? null);
+      setPreview(normalizePreview(data));
+      setChatMessage("");
+      setTurns([]);
     } catch (e) {
       notifyError(e?.data?.message ?? "Gợi ý AI thất bại");
     }
   }
 
-  function handleApply() {
+  async function handleChat() {
+    const trimmed = chatMessage.trim();
+    if (!preview || !sessionId) {
+      notifyError("Chưa có phiên AI để tiếp tục chat");
+      return;
+    }
+    if (!trimmed) {
+      notifyError("Nhập nội dung cần chỉnh");
+      return;
+    }
+    try {
+      const data = await chatAi({
+        sessionId,
+        unitId,
+        message: trimmed,
+        currentPreview: preview,
+      }).unwrap();
+      setPreview(normalizePreview(data));
+      setChatMessage("");
+      setTurns((prev) => [
+        ...prev,
+        { role: "user", text: trimmed },
+        { role: "assistant", text: "Đã cập nhật bản xem trước." },
+      ]);
+    } catch (e) {
+      notifyError(e?.data?.message ?? "Chat AI thất bại");
+    }
+  }
+
+  async function handleApply() {
     if (!preview) {
       return;
     }
-    onApply?.(preview);
+    if (!sessionId) {
+      notifyError("Chưa có sessionId AI để áp dụng");
+      return;
+    }
+    try {
+      await commitAi({
+        sessionId,
+        unitId,
+        finalPreview: preview,
+      }).unwrap();
+      onApply?.(preview, { sessionId });
+      resetDialog();
+      onClose?.();
+    } catch (e) {
+      notifyError(e?.data?.message ?? "Không lưu được ghi nhớ AI");
+    }
+  }
+
+  function handleClose() {
+    resetDialog();
     onClose?.();
   }
 
@@ -89,6 +170,7 @@ export function LttpIssueSlipAiSuggestDialog({
           <p className="text-xs text-muted-foreground">
             {issueDate ? `Ngày phiếu: ${issueDate}` : "Tạo phiếu xuất mới"}
             {preview ? ` · mẫu lịch sử: ${historyCount}` : ""}
+            {preview ? ` · mẫu nhớ: ${memoryCount}` : ""}
             {unmapped > 0 ? ` · chưa map: ${unmapped} dòng` : ""}
           </p>
         </div>
@@ -102,7 +184,7 @@ export function LttpIssueSlipAiSuggestDialog({
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Ví dụ: Xuất 10 kg gạo tẻ và 5 kg thịt heo cho bếp trưa ngày mai, giá mua TT…"
-              disabled={suggesting}
+              disabled={busy}
             />
           </label>
           {(preview?.warnings || []).length > 0 ? (
@@ -114,6 +196,52 @@ export function LttpIssueSlipAiSuggestDialog({
           ) : null}
           {preview ? (
             <>
+              <section className="space-y-2 rounded-md border border-border px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <header className="text-sm font-semibold">Trao đổi với AI</header>
+                  <span className="text-[11px] text-muted-foreground">Phiên: {sessionId}</span>
+                </div>
+                {turns.length > 0 ? (
+                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-md bg-muted/30 p-2 text-xs">
+                    {turns.map((turn, i) => (
+                      <div key={`${turn.role}-${i}`} className="rounded-md bg-background px-2 py-1">
+                        <span className="font-medium">
+                          {turn.role === "user" ? "Bạn" : "AI"}:
+                        </span>{" "}
+                        <span>{turn.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Có thể chat để chỉnh lại preview sau khi đã gợi ý.
+                  </p>
+                )}
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    className={inputClass}
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    placeholder="Ví dụ: đổi 5 kg gạo tẻ thành 7 kg gạo nếp"
+                    disabled={busy}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleChat();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void handleChat()}
+                    disabled={busy || !chatMessage.trim()}
+                  >
+                    {chatting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                    Gửi
+                  </Button>
+                </div>
+              </section>
               <section className="rounded-md border border-border px-3 py-2">
                 <header className="mb-2 text-sm font-semibold">Header</header>
                 <div className="space-y-0.5">
@@ -188,14 +316,15 @@ export function LttpIssueSlipAiSuggestDialog({
           ) : null}
         </div>
         <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3">
-          <Button type="button" variant="outline" onClick={onClose} disabled={suggesting}>
+          <Button type="button" variant="outline" onClick={handleClose} disabled={busy}>
             Hủy
           </Button>
-          <Button type="button" variant="secondary" onClick={handleSuggest} disabled={suggesting}>
+          <Button type="button" variant="secondary" onClick={() => void handleSuggest()} disabled={busy}>
             {suggesting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Gợi ý
           </Button>
-          <Button type="button" onClick={handleApply} disabled={suggesting || !preview}>
+          <Button type="button" onClick={() => void handleApply()} disabled={busy || !preview}>
+            {committing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Áp dụng
           </Button>
         </div>
