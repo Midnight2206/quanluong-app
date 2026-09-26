@@ -62,6 +62,8 @@ import {
   LTTP_ISSUE_SLIP_WIZARD_STEPS,
 } from "./LttpIssueSlipWizard";
 import { LttpIssueSlipMobileLineCard } from "./LttpIssueSlipMobileLineCard";
+import { applyIssueSlipAiPreview } from "./applyIssueSlipAiPreview.js";
+import { LttpIssueSlipAiSuggestDialog } from "./LttpIssueSlipAiSuggestDialog.jsx";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -72,6 +74,16 @@ const tableInputClass =
 
 const tableQtyDisplayClass =
   "flex h-7 items-center justify-center rounded-md border border-border bg-muted/35 px-0.5 text-center text-[10px] tabular-nums text-muted-foreground";
+
+function emptyHeaderTouched() {
+  return {
+    issueDate: false,
+    receivedDate: false,
+    recipientUnitId: false,
+    buyerUserId: false,
+    slipNote: false,
+  };
+}
 
 function localYmd(d = new Date()) {
   const y = d.getFullYear();
@@ -484,6 +496,8 @@ export function LttpPhieuXuatTab({
   const [signerApprover, setSignerApprover] = useState("");
   /** Phân biệt phiếu trên tab Đặt hàng — lưu `LttpIssueSlip.note`, không hiển thị trên bản in. */
   const [slipNote, setSlipNote] = useState("");
+  const [headerTouched, setHeaderTouched] = useState(emptyHeaderTouched);
+  const [aiSuggestOpen, setAiSuggestOpen] = useState(false);
 
   const [rows, setRows] = useState(() => [newEmptyRow()]);
   const rowQtyRefs = useRef({});
@@ -639,6 +653,7 @@ export function LttpPhieuXuatTab({
       setIssueDate(localYmd());
       setRows([newEmptyRow()]);
       setSlipNote("");
+      setHeaderTouched(emptyHeaderTouched());
       defLoadedKey.current = null;
       setDraftNotice(false);
     }
@@ -1135,9 +1150,68 @@ export function LttpPhieuXuatTab({
     setSignerRecipient("");
     setRecipientUnitId(Number(selectedUnitId));
     setSlipNote("");
+    setHeaderTouched(emptyHeaderTouched());
     defLoadedKey.current = null;
     skipReceivingDefAfterDraftRef.current = false;
   }, [selectedUnitId, clearIssueSlipPersist]);
+
+  const markHeaderFieldTouched = useCallback((field) => {
+    setHeaderTouched((prev) =>
+      prev[field] ? prev : { ...prev, [field]: true },
+    );
+  }, []);
+
+  const handleApplyIssueSlipAiPreview = useCallback(
+    (preview) => {
+      const { headerPatch, nextRows, appliedCount, skippedCount } =
+        applyIssueSlipAiPreview({
+          header: {
+            issueDate,
+            receivedDate,
+            recipientUnitId,
+            buyerUserId,
+            slipNote,
+          },
+          touched: headerTouched,
+          preview,
+          newEmptyRow,
+        });
+      if (headerPatch.issueDate != null && headerPatch.issueDate !== "") {
+        setIssueDate(String(headerPatch.issueDate).slice(0, 10));
+      }
+      if (headerPatch.receivedDate != null && headerPatch.receivedDate !== "") {
+        setReceivedDate(String(headerPatch.receivedDate).slice(0, 10));
+      }
+      if (headerPatch.recipientUnitId != null) {
+        setRecipientUnitId(Number(headerPatch.recipientUnitId));
+      }
+      if (headerPatch.recipientDisplayName != null) {
+        setRecipientUnitLabel(String(headerPatch.recipientDisplayName));
+      }
+      if (Object.prototype.hasOwnProperty.call(headerPatch, "buyerUserId")) {
+        const bid = headerPatch.buyerUserId;
+        setBuyerUserId(bid != null && bid !== "" ? String(bid) : "");
+      }
+      if (headerPatch.buyerDisplayName != null) {
+        setBuyerDisplayName(String(headerPatch.buyerDisplayName));
+      }
+      if (headerPatch.slipNote != null) {
+        setSlipNote(String(headerPatch.slipNote));
+      }
+      setRows(nextRows);
+      notifySuccess(
+        `Đã áp dụng ${appliedCount} dòng; bỏ qua ${skippedCount} dòng chưa khớp LTTP`,
+      );
+    },
+    [
+      issueDate,
+      receivedDate,
+      recipientUnitId,
+      buyerUserId,
+      slipNote,
+      headerTouched,
+    ],
+  );
 
   const applyRowPatch = useCallback((key, patch) => {
     setRows((prev) => {
@@ -1855,6 +1929,7 @@ export function LttpPhieuXuatTab({
               value={issueDate}
               onChange={(e) => {
                 const next = e.target.value;
+                markHeaderFieldTouched("issueDate");
                 setIssueDate(next);
                 setReceivedDate((prev) =>
                   !prev || prev === issueDate ? next : prev,
@@ -1871,7 +1946,10 @@ export function LttpPhieuXuatTab({
               type="date"
               className={cn(inputClass, "mt-0.5 block")}
               value={receivedDate}
-              onChange={(e) => setReceivedDate(e.target.value)}
+              onChange={(e) => {
+                markHeaderFieldTouched("receivedDate");
+                setReceivedDate(e.target.value);
+              }}
             />
           </label>
           {canPickUnits && units.length > 0 ? (
@@ -1881,6 +1959,7 @@ export function LttpPhieuXuatTab({
                 className={cn(inputClass, "mt-0.5 block")}
                 value={String(recipientUnitId ?? "")}
                 onChange={(e) => {
+                  markHeaderFieldTouched("recipientUnitId");
                   setRecipientUserId("");
                   setRecipientName("");
                   setSignerRecipient("");
@@ -1907,7 +1986,10 @@ export function LttpPhieuXuatTab({
             <select
               className={cn(inputClass, "mt-0.5 block")}
               value={buyerUserId}
-              onChange={(e) => setBuyerUserId(e.target.value)}
+              onChange={(e) => {
+                markHeaderFieldTouched("buyerUserId");
+                setBuyerUserId(e.target.value);
+              }}
               disabled={!canWrite}
             >
               <option value="">— Chọn người mua —</option>
@@ -1927,7 +2009,10 @@ export function LttpPhieuXuatTab({
             rows={2}
             maxLength={500}
             value={slipNote}
-            onChange={(e) => setSlipNote(e.target.value)}
+            onChange={(e) => {
+              markHeaderFieldTouched("slipNote");
+              setSlipNote(e.target.value);
+            }}
             placeholder="Ví dụ: bữa trưa 28/4, ca 1…"
             disabled={!canWrite}
           />
@@ -2575,6 +2660,17 @@ export function LttpPhieuXuatTab({
               ) : null}
               {isEditMode ? "Cập nhật phiếu" : "Lưu phiếu xuất"}
             </Button>
+            {!isEditMode ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-1.5 text-xs"
+                disabled={!selectedUnitId || !canWrite}
+                onClick={() => setAiSuggestOpen(true)}
+              >
+                AI gợi ý phiếu
+              </Button>
+            ) : null}
             {isEditMode ? (
               <Button
                 type="button"
@@ -2638,6 +2734,16 @@ export function LttpPhieuXuatTab({
           />
         ) : null}
       </form>
+
+      {!isEditMode ? (
+        <LttpIssueSlipAiSuggestDialog
+          open={aiSuggestOpen}
+          onClose={() => setAiSuggestOpen(false)}
+          unitId={selectedUnitId}
+          issueDate={issueDate}
+          onApply={handleApplyIssueSlipAiPreview}
+        />
+      ) : null}
     </div>
   );
 }
