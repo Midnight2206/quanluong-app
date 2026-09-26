@@ -455,6 +455,27 @@ export function useSuggestLttpIssueSlipAiMutation() {
   });
 }
 
+export function useChatLttpIssueSlipAiMutation() {
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/issue-slips/ai-chat", method: "post", data: body }),
+  });
+}
+
+export function useCommitLttpIssueSlipAiMemoryMutation() {
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/issue-slips/ai-memory/commit", method: "post", data: body }),
+  });
+}
+
+export function useLinkLttpIssueSlipAiMemoryMutation() {
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/issue-slips/ai-memory/link", method: "post", data: body }),
+  });
+}
+
 export function useUpdateLttpIssueSlipMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
