@@ -152,6 +152,7 @@ model User {
   lttpIssueSlipsCreated     LttpIssueSlip[]   @relation("LttpIssueSlipCreatedBy")
   lttpIssueSlipsAsRecipient LttpIssueSlip[] @relation("LttpIssueSlipRecipientUser")
   lttpIssueSlipsAsBuyer     LttpIssueSlip[] @relation("LttpIssueSlipBuyerUser")
+  lttpIssueSlipAiMemoriesCreated LttpIssueSlipAiMemory[] @relation("LttpIssueSlipAiMemoryCreatedBy")
   lttpFormDefaultsAsDefaultRecipientUser LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultRecipientUser")
   lttpFormDefaultsAsDefaultBuyerUser     LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultBuyerUser")
   lttpAsDefaultForRecipientUnit          LttpRecipientUnitDefaultUser[] @relation("LttpRecipientDefaultUserUser")
@@ -642,6 +643,7 @@ model Unit {
   lttpPartnerPaymentTotals LttpPartnerPaymentTotal[]
   lttpIssueSlips              LttpIssueSlip[]              @relation("LttpIssueSlipStorageUnit")
   lttpIssueSlipsAsRecipient   LttpIssueSlip[]              @relation("LttpIssueSlipRecipientUnit")
+  lttpIssueSlipAiMemories     LttpIssueSlipAiMemory[]      @relation("LttpIssueSlipAiMemoryUnit")
   lttpIssueSlipSerials        LttpIssueSlipSerial[]
   lttpUnitIssueFormDefaults   LttpUnitIssueFormDefaults?   @relation("LttpIssueFormDefaultUnit")
   lttpIssueFormDefaultRecip   LttpUnitIssueFormDefaults[]  @relation("LttpIssueFormDefaultRecipUnit")
@@ -891,11 +893,32 @@ model LttpIssueSlip {
   buyerUser     User?  @relation("LttpIssueSlipBuyerUser", fields: [buyerUserId], references: [id], onDelete: SetNull)
   lines         LttpIssueSlipLine[]
   chungTuDocuments ChungTuDocument[]
+  aiMemories    LttpIssueSlipAiMemory[]
 
   @@index([unitId, issueDate])
   @@index([unitId, bookMmyy, slipNo])
   @@index([createdById])
   @@index([recipientUnitId])
+}
+
+model LttpIssueSlipAiMemory {
+  id            Int       @id @default(autoincrement())
+  unitId        Int
+  sessionId     String    @unique @db.Char(36)
+  prompt        String    @db.VarChar(2000)
+  turns         Json      // [{ role, text, at }]
+  finalPreview  Json?
+  issueSlipId   Int?
+  createdById   Int
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  unit       Unit          @relation("LttpIssueSlipAiMemoryUnit", fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy  User          @relation("LttpIssueSlipAiMemoryCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  issueSlip  LttpIssueSlip? @relation(fields: [issueSlipId], references: [id], onDelete: SetNull)
+
+  @@index([unitId, updatedAt])
+  @@index([issueSlipId])
 }
 
 /// Số thứ tự phiếu tăng theo quyển (MMYY) từng đơn vị kho.
