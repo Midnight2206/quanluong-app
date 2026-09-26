@@ -23,7 +23,15 @@ function headerField(label, value) {
   );
 }
 
-export function LttpIssueSlipAiSuggestDialog({ open, onClose, unitId, issueDate, onApply }) {
+export function LttpIssueSlipAiSuggestDialog({
+  open,
+  onClose,
+  unitId,
+  issueDate,
+  receivedDate,
+  recipientUnitId,
+  onApply,
+}) {
   const [prompt, setPrompt] = useState("");
   const [preview, setPreview] = useState(null);
   const [suggestAi, { isLoading: suggesting }] = useSuggestLttpIssueSlipAiMutation();
@@ -54,6 +62,10 @@ export function LttpIssueSlipAiSuggestDialog({ open, onClose, unitId, issueDate,
         unitId,
         prompt: trimmed,
         ...(issueDate ? { issueDate } : {}),
+        ...(receivedDate ? { receivedDate } : {}),
+        ...(recipientUnitId != null && recipientUnitId !== ""
+          ? { recipientUnitId: Number(recipientUnitId) }
+          : {}),
       }).unwrap();
       setPreview(data);
     } catch (e) {

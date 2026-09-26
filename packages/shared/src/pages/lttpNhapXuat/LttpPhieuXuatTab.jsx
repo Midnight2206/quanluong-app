@@ -2741,6 +2741,8 @@ export function LttpPhieuXuatTab({
           onClose={() => setAiSuggestOpen(false)}
           unitId={selectedUnitId}
           issueDate={issueDate}
+          receivedDate={receivedDate}
+          recipientUnitId={recipientUnitId}
           onApply={handleApplyIssueSlipAiPreview}
         />
       ) : null}

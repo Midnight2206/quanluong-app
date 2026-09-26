@@ -1,24 +1,46 @@
-# Task 5 Report: `ReauthOverlay` UI
+# Task 5 Report: Wire `LttpPhieuXuatTab`
 
 ## Status
-**Complete**
 
-## Changes
-- `packages/shared/src/offline/ui/ReauthOverlay.jsx`: Modal overlay (`z-[70]`, `role="alertdialog"`) with headline `Phiên hết hạn, đăng nhập lại`; identifier/password form mirroring `LoginPage.jsx`; `useForm` + `zodResolver(loginSchema)` + `useLoginMutation`; on success `notifySuccess` then `await onSuccess?.()`; footer link to `/login` for Google (no authorize API).
-- `packages/shared/src/offline/ui/ReauthOverlay.contract.selfcheck.mjs`: Static contract checks (headline, hooks/schema, `onSuccess`, no `google/login`).
+**Done.** Create-mode toolbar button opens `LttpIssueSlipAiSuggestDialog`; apply uses `applyIssueSlipAiPreview` + `headerTouched` + `notifySuccess` toast.
 
 ## TDD
-1. Added contract selfcheck → `node …/ReauthOverlay.contract.selfcheck.mjs` → ENOENT (expected).
-2. Implemented component → same command → `ReauthOverlay contract: ok`.
+
+1. Added `LttpPhieuXuatTab.ai.contract.selfcheck.mjs` (button copy, dialog, helper, `!isEditMode`, `headerTouched`, toast).
+2. Wired `LttpPhieuXuatTab.jsx`: `headerTouched` on five header fields; reset on unit change / discard draft; apply handler patches header + replaces lines.
+3. All selfchecks + BE tests → **PASS** (see below).
 
 ## Test summary
+
 | Command | Result |
 |---------|--------|
-| `node packages/shared/src/offline/ui/ReauthOverlay.contract.selfcheck.mjs` | PASS (`ReauthOverlay contract: ok`) |
+| `applyIssueSlipAiPreview.selfcheck.mjs` | PASS |
+| `LttpIssueSlipAiSuggestDialog.contract.selfcheck.mjs` | PASS |
+| `LttpPhieuXuatTab.ai.contract.selfcheck.mjs` | PASS |
+| `lttp-issue-slip-ai-enrich.test.js` | PASS (3) |
+| `lttp-issue-slip-ai.service.test.js` | PASS (3) |
 
-## Concerns
-- Not wired into `OfflineProvider` (Task 6); overlay is unused until then.
-- Reauth uses same login mutation as full page (no superadmin portal redirect); acceptable for in-place session refresh per spec v1.
+## Manual smoke
+
+**SKIP** — no browser in this session.
 
 ## Commit
-`feat(offline): add ReauthOverlay for expired session`
+
+`feat(lttp): wire AI suggest into phiếu xuất create form`
+
+Files: `LttpPhieuXuatTab.jsx`, `LttpPhieuXuatTab.ai.contract.selfcheck.mjs`
+
+## Concerns
+
+- Wizard mobile layout: AI button only on desktop action row (`wizardShowDesktopActions`); wizard users on small screens may need a footer entry later.
+- Restored IDB draft does not mark `headerTouched`; AI may overwrite draft header fields user had not re-edited (same as fresh create).
+
+---
+
+## Final review fix (TGSX apply)
+
+**Root cause:** BE `resolveIssueSlipAiSuggestLine` returns resolved price in `unitPrice` only; `mapPreviewLineToRow` copied `tgsxPrice` from missing field → TGSX rows had `tgsxPrice: null` after Áp dụng → `resolveIssueSlipAppliedUnitPrice` / TGSX radio disabled.
+
+**Fix:** In `applyIssueSlipAiPreview.js`, when `priceKind === tgsx`, set `tgsxPrice` from `line.tgsxPrice ?? line.unitPrice`; market unchanged. Optional: dialog suggest body now includes `receivedDate` + `recipientUnitId` from tab for LLM context.
+
+**Tests:** `applyIssueSlipAiPreview.selfcheck.mjs` (+ TGSX unitPrice-only case); all three LTTP AI selfchecks PASS.

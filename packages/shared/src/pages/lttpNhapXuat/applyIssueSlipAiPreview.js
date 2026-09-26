@@ -74,15 +74,25 @@ function finitePriceOrNull(value) {
 function mapPreviewLineToRow(line, newEmptyRow) {
   const base = newEmptyRow();
   const quantity = Number(line.quantity);
+  const priceKind = normalizeIssueSlipPriceKind(line.priceKind);
+  const unitFromLine = finitePriceOrNull(line.unitPrice);
+  const tgsxFromLine = finitePriceOrNull(line.tgsxPrice);
+  // ponytail: BE suggest resolves applied price into unitPrice only; FE rows need tgsxPrice for TGSX kind.
+  const unitPrice = unitFromLine;
+  const tgsxPrice =
+    priceKind === LTTP_ISSUE_SLIP_PRICE_KIND.TGSX
+      ? (tgsxFromLine ?? unitFromLine)
+      : tgsxFromLine;
+
   return {
     ...base,
     commodityId: String(line.commodityId),
     codeDraft: line.code != null ? String(line.code) : "",
     lttpSupplierId: String(line.lttpSupplierId),
     quantity: String(quantity),
-    unitPrice: finitePriceOrNull(line.unitPrice),
-    tgsxPrice: finitePriceOrNull(line.tgsxPrice),
-    priceKind: normalizeIssueSlipPriceKind(line.priceKind),
+    unitPrice,
+    tgsxPrice,
+    priceKind,
     lineNote: "",
   };
 }

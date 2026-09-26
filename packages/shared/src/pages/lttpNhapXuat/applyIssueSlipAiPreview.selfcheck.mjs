@@ -98,6 +98,26 @@ assert.equal(out.nextRows[0].quantity, "2.5");
 assert.equal(out.nextRows[0].priceKind, LTTP_ISSUE_SLIP_PRICE_KIND.MARKET);
 assert.equal(out.nextRows[0].unitPrice, 15000);
 assert.equal(out.nextRows[1].priceKind, LTTP_ISSUE_SLIP_PRICE_KIND.TGSX);
+assert.equal(out.nextRows[1].tgsxPrice, 12000);
+
+const tgsxBeOnly = applyIssueSlipAiPreview({
+  header: {},
+  touched: {},
+  preview: {
+    lines: [
+      goodLine({
+        priceKind: "tgsx",
+        unitPrice: 8800,
+        tgsxPrice: null,
+      }),
+    ],
+  },
+  newEmptyRow: mockNewEmptyRow,
+});
+assert.equal(tgsxBeOnly.appliedCount, 1);
+assert.equal(tgsxBeOnly.nextRows[0].priceKind, LTTP_ISSUE_SLIP_PRICE_KIND.TGSX);
+assert.equal(tgsxBeOnly.nextRows[0].tgsxPrice, 8800);
+assert.equal(tgsxBeOnly.nextRows[0].unitPrice, 8800);
 
 const emptyApply = applyIssueSlipAiPreview({
   header: {},
