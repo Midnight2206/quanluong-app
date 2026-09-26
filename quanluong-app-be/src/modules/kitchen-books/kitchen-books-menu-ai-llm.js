@@ -130,10 +130,13 @@ async function completeMenuJson({ system, user }, opts = {}) {
   try {
     return extractJsonObject(content);
   } catch {
+    const retryHint =
+      opts.retryUserHint ??
+      "Hay tra lai dung schema periods.sang|trua|chieu.";
     content = await completeOnce(
       {
         system: `${system}\nChi tra ve mot JSON object hop le, khong markdown.`,
-        user: `JSON truoc do khong parse duoc. Hay tra lai dung schema periods.sang|trua|chieu.\n\n${user}`,
+        user: `JSON truoc do khong parse duoc. ${retryHint}\n\n${user}`,
       },
       cfg,
       fetchImpl,

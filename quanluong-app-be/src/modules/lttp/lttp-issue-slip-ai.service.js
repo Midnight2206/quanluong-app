@@ -3,12 +3,22 @@ import { config } from "../../config/config.js";
 import { formatLocalCatalogForPrompt } from "../kitchen-books/kitchen-books-menu-ai-history.js";
 import { assertMenuAiConfigured, completeMenuJson } from "../kitchen-books/kitchen-books-menu-ai-llm.js";
 import { enrichLlmIssueSlipDraft } from "./lttp-issue-slip-ai-enrich.js";
+import { scopeSanitizeIssueSlipAiHeaderDraft } from "./lttp-issue-slip-ai-header-scope.js";
 import { buildIssueSlipAiPrompt, formatIssueSlipHistoryForPrompt } from "./lttp-issue-slip-ai.prompt.js";
 import {
   assertIssueSlipWriteAccess,
+  assertBuyerUserAllowedForStorage,
+  assertRecipientUserAllowedForUnit,
+  assertUnitInEffectiveBranch,
   getEffectivePrices,
   resolveIssueSlipAiSuggestLine,
 } from "./lttp.service.js";
+
+const defaultIssueSlipAiHeaderScopeDeps = {
+  assertUnitInBranch: assertUnitInEffectiveBranch,
+  assertBuyer: assertBuyerUserAllowedForStorage,
+  assertRecipientUser: assertRecipientUserAllowedForUnit,
+};
 
 async function loadCatalog(storageUnitId) {
   const commodities = await prisma.lttpCommodity.findMany({
@@ -58,17 +68,10 @@ async function loadDefaultSuppliers(storageUnitId) {
 function mergeHeaderFromRequest(headerDraft, body) {
   const issueDate = body.issueDate != null ? String(body.issueDate).trim() : "";
   const receivedDate = body.receivedDate != null ? String(body.receivedDate).trim() : "";
-  const recipientUnitId =
-    body.recipientUnitId != null && body.recipientUnitId !== ""
-      ? Number(body.recipientUnitId)
-      : null;
   return {
     ...headerDraft,
     issueDate: headerDraft.issueDate ?? (issueDate || null),
     receivedDate: headerDraft.receivedDate ?? (receivedDate || null),
-    recipientUnitId:
-      headerDraft.recipientUnitId ??
-      (Number.isInteger(recipientUnitId) && recipientUnitId > 0 ? recipientUnitId : null),
   };
 }
 
@@ -119,6 +122,7 @@ async function suggestIssueSlipAi(
   const llmJson = await complete(llmPrompt, {
     configOverride: menuAiCfg,
     fetchImpl: opts.fetchImpl,
+    retryUserHint: "Hay tra lai dung schema header va lines[] (phieu xuat LTTP).",
   });
 
   const { headerDraft: rawHeader, lines, warnings } = enrichLlmIssueSlipDraft({
@@ -128,10 +132,15 @@ async function suggestIssueSlipAi(
       resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid),
   });
 
-  const headerDraft = mergeHeaderFromRequest(rawHeader, {
-    issueDate,
-    receivedDate,
-    recipientUnitId,
+  const mergedHeader = mergeHeaderFromRequest(rawHeader, { issueDate, receivedDate });
+  const scopeSanitize =
+    opts.scopeSanitizeIssueSlipAiHeaderDraft ?? scopeSanitizeIssueSlipAiHeaderDraft;
+  const headerDraft = await scopeSanitize(mergedHeader, {
+    effectiveUnitIds,
+    storageUnitId,
+    requestRecipientUnitId: recipientUnitId,
+    warnings,
+    deps: opts.headerScopeDeps ?? defaultIssueSlipAiHeaderScopeDeps,
   });
 
   if (historySampleCount < 3) {

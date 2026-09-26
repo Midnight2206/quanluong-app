@@ -51,6 +51,7 @@ function buildHeaderDraft(header) {
     issueDate: trimOrNull(h.issueDate),
     receivedDate: trimOrNull(h.receivedDate),
     recipientUnitId: intOrNull(h.recipientUnitId),
+    recipientUserId: intOrNull(h.recipientUserId),
     recipientDisplayName: trimOrNull(h.recipientDisplayName),
     buyerUserId: intOrNull(h.buyerUserId),
     buyerDisplayName: trimOrNull(h.buyerDisplayName),

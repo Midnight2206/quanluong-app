@@ -61,3 +61,33 @@ test("suggestIssueSlipAi returns headerDraft, lines, warnings, meta without DB w
   assert.equal(result.meta.model, "gpt-test");
   assert.ok(Array.isArray(result.warnings));
 });
+
+test("suggestIssueSlipAi does not put unvalidated body recipientUnitId in headerDraft", async () => {
+  const { suggestIssueSlipAi } = await import("./lttp-issue-slip-ai.service.js");
+  const result = await suggestIssueSlipAi(
+    { unitId: 1, prompt: "Xuat ga", recipientUnitId: 999 },
+    { unitIds: [1] },
+    [1],
+    { logicalUnitId: 1, storageUnitId: 1 },
+    1,
+    {
+      configOverride: { apiKey: "test-key", provider: "openai", model: "gpt-test" },
+      loadCatalog: async () => ({
+        commodities: [{ id: 10, name: "Gạo tẻ", code: "GAO" }],
+        catalogText: "cat",
+      }),
+      loadHistorySamples: async () => ({ historyText: "", historySampleCount: 5 }),
+      loadDefaultSuppliers: async () => new Map([[10, 99]]),
+      getEffectivePrices: async () => ({
+        items: [{ commodity: { id: 10 }, unitPrice: 1, tgsxPrice: 1 }],
+      }),
+      completeMenuJson: async () => ({
+        header: {},
+        lines: [{ commodityName: "Gạo tẻ", quantity: 1, priceKind: "market" }],
+      }),
+    },
+  );
+
+  assert.equal(result.headerDraft.recipientUnitId, null);
+  assert.ok(result.warnings.some((w) => w.includes("yêu cầu")));
+});
