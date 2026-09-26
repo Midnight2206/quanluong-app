@@ -39,6 +39,20 @@ function normalizePreview(data) {
   };
 }
 
+function mergePreviewMeta(baseMeta, nextMeta) {
+  if (!baseMeta && !nextMeta) {
+    return null;
+  }
+  return {
+    ...(baseMeta ?? {}),
+    ...(nextMeta ?? {}),
+    historySampleCount:
+      baseMeta?.historySampleCount ?? nextMeta?.historySampleCount ?? 0,
+    memorySampleCount:
+      baseMeta?.memorySampleCount ?? nextMeta?.memorySampleCount ?? 0,
+  };
+}
+
 export function LttpIssueSlipAiSuggestDialog({
   open,
   onClose,
@@ -123,7 +137,16 @@ export function LttpIssueSlipAiSuggestDialog({
         message: trimmed,
         currentPreview: preview,
       }).unwrap();
-      setPreview(normalizePreview(data));
+      setPreview((prev) => {
+        const next = normalizePreview(data);
+        if (!next) {
+          return next;
+        }
+        return {
+          ...next,
+          meta: mergePreviewMeta(prev?.meta, next.meta),
+        };
+      });
       setChatMessage("");
       setTurns((prev) => [
         ...prev,

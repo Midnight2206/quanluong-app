@@ -151,6 +151,18 @@ function resolveIssueSlipAiEffDate(...candidates) {
   return new Date().toISOString().slice(0, 10);
 }
 
+function requireActorUserId(actorUserId) {
+  const value = Number(actorUserId);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new AppError({
+      message: "Thiếu người thực hiện để lưu phiên AI phiếu xuất.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  return value;
+}
+
 function mergeHeaderFromRequest(headerDraft, body) {
   const issueDate = body.issueDate != null ? String(body.issueDate).trim() : "";
   const receivedDate = body.receivedDate != null ? String(body.receivedDate).trim() : "";
@@ -176,6 +188,7 @@ async function suggestIssueSlipAi(
   assertMenuAiConfigured(menuAiCfg);
   const prismaClient = getPrismaClient(opts);
   const sessionId = (opts.randomUUID ?? randomUUID)();
+  const actorUserId = requireActorUserId(opts.actorUserId);
 
   const storageUnitId = dataScope.storageUnitId;
   const effDate = resolveIssueSlipAiEffDate(issueDate);
@@ -193,7 +206,7 @@ async function suggestIssueSlipAi(
       prompt: String(prompt ?? "").trim(),
       turns: [],
       finalPreview: null,
-      createdById: opts.actorUserId ?? null,
+      createdById: actorUserId,
     },
   });
 
@@ -365,7 +378,7 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
 }
 
 async function commitIssueSlipAiMemory(
-  { sessionId, unitId, finalPreview, userId },
+  { sessionId, unitId, finalPreview },
   scope,
   effectiveUnitIds,
   dataScope,
@@ -379,7 +392,6 @@ async function commitIssueSlipAiMemory(
     where: { sessionId, unitId: storageUnitId },
     data: {
       finalPreview,
-      updatedById: userId ?? null,
     },
   });
   if (!result?.count) {
@@ -392,7 +404,7 @@ async function commitIssueSlipAiMemory(
 }
 
 async function linkIssueSlipAiMemory(
-  { sessionId, unitId, issueSlipId, userId },
+  { sessionId, unitId, issueSlipId },
   scope,
   effectiveUnitIds,
   dataScope,
@@ -416,7 +428,6 @@ async function linkIssueSlipAiMemory(
     where: { sessionId },
     data: {
       issueSlipId,
-      updatedById: userId ?? null,
     },
   });
 }

@@ -1554,23 +1554,23 @@ export function LttpPhieuXuatTab({
         ...sharedPayload,
       });
       notifySuccess("Đã lưu phiếu xuất.");
-      if (created?.id != null && aiSessionId) {
-        try {
-          await linkIssueSlipAiMemory({
+      if (created?.id != null) {
+        openSavedSlipPdf(created.id);
+        if (aiSessionId) {
+          void linkIssueSlipAiMemory({
             sessionId: aiSessionId,
             unitId: selectedUnitId,
             issueSlipId: created.id,
-          }).unwrap();
-        } catch (linkErr) {
-          notifyError(
-            linkErr?.data?.message ||
-              linkErr?.message ||
-              "Đã lưu phiếu, nhưng chưa liên kết được ghi nhớ AI.",
-          );
+          })
+            .unwrap()
+            .catch((linkErr) => {
+              notifyWarning(
+                linkErr?.data?.message ||
+                  linkErr?.message ||
+                  "Đã lưu phiếu, nhưng chưa liên kết được ghi nhớ AI.",
+              );
+            });
         }
-      }
-      if (created?.id != null) {
-        openSavedSlipPdf(created.id);
       }
       void clearIssueSlipPersist();
       setDraftNotice(false);

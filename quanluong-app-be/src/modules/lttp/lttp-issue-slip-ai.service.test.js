@@ -45,6 +45,7 @@ test("suggestIssueSlipAi returns headerDraft, lines, warnings, meta without DB w
     1,
     {
       configOverride: { apiKey: "test-key", provider: "openai", model: "gpt-test" },
+      actorUserId: 77,
       randomUUID: () => "11111111-1111-4111-8111-111111111111",
       prismaClient: {
         lttpIssueSlipAiMemory: {
@@ -101,7 +102,7 @@ test("suggestIssueSlipAi returns headerDraft, lines, warnings, meta without DB w
     prompt: "Xuất 5 kg gạo tẻ",
     turns: [],
     finalPreview: null,
-    createdById: null,
+    createdById: 77,
   });
 });
 
@@ -115,6 +116,7 @@ test("suggestIssueSlipAi does not put unvalidated body recipientUnitId in header
     1,
     {
       configOverride: { apiKey: "test-key", provider: "openai", model: "gpt-test" },
+      actorUserId: 78,
       randomUUID: () => "22222222-2222-4222-8222-222222222222",
       prismaClient: {
         lttpIssueSlipAiMemory: {
@@ -158,6 +160,7 @@ test("suggestIssueSlipAi passes recipientUnitId into history loader and drops TG
     1,
     {
       configOverride: { apiKey: "test-key", provider: "openai", model: "gpt-test" },
+      actorUserId: 79,
       randomUUID: () => "33333333-3333-4333-8333-333333333333",
       prismaClient: {
         lttpIssueSlipAiMemory: {
@@ -190,6 +193,31 @@ test("suggestIssueSlipAi passes recipientUnitId into history loader and drops TG
   });
   assert.equal(result.lines.length, 0);
   assert.ok(result.warnings.some((w) => /TGSX/i.test(w)));
+});
+
+test("suggestIssueSlipAi requires a positive actorUserId", async () => {
+  const { suggestIssueSlipAi } = await import("./lttp-issue-slip-ai.service.js");
+
+  await assert.rejects(
+    () =>
+      suggestIssueSlipAi(
+        { unitId: 1, prompt: "Xuất 1 kg gạo" },
+        { unitIds: [1] },
+        [1],
+        { logicalUnitId: 1, storageUnitId: 1 },
+        1,
+        {
+          configOverride: { apiKey: "test-key", provider: "openai", model: "gpt-test" },
+          actorUserId: null,
+        },
+      ),
+    (error) => {
+      assert.ok(error instanceof AppError);
+      assert.equal(error.statusCode, 400);
+      assert.match(error.message, /người thực hiện/i);
+      return true;
+    },
+  );
 });
 
 test("chatIssueSlipAi appends user and assistant turns and returns sessionId", async () => {
@@ -345,7 +373,6 @@ test("commitIssueSlipAiMemory sets finalPreview for the session", async () => {
     },
     data: {
       finalPreview,
-      updatedById: 7,
     },
   });
 });
@@ -388,7 +415,6 @@ test("linkIssueSlipAiMemory links issueSlipId only when session belongs to unit"
     where: { sessionId: "77777777-7777-4777-8777-777777777777" },
     data: {
       issueSlipId: 123,
-      updatedById: 9,
     },
   });
 });

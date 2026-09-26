@@ -10,6 +10,7 @@ import { validateRequest } from "../../middlewares/validate-request.middleware.j
 import { unitDataScopeMiddleware } from "../../middlewares/unit-data-scope.middleware.js";
 import {
   lttpIssueSlipAiChatRateLimit,
+  lttpIssueSlipAiMemoryWriteRateLimit,
   lttpIssueSlipAiSuggestRateLimit,
 } from "../../middlewares/lttp-issue-slip-ai-rate-limit.middleware.js";
 import { DATA_SCOPE_KINDS } from "../../shared/data-scope/data-scope.registry.js";
@@ -246,7 +247,7 @@ lttpRouter.post(
   validateRequest({ body: aiMemoryCommitBodySchema }),
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   permissionMiddleware([routePermissions.aiMemoryCommitIssueSlip]),
-  lttpIssueSlipAiChatRateLimit,
+  lttpIssueSlipAiMemoryWriteRateLimit,
   asyncHandler(commitIssueSlipAiMemoryController),
 );
 
@@ -255,7 +256,7 @@ lttpRouter.post(
   validateRequest({ body: aiMemoryLinkBodySchema }),
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   permissionMiddleware([routePermissions.aiMemoryLinkIssueSlip]),
-  lttpIssueSlipAiChatRateLimit,
+  lttpIssueSlipAiMemoryWriteRateLimit,
   asyncHandler(linkIssueSlipAiMemoryController),
 );
 

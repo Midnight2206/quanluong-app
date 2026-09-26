@@ -33,4 +33,24 @@ const lttpIssueSlipAiChatRateLimit = rateLimit({
   },
 });
 
-export { lttpIssueSlipAiChatRateLimit, lttpIssueSlipAiSuggestRateLimit };
+const lttpIssueSlipAiMemoryWriteRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const uid = req.user?.id != null ? String(req.user.id) : "anon";
+    const ip = req.ip ?? req.socket?.remoteAddress ?? "unknown";
+    return `lttp-issue-ai-memory-write:${uid}:${ip}`;
+  },
+  message: {
+    success: false,
+    message: "Quá nhiều yêu cầu lưu/liên kết memory AI phiếu xuất. Thử lại sau 15 phút.",
+  },
+});
+
+export {
+  lttpIssueSlipAiChatRateLimit,
+  lttpIssueSlipAiMemoryWriteRateLimit,
+  lttpIssueSlipAiSuggestRateLimit,
+};

@@ -20,6 +20,10 @@ assert.match(
   tabSrc,
   /await enqueueCreate\([\s\S]*?void clearIssueSlipPersist\(\);[\s\S]*?setAiSessionId\(null\)/,
 );
+assert.match(
+  tabSrc,
+  /notifySuccess\("Đã lưu phiếu xuất\."\);[\s\S]*?openSavedSlipPdf\(created\.id\);[\s\S]*?linkIssueSlipAiMemory/,
+);
 assert.match(tabSrc, /!isEditMode/);
 assert.match(tabSrc, /headerTouched/);
 assert.match(
