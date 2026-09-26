@@ -9,9 +9,12 @@ function buildIssueSlipAiSystemPrompt() {
     "Chi tra ve JSON object dung schema co header va lines[].",
     "header: { issueDate?, receivedDate?, recipientUnitId?, buyerUserId?, slipNote? } (YYYY-MM-DD cho ngay).",
     "lines[]: { commodityName, code?, quantity, priceKind: market|tgsx }.",
+    "QUY TAC COT LOI: Chi tao dong hang ma nguoi dung da neu ro trong mo ta/tin nhan (ten/ma + so luong).",
+    "KHONG tu them dong moi tu lich su/bai hoc/mau phieu. KHONG copy danh sach hang cua phieu cu.",
+    "Lich su/bai hoc/mau phieu CHI de giai ten gan giong trong danh muc LTTP (alias → ten chuan theo thoi quen don vi nhan).",
     "Mac dinh priceKind=market (gia mua TT). Chi dung tgsx khi nguoi dung noi ro TGSX/gia san xuat.",
-    "Chap nhan mo ta tieng Viet khong chuan: suy ra ten/ma LTTP + so luong; uu tien khop danh muc don vi.",
-    "Toi da 2 dong/commodity (market va tgsx).",
+    "Chap nhan tieng Viet khong chuan; uu tien khop danh muc don vi.",
+    "Toi da 2 dong/commodity (market va tgsx) va chi khi user yeu cau ca hai loai gia.",
   ].join(" ");
 }
 
@@ -41,13 +44,13 @@ function buildIssueSlipAiPrompt({ prompt, issueDate, catalogText, memoryText, hi
     "",
     catalogText,
     memoryText ? "" : null,
-    memoryText ? "Bai hoc AI gan day:" : null,
+    memoryText ? "Bai hoc AI (chi de khop ten LTTP, KHONG copy dong hang):" : null,
     memoryText || null,
     "",
-    "Mau phieu xuat gan day:",
+    "Mau phieu cu (chi de khop ten theo thoi quen don vi nhan, KHONG them dong):",
     historyText,
     "",
-    "Mo ta nguoi dung:",
+    "Mo ta nguoi dung (NGUON DUY NHAT cho danh sach dong hang):",
     prompt,
   ].filter((line) => line != null);
 
@@ -59,16 +62,16 @@ function buildIssueSlipAiChatPrompt({ message, currentPreview, turns, catalogTex
   const userParts = [
     catalogText,
     memoryText ? "" : null,
-    memoryText ? "Bai hoc AI gan day:" : null,
+    memoryText ? "Bai hoc AI (chi de khop ten LTTP, KHONG copy dong hang):" : null,
     memoryText || null,
     "",
-    "Preview hien tai:",
+    "Preview hien tai (sua theo tin nhan; khong them hang ngoai yeu cau):",
     JSON.stringify(currentPreview ?? {}, null, 2),
     "",
     "Hoi thoai hien tai:",
     formatTurnsForPrompt(turns),
     "",
-    "Tin nhan moi:",
+    "Tin nhan moi (uu tien noi dung nay):",
     String(message ?? "").trim(),
   ].filter((line) => line != null);
 

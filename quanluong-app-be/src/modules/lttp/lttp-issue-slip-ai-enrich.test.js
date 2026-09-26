@@ -73,3 +73,22 @@ test("enrichLlmIssueSlipDraft mapped false without supplier from resolveLine", (
   assert.equal(lines[0].priceKind, "tgsx");
   assert.equal(lines[0].mapped, false);
 });
+
+test("enrichLlmIssueSlipDraft defaults missing/ambiguous priceKind to market", () => {
+  const { lines } = enrichLlmIssueSlipDraft({
+    llm: {
+      header: {},
+      lines: [
+        { commodityName: "Gạo tẻ", quantity: 2 },
+        { commodityName: "Thịt heo", quantity: 1, priceKind: "mua TT" },
+      ],
+    },
+    commodities,
+    resolveLine: () => ({ lttpSupplierId: 1, unitPrice: 100 }),
+  });
+
+  assert.equal(lines[0].priceKind, "market");
+  assert.equal(lines[0].mapped, true);
+  assert.equal(lines[1].priceKind, "market");
+  assert.equal(lines[1].mapped, true);
+});

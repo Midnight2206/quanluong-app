@@ -75,6 +75,8 @@ function mapPreviewLineToRow(line, newEmptyRow) {
   const base = newEmptyRow();
   const quantity = Number(line.quantity);
   const priceKind = normalizeIssueSlipPriceKind(line.priceKind);
+  const commodityId = Number(line.commodityId);
+  const supplierId = Number(line.lttpSupplierId);
   const unitFromLine = finitePriceOrNull(line.unitPrice);
   const tgsxFromLine = finitePriceOrNull(line.tgsxPrice);
   // ponytail: BE suggest resolves applied price into unitPrice only; FE rows need tgsxPrice for TGSX kind.
@@ -86,9 +88,10 @@ function mapPreviewLineToRow(line, newEmptyRow) {
 
   return {
     ...base,
-    commodityId: String(line.commodityId),
+    // number id — matches comById Map keys / onPickCommodity (string breaks name label)
+    commodityId,
     codeDraft: line.code != null ? String(line.code) : "",
-    lttpSupplierId: String(line.lttpSupplierId),
+    lttpSupplierId: String(supplierId),
     quantity: String(quantity),
     unitPrice,
     tgsxPrice,

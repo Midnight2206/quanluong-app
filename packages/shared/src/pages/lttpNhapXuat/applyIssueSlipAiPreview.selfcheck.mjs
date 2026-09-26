@@ -84,8 +84,8 @@ assert.equal(out.skippedCount, 3);
 assert.equal(out.nextRows.length, 2);
 
 for (const row of out.nextRows) {
-  assert.equal(typeof row.commodityId, "string");
-  assert.equal(row.commodityId, "10");
+  assert.equal(typeof row.commodityId, "number");
+  assert.equal(row.commodityId, 10);
   assert.equal(typeof row.lttpSupplierId, "string");
   assert.equal(row.lttpSupplierId, "3");
   assert.equal(typeof row.quantity, "string");

@@ -22,19 +22,23 @@ function quantityOrNull(value) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** @returns {'market' | 'tgsx' | null} */
+/** Default mua TT (`market`). Chỉ `tgsx` khi LLM/user nói rõ TGSX. @returns {'market' | 'tgsx'} */
 function normalizeEnrichPriceKind(value) {
-  const v = String(value ?? "").trim().toLowerCase();
-  if (!v) {
-    return null;
-  }
-  if (v === LTTP_ISSUE_SLIP_PRICE_KIND.TGSX) {
+  const v = String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+  if (
+    v === LTTP_ISSUE_SLIP_PRICE_KIND.TGSX ||
+    v === "gia tgsx" ||
+    v.includes("tgsx") ||
+    v.includes("gia san xuat")
+  ) {
     return LTTP_ISSUE_SLIP_PRICE_KIND.TGSX;
   }
-  if (v === LTTP_ISSUE_SLIP_PRICE_KIND.MARKET) {
-    return LTTP_ISSUE_SLIP_PRICE_KIND.MARKET;
-  }
-  return null;
+  // thiếu / mơ hồ / "mua TT" / "thi truong" → market
+  return LTTP_ISSUE_SLIP_PRICE_KIND.MARKET;
 }
 
 function issueSlipLineDedupeKey(commodityId, priceKind) {
@@ -117,12 +121,6 @@ function enrichLlmIssueSlipDraft({ llm, commodities, resolveLine }) {
 
     if (quantity == null) {
       warnings.push(`Thiếu số lượng hợp lệ cho «${line.commodityName}».`);
-      lines.push(line);
-      continue;
-    }
-
-    if (priceKind == null) {
-      warnings.push(`Thiếu hoặc sai loại giá cho «${line.commodityName}».`);
       lines.push(line);
       continue;
     }
