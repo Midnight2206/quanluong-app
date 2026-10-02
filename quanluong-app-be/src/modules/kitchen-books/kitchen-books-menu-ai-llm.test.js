@@ -12,6 +12,31 @@ test("extractJsonObject strips fences", () => {
   assert.equal(o.ok, true);
 });
 
+test("completeMenuJson caps OpenRouter output at 8000 tokens", async () => {
+  let body;
+  const fetchImpl = async (_url, init) => {
+    body = JSON.parse(init.body);
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }),
+    };
+  };
+  await completeMenuJson(
+    { system: "sys", user: "usr" },
+    {
+      fetchImpl,
+      configOverride: {
+        provider: "openai",
+        apiKey: "test-key",
+        model: "gpt-test",
+        baseUrl: "https://example.test/v1",
+        timeoutMs: 5000,
+      },
+    },
+  );
+  assert.equal(body.max_tokens, 8000);
+});
+
 test("completeMenuJson retries once on bad JSON", async () => {
   let calls = 0;
   const fetchImpl = async () => {

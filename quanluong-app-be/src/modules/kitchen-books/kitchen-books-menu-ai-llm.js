@@ -65,6 +65,8 @@ async function callOpenAiCompatible({ system, user }, cfg, fetchImpl) {
     body: JSON.stringify({
       model: cfg.model,
       temperature: 0.4,
+      // OpenRouter giữ credit theo trần này. Bỏ qua thì model Gemini xin 65536 và 402 khi số dư chỉ đủ ~16000.
+      max_tokens: 8000,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
