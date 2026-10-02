@@ -99,6 +99,10 @@ export const ROUTE_ACCESS_RULES = {
     description: "Quản lý mẫu PDF chứng từ quyết toán (upload Excel)",
     requiredPermissions: [],
   },
+  "dashboard-backup": {
+    description: "Backup dữ liệu — superadmin chọn một ngày để khôi phục",
+    requiredPermissions: [],
+  },
   "nav-meal-roster": {
     description: "Trang Chấm cơm / danh sách bảo đảm quân lương",
     requiredPermissions: [PERMISSIONS.MEAL_ROSTER_ACCESS],

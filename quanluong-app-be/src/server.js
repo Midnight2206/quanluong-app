@@ -10,6 +10,7 @@ import { createRedisSessionStore } from "./infra/session/redis-session.store.js"
 import { REFRESH_TOKEN_CLEANUP_SCHEDULE } from "./modules/auth/auth.constants.js";
 import { bootstrapAuthSystem, cleanupExpiredRefreshTokens } from "./modules/auth/auth.service.js";
 import { rebuildCommodityHabits } from "./modules/lttp/lttp-issue-slip-ai-backfill.js";
+import { drainBackupNotify } from "./modules/system-backup/system-backup.notify.js";
 import { prisma } from "./infra/database/prisma/prisma.client.js";
 import { logger } from "./shared/utils/logger.js";
 
@@ -78,6 +79,12 @@ async function bootstrapServer() {
       logger.info(result, "Rebuilt LTTP commodity habits");
     },
     { name: "lttp-ai-habit-rebuild" },
+  );
+
+  registerSchedule(
+    "* * * * *",
+    () => drainBackupNotify(),
+    { name: "backup-report-mail" },
   );
 
   registerSchedule(

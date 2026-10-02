@@ -1,0 +1,30 @@
+# Remote crypt trỏ vào thư mục backup trên Drive của tài khoản superadmin.
+# File thật (có token) đặt tại ops/backup/secrets/rclone.conf — không commit.
+# Production tạo file mới trên máy chủ. Không chép file từ máy dev.
+# Remote crypt phải đúng tên gdrive-crypt. Remote drive đặt tên gì cũng được.
+#
+# Trong container backup (entrypoint là cron, nên phải --entrypoint rclone):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+#     --env-file quanluong-app-be/.env.docker run --rm -it \
+#     --entrypoint rclone backup config --config /config/rclone.conf
+#
+# 1) New remote tên gdrive, type drive, scope drive.
+#    Đăng nhập đúng tài khoản Google của superadmin.
+# 2) New remote tên gdrive-crypt, type crypt,
+#    remote = gdrive:quanluong-backup
+#    (thư mục quanluong-backup trên Drive của superadmin).
+#    rclone tự tạo mật khẩu mã hoá — giữ file conf, mất file là không giải mã được.
+#
+# Mỗi đêm ghi db/, document/, qdrant/ và media/YYYY-MM-DD. Drive giữ 10 bản mới nhất.
+#
+# Kết quả gần giống:
+# [gdrive]
+# type = drive
+# scope = drive
+# token = {...}
+#
+# [gdrive-crypt]
+# type = crypt
+# remote = gdrive:quanluong-backup
+# password = ...
+# password2 = ...

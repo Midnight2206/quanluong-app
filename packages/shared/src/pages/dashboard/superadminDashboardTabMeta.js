@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Building2,
+  DatabaseBackup,
   FileText,
   Layers,
   Shield,
@@ -81,5 +82,13 @@ export const DASHBOARD_SUPERADMIN_TAB_META = [
     section: "Chứng từ",
     icon: FileText,
     routeAccessKey: "dashboard-chung-tu-pdf-templates",
+  },
+  {
+    path: "backup",
+    label: "Backup dữ liệu",
+    shortLabel: "Backup",
+    section: "Hệ thống",
+    icon: DatabaseBackup,
+    routeAccessKey: "dashboard-backup",
   },
 ];

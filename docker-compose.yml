@@ -33,8 +33,11 @@ services:
     ports:
       - "3000:3000"
       - "3030:3030"
+    environment:
+      BACKUP_DIR: /var/backups/quanluong
     volumes:
       - media_data:/data/media
+      - backup_data:/var/backups/quanluong
     healthcheck:
       test:
         [
@@ -183,6 +186,41 @@ services:
       retries: 10
       start_period: 10s
 
+  # Dump MariaDB + Postgres chứng từ + Qdrant + media, rclone crypt lên Drive. 02:15 giờ TZ.
+  backup:
+    build:
+      context: ./ops/backup
+    image: quanluong-backup:latest
+    container_name: quanluong-backup
+    restart: unless-stopped
+    env_file:
+      - quanluong-app-be/.env.docker
+    environment:
+      DB_HOST: db
+      MEDIA_DIR: /data/media
+      BACKUP_DIR: /var/backups/quanluong
+      RCLONE_CONFIG: /config/rclone.conf
+      RCLONE_REMOTE: gdrive-crypt
+      BACKUP_LOG: /var/backups/quanluong/backup.log
+      PGHOST: document-db
+      PGUSER: ${DOCUMENT_DB_USER:-document}
+      PGPASSWORD: ${DOCUMENT_DB_PASSWORD:-document}
+      PGDATABASE: ${DOCUMENT_DB_NAME:-document}
+      QDRANT_URL: http://qdrant:6333
+      KEEP_COUNT: "10"
+    volumes:
+      - media_data:/data/media
+      - backup_data:/var/backups/quanluong
+      - ./ops/backup/backup.sh:/opt/backup/backup.sh:ro
+      - ./ops/backup/secrets:/config
+    depends_on:
+      db:
+        condition: service_healthy
+      document-db:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
   # Vector store cho AI thực đơn (optional). Tắt bằng cách không set QDRANT_URL trên app.
   qdrant:
     image: qdrant/qdrant:v1.13.2
@@ -209,4 +247,5 @@ volumes:
   redis_data:
   document_pg_data:
   media_data:
+  backup_data:
   qdrant_data:

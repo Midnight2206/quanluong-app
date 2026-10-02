@@ -20,6 +20,7 @@ export const qk = {
   permissions: { root: ["permissions"], catalog: () => ["permissions", "catalog"] },
   unitLevelCaps: { root: ["unitLevelCaps"], matrix: () => ["unitLevelCaps", "matrix"] },
   mealAllowanceRates: { root: ["mealAllowanceRates"], list: () => ["mealAllowanceRates", "list"] },
+  systemBackup: { root: ["systemBackup"], state: () => ["systemBackup", "state"] },
   lttp: {
     root: ["lttp"],
     foodGroups: () => ["lttp", "foodGroups"],
