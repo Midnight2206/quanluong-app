@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * @deprecated Dùng UI tab Nhập xuất LTTP → «Cài người mua theo đơn vị kho» → Lưu & áp dụng.
- *
- * Giữ lệnh cho ops nếu cần chạy ngoài UI (tương đương API applyToAllSlips=true).
+ * Gán một user cho mọi phiếu của một kho.
+ * UI: Admin LTTP → nút tạm «Gán cho mọi phiếu cũ».
  */
 import "dotenv/config";
 import { prisma } from "../src/infra/database/prisma/prisma.client.js";
-import { putBuyerDefaultForUnit } from "../src/modules/lttp/lttp.service.js";
+import { rewriteAllWarehouseSlipBuyers } from "../src/modules/lttp/lttp-warehouse-buyer.service.js";
 
 function parseArgs(argv) {
   const opts = { dryRun: false, unitId: null, userId: null };
@@ -33,12 +32,10 @@ async function main() {
   if (!unit) {
     throw new Error(`Không tìm thấy unit id=${opts.unitId}`);
   }
-  const data = await putBuyerDefaultForUnit(
-    { unitId: opts.unitId, userId: opts.userId, applyToAllSlips: true },
-    { mode: "ALL" },
-    [opts.unitId],
-    { storageUnitId: opts.unitId },
-  );
+  const data = await rewriteAllWarehouseSlipBuyers({
+    storageUnitId: opts.unitId,
+    userId: opts.userId,
+  });
   console.log(JSON.stringify(data, null, 2));
 }
 

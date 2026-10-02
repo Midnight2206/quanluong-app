@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { respondCreated, respondSuccess } from "../../shared/utils/responders.js";
 import {
+  assertIssueSlipWriteAccess,
   buildPriceImportTemplateBuffer,
   createCommodity,
   createFoodGroup,
@@ -40,14 +42,30 @@ import {
   patchPriceTable,
   putRecipientDefaultUser,
   putBuyerDefaultForUnit,
+  getWarehouseBuyerForUnit,
+  putWarehouseBuyerForUnit,
+  rewriteWarehouseSlipBuyers,
   resolveIssueSlipLine,
   resyncIssueSlipLinePricesFromEffectiveTable,
   updateIssueSlip,
   upsertIssueFormDefaults,
 } from "./lttp.service.js";
+import { commitIssueSlipAiDraft } from "./lttp-issue-slip-ai-draft-commit.js";
+import {
+  applyProposedDraftPatch,
+  proposeIssueSlipAiDraftChat,
+  undoLastDraftChatApply,
+} from "./lttp-issue-slip-ai-draft-chat.js";
+import {
+  discardIssueSlipAiDraft,
+  getIssueSlipAiDraft,
+  listEditingIssueSlipAiDrafts,
+  updateIssueSlipAiDraftLine,
+} from "./lttp-issue-slip-ai-draft.js";
 import {
   chatIssueSlipAi,
   commitIssueSlipAiMemory,
+  confirmIssueSlipAiUomRule,
   linkIssueSlipAiMemory,
   suggestIssueSlipAi,
 } from "./lttp-issue-slip-ai.service.js";
@@ -489,7 +507,7 @@ async function commitIssueSlipAiMemoryController(req, res) {
 }
 
 async function linkIssueSlipAiMemoryController(req, res) {
-  await linkIssueSlipAiMemory(
+  const data = await linkIssueSlipAiMemory(
     {
       ...req.validatedBody,
       userId: req.user.id,
@@ -499,7 +517,121 @@ async function linkIssueSlipAiMemoryController(req, res) {
     req.dataScope,
     req.user.unitId,
   );
-  return respondSuccess(res, { message: "Đã liên kết memory AI với phiếu xuất", data: null });
+  return respondSuccess(res, { message: "Đã liên kết memory AI với phiếu xuất", data });
+}
+
+function assertDraftAccess(req, unitId) {
+  assertIssueSlipWriteAccess(
+    unitId,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+    req.user.unitId,
+  );
+}
+
+async function listIssueSlipAiDraftsController(req, res) {
+  const { unitId, recipientUnitId, recipientUserId } = req.validatedQuery;
+  assertDraftAccess(req, unitId);
+  const data = await listEditingIssueSlipAiDrafts(prisma, {
+    storageUnitId: req.dataScope.storageUnitId,
+    recipientUnitId,
+    recipientUserId,
+  });
+  return respondSuccess(res, { message: "Danh sách bản nháp AI đang sửa", data });
+}
+
+async function getIssueSlipAiDraftController(req, res) {
+  const unitId = req.validatedQuery.unitId;
+  assertDraftAccess(req, unitId);
+  const data = await getIssueSlipAiDraft(prisma, {
+    id: req.validatedParams.id,
+    storageUnitId: req.dataScope.storageUnitId,
+  });
+  return respondSuccess(res, { message: "Đã tải bản nháp AI", data });
+}
+
+async function patchIssueSlipAiDraftLineController(req, res) {
+  assertDraftAccess(req, req.validatedBody.unitId);
+  const data = await updateIssueSlipAiDraftLine(prisma, {
+    ...req.validatedBody,
+    id: req.validatedParams.id,
+    lineId: req.validatedParams.lineId,
+    storageUnitId: req.dataScope.storageUnitId,
+    actorUserId: req.user.id,
+  });
+  return respondSuccess(res, { message: "Đã sửa dòng bản nháp", data });
+}
+
+async function proposeIssueSlipAiDraftChatController(req, res) {
+  assertDraftAccess(req, req.validatedBody.unitId);
+  const data = await proposeIssueSlipAiDraftChat(prisma, {
+    id: req.validatedParams.id,
+    storageUnitId: req.dataScope.storageUnitId,
+    message: req.validatedBody.message,
+    lineIds: req.validatedBody.lineIds,
+    actorUserId: req.user.id,
+  });
+  return respondSuccess(res, { message: "Đã tạo bản sửa từ chat", data });
+}
+
+async function applyIssueSlipAiDraftChatController(req, res) {
+  assertDraftAccess(req, req.validatedBody.unitId);
+  const data = await applyProposedDraftPatch(prisma, {
+    id: req.validatedParams.id,
+    storageUnitId: req.dataScope.storageUnitId,
+    version: req.validatedBody.version,
+    turnId: req.validatedBody.turnId,
+    acceptRule: req.validatedBody.acceptRule,
+    actorUserId: req.user.id,
+  });
+  return respondSuccess(res, { message: "Đã áp dụng sửa từ chat", data });
+}
+
+async function undoIssueSlipAiDraftChatController(req, res) {
+  assertDraftAccess(req, req.validatedBody.unitId);
+  const data = await undoLastDraftChatApply(prisma, {
+    id: req.validatedParams.id,
+    storageUnitId: req.dataScope.storageUnitId,
+    version: req.validatedBody.version,
+    actorUserId: req.user.id,
+  });
+  return respondSuccess(res, { message: "Đã hoàn tác lần sửa chat gần nhất", data });
+}
+
+async function commitIssueSlipAiDraftController(req, res) {
+  assertDraftAccess(req, req.validatedBody.unitId);
+  const data = await commitIssueSlipAiDraft(prisma, {
+    id: req.validatedParams.id,
+    storageUnitId: req.dataScope.storageUnitId,
+    version: req.validatedBody.version,
+    issueSlipId: req.validatedBody.issueSlipId,
+    confirmAll: req.validatedBody.confirmAll,
+    sessionId: req.validatedBody.sessionId,
+    actorUserId: req.user.id,
+  });
+  return respondSuccess(res, { message: "Đã chốt phiếu và học lại", data });
+}
+
+async function discardIssueSlipAiDraftController(req, res) {
+  assertDraftAccess(req, req.validatedBody.unitId);
+  const data = await discardIssueSlipAiDraft(prisma, {
+    id: req.validatedParams.id,
+    storageUnitId: req.dataScope.storageUnitId,
+    version: req.validatedBody.version,
+  });
+  return respondSuccess(res, { message: "Đã bỏ bản nháp AI", data });
+}
+
+async function confirmIssueSlipAiUomRuleController(req, res) {
+  const data = await confirmIssueSlipAiUomRule(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+    req.user.unitId,
+  );
+  return respondSuccess(res, { message: "Đã lưu quy đổi đơn vị", data });
 }
 
 async function createIssueSlipController(req, res) {
@@ -695,12 +827,58 @@ async function putBuyerDefaultForUnitController(req, res) {
   });
 }
 
+async function getWarehouseBuyerController(req, res) {
+  const data = await getWarehouseBuyerForUnit(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Người mua hiệu lực theo ngày", data });
+}
+
+async function putWarehouseBuyerController(req, res) {
+  const data = await putWarehouseBuyerForUnit(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+    req.user.id,
+  );
+  return respondSuccess(res, {
+    message: "Đã lưu người mua từ mốc ngày và cập nhật phiếu từ ngày đó",
+    data,
+  });
+}
+
+async function rewriteWarehouseBuyerController(req, res) {
+  const data = await rewriteWarehouseSlipBuyers(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, {
+    message: "Đã gán người mua cho toàn bộ phiếu của kho",
+    data,
+  });
+}
+
 export {
   chatIssueSlipAiController,
   commitIssueSlipAiMemoryController,
   createCommodityController,
   createFoodGroupController,
   suggestIssueSlipAiController,
+  listIssueSlipAiDraftsController,
+  getIssueSlipAiDraftController,
+  patchIssueSlipAiDraftLineController,
+  discardIssueSlipAiDraftController,
+  proposeIssueSlipAiDraftChatController,
+  applyIssueSlipAiDraftChatController,
+  undoIssueSlipAiDraftChatController,
+  commitIssueSlipAiDraftController,
+  confirmIssueSlipAiUomRuleController,
   linkIssueSlipAiMemoryController,
   createIssueSlipController,
   createPriceTableController,
@@ -743,6 +921,9 @@ export {
   listBuyerDefaultsInScopeController,
   listBuyerUsersController,
   putBuyerDefaultForUnitController,
+  getWarehouseBuyerController,
+  putWarehouseBuyerController,
+  rewriteWarehouseBuyerController,
   resolveIssueSlipLineController,
   resyncIssueSlipPricesController,
   updateIssueSlipController,

@@ -51,6 +51,7 @@ async function scopeSanitizeIssueSlipAiHeaderDraft(headerDraft, ctx) {
       out.recipientUnitId = requestRid;
     } else {
       warnings.push("Đơn vị nhận trong yêu cầu ngoài phạm vi — bỏ qua.");
+      out.recipientUnitId = null;
     }
   }
 

@@ -442,8 +442,7 @@ const LTTP_ROUTE_DEFINITIONS = [
     permission: {
       code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
       name: "Danh sách user người mua theo đơn vị kho (LTTP)",
-      description:
-        "Gợi ý chọn người mua thuộc đơn vị kho hoặc nhánh cha/con trong phạm vi LTTP.",
+      description: "User thuộc đúng đơn vị kho, không gồm cấp dưới.",
     },
   },
   {
@@ -468,6 +467,42 @@ const LTTP_ROUTE_DEFINITIONS = [
       code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
       name: "Lưu người mua mặc định theo đơn vị kho (LTTP)",
       description: "Gán/bỏ user người mua mặc định cho một đơn vị kho.",
+    },
+  },
+  {
+    key: "getWarehouseBuyer",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/warehouse-buyer",
+    pathRoute: "/api/lttp/warehouse-buyer",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "Người mua hiệu lực theo ngày (LTTP)",
+      description: "Người mua của kho đang áp dụng cho một ngày phiếu.",
+    },
+  },
+  {
+    key: "putWarehouseBuyer",
+    method: "PUT",
+    module: LTTP_MODULE_NAME,
+    path: "/warehouse-buyer",
+    pathRoute: "/api/lttp/warehouse-buyer",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Cài người mua theo mốc ngày (LTTP)",
+      description: "Lưu người mua của kho từ một ngày và cập nhật phiếu từ ngày đó.",
+    },
+  },
+  {
+    key: "rewriteWarehouseBuyer",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/warehouse-buyer/rewrite-all",
+    pathRoute: "/api/lttp/warehouse-buyer/rewrite-all",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Gán lại người mua mọi phiếu (LTTP)",
+      description: "Tạm: gán một user cho toàn bộ phiếu đã phát hành của kho.",
     },
   },
   {
@@ -533,6 +568,114 @@ const LTTP_ROUTE_DEFINITIONS = [
       name: "Lưu preview AI phiếu xuất LTTP",
       description:
         "Lưu preview cuối của một phiên AI phiếu xuất LTTP để làm memory tham chiếu cho các gợi ý sau.",
+    },
+  },
+  {
+    key: "listIssueSlipAiDrafts",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-drafts",
+    pathRoute: "/api/lttp/issue-slips/ai-drafts",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Danh sách bản nháp AI phiếu xuất",
+      description: "Xem các bản nháp AI phiếu xuất đang sửa của đơn vị nhận.",
+    },
+  },
+  {
+    key: "getIssueSlipAiDraft",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-drafts/:id",
+    pathRoute: "/api/lttp/issue-slips/ai-drafts/:id",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Mở bản nháp AI phiếu xuất",
+      description: "Mở lại một bản nháp AI phiếu xuất đang sửa, gồm dòng hàng và các lượt chat.",
+    },
+  },
+  {
+    key: "patchIssueSlipAiDraftLine",
+    method: "PATCH",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-drafts/:id/lines/:lineId",
+    pathRoute: "/api/lttp/issue-slips/ai-drafts/:id/lines/:lineId",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Sửa dòng bản nháp AI phiếu xuất",
+      description: "Sửa một dòng bản nháp AI bằng nút chọn hoặc gõ tay. Chưa học thói quen.",
+    },
+  },
+  {
+    key: "chatIssueSlipAiDraft",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-drafts/:id/chat",
+    pathRoute: "/api/lttp/issue-slips/ai-drafts/:id/chat",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Chat sửa dòng bản nháp AI",
+      description: "Nhờ AI đề xuất sửa các dòng đã chọn trên bản nháp phiếu xuất. Chưa ghi vào dòng khi chưa áp dụng.",
+    },
+  },
+  {
+    key: "applyIssueSlipAiDraftChat",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-drafts/:id/chat/apply",
+    pathRoute: "/api/lttp/issue-slips/ai-drafts/:id/chat/apply",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Áp dụng sửa chat bản nháp AI",
+      description: "Ghi bản sửa chat đã xem diff vào các dòng bản nháp phiếu xuất.",
+    },
+  },
+  {
+    key: "undoIssueSlipAiDraftChat",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-drafts/:id/chat/undo",
+    pathRoute: "/api/lttp/issue-slips/ai-drafts/:id/chat/undo",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Hoàn tác sửa chat bản nháp AI",
+      description: "Hoàn tác lần áp dụng chat gần nhất trên bản nháp phiếu xuất.",
+    },
+  },
+  {
+    key: "commitIssueSlipAiDraft",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-drafts/:id/commit",
+    pathRoute: "/api/lttp/issue-slips/ai-drafts/:id/commit",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Chốt bản nháp AI phiếu xuất",
+      description: "Khóa bản nháp AI sau khi phiếu xuất đã lưu và học thói quen theo trọng số từng dòng.",
+    },
+  },
+  {
+    key: "discardIssueSlipAiDraft",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-drafts/:id/discard",
+    pathRoute: "/api/lttp/issue-slips/ai-drafts/:id/discard",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Bỏ bản nháp AI phiếu xuất",
+      description: "Đánh dấu một bản nháp AI phiếu xuất là đã bỏ.",
+    },
+  },
+  {
+    key: "aiUomRuleIssueSlip",
+    method: "POST",
+    module: LTTP_MODULE_NAME,
+    path: "/issue-slips/ai-uom-rule",
+    pathRoute: "/api/lttp/issue-slips/ai-uom-rule",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Lưu quy đổi đơn vị AI phiếu xuất",
+      description: "Lưu hệ số quy đổi đơn vị tính mà người dùng đã xác nhận cho đơn vị nhận.",
     },
   },
   {

@@ -30,14 +30,17 @@ import {
   useGetLttpNextIssueSlipSerialQuery,
   useGetLttpRecipientUsersQuery,
   useGetLttpReceivingDefaultRecipientQuery,
+  useConfirmLttpIssueSlipAiUomMutation,
+  useCommitLttpIssueSlipAiDraftMutation,
   useLinkLttpIssueSlipAiMemoryMutation,
   usePutLttpIssueFormDefaultsMutation,
   useResyncLttpIssueSlipPricesMutation,
   useUpdateLttpIssueSlipMutation,
 } from "@/features/lttp/api/lttpApi";
 import { useLttpIssueSlipOffline } from "@/offline/adapters/lttp/useLttpIssueSlipOffline.js";
-import { useGetLttpBuyerUsersQuery } from "@/features/lttp/api/lttpBuyerDefaultsApi";
+import { useGetLttpWarehouseBuyerQuery } from "@/features/lttp/api/lttpBuyerDefaultsApi";
 import { apiRequest } from "@/services/apiRequest";
+import { useConfirm } from "@/contexts/ConfirmProvider";
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { vndToVietnameseDocumentLine } from "@/utils/vndVietnameseText";
@@ -500,6 +503,8 @@ export function LttpPhieuXuatTab({
   const [headerTouched, setHeaderTouched] = useState(emptyHeaderTouched);
   const [aiSuggestOpen, setAiSuggestOpen] = useState(false);
   const [aiSessionId, setAiSessionId] = useState(null);
+  const [aiLearn, setAiLearn] = useState(null);
+  const confirm = useConfirm();
 
   const [rows, setRows] = useState(() => [newEmptyRow()]);
   const rowQtyRefs = useRef({});
@@ -520,7 +525,6 @@ export function LttpPhieuXuatTab({
   const prevCreateUnitRef = useRef(null);
   const skipRecipientResetAfterDraftRef = useRef(false);
   const skipReceivingDefAfterDraftRef = useRef(false);
-  const skipBuyerDefAfterDraftRef = useRef(false);
   const draftPersistAllowedRef = useRef(false);
   const profileHeaderSeededRef = useRef(false);
 
@@ -575,6 +579,7 @@ export function LttpPhieuXuatTab({
 
     if (unitChanged) {
       setAiSessionId(null);
+      setAiLearn(null);
     }
 
     if (draft && Number(draft.unitId) === Number(selectedUnitId)) {
@@ -617,9 +622,6 @@ export function LttpPhieuXuatTab({
       setBuyerDisplayName(
         draft.buyerDisplayName != null ? String(draft.buyerDisplayName) : "",
       );
-      skipBuyerDefAfterDraftRef.current =
-        draft.buyerUserId != null &&
-        String(draft.buyerUserId).trim() !== "";
       setRecipientName(
         draft.recipientName != null ? String(draft.recipientName) : "",
       );
@@ -710,10 +712,14 @@ export function LttpPhieuXuatTab({
       staleTime: 5 * 60 * 1000,
     },
   );
-  const { data: buyerUsers = [] } = useGetLttpBuyerUsersQuery(selectedUnitId, {
-      skip: !selectedUnitId,
-      staleTime: 5 * 60 * 1000,
-    });
+  const { data: warehouseBuyer } = useGetLttpWarehouseBuyerQuery(
+    selectedUnitId,
+    issueDate,
+    { skip: !selectedUnitId || !issueDate || isEditMode },
+  );
+  const shownBuyerName = isEditMode
+    ? buyerDisplayName
+    : warehouseBuyer?.buyerDisplayName || "";
   const { data: receivingDef, isSuccess: receivingDefSuccess } =
     useGetLttpReceivingDefaultRecipientQuery(recipientUnitId, {
       skip: !recipientUnitId,
@@ -821,39 +827,6 @@ export function LttpPhieuXuatTab({
     }
     defLoadedKey.current = selectedUnitId;
   }, [formDefPayload, selectedUnitId, isEditMode]);
-
-  /** Người mua mặc định theo đơn vị kho — sau khi tải form defaults. */
-  useEffect(() => {
-    if (selectedUnitId == null || formDefPayload?.unitId !== selectedUnitId) {
-      return;
-    }
-    if (isEditMode) {
-      return;
-    }
-    if (skipBuyerDefAfterDraftRef.current) {
-      skipBuyerDefAfterDraftRef.current = false;
-      return;
-    }
-    const defaultId = formDefPayload?.defaults?.defaultBuyerUserId;
-    if (defaultId != null) {
-      setBuyerUserId(String(defaultId));
-    }
-  }, [formDefPayload, selectedUnitId, isEditMode]);
-
-  /** Tên người mua trên form theo user đang chọn. */
-  useEffect(() => {
-    if (!buyerUserId) {
-      if (!isEditMode) {
-        setBuyerDisplayName("");
-      }
-      return;
-    }
-    const p = buyerUsers.find((x) => String(x.id) === String(buyerUserId));
-    const name = displayNameFromRecipientUserRow(p);
-    if (name) {
-      setBuyerDisplayName(name);
-    }
-  }, [buyerUserId, buyerUsers, isEditMode]);
 
   useEffect(() => {
     if (recipientUnitId == null) {
@@ -970,6 +943,8 @@ export function LttpPhieuXuatTab({
   const [updateSlip, { isLoading: updateBusy }] =
     useUpdateLttpIssueSlipMutation();
   const [linkIssueSlipAiMemory] = useLinkLttpIssueSlipAiMemoryMutation();
+  const [commitIssueSlipAiDraft] = useCommitLttpIssueSlipAiDraftMutation();
+  const [confirmAiUom] = useConfirmLttpIssueSlipAiUomMutation();
   const { enqueueCreate, enqueueUpdate, isOfflineLikeError } =
     useLttpIssueSlipOffline();
   const [resyncSlipPrices, { isLoading: resyncBusy }] =
@@ -1158,6 +1133,7 @@ export function LttpPhieuXuatTab({
     setRecipientUnitId(Number(selectedUnitId));
     setSlipNote("");
     setAiSessionId(null);
+    setAiLearn(null);
     setHeaderTouched(emptyHeaderTouched());
     defLoadedKey.current = null;
     skipReceivingDefAfterDraftRef.current = false;
@@ -1207,6 +1183,13 @@ export function LttpPhieuXuatTab({
         setSlipNote(String(headerPatch.slipNote));
       }
       setAiSessionId(meta?.sessionId ?? null);
+      setAiLearn({
+        orderMessageId: meta?.orderMessageId ?? preview?.meta?.orderMessageId ?? null,
+        lines: preview?.lines ?? [],
+        draftId: meta?.draftId ?? preview?.meta?.draftId ?? null,
+        draftVersion: meta?.draftVersion ?? preview?.meta?.draftVersion ?? null,
+        confirmAll: Boolean(meta?.confirmAll),
+      });
       setRows(nextRows);
       notifySuccess(
         `Đã áp dụng ${appliedCount} dòng; bỏ qua ${skippedCount} dòng chưa khớp LTTP`,
@@ -1475,18 +1458,41 @@ export function LttpPhieuXuatTab({
     });
   }, []);
 
-  async function onSubmit(e) {
-    e?.preventDefault();
-    if (!selectedUnitId) {
-      notifyError("Chưa chọn đơn vị.");
-      return;
+  async function askUomProposals(proposals) {
+    for (const proposal of proposals || []) {
+      const ok = await confirm({
+        title: "Quy đổi đơn vị",
+        message: `Lưu 1 ${proposal.fromUom} = ${proposal.factor} cho mặt hàng này ở đơn vị nhận?`,
+        confirmLabel: "Lưu",
+      });
+      if (!ok) continue;
+      await confirmAiUom({
+        unitId: selectedUnitId,
+        recipientUnitId: proposal.recipientUnitId || recipientUnitId || selectedUnitId,
+        commodityId: proposal.commodityId,
+        fromUom: proposal.fromUom,
+        factor: proposal.factor,
+      }).unwrap();
     }
-    const toSave = rows.filter(isRowCompleteForSubmit);
+  }
+
+  async function onSubmit(e, source) {
+    e?.preventDefault();
+    function stopSubmit(message) {
+      notifyError(message);
+      if (!source?.draftCommit) return false;
+      const error = new Error(message);
+      error.notified = true;
+      throw error;
+    }
+    if (!selectedUnitId) {
+      return stopSubmit("Chưa chọn đơn vị.");
+    }
+    const toSave = (source?.rows ?? rows).filter(isRowCompleteForSubmit);
     if (!toSave.length) {
-      notifyError(
+      return stopSubmit(
         "Cần ít nhất một dòng hợp lệ (mặt hàng, đối tác, giá theo loại đã chọn, số lượng > 0).",
       );
-      return;
     }
     const lines = [];
     for (const r of toSave) {
@@ -1513,22 +1519,43 @@ export function LttpPhieuXuatTab({
       const msg = issues.tripleCommodityIds.size
         ? LTTP_ISSUE_SLIP_TRIPLE_COMMODITY_MESSAGE
         : LTTP_ISSUE_SLIP_DUPLICATE_LINE_MESSAGE;
-      notifyError(`${msg} — chỉnh các dòng trước khi lưu.`);
+      stopSubmit(`${msg} — chỉnh các dòng trước khi lưu.`);
       return;
     }
     const noteTrim =
       slipNote != null && String(slipNote).trim() !== ""
         ? String(slipNote).trim().slice(0, 500)
         : null;
+    const headerPatch = source?.headerPatch || {};
+    const issueDateValue =
+      headerPatch.issueDate != null && headerPatch.issueDate !== ""
+        ? String(headerPatch.issueDate).slice(0, 10)
+        : issueDate;
+    const receivedDateValue =
+      headerPatch.receivedDate != null && headerPatch.receivedDate !== ""
+        ? String(headerPatch.receivedDate).slice(0, 10)
+        : receivedDate;
+    const recipientUnitValue = headerPatch.recipientUnitId ?? recipientUnitId ?? selectedUnitId;
+    const draftCommit =
+      source?.draftCommit ||
+      (aiLearn?.draftId
+        ? {
+            id: aiLearn.draftId,
+            version: aiLearn.draftVersion,
+            confirmAll: Boolean(aiLearn.confirmAll),
+            sessionId: aiSessionId,
+          }
+        : null);
     const sharedPayload = {
-      note: noteTrim,
+      note:
+        headerPatch.slipNote != null && String(headerPatch.slipNote).trim() !== ""
+          ? String(headerPatch.slipNote).trim().slice(0, 500)
+          : noteTrim,
       lines,
-      receivedDate: receivedDate?.trim() || issueDate,
-      recipientUnitId: recipientUnitId ?? selectedUnitId,
+      receivedDate: receivedDateValue?.trim() || issueDateValue,
+      recipientUnitId: recipientUnitValue,
       recipientUserId: recipientUserId ? Number(recipientUserId) : null,
       recipientDisplayName: recipientName?.trim() || null,
-      buyerUserId: buyerUserId ? Number(buyerUserId) : null,
-      buyerDisplayName: buyerDisplayName?.trim() || null,
       printLine1: printHeaderLine1?.trim() || null,
       printLine2: printHeaderLine2?.trim() || null,
       formMauSo: formMauSo?.trim() || null,
@@ -1550,19 +1577,51 @@ export function LttpPhieuXuatTab({
       }
       const created = await createSlip({
         unitId: selectedUnitId,
-        issueDate,
+        issueDate: issueDateValue,
         ...sharedPayload,
       });
-      notifySuccess("Đã lưu phiếu xuất.");
+      notifySuccess(draftCommit?.id ? "Đã chốt phiếu xuất." : "Đã lưu phiếu xuất.");
       if (created?.id != null) {
         openSavedSlipPdf(created.id);
-        if (aiSessionId) {
+        if (draftCommit?.id) {
+          try {
+            const learned = await commitIssueSlipAiDraft({
+              id: draftCommit.id,
+              unitId: selectedUnitId,
+              version: draftCommit.version,
+              issueSlipId: created.id,
+              confirmAll: Boolean(draftCommit.confirmAll),
+              ...(draftCommit.sessionId ? { sessionId: draftCommit.sessionId } : {}),
+            }).unwrap();
+            await askUomProposals(learned?.proposals || learned?.data?.proposals);
+          } catch (commitErr) {
+            notifyWarning(
+              commitErr?.data?.message ||
+                "Đã lưu phiếu, nhưng chưa khóa được bản nháp AI.",
+            );
+            if (source?.draftCommit) {
+              commitErr.notified = true;
+              throw commitErr;
+            }
+          }
+        } else if (aiSessionId) {
+          const confirmedLines = toSave.map((r) => ({
+            commodityId: Number(r.commodityId),
+            quantity: parsePositiveDecimalField(r.quantity),
+            measureUnit: comById.get(Number(r.commodityId))?.measureUnit || null,
+          }));
           void linkIssueSlipAiMemory({
             sessionId: aiSessionId,
             unitId: selectedUnitId,
             issueSlipId: created.id,
+            recipientUnitId: recipientUnitId ?? selectedUnitId,
+            recipientUserId: recipientUserId ? Number(recipientUserId) : null,
+            orderMessageId: aiLearn?.orderMessageId ?? null,
+            aiLines: aiLearn?.lines ?? [],
+            confirmedLines,
           })
             .unwrap()
+            .then((body) => askUomProposals(body?.proposals || body?.data?.proposals))
             .catch((linkErr) => {
               notifyWarning(
                 linkErr?.data?.message ||
@@ -1576,9 +1635,17 @@ export function LttpPhieuXuatTab({
       setDraftNotice(false);
       setRows([newEmptyRow()]);
       setAiSessionId(null);
+      setAiLearn(null);
       // ponytail: offline link deferred until outbox flush returns server id to the tab.
       refetchNextSerial();
     } catch (err) {
+      if (source?.draftCommit) {
+        if (!err?.notified) {
+          notifyError(err?.data?.message || err?.message || "Không chốt được phiếu.");
+          if (err && typeof err === "object") err.notified = true;
+        }
+        throw err;
+      }
       if (user?.id != null && isOfflineLikeError(err)) {
         try {
           if (isEditMode) {
@@ -1592,6 +1659,7 @@ export function LttpPhieuXuatTab({
             void clearIssueSlipPersist();
             setDraftNotice(false);
             setAiSessionId(null);
+            setAiLearn(null);
             // ponytail: offline link deferred until outbox flush returns server id to the tab.
           }
           notifySuccess("Đã lưu hàng đợi, sẽ gửi khi có mạng");
@@ -1604,6 +1672,37 @@ export function LttpPhieuXuatTab({
         err?.data?.message || err?.message || "Lưu không thành công.",
       );
     }
+  }
+
+  async function handleCommitIssueSlipAiDraft(preview, meta) {
+    const { headerPatch, nextRows, appliedCount, skippedCount } = applyIssueSlipAiPreview({
+      header: {
+        issueDate,
+        receivedDate,
+        recipientUnitId,
+        buyerUserId,
+        slipNote,
+      },
+      touched: headerTouched,
+      preview,
+      newEmptyRow,
+    });
+    if (!appliedCount || skippedCount > 0) {
+      notifyError("Còn dòng chưa khớp mặt hàng, đối tác hoặc cần xác nhận.");
+      const error = new Error("draft");
+      error.notified = true;
+      throw error;
+    }
+    await onSubmit(null, {
+      rows: nextRows,
+      headerPatch,
+      draftCommit: {
+        id: meta?.draftId,
+        version: meta?.draftVersion,
+        confirmAll: Boolean(meta?.confirmAll),
+        sessionId: meta?.sessionId ?? null,
+      },
+    });
   }
 
   async function onResyncSlipPricesFromEffectiveTable() {
@@ -2009,25 +2108,12 @@ export function LttpPhieuXuatTab({
               </span>
             </div>
           )}
-          <label className="min-w-0 flex-1 space-y-0.5 text-xs">
+          <div className="min-w-0 flex-1 space-y-0.5 text-xs">
             Người mua hàng
-            <select
-              className={cn(inputClass, "mt-0.5 block")}
-              value={buyerUserId}
-              onChange={(e) => {
-                markHeaderFieldTouched("buyerUserId");
-                setBuyerUserId(e.target.value);
-              }}
-              disabled={!canWrite}
-            >
-              <option value="">— Chọn người mua —</option>
-              {buyerUsers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName || u.username}
-                </option>
-              ))}
-            </select>
-          </label>
+            <p className={cn(inputClass, "mt-0.5 bg-muted/30 text-foreground")}>
+              {shownBuyerName || (isEditMode ? "—" : "Chưa cài người mua cho ngày này")}
+            </p>
+          </div>
         </div>
         <label className="block space-y-0.5 text-xs">
           Chú thích phiếu (chỉ dùng trên tab Đặt hàng để phân biệt phiếu — không
@@ -2605,7 +2691,7 @@ export function LttpPhieuXuatTab({
                 <div className="flex justify-between gap-3">
                   <dt className="text-muted-foreground">Người mua</dt>
                   <dd className="text-right font-medium">
-                    {buyerDisplayName || "—"}
+                    {shownBuyerName || "—"}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-3">
@@ -2686,7 +2772,7 @@ export function LttpPhieuXuatTab({
               {createBusy || updateBusy ? (
                 <Loader2 className="size-3.5 animate-spin" />
               ) : null}
-              {isEditMode ? "Cập nhật phiếu" : "Lưu phiếu xuất"}
+              {isEditMode ? "Cập nhật phiếu" : aiLearn?.draftId ? "Chốt phiếu" : "Lưu phiếu xuất"}
             </Button>
             {!isEditMode ? (
               <Button
@@ -2747,7 +2833,7 @@ export function LttpPhieuXuatTab({
             onNext={goWizardNext}
             showSubmit={canWrite}
             submitLabel={
-              isEditMode ? "Cập nhật phiếu" : "Lưu phiếu xuất"
+              isEditMode ? "Cập nhật phiếu" : aiLearn?.draftId ? "Chốt phiếu" : "Lưu phiếu xuất"
             }
             submitBusy={createBusy || updateBusy}
             submitDisabled={
@@ -2771,7 +2857,18 @@ export function LttpPhieuXuatTab({
           issueDate={issueDate}
           receivedDate={receivedDate}
           recipientUnitId={recipientUnitId}
+          recipientUserId={recipientUserId}
+          catalog={commodities.map((c) => ({
+            id: c.id,
+            name: c.name,
+            code: c.code,
+            measureUnit: c.measureUnit,
+            lttpSupplierId: c.defaultLttpSupplier?.id ?? null,
+            unitPrice: priceByCommodityId.get(c.id)?.unitPrice ?? null,
+            tgsxPrice: priceByCommodityId.get(c.id)?.tgsxPrice ?? null,
+          }))}
           onApply={handleApplyIssueSlipAiPreview}
+          onCommit={handleCommitIssueSlipAiDraft}
         />
       ) : null}
     </div>

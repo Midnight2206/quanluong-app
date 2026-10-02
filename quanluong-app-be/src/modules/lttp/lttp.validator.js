@@ -118,6 +118,7 @@ const aiSuggestIssueSlipBodySchema = z.object({
   issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   receivedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
+  recipientUserId: z.coerce.number().int().positive().optional().nullable(),
 });
 
 const aiChatIssueSlipBodySchema = z.object({
@@ -125,6 +126,8 @@ const aiChatIssueSlipBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   message: z.string().trim().min(1).max(2000),
   currentPreview: z.record(z.any()).optional(),
+  recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
+  recipientUserId: z.coerce.number().int().positive().optional().nullable(),
 });
 
 const aiMemoryCommitBodySchema = z.object({
@@ -133,10 +136,91 @@ const aiMemoryCommitBodySchema = z.object({
   finalPreview: z.record(z.any()),
 });
 
+const aiLineSchema = z.object({
+  commodityId: z.coerce.number().int().positive().optional().nullable(),
+  quantity: z.union([z.coerce.number(), z.string()]).optional().nullable(),
+  measureUnit: z.string().max(64).optional().nullable(),
+  rawName: z.string().max(255).optional().nullable(),
+  writtenQty: z.union([z.coerce.number(), z.string()]).optional().nullable(),
+  writtenUom: z.string().max(64).optional().nullable(),
+}).passthrough();
+
 const aiMemoryLinkBodySchema = z.object({
   sessionId: z.string().uuid(),
   unitId: z.coerce.number().int().positive(),
   issueSlipId: z.coerce.number().int().positive(),
+  recipientUnitId: z.coerce.number().int().positive().optional().nullable(),
+  recipientUserId: z.coerce.number().int().positive().optional().nullable(),
+  orderMessageId: z.coerce.number().int().positive().optional().nullable(),
+  aiLines: z.array(aiLineSchema).max(80).optional(),
+  confirmedLines: z.array(aiLineSchema).max(80).optional(),
+});
+
+const aiDraftQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  recipientUnitId: z.coerce.number().int().positive().optional(),
+  recipientUserId: z.coerce.number().int().positive().optional(),
+});
+
+const aiDraftParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const aiDraftLineParamsSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  lineId: z.coerce.number().int().positive(),
+});
+
+const aiDraftLinePatchBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  version: z.coerce.number().int().positive(),
+  source: z.enum(["choice", "manual"]),
+  commodityId: z.coerce.number().int().positive().optional().nullable(),
+  quantity: z.coerce.number().positive().optional(),
+  measureUnit: z.string().trim().max(64).optional().nullable(),
+  commodityName: z.string().max(255).optional().nullable(),
+  code: z.string().max(64).optional().nullable(),
+  lttpSupplierId: z.coerce.number().int().positive().optional().nullable(),
+  unitPrice: z.coerce.number().optional().nullable(),
+});
+
+const aiDraftChatBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  message: z.string().trim().min(1).max(2000),
+  lineIds: z.array(z.coerce.number().int().positive()).min(1).max(80),
+});
+
+const aiDraftChatApplyBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  version: z.coerce.number().int().positive(),
+  turnId: z.coerce.number().int().positive(),
+  acceptRule: z.boolean().optional(),
+});
+
+const aiDraftChatUndoBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  version: z.coerce.number().int().positive(),
+});
+
+const aiDraftCommitBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  version: z.coerce.number().int().positive(),
+  issueSlipId: z.coerce.number().int().positive(),
+  confirmAll: z.boolean().optional(),
+  sessionId: z.string().uuid().optional().nullable(),
+});
+
+const aiDraftDiscardBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  version: z.coerce.number().int().positive(),
+});
+
+const aiUomRuleBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  recipientUnitId: z.coerce.number().int().positive(),
+  commodityId: z.coerce.number().int().positive().optional().nullable(),
+  fromUom: z.string().trim().min(1).max(64),
+  factor: z.coerce.number().positive(),
 });
 
 const createIssueSlipBodySchema = z.object({
@@ -294,8 +378,24 @@ const putRecipientDefaultUserBodySchema = z.object({
 const putBuyerDefaultUserBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   userId: z.coerce.number().int().positive().optional().nullable(),
-  /** Mặc định true: gán người mua cho mọi phiếu xuất của đơn vị kho. */
-  applyToAllSlips: z.boolean().optional().default(true),
+  /** Giữ field cho client cũ. Phiếu không còn gán hàng loạt qua endpoint này. */
+  applyToAllSlips: z.boolean().optional(),
+});
+
+const warehouseBuyerQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+const putWarehouseBuyerBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  userId: z.coerce.number().int().positive(),
+  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+const rewriteWarehouseBuyerBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  userId: z.coerce.number().int().positive(),
 });
 
 const lttpSupplierQuerySchema = z.object({
@@ -337,6 +437,16 @@ export {
   aiChatIssueSlipBodySchema,
   aiMemoryCommitBodySchema,
   aiMemoryLinkBodySchema,
+  aiUomRuleBodySchema,
+  aiDraftQuerySchema,
+  aiDraftParamsSchema,
+  aiDraftLineParamsSchema,
+  aiDraftLinePatchBodySchema,
+  aiDraftDiscardBodySchema,
+  aiDraftChatBodySchema,
+  aiDraftChatApplyBodySchema,
+  aiDraftChatUndoBodySchema,
+  aiDraftCommitBodySchema,
   createIssueSlipBodySchema,
   createPriceTableBodySchema,
   effectiveQuerySchema,
@@ -363,6 +473,9 @@ export {
   priceTableParamsSchema,
   putRecipientDefaultUserBodySchema,
   putBuyerDefaultUserBodySchema,
+  warehouseBuyerQuerySchema,
+  putWarehouseBuyerBodySchema,
+  rewriteWarehouseBuyerBodySchema,
   recipientDefaultByUnitQuerySchema,
   updateIssueSlipBodySchema,
   upsertIssueFormDefaultsBodySchema,

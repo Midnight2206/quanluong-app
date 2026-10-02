@@ -55,6 +55,7 @@ export const qk = {
     receivingDefaultRecipientsList: () => ["lttp", "receivingDefaultRecipientsList"],
     buyerDefaultsList: () => ["lttp", "buyerDefaultsList"],
     buyerUsers: (unitId) => ["lttp", "buyerUsers", String(unitId)],
+    warehouseBuyer: (unitId, date) => ["lttp", "warehouseBuyer", String(unitId), date ?? ""],
     dailyOrderSummary: (unitId, date, supplierFilter) => [
       "lttp",
       "dailyOrderSummary",

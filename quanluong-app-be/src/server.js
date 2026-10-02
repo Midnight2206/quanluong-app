@@ -9,6 +9,8 @@ import { registerSchedule } from "./infra/schedule/scheduler.js";
 import { createRedisSessionStore } from "./infra/session/redis-session.store.js";
 import { REFRESH_TOKEN_CLEANUP_SCHEDULE } from "./modules/auth/auth.constants.js";
 import { bootstrapAuthSystem, cleanupExpiredRefreshTokens } from "./modules/auth/auth.service.js";
+import { rebuildCommodityHabits } from "./modules/lttp/lttp-issue-slip-ai-backfill.js";
+import { prisma } from "./infra/database/prisma/prisma.client.js";
 import { logger } from "./shared/utils/logger.js";
 
 async function bootstrapServer() {
@@ -68,6 +70,15 @@ async function bootstrapServer() {
   }
 
   await bootstrapAuthSystem(ROUTE_PERMISSION_DEFINITIONS);
+
+  registerSchedule(
+    "0 2 * * *",
+    async () => {
+      const result = await rebuildCommodityHabits(prisma);
+      logger.info(result, "Rebuilt LTTP commodity habits");
+    },
+    { name: "lttp-ai-habit-rebuild" },
+  );
 
   registerSchedule(
     REFRESH_TOKEN_CLEANUP_SCHEDULE,

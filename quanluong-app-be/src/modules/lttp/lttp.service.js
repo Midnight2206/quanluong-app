@@ -11,10 +11,14 @@ import {
 } from "../../shared/units/unit-scope.service.js";
 import { assertLogicalUnitIsLevel1ForWrite } from "../../shared/units/unit-level.helpers.js";
 import { resolvePrivateStorageUnitId } from "../../shared/data-scope/unit-data-policy.service.js";
+import { markChungTuDocumentsStaleForLttpIssueSlipChange } from "../chung-tu-quyet-toan/chung-tu-document.service.js";
 import {
-  markChungTuDocumentsStaleForLttpIssueSlipChange,
-  markChungTuDocumentsStaleForStorageUnit,
-} from "../chung-tu-quyet-toan/chung-tu-document.service.js";
+  assertWarehouseBuyerUser,
+  getEffectiveWarehouseBuyer,
+  resolveWarehouseBuyerForIssueDate,
+  rewriteAllWarehouseSlipBuyers,
+  setWarehouseBuyerTerm,
+} from "./lttp-warehouse-buyer.service.js";
 import { LTTP_ISSUE_SLIP_PRICE_KIND, LTTP_OTHER_GROUP_CODE } from "./lttp.constants.js";
 
 const commodityInclude = {
@@ -1059,30 +1063,12 @@ function mapIssueFormDefaultsRow(row) {
   };
 }
 
-function displayNameFromUserRow(user) {
-  if (!user) return "";
-  const fullName = user.profile?.fullName != null ? String(user.profile.fullName).trim() : "";
-  if (fullName) return fullName;
-  return String(user.username ?? "").trim();
-}
-
-async function resolveBuyerFields(payload, storageUnitId) {
-  let buyerUserId = null;
-  let buyerDisplayName = payload.buyerDisplayName?.trim() || null;
-  if (payload.buyerUserId != null && payload.buyerUserId !== "") {
-    const buId = Number(payload.buyerUserId);
-    if (!Number.isInteger(buId) || buId <= 0) {
-      throw new AppError({
-        message: "Người mua hàng (user) không hợp lệ",
-        statusCode: 400,
-        code: ERROR_CODES.VALIDATION_ERROR,
-      });
-    }
-    const bu = await assertBuyerUserAllowedForStorage(buId, storageUnitId);
-    buyerUserId = buId;
-    buyerDisplayName = buyerDisplayName || displayNameFromUserRow(bu);
-  }
-  return { buyerUserId, buyerDisplayName };
+async function resolveBuyerFields(storageUnitId, issueDate) {
+  const resolved = await resolveWarehouseBuyerForIssueDate(storageUnitId, issueDate);
+  return {
+    buyerUserId: resolved.buyerUserId,
+    buyerDisplayName: resolved.buyerDisplayName,
+  };
 }
 
 async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataScope, callerUnitId) {
@@ -1246,7 +1232,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
   const signerWriter = payload.signerWriter?.trim() || null;
   const signerStorekeeper = payload.signerStorekeeper?.trim() || null;
   const signerApprover = payload.signerApprover?.trim() || null;
-  const { buyerUserId, buyerDisplayName } = await resolveBuyerFields(payload, storageUnitId);
+  const { buyerUserId, buyerDisplayName } = await resolveBuyerFields(storageUnitId, issueD);
   const receivedDateRaw =
     payload.receivedDate != null && String(payload.receivedDate).trim() !== ""
       ? String(payload.receivedDate).trim().slice(0, 10)
@@ -1510,7 +1496,12 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope, 
   const signerWriter = payload.signerWriter?.trim() || null;
   const signerStorekeeper = payload.signerStorekeeper?.trim() || null;
   const signerApprover = payload.signerApprover?.trim() || null;
-  const { buyerUserId, buyerDisplayName } = await resolveBuyerFields(payload, storageUnitId);
+  const resolvedBuyer = await resolveBuyerFields(storageUnitId, existing.issueDate);
+  const buyerUserId = resolvedBuyer.buyerUserId ?? existing.buyerUserId ?? null;
+  const buyerDisplayName =
+    resolvedBuyer.buyerUserId != null
+      ? resolvedBuyer.buyerDisplayName
+      : existing.buyerDisplayName ?? null;
   const receivedDateRaw =
     payload.receivedDate != null && String(payload.receivedDate).trim() !== ""
       ? String(payload.receivedDate).trim().slice(0, 10)
@@ -2892,39 +2883,19 @@ async function resolveBuyerPickUnitIds(logicalUnitId) {
 }
 
 async function assertBuyerUserAllowedForStorage(userId, storageUnitId) {
-  const pickUnitIds = await resolveBuyerPickUnitIds(storageUnitId);
-  const u = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      deletedAt: null,
-      isActive: true,
-      unitId: { in: pickUnitIds.length ? pickUnitIds : [storageUnitId] },
-    },
-    include: { profile: { select: { fullName: true } } },
-  });
-  if (!u) {
-    throw new AppError({
-      message: "Người mua phải thuộc đơn vị kho hoặc nhánh con của kho đã chọn.",
-      statusCode: 400,
-      code: ERROR_CODES.VALIDATION_ERROR,
-    });
-  }
-  return u;
+  return assertWarehouseBuyerUser(userId, storageUnitId);
 }
 
 async function listBuyerUsers({ unitId }, scope, effectiveUnitIds) {
   assertUnitIdInScope(unitId, scope);
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
-  const pickUnitIds = await resolveBuyerPickUnitIds(unitId);
-  if (!pickUnitIds.length) {
-    return [];
-  }
+  const { storageUnitId } = await resolvePrivateStorageUnitId({
+    logicalUnitId: Number(unitId),
+    dataKind: "LTTP_COMMODITY",
+  });
+  const khoId = storageUnitId ?? Number(unitId);
   const rows = await prisma.user.findMany({
-    where: {
-      unitId: { in: pickUnitIds },
-      deletedAt: null,
-      isActive: true,
-    },
+    where: { unitId: khoId, deletedAt: null, isActive: true },
     select: { id: true, username: true, unitId: true, profile: { select: { fullName: true } } },
     orderBy: { id: "asc" },
   });
@@ -2951,7 +2922,7 @@ async function listBuyerDefaultsInScope(effectiveUnitIds) {
 }
 
 async function putBuyerDefaultForUnit(
-  { unitId, userId: userIdIn, applyToAllSlips = true },
+  { unitId, userId: userIdIn },
   scope,
   effectiveUnitIds,
   dataScope,
@@ -2961,7 +2932,6 @@ async function putBuyerDefaultForUnit(
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
   const storageUnitId = dataScope.storageUnitId;
   const userId = userIdIn != null && userIdIn !== "" ? Number(userIdIn) : null;
-  let buyerDisplayName = null;
   if (userId != null) {
     if (!Number.isInteger(userId) || userId <= 0) {
       throw new AppError({
@@ -2970,8 +2940,7 @@ async function putBuyerDefaultForUnit(
         code: ERROR_CODES.VALIDATION_ERROR,
       });
     }
-    const u = await assertBuyerUserAllowedForStorage(userId, storageUnitId);
-    buyerDisplayName = displayNameFromUserRow(u) || null;
+    await assertBuyerUserAllowedForStorage(userId, storageUnitId);
   }
   assertLttpPrismaDelegates();
   await prisma.lttpUnitIssueFormDefaults.upsert({
@@ -2980,26 +2949,46 @@ async function putBuyerDefaultForUnit(
     update: { defaultBuyerUserId: userId },
   });
 
-  let slipsUpdated = 0;
-  if (applyToAllSlips !== false) {
-    const slipData =
-      userId != null
-        ? { buyerUserId: userId, buyerDisplayName }
-        : { buyerUserId: null, buyerDisplayName: null };
-    const updated = await prisma.lttpIssueSlip.updateMany({
-      where: { unitId: storageUnitId },
-      data: slipData,
-    });
-    slipsUpdated = updated.count;
-    if (slipsUpdated > 0) {
-      await markChungTuDocumentsStaleForStorageUnit(storageUnitId);
-    }
-  }
-
-  return { unitId: storageUnitId, userId, slipsUpdated, applyToAllSlips: applyToAllSlips !== false };
+  // Phiếu lấy người mua từ mốc ngày (LttpWarehouseBuyerTerm), không gán hàng loạt ở đây.
+  return { unitId: storageUnitId, userId, slipsUpdated: 0, applyToAllSlips: false };
 }
 
-/** Cùng phạm vi pick với người mua: subtree kho LTTP + tổ tiên tới storage root. */
+async function getWarehouseBuyerForUnit({ unitId, date }, scope, effectiveUnitIds, dataScope) {
+  assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  return getEffectiveWarehouseBuyer(dataScope.storageUnitId, date);
+}
+
+async function putWarehouseBuyerForUnit(
+  { unitId, userId, effectiveDate },
+  scope,
+  effectiveUnitIds,
+  dataScope,
+  createdById,
+) {
+  assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  return setWarehouseBuyerTerm({
+    storageUnitId: dataScope.storageUnitId,
+    userId,
+    effectiveDate,
+    createdById,
+  });
+}
+
+async function rewriteWarehouseSlipBuyers({ unitId, userId }, scope, effectiveUnitIds, dataScope) {
+  assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  return rewriteAllWarehouseSlipBuyers({
+    storageUnitId: dataScope.storageUnitId,
+    userId,
+  });
+}
+
+/** Phạm vi chọn người nhận: subtree đơn vị + tổ tiên tới storage root. */
 async function resolveRecipientPickUnitIds(recipientUnitId) {
   return resolveBuyerPickUnitIds(recipientUnitId);
 }
@@ -3814,6 +3803,9 @@ export {
   recalculateLttpPartnerDebtsForUnit,
   putRecipientDefaultUser,
   putBuyerDefaultForUnit,
+  getWarehouseBuyerForUnit,
+  putWarehouseBuyerForUnit,
+  rewriteWarehouseSlipBuyers,
   resolveIssueSlipLine,
   resolveIssueSlipAiSuggestLine,
   assertIssueSlipWriteAccess,

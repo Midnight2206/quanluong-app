@@ -5,12 +5,12 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { formatLocalCatalogForPrompt } from "../kitchen-books/kitchen-books-menu-ai-history.js";
 import { assertMenuAiConfigured, completeMenuJson } from "../kitchen-books/kitchen-books-menu-ai-llm.js";
-import { enrichLlmIssueSlipDraft } from "./lttp-issue-slip-ai-enrich.js";
 import { scopeSanitizeIssueSlipAiHeaderDraft } from "./lttp-issue-slip-ai-header-scope.js";
 import { formatMemoriesForPrompt } from "./lttp-issue-slip-ai-memory.js";
-import { dropTgsxUnlessSignaled } from "./lttp-issue-slip-ai-tgsx.js";
+import { createIssueSlipAiDraft } from "./lttp-issue-slip-ai-draft.js";
+import { confirmUomRule, learnConfirmedOrder } from "./lttp-issue-slip-ai-learn.js";
+import { parseOrderItems } from "./lttp-issue-slip-ai-parse.js";
 import {
-  buildIssueSlipAiChatPrompt,
   buildIssueSlipAiPrompt,
   formatIssueSlipHistoryForPrompt,
 } from "./lttp-issue-slip-ai.prompt.js";
@@ -31,6 +31,39 @@ const defaultIssueSlipAiHeaderScopeDeps = {
 
 function getPrismaClient(opts) {
   return opts.prismaClient ?? prisma;
+}
+
+async function loadAiStats(recipientUnitId, recipientUserId, prismaClient) {
+  if (!recipientUnitId || !prismaClient.lttpAiCommodityHabit) {
+    return { habits: [], aliases: [], rules: [], examples: [] };
+  }
+  const [habits, aliases, rules] = await Promise.all([
+    prismaClient.lttpAiCommodityHabit.findMany({ where: { recipientUnitId } }),
+    prismaClient.lttpAiAliasStat.findMany({ where: { recipientUnitId } }),
+    prismaClient.lttpAiUomRule.findMany({ where: { recipientUnitId, confirmed: true } }),
+  ]);
+  let examples = [];
+  if (prismaClient.lttpAiOrderMessage) {
+    const personal = recipientUserId
+      ? await prismaClient.lttpAiOrderMessage.findMany({
+          where: { recipientUserId, issueSlipId: { not: null } },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        })
+      : [];
+    const rows = personal.length
+      ? personal
+      : await prismaClient.lttpAiOrderMessage.findMany({
+          where: { issueSlipId: { not: null } },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        });
+    examples = rows.map((row) => ({
+      rawText: row.rawText,
+      items: row.parseResult?.items || [],
+    }));
+  }
+  return { habits, aliases, rules, examples };
 }
 
 function buildAssistantTurnText(headerDraft, lines) {
@@ -181,7 +214,7 @@ async function suggestIssueSlipAi(
   callerUnitId,
   opts = {},
 ) {
-  const { unitId, prompt, issueDate, receivedDate, recipientUnitId } = payload;
+  const { unitId, prompt, issueDate, receivedDate, recipientUnitId, recipientUserId } = payload;
   assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId);
 
   const menuAiCfg = opts.configOverride ?? config.menuAi;
@@ -194,96 +227,109 @@ async function suggestIssueSlipAi(
   const effDate = resolveIssueSlipAiEffDate(issueDate);
 
   const loadCatalogFn = opts.loadCatalog ?? loadCatalog;
-  const loadHistoryFn = opts.loadHistorySamples ?? loadHistorySamples;
-  const loadMemoriesFn = opts.loadMemories ?? ((targetUnitId, args) => loadMemories(targetUnitId, args, prismaClient));
   const loadSuppliersFn = opts.loadDefaultSuppliers ?? loadDefaultSuppliers;
   const getEffectiveFn = opts.getEffectivePrices ?? getEffectivePrices;
+  const loadStatsFn = opts.loadAiStats ?? ((unit, userId) => loadAiStats(unit, userId, prismaClient));
+  const text = String(prompt ?? "").trim();
 
   await prismaClient.lttpIssueSlipAiMemory.create({
     data: {
       unitId: storageUnitId,
       sessionId,
-      prompt: String(prompt ?? "").trim(),
+      prompt: text,
       turns: [],
       finalPreview: null,
       createdById: actorUserId,
     },
   });
 
-  const [
-    { commodities, catalogText },
-    { memoryText, memorySampleCount },
-    { historyText, historySampleCount },
-    eff,
-    defaultSupplierByCid,
-  ] = await Promise.all([
-      loadCatalogFn(storageUnitId),
-      loadMemoriesFn(storageUnitId, { limit: 20 }),
-      loadHistoryFn(storageUnitId, { recipientUnitId }),
-      getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
-      loadSuppliersFn(storageUnitId),
-    ]);
+  const [{ commodities }, stats, eff, defaultSupplierByCid] = await Promise.all([
+    loadCatalogFn(storageUnitId),
+    loadStatsFn(recipientUnitId, recipientUserId),
+    getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
+    loadSuppliersFn(storageUnitId),
+  ]);
 
   const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
-
-  const llmPrompt = buildIssueSlipAiPrompt({
-    prompt: String(prompt ?? "").trim(),
-    issueDate: effDate,
-    catalogText,
-    memoryText,
-    historyText,
-    context: { receivedDate, recipientUnitId },
-  });
-
   const complete = opts.completeMenuJson ?? completeMenuJson;
-  const llmJson = await complete(llmPrompt, {
-    configOverride: menuAiCfg,
-    fetchImpl: opts.fetchImpl,
-    retryUserHint: "Hay tra lai dung schema header va lines[] (phieu xuat LTTP).",
-  });
-
-  const { headerDraft: rawHeader, lines, warnings } = enrichLlmIssueSlipDraft({
-    llm: llmJson,
+  const parsed = await parseOrderItems({
+    text,
     commodities,
+    habits: stats.habits,
+    aliases: stats.aliases,
+    rules: stats.rules,
+    examples: stats.examples,
+    includeExamples: true,
+    priceByCid,
     resolveLine: ({ commodityId, priceKind }) =>
       resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid),
-  });
-  const tgsxFiltered = dropTgsxUnlessSignaled({
-    lines,
-    signalTexts: [String(prompt ?? "").trim()],
-    warnings,
+    complete,
+    completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
   });
 
-  const mergedHeader = mergeHeaderFromRequest(rawHeader, { issueDate, receivedDate });
+  let orderMessageId = null;
+  if (recipientUnitId && prismaClient.lttpAiOrderMessage) {
+    const saved = await prismaClient.lttpAiOrderMessage.create({
+      data: {
+        recipientUserId: recipientUserId || null,
+        recipientUnitId,
+        storageUnitId,
+        rawText: text,
+        parseResult: { items: parsed.items, lines: parsed.lines },
+      },
+    });
+    orderMessageId = saved.id;
+  }
+
+  const draft = await createIssueSlipAiDraft(prismaClient, {
+    storageUnitId,
+    recipientUnitId,
+    recipientUserId,
+    orderMessageId,
+    rawText: text,
+    lines: parsed.lines,
+    actorUserId,
+  });
+
+  const mergedHeader = mergeHeaderFromRequest({}, { issueDate, receivedDate });
   const scopeSanitize =
     opts.scopeSanitizeIssueSlipAiHeaderDraft ?? scopeSanitizeIssueSlipAiHeaderDraft;
   const headerDraft = await scopeSanitize(mergedHeader, {
     effectiveUnitIds,
     storageUnitId,
     requestRecipientUnitId: recipientUnitId,
-    warnings: tgsxFiltered.warnings,
+    warnings: parsed.warnings,
     deps: opts.headerScopeDeps ?? defaultIssueSlipAiHeaderScopeDeps,
   });
 
-  if (historySampleCount < 3) {
-    tgsxFiltered.warnings.unshift("Ít dữ liệu phiếu xuất gần đây — gợi ý có thể kém ổn định.");
+  if (!stats.habits.length) {
+    parsed.warnings.unshift("Đơn vị nhận chưa có thói quen đặt hàng — dòng lạ sẽ cần xác nhận.");
   }
+
+  const lines = parsed.lines.map((line, index) => {
+    const saved = draft?.lines?.[index];
+    if (!saved) return line;
+    return { ...line, draftLineId: saved.id, lineStatus: saved.status };
+  });
 
   return {
     headerDraft,
-    lines: tgsxFiltered.lines,
-    warnings: tgsxFiltered.warnings,
+    lines,
+    warnings: parsed.warnings,
     sessionId,
     meta: {
-      historySampleCount,
-      memorySampleCount,
+      historySampleCount: stats.habits.length,
+      memorySampleCount: stats.examples.length,
+      orderMessageId,
+      draftId: draft?.id ?? null,
+      draftVersion: draft?.version ?? null,
       model: menuAiCfg.model,
     },
   };
 }
 
 async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, callerUnitId, opts = {}) {
-  const { sessionId, unitId, message, currentPreview } = payload;
+  const { sessionId, unitId, message, currentPreview, recipientUnitId, recipientUserId } = payload;
   assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId);
 
   const menuAiCfg = opts.configOverride ?? config.menuAi;
@@ -305,60 +351,52 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
   }
 
   const loadCatalogFn = opts.loadCatalog ?? loadCatalog;
-  const loadMemoriesFn = opts.loadMemories ?? ((targetUnitId, args) => loadMemories(targetUnitId, args, prismaClient));
   const loadSuppliersFn = opts.loadDefaultSuppliers ?? loadDefaultSuppliers;
   const getEffectiveFn = opts.getEffectivePrices ?? getEffectivePrices;
+  const loadStatsFn = opts.loadAiStats ?? ((unit, userId) => loadAiStats(unit, userId, prismaClient));
+  const text = String(message ?? "").trim();
+  const habitUnitId = recipientUnitId ?? currentPreview?.headerDraft?.recipientUnitId ?? null;
   const effDate = resolveIssueSlipAiEffDate(currentPreview?.headerDraft?.issueDate, payload?.issueDate);
-  const [{ commodities, catalogText }, { memoryText }, eff, defaultSupplierByCid] = await Promise.all([
+  const [{ commodities }, stats, eff, defaultSupplierByCid] = await Promise.all([
     loadCatalogFn(storageUnitId),
-    loadMemoriesFn(storageUnitId, { limit: 20 }),
+    loadStatsFn(habitUnitId, recipientUserId),
     getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
     loadSuppliersFn(storageUnitId),
   ]);
 
-  const llmPrompt = buildIssueSlipAiChatPrompt({
-    message: String(message ?? "").trim(),
-    currentPreview,
-    turns,
-    catalogText,
-    memoryText,
-  });
-
-  const complete = opts.completeMenuJson ?? completeMenuJson;
-  const llmJson = await complete(llmPrompt, {
-    configOverride: menuAiCfg,
-    fetchImpl: opts.fetchImpl,
-    retryUserHint: "Hay tra lai dung schema header va lines[] (phieu xuat LTTP).",
-  });
-
   const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
-  const enriched = enrichLlmIssueSlipDraft({
-    llm: llmJson,
+  const complete = opts.completeMenuJson ?? completeMenuJson;
+  const parsed = await parseOrderItems({
+    text,
     commodities,
+    habits: stats.habits,
+    aliases: stats.aliases,
+    rules: stats.rules,
+    examples: [],
+    includeExamples: false,
+    priceByCid,
     resolveLine: ({ commodityId, priceKind }) =>
       resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid),
-  });
-  const tgsxFiltered = dropTgsxUnlessSignaled({
-    lines: enriched.lines,
-    warnings: enriched.warnings,
-    signalTexts: [memory.prompt, ...turns.map((turn) => turn?.text), String(message ?? "").trim()],
+    complete,
+    completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
+    now: opts.now ? opts.now() : new Date(),
   });
 
   const scopeSanitize =
     opts.scopeSanitizeIssueSlipAiHeaderDraft ?? scopeSanitizeIssueSlipAiHeaderDraft;
-  const headerDraft = await scopeSanitize(enriched.headerDraft, {
+  const headerDraft = await scopeSanitize(currentPreview?.headerDraft || {}, {
     effectiveUnitIds,
     storageUnitId,
-    requestRecipientUnitId: currentPreview?.headerDraft?.recipientUnitId ?? null,
-    warnings: tgsxFiltered.warnings,
+    requestRecipientUnitId: habitUnitId,
+    warnings: parsed.warnings,
     deps: opts.headerScopeDeps ?? defaultIssueSlipAiHeaderScopeDeps,
   });
 
   const at = (opts.now ? opts.now() : new Date()).toISOString();
   const nextTurns = [
     ...turns,
-    { role: "user", text: String(message ?? "").trim(), at },
-    { role: "assistant", text: buildAssistantTurnText(headerDraft, tgsxFiltered.lines), at },
+    { role: "user", text, at },
+    { role: "assistant", text: buildAssistantTurnText(headerDraft, parsed.lines), at },
   ];
   await prismaClient.lttpIssueSlipAiMemory.update({
     where: { sessionId },
@@ -367,8 +405,8 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
 
   return {
     headerDraft,
-    lines: tgsxFiltered.lines,
-    warnings: tgsxFiltered.warnings,
+    lines: parsed.lines,
+    warnings: parsed.warnings,
     sessionId,
     meta: {
       memorySampleCount: turns.length,
@@ -404,7 +442,16 @@ async function commitIssueSlipAiMemory(
 }
 
 async function linkIssueSlipAiMemory(
-  { sessionId, unitId, issueSlipId },
+  {
+    sessionId,
+    unitId,
+    issueSlipId,
+    recipientUnitId,
+    recipientUserId,
+    orderMessageId,
+    aiLines,
+    confirmedLines,
+  },
   scope,
   effectiveUnitIds,
   dataScope,
@@ -430,6 +477,37 @@ async function linkIssueSlipAiMemory(
       issueSlipId,
     },
   });
+
+  const learned = await learnConfirmedOrder({
+    prisma: prismaClient,
+    recipientUnitId: recipientUnitId || null,
+    recipientUserId: recipientUserId || null,
+    issueSlipId,
+    orderMessageId: orderMessageId || null,
+    aiLines: aiLines || memory.finalPreview?.lines || [],
+    confirmedLines: confirmedLines || [],
+  });
+  return { proposals: learned.proposals };
+}
+
+async function confirmIssueSlipAiUomRule(
+  { unitId, recipientUnitId, commodityId, fromUom, factor },
+  scope,
+  effectiveUnitIds,
+  dataScope,
+  callerUnitId,
+  opts = {},
+) {
+  assertIssueSlipWriteAccess(unitId, scope, effectiveUnitIds, dataScope, callerUnitId);
+  const prismaClient = getPrismaClient(opts);
+  if (!prismaClient.lttpAiUomRule) return null;
+  return confirmUomRule({
+    prisma: prismaClient,
+    recipientUnitId,
+    commodityId: commodityId ?? null,
+    fromUom: String(fromUom || "").slice(0, 64),
+    factor,
+  });
 }
 
 export {
@@ -437,6 +515,7 @@ export {
   buildIssueSlipAiPrompt,
   chatIssueSlipAi,
   commitIssueSlipAiMemory,
+  confirmIssueSlipAiUomRule,
   linkIssueSlipAiMemory,
   suggestIssueSlipAi,
 };

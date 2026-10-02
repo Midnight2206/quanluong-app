@@ -153,8 +153,13 @@ model User {
   lttpIssueSlipsAsRecipient LttpIssueSlip[] @relation("LttpIssueSlipRecipientUser")
   lttpIssueSlipsAsBuyer     LttpIssueSlip[] @relation("LttpIssueSlipBuyerUser")
   lttpIssueSlipAiMemoriesCreated LttpIssueSlipAiMemory[] @relation("LttpIssueSlipAiMemoryCreatedBy")
+  lttpAiOrderMessages            LttpAiOrderMessage[]     @relation("LttpAiOrderMessageRecipientUser")
+  lttpAiOrderDraftsCreated       LttpAiOrderDraft[]       @relation("LttpAiOrderDraftCreatedBy")
+  lttpAiOrderDraftsAsRecipient   LttpAiOrderDraft[]       @relation("LttpAiOrderDraftRecipientUser")
   lttpFormDefaultsAsDefaultRecipientUser LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultRecipientUser")
   lttpFormDefaultsAsDefaultBuyerUser     LttpUnitIssueFormDefaults[] @relation("LttpIssueFormDefaultBuyerUser")
+  lttpWarehouseBuyerTermsAsBuyer         LttpWarehouseBuyerTerm[] @relation("LttpWarehouseBuyerTermBuyer")
+  lttpWarehouseBuyerTermsCreated         LttpWarehouseBuyerTerm[] @relation("LttpWarehouseBuyerTermCreatedBy")
   lttpAsDefaultForRecipientUnit          LttpRecipientUnitDefaultUser[] @relation("LttpRecipientDefaultUserUser")
   chungTuQuyetToanTemplateConfigs        ChungTuQuyetToanTemplateConfig[]
   chungTuDocumentsCreated                ChungTuDocument[] @relation("ChungTuDocumentCreatedBy")
@@ -644,8 +649,15 @@ model Unit {
   lttpIssueSlips              LttpIssueSlip[]              @relation("LttpIssueSlipStorageUnit")
   lttpIssueSlipsAsRecipient   LttpIssueSlip[]              @relation("LttpIssueSlipRecipientUnit")
   lttpIssueSlipAiMemories     LttpIssueSlipAiMemory[]      @relation("LttpIssueSlipAiMemoryUnit")
+  lttpAiCommodityHabits       LttpAiCommodityHabit[]
+  lttpAiAliasStats            LttpAiAliasStat[]
+  lttpAiUomRules              LttpAiUomRule[]
+  lttpAiOrderMessages         LttpAiOrderMessage[]         @relation("LttpAiOrderMessageRecipientUnit")
+  lttpAiOrderDraftsStorage    LttpAiOrderDraft[]           @relation("LttpAiOrderDraftStorage")
+  lttpAiOrderDraftsRecipient  LttpAiOrderDraft[]           @relation("LttpAiOrderDraftRecipient")
   lttpIssueSlipSerials        LttpIssueSlipSerial[]
   lttpUnitIssueFormDefaults   LttpUnitIssueFormDefaults?   @relation("LttpIssueFormDefaultUnit")
+  lttpWarehouseBuyerTerms     LttpWarehouseBuyerTerm[]      @relation("LttpWarehouseBuyerTermUnit")
   lttpIssueFormDefaultRecip   LttpUnitIssueFormDefaults[]  @relation("LttpIssueFormDefaultRecipUnit")
   lttpIssueSlipSignatureSettings LttpIssueSlipSignatureSettings? @relation("LttpIssueSlipSignatureSettingsUnit")
   lttpRecipientDefaultUser   LttpRecipientUnitDefaultUser? @relation("LttpRecipientDefaultRecipientUnit")
@@ -811,6 +823,9 @@ model LttpCommodity {
   kitchenMenuDishLines           KitchenMenuDishLine[]
   kitchenReceiptSlipLines        KitchenReceiptSlipLine[]
   lttpCommodityDefaultSupplier  LttpCommodityDefaultSupplier?
+  lttpAiCommodityHabits         LttpAiCommodityHabit[]
+  lttpAiUomRules                LttpAiUomRule[]
+  lttpAiDraftLines              LttpAiDraftLine[]
 
   @@unique([unitId, code])
   @@index([unitId])
@@ -894,6 +909,8 @@ model LttpIssueSlip {
   lines         LttpIssueSlipLine[]
   chungTuDocuments ChungTuDocument[]
   aiMemories    LttpIssueSlipAiMemory[]
+  lttpAiOrderMessages LttpAiOrderMessage[]
+  lttpAiOrderDrafts   LttpAiOrderDraft[]
 
   @@index([unitId, issueDate])
   @@index([unitId, bookMmyy, slipNo])
@@ -919,6 +936,168 @@ model LttpIssueSlipAiMemory {
 
   @@index([unitId, updatedAt])
   @@index([issueSlipId])
+}
+
+/// Thói quen đặt hàng theo đơn vị nhận. commodityId thuộc danh mục kho.
+model LttpAiCommodityHabit {
+  id              Int       @id @default(autoincrement())
+  recipientUnitId Int
+  commodityId     Int
+  measureUnit     String    @db.VarChar(64)
+  orderCount      Int       @default(0)
+  lastOrderedAt   DateTime?
+  /// Số lượng các lần gần nhất, tối đa 100 phần tử. Trung vị tính lại từ mảng này.
+  qtySamples      Json
+  recipientUnit   Unit          @relation(fields: [recipientUnitId], references: [id], onDelete: Cascade)
+  commodity       LttpCommodity @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+
+  @@unique([recipientUnitId, commodityId, measureUnit])
+  @@index([recipientUnitId])
+}
+
+/// Cách viết tên → SKU trong một đơn vị nhận. 80% = hitCount / tổng hit của cùng rawNorm.
+model LttpAiAliasStat {
+  id              Int    @id @default(autoincrement())
+  recipientUnitId Int
+  rawNorm         String @db.VarChar(191)
+  commodityId     Int
+  hitCount        Int    @default(0)
+  recipientUnit   Unit   @relation(fields: [recipientUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([recipientUnitId, rawNorm, commodityId])
+  @@index([recipientUnitId, rawNorm])
+}
+
+/// Hệ số: số lượng kho = số khách ghi × factor. commodityId null = mọi SKU của đơn vị.
+model LttpAiUomRule {
+  id              Int      @id @default(autoincrement())
+  recipientUnitId Int
+  commodityId     Int?
+  fromUom         String   @db.VarChar(64)
+  factor          Decimal  @db.Decimal(18, 4)
+  confirmed       Boolean  @default(false)
+  recipientUnit   Unit          @relation(fields: [recipientUnitId], references: [id], onDelete: Cascade)
+  commodity       LttpCommodity? @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUnitId, fromUom])
+}
+
+model LttpAiOrderMessage {
+  id               Int       @id @default(autoincrement())
+  recipientUserId  Int?
+  recipientUnitId  Int
+  storageUnitId    Int
+  rawText          String    @db.Text
+  parseResult      Json
+  issueSlipId      Int?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  recipientUser    User?     @relation("LttpAiOrderMessageRecipientUser", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  recipientUnit    Unit      @relation("LttpAiOrderMessageRecipientUnit", fields: [recipientUnitId], references: [id], onDelete: Cascade)
+  issueSlip        LttpIssueSlip? @relation(fields: [issueSlipId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, createdAt])
+  @@index([issueSlipId])
+  drafts LttpAiOrderDraft[]
+}
+
+model LttpAiFillLog {
+  id               Int      @id @default(autoincrement())
+  recipientUnitId  Int
+  recipientUserId  Int?
+  issueSlipId      Int?
+  aiJson           Json
+  confirmedJson    Json
+  createdAt        DateTime @default(now())
+
+  @@index([recipientUnitId, createdAt])
+}
+
+/// Bản nháp AI trước khi chốt phiếu. Không sửa bảng phiếu cũ.
+model LttpAiOrderDraft {
+  id               Int      @id @default(autoincrement())
+  storageUnitId    Int
+  recipientUnitId  Int
+  recipientUserId  Int?
+  orderMessageId   Int?
+  issueSlipId      Int?
+  rawText          String   @db.Text
+  /// editing | committed | discarded
+  status           String   @default("editing") @db.VarChar(16)
+  version          Int      @default(1)
+  createdById      Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  storageUnit      Unit     @relation("LttpAiOrderDraftStorage", fields: [storageUnitId], references: [id], onDelete: Cascade)
+  recipientUnit    Unit     @relation("LttpAiOrderDraftRecipient", fields: [recipientUnitId], references: [id], onDelete: Cascade)
+  recipientUser    User?    @relation("LttpAiOrderDraftRecipientUser", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  createdBy        User     @relation("LttpAiOrderDraftCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  orderMessage     LttpAiOrderMessage? @relation(fields: [orderMessageId], references: [id], onDelete: SetNull)
+  issueSlip        LttpIssueSlip? @relation(fields: [issueSlipId], references: [id], onDelete: SetNull)
+  lines            LttpAiDraftLine[]
+  chatTurns        LttpAiDraftChatTurn[]
+
+  @@index([recipientUserId, recipientUnitId, status])
+  @@index([storageUnitId, status, updatedAt])
+  @@index([issueSlipId])
+}
+
+model LttpAiDraftLine {
+  id              Int      @id @default(autoincrement())
+  draftId         Int
+  sortOrder       Int
+  commodityId     Int?
+  commodityName   String?  @db.VarChar(255)
+  code            String?  @db.VarChar(64)
+  quantity        Decimal? @db.Decimal(18, 4)
+  measureUnit     String?  @db.VarChar(64)
+  /// sure | needs_confirm | edited
+  status          String   @db.VarChar(16)
+  /// alias | score | llm | none | confirm
+  decisionSource  String   @db.VarChar(16)
+  confidence      Decimal  @default(0) @db.Decimal(6, 4)
+  rawName         String   @default("") @db.VarChar(255)
+  writtenQty      String?  @db.VarChar(64)
+  writtenUom      String?  @db.VarChar(64)
+  /// Ứng viên khi dòng cần xác nhận, để mở lại bản nháp.
+  choices         Json
+  lttpSupplierId  Int?
+  unitPrice       Decimal? @db.Decimal(18, 4)
+  priceKind       String   @default("market") @db.VarChar(16)
+  draft           LttpAiOrderDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  commodity       LttpCommodity?   @relation(fields: [commodityId], references: [id], onDelete: SetNull)
+  events          LttpAiDraftLineEvent[]
+
+  @@index([draftId, sortOrder])
+}
+
+model LttpAiDraftLineEvent {
+  id          Int      @id @default(autoincrement())
+  draftLineId Int
+  /// ai | choice | chat | manual
+  source      String   @db.VarChar(16)
+  beforeJson  Json?
+  afterJson   Json
+  actorUserId Int?
+  createdAt   DateTime @default(now())
+  line        LttpAiDraftLine @relation(fields: [draftLineId], references: [id], onDelete: Cascade)
+
+  @@index([draftLineId, createdAt])
+}
+
+model LttpAiDraftChatTurn {
+  id            Int      @id @default(autoincrement())
+  draftId       Int
+  role          String   @db.VarChar(16)
+  content       String   @db.Text
+  tickedLineIds Json
+  proposedPatch Json?
+  applied       Boolean  @default(false)
+  actorUserId   Int?
+  createdAt     DateTime @default(now())
+  draft         LttpAiOrderDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId, createdAt])
 }
 
 /// Số thứ tự phiếu tăng theo quyển (MMYY) từng đơn vị kho.
@@ -989,6 +1168,24 @@ model LttpUnitIssueFormDefaults {
   defaultRecipientUnit   Unit? @relation("LttpIssueFormDefaultRecipUnit", fields: [defaultRecipientUnitId], references: [id], onDelete: SetNull)
   defaultRecipientUser   User? @relation("LttpIssueFormDefaultRecipientUser", fields: [defaultRecipientUserId], references: [id], onDelete: SetNull)
   defaultBuyerUser       User? @relation("LttpIssueFormDefaultBuyerUser", fields: [defaultBuyerUserId], references: [id], onDelete: SetNull)
+}
+
+/// Người mua của một kho, hiệu lực từ `effectiveDate`. Phiếu có issueDate >= mốc lấy buyer của mốc mới nhất còn hiệu lực.
+model LttpWarehouseBuyerTerm {
+  id            Int      @id @default(autoincrement())
+  unitId        Int
+  effectiveDate DateTime @db.Date
+  buyerUserId   Int
+  createdById   Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  unit          Unit @relation("LttpWarehouseBuyerTermUnit", fields: [unitId], references: [id], onDelete: Cascade)
+  buyerUser     User @relation("LttpWarehouseBuyerTermBuyer", fields: [buyerUserId], references: [id], onDelete: Restrict)
+  createdBy     User @relation("LttpWarehouseBuyerTermCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([unitId, effectiveDate])
+  @@index([buyerUserId])
+  @@index([createdById])
 }
 
 enum LttpIssueSlipPriceKind {

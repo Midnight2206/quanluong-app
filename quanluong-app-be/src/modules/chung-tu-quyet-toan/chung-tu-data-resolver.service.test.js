@@ -419,7 +419,7 @@ test("materializeSignatureBlockForRender turns resolved system slots into static
   });
 });
 
-test("resolvePdfHeaderSettings prefers resolvedBkmhBuyer over slip buyer", () => {
+test("resolvePdfHeaderSettings prefers slip buyer and that user's department", () => {
   const result = resolvePdfHeaderSettings({
     mergedSettings: {},
     rawSettings: {},
@@ -428,7 +428,13 @@ test("resolvePdfHeaderSettings prefers resolvedBkmhBuyer over slip buyer", () =>
       hoTenNguoiMua: "Buyer from settings",
       boPhan: "Bo phan from settings",
     },
-    slips: [{ slipNo: 1, buyerDisplayName: "Buyer from slip" }],
+    slips: [
+      {
+        slipNo: 1,
+        buyerDisplayName: "Buyer from slip",
+        buyerUser: { profile: { department: "Kho" } },
+      },
+    ],
     resolvedBkmhBuyer: {
       name: "Nguyễn Văn A",
       signatureName: "Th/tá Nguyễn Văn A",
@@ -436,8 +442,8 @@ test("resolvePdfHeaderSettings prefers resolvedBkmhBuyer over slip buyer", () =>
     },
   });
 
-  assert.equal(result.hoTenNguoiMua, "Nguyễn Văn A");
-  assert.equal(result.boPhan, "Tài vụ");
+  assert.equal(result.hoTenNguoiMua, "Buyer from slip");
+  assert.equal(result.boPhan, "Kho");
 });
 
 test("resolvePdfHeaderSettings falls back to BKMH settings when slip buyer and boPhan empty", () => {
@@ -465,4 +471,33 @@ test("resolvePdfHeaderSettings falls back to BKMH settings when slip buyer and b
 
   assert.equal(result.hoTenNguoiMua, "Buyer from settings");
   assert.equal(result.boPhan, "Bo phan from settings");
+});
+
+test("bkmh.nguoiMua catalog uses the warehouse term for the date", async () => {
+  const { SIGNATURE_CATALOG } = await import("./chung-tu-signature-catalog.js");
+  let defaultsRead = false;
+  const prisma = {
+    lttpWarehouseBuyerTerm: {
+      findFirst: async () => ({
+        buyerUser: {
+          username: "term",
+          profile: { fullName: "Người Mốc", rankAbbr: "Th/tá", department: "Kho" },
+        },
+      }),
+    },
+    lttpUnitIssueFormDefaults: {
+      findUnique: async () => {
+        defaultsRead = true;
+        return null;
+      },
+    },
+  };
+  const result = await SIGNATURE_CATALOG["bkmh.nguoiMua"].resolve({
+    storageUnitId: 1,
+    asOf: "2026-06-01",
+    prisma,
+  });
+  assert.equal(result.name, "Người Mốc");
+  assert.equal(result.title, "Kho");
+  assert.equal(defaultsRead, false);
 });

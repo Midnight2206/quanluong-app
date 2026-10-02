@@ -1248,6 +1248,7 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
   return (
     <div
       data-local-commit-form="true"
+      data-no-unsaved-mark="true"
       className={cn(
         useWizardLayout ? "space-y-3 px-0 py-3 sm:p-4" : "space-y-3 p-3 sm:p-4",
         useWizardLayout && wizardStep === 1 && "pb-36",

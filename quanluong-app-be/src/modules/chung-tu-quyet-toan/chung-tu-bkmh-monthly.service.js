@@ -219,9 +219,10 @@ async function createChungTuBkmhMonthlyExport({
   }
 
   const storageUnitIdNum = Number(storageUnitId);
+  const buyerAsOf = lastDayOfMonth(safePeriodMonth);
   const [resolvedBkmhBuyer, buyerDefaults] = await Promise.all([
     SIGNATURE_CATALOG["bkmh.nguoiMua"]
-      .resolve({ storageUnitId: storageUnitIdNum })
+      .resolve({ storageUnitId: storageUnitIdNum, asOf: buyerAsOf })
       .catch(() => null),
     prisma.lttpUnitIssueFormDefaults.findUnique({
       where: { unitId: storageUnitIdNum },
@@ -267,6 +268,7 @@ async function createChungTuBkmhMonthlyExport({
   const finalSignatureBlock = await prepareSignatureBlockForRender(blockForResolve, {
     storageUnitId: Number(storageUnitId),
     currentUserId: Number(createdById),
+    asOf: buyerAsOf,
   });
   const exportContext = { ...(context ?? {}), categoryKey: CATEGORY_KEY };
   const slices = pickExportSlices({
@@ -403,14 +405,16 @@ async function reExportChungTuBkmhMonthly({
     settingsBlock.slots.some((s) => s?.source === "system")
       ? settingsBlock
       : (signatureBlock ?? settingsBlock ?? undefined);
+  const buyerAsOf = row.periodMonth ? lastDayOfMonth(row.periodMonth) : undefined;
   const finalSignatureBlock = await prepareSignatureBlockForRender(blockForResolve, {
     storageUnitId: Number(row.storageUnitId),
     currentUserId: Number(createdById ?? row.updatedById),
+    asOf: buyerAsOf,
   });
 
   const [resolvedBkmhBuyer, buyerDefaults] = await Promise.all([
     SIGNATURE_CATALOG["bkmh.nguoiMua"]
-      .resolve({ storageUnitId: Number(row.storageUnitId) })
+      .resolve({ storageUnitId: Number(row.storageUnitId), asOf: buyerAsOf })
       .catch(() => null),
     prisma.lttpUnitIssueFormDefaults.findUnique({
       where: { unitId: Number(row.storageUnitId) },

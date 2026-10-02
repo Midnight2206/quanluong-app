@@ -20,3 +20,18 @@ test("category workspace always defines four ordered subtabs and gates summary b
   assert.match(source, /disabled:\s*!config\?\.hasSummary/);
   assert.doesNotMatch(source, /\.\.\.\(isBkmh/);
 });
+
+test("export workspace opts out of local unsaved marks; signature settings does not", () => {
+  const exportSource = readFileSync(
+    new URL("./ChungTuExportWorkspace.jsx", import.meta.url),
+    "utf8",
+  );
+  const signatureSource = readFileSync(
+    new URL("./ChungTuSignatureSettingsWorkspace.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(exportSource, /data-no-unsaved-mark=["']true["']/);
+  assert.match(exportSource, /data-local-commit-form=["']true["']/);
+  assert.match(signatureSource, /data-local-commit-form=["']true["']/);
+  assert.doesNotMatch(signatureSource, /data-no-unsaved-mark=["']true["']/);
+});

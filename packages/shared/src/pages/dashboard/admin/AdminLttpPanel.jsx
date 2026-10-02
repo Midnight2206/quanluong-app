@@ -49,6 +49,7 @@ import httpClient from "@/services/httpClient";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 import { formatVnd } from "@/utils/formatVnd";
+import { LttpWarehouseBuyerCard } from "./LttpWarehouseBuyerCard";
 
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -114,6 +115,7 @@ export function AdminLttpPanel({
   const canPRead = useHasPermission(P.P_READ);
   const canPWrite = useHasPermission(P.P_WRITE);
   const canGRead = useHasPermission(P.G_READ);
+  const canIssueSlipWrite = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
 
   const { data: foodGroupsData } = useGetLttpFoodGroupsQuery(undefined, {
     skip: !canGRead,
@@ -1073,6 +1075,9 @@ export function AdminLttpPanel({
 
               {sub === "commodities" && canCRead ? (
                 <div className="space-y-3">
+                  {canIssueSlipWrite && selectedUnitId != null ? (
+                    <LttpWarehouseBuyerCard unitId={selectedUnitId} unitLabel={selectedUnitLabel} />
+                  ) : null}
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     Mặt hàng LTTP dùng chung kho đơn vị cấp 1 trong nhánh; đơn vị cấp 2 chỉ xem. Đối tác
                     mặc định (phiếu xuất) cấu hình từng dòng; chọn xong lưu ngay.

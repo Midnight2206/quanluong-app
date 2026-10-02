@@ -18,7 +18,7 @@ export function useGetLttpBuyerDefaultsListQuery(options = {}) {
   });
 }
 
-/** User có thể chọn làm người mua theo đơn vị kho (gồm nhánh cha/con LTTP). */
+/** User thuộc đúng đơn vị kho, không gồm cấp dưới. */
 export function useGetLttpBuyerUsersQuery(unitId, options = {}) {
   const { skip, ...rest } = options;
   return useQuery({
@@ -28,6 +28,49 @@ export function useGetLttpBuyerUsersQuery(unitId, options = {}) {
     enabled: skip !== true && unitId != null && unitId !== "",
     staleTime: 5 * 60 * 1000,
     ...rest,
+  });
+}
+
+export function useGetLttpWarehouseBuyerQuery(unitId, date, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.warehouseBuyer(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp/warehouse-buyer",
+        method: "get",
+        params: { unitId, date },
+      }),
+    enabled: skip !== true && unitId != null && unitId !== "" && Boolean(date),
+    staleTime: 30 * 1000,
+    ...rest,
+  });
+}
+
+export function usePutLttpWarehouseBuyerMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/warehouse-buyer", method: "put", data: body }),
+    onSuccess: (_data, variables) => {
+      invalidateLttpData(qc);
+      qc.invalidateQueries({ queryKey: qk.lttp.buyerUsers(variables?.unitId) });
+      qc.invalidateQueries({ queryKey: ["lttp", "warehouseBuyer"] });
+      qc.invalidateQueries({ queryKey: ["lttp", "issueSlips"] });
+    },
+  });
+}
+
+/** ponytail: xoá hook này cùng nút «Gán cho mọi phiếu cũ» ở lần cập nhật tới. */
+export function useRewriteLttpWarehouseBuyerMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/warehouse-buyer/rewrite-all", method: "post", data: body }),
+    onSuccess: () => {
+      invalidateLttpData(qc);
+      qc.invalidateQueries({ queryKey: ["lttp", "issueSlips"] });
+    },
   });
 }
 

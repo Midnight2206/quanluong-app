@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockPrisma = {
+  lttpWarehouseBuyerTerm: {
+    findFirst: vi.fn(),
+  },
   lttpUnitIssueFormDefaults: {
     findUnique: vi.fn(),
   },
@@ -16,6 +19,36 @@ const { SIGNATURE_CATALOG, getCatalogNodesForCategory } = await import(
 );
 
 describe("SIGNATURE_CATALOG", () => {
+  beforeEach(() => {
+    mockPrisma.lttpWarehouseBuyerTerm.findFirst.mockReset();
+    mockPrisma.lttpWarehouseBuyerTerm.findFirst.mockResolvedValue(null);
+    mockPrisma.lttpUnitIssueFormDefaults.findUnique.mockReset();
+    mockPrisma.user.findUnique.mockReset();
+  });
+
+  it("bkmh.nguoiMua prefers the warehouse term effective on the date", async () => {
+    mockPrisma.lttpWarehouseBuyerTerm.findFirst.mockResolvedValue({
+      buyerUser: {
+        username: "term",
+        profile: { fullName: "Người Mốc", rankAbbr: "Th/tá", department: "Kho" },
+      },
+    });
+    mockPrisma.lttpUnitIssueFormDefaults.findUnique.mockResolvedValue({
+      defaultBuyerUser: {
+        username: "old",
+        profile: { fullName: "Người Cũ", rankAbbr: "Đ/tá", department: "Tài vụ" },
+      },
+    });
+    const result = await SIGNATURE_CATALOG["bkmh.nguoiMua"].resolve({
+      storageUnitId: 1,
+      asOf: "2026-06-01",
+      prisma: mockPrisma,
+    });
+    expect(result.name).toBe("Người Mốc");
+    expect(result.title).toBe("Kho");
+    expect(mockPrisma.lttpUnitIssueFormDefaults.findUnique).not.toHaveBeenCalled();
+  });
+
   it("bkmh.nguoiMua resolves name from buyer profile", async () => {
     mockPrisma.lttpUnitIssueFormDefaults.findUnique.mockResolvedValue({
       defaultBuyerUser: {

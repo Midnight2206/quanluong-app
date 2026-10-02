@@ -61,9 +61,21 @@ import {
   putIssueFormDefaultsController,
   putRecipientDefaultUserController,
   putBuyerDefaultForUnitController,
+  getWarehouseBuyerController,
+  putWarehouseBuyerController,
+  rewriteWarehouseBuyerController,
   resolveIssueSlipLineController,
   resyncIssueSlipPricesController,
   suggestIssueSlipAiController,
+  listIssueSlipAiDraftsController,
+  getIssueSlipAiDraftController,
+  patchIssueSlipAiDraftLineController,
+  discardIssueSlipAiDraftController,
+  proposeIssueSlipAiDraftChatController,
+  applyIssueSlipAiDraftChatController,
+  undoIssueSlipAiDraftChatController,
+  commitIssueSlipAiDraftController,
+  confirmIssueSlipAiUomRuleController,
   linkIssueSlipAiMemoryController,
   updateIssueSlipController,
 } from "./lttp.controller.js";
@@ -77,6 +89,16 @@ import {
   aiChatIssueSlipBodySchema,
   aiMemoryCommitBodySchema,
   aiMemoryLinkBodySchema,
+  aiUomRuleBodySchema,
+  aiDraftQuerySchema,
+  aiDraftParamsSchema,
+  aiDraftLineParamsSchema,
+  aiDraftLinePatchBodySchema,
+  aiDraftDiscardBodySchema,
+  aiDraftChatBodySchema,
+  aiDraftChatApplyBodySchema,
+  aiDraftChatUndoBodySchema,
+  aiDraftCommitBodySchema,
   aiSuggestIssueSlipBodySchema,
   createIssueSlipBodySchema,
   createPriceTableBodySchema,
@@ -104,6 +126,9 @@ import {
   priceTableParamsSchema,
   putRecipientDefaultUserBodySchema,
   putBuyerDefaultUserBodySchema,
+  warehouseBuyerQuerySchema,
+  putWarehouseBuyerBodySchema,
+  rewriteWarehouseBuyerBodySchema,
   recipientDefaultByUnitQuerySchema,
   updateIssueSlipBodySchema,
   upsertIssueFormDefaultsBodySchema,
@@ -251,6 +276,85 @@ lttpRouter.post(
   asyncHandler(commitIssueSlipAiMemoryController),
 );
 
+lttpRouter.get(
+  "/issue-slips/ai-drafts",
+  validateRequest({ query: aiDraftQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.listIssueSlipAiDrafts]),
+  asyncHandler(listIssueSlipAiDraftsController),
+);
+
+lttpRouter.get(
+  "/issue-slips/ai-drafts/:id",
+  validateRequest({ params: aiDraftParamsSchema, query: aiDraftQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.getIssueSlipAiDraft]),
+  asyncHandler(getIssueSlipAiDraftController),
+);
+
+lttpRouter.patch(
+  "/issue-slips/ai-drafts/:id/lines/:lineId",
+  validateRequest({ params: aiDraftLineParamsSchema, body: aiDraftLinePatchBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.patchIssueSlipAiDraftLine]),
+  lttpIssueSlipAiMemoryWriteRateLimit,
+  asyncHandler(patchIssueSlipAiDraftLineController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-drafts/:id/chat",
+  validateRequest({ params: aiDraftParamsSchema, body: aiDraftChatBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.chatIssueSlipAiDraft]),
+  lttpIssueSlipAiChatRateLimit,
+  asyncHandler(proposeIssueSlipAiDraftChatController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-drafts/:id/chat/apply",
+  validateRequest({ params: aiDraftParamsSchema, body: aiDraftChatApplyBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.applyIssueSlipAiDraftChat]),
+  lttpIssueSlipAiMemoryWriteRateLimit,
+  asyncHandler(applyIssueSlipAiDraftChatController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-drafts/:id/chat/undo",
+  validateRequest({ params: aiDraftParamsSchema, body: aiDraftChatUndoBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.undoIssueSlipAiDraftChat]),
+  lttpIssueSlipAiMemoryWriteRateLimit,
+  asyncHandler(undoIssueSlipAiDraftChatController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-drafts/:id/commit",
+  validateRequest({ params: aiDraftParamsSchema, body: aiDraftCommitBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.commitIssueSlipAiDraft]),
+  lttpIssueSlipAiMemoryWriteRateLimit,
+  asyncHandler(commitIssueSlipAiDraftController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-drafts/:id/discard",
+  validateRequest({ params: aiDraftParamsSchema, body: aiDraftDiscardBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.discardIssueSlipAiDraft]),
+  lttpIssueSlipAiMemoryWriteRateLimit,
+  asyncHandler(discardIssueSlipAiDraftController),
+);
+
+lttpRouter.post(
+  "/issue-slips/ai-uom-rule",
+  validateRequest({ body: aiUomRuleBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.aiUomRuleIssueSlip]),
+  lttpIssueSlipAiMemoryWriteRateLimit,
+  asyncHandler(confirmIssueSlipAiUomRuleController),
+);
+
 lttpRouter.post(
   "/issue-slips/ai-memory/link",
   validateRequest({ body: aiMemoryLinkBodySchema }),
@@ -354,6 +458,30 @@ lttpRouter.put(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   permissionMiddleware([routePermissions.putBuyerDefaultUser]),
   asyncHandler(putBuyerDefaultForUnitController),
+);
+
+lttpRouter.get(
+  "/warehouse-buyer",
+  validateRequest({ query: warehouseBuyerQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.getWarehouseBuyer]),
+  asyncHandler(getWarehouseBuyerController),
+);
+
+lttpRouter.put(
+  "/warehouse-buyer",
+  validateRequest({ body: putWarehouseBuyerBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.putWarehouseBuyer]),
+  asyncHandler(putWarehouseBuyerController),
+);
+
+lttpRouter.post(
+  "/warehouse-buyer/rewrite-all",
+  validateRequest({ body: rewriteWarehouseBuyerBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.rewriteWarehouseBuyer]),
+  asyncHandler(rewriteWarehouseBuyerController),
 );
 
 lttpRouter.post(

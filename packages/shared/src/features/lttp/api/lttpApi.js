@@ -476,6 +476,68 @@ export function useLinkLttpIssueSlipAiMemoryMutation() {
   });
 }
 
+export function useProposeLttpIssueSlipAiDraftChatMutation() {
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) =>
+      apiRequest({
+        url: `/lttp/issue-slips/ai-drafts/${id}/chat`,
+        method: "post",
+        data: body,
+      }),
+  });
+}
+
+export function useApplyLttpIssueSlipAiDraftChatMutation() {
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) =>
+      apiRequest({
+        url: `/lttp/issue-slips/ai-drafts/${id}/chat/apply`,
+        method: "post",
+        data: body,
+      }),
+  });
+}
+
+export function useUndoLttpIssueSlipAiDraftChatMutation() {
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) =>
+      apiRequest({
+        url: `/lttp/issue-slips/ai-drafts/${id}/chat/undo`,
+        method: "post",
+        data: body,
+      }),
+  });
+}
+
+export function useCommitLttpIssueSlipAiDraftMutation() {
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) =>
+      apiRequest({
+        url: `/lttp/issue-slips/ai-drafts/${id}/commit`,
+        method: "post",
+        data: body,
+      }),
+  });
+}
+
+export function usePatchLttpIssueSlipAiDraftLineMutation() {
+  return useWrappedMutation({
+    mutationFn: ({ id, lineId, ...body }) =>
+      apiRequest({
+        url: `/lttp/issue-slips/ai-drafts/${id}/lines/${lineId}`,
+        method: "patch",
+        data: body,
+      }),
+  });
+}
+
+export function useConfirmLttpIssueSlipAiUomMutation() {
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/issue-slips/ai-uom-rule", method: "post", data: body }),
+  });
+}
+
 export function useUpdateLttpIssueSlipMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({

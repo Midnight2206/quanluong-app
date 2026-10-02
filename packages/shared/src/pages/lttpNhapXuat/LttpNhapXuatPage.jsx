@@ -16,7 +16,6 @@ import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpOrderingTab } from "./LttpOrderingTab";
 import { LttpSignatureSettingsTab } from "./LttpSignatureSettingsTab";
 import { LttpNguoiNhanBulkModal } from "./LttpNguoiNhanBulkModal";
-import { LttpNguoiMuaBulkModal } from "./LttpNguoiMuaBulkModal";
 
 const LTTP_TAB_PERSIST_ID = "lttp-nhap-xuat";
 /** Khớp thư mục `app/.../lttp-nhap-xuat/ordering-lttp/` */
@@ -72,7 +71,6 @@ export function LttpNhapXuatPage() {
   const effectiveUnitId = ownUnitId;
 
   const [bulkRecipientOpen, setBulkRecipientOpen] = useState(false);
-  const [bulkBuyerOpen, setBulkBuyerOpen] = useState(false);
   const [editingSlip, setEditingSlip] = useState(null);
   const [tabRemountKey, setTabRemountKey] = useState(0);
   const [isToolbarCompact, setIsToolbarCompact] = useState(false);
@@ -214,16 +212,7 @@ export function LttpNhapXuatPage() {
               </p>
             </div>
             {canWrite && !isToolbarCompact ? (
-              <div className="grid w-full grid-cols-1 gap-2 sm:col-span-2 sm:grid-cols-2 lg:col-span-1 lg:w-auto">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-auto min-h-10 w-full gap-2 whitespace-normal px-3 py-2 text-xs leading-tight lg:w-auto xl:whitespace-nowrap"
-                  onClick={() => setBulkBuyerOpen(true)}
-                >
-                  <Users className="size-3.5" />
-                  Cài người mua theo đơn vị kho
-                </Button>
+              <div className="flex w-full sm:col-span-2 lg:col-span-1 lg:w-auto">
                 <Button
                   type="button"
                   variant="secondary"
@@ -241,12 +230,6 @@ export function LttpNhapXuatPage() {
 
       {canWrite ? (
         <>
-          <LttpNguoiMuaBulkModal
-            open={bulkBuyerOpen}
-            onClose={() => setBulkBuyerOpen(false)}
-            units={unitsInOwnSubtree}
-            canWrite={canWrite}
-          />
           <LttpNguoiNhanBulkModal
             open={bulkRecipientOpen}
             onClose={() => setBulkRecipientOpen(false)}

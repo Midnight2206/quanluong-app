@@ -208,13 +208,15 @@ async function createChungTuPdfExport({
       ? normalizeAggregationMode(aggregationMode)
       : undefined;
 
-  const resolveCtx = { storageUnitId: unitId, currentUserId: createdById };
+  const buyerAsOf =
+    periodDate || (safePeriodMonth ? lastDayOfMonth(safePeriodMonth) : "") || safeDateTo || undefined;
+  const resolveCtx = { storageUnitId: unitId, currentUserId: createdById, asOf: buyerAsOf };
   const resolvedSignatureBlock = await prepareSignatureBlockForRender(signatureBlock, resolveCtx);
 
   const resolvedBkmhBuyer =
     categoryKey === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG
       ? await SIGNATURE_CATALOG["bkmh.nguoiMua"]
-          .resolve({ storageUnitId: unitId })
+          .resolve({ storageUnitId: unitId, asOf: buyerAsOf })
           .catch(() => null)
       : null;
 

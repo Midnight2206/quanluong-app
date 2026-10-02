@@ -45,7 +45,13 @@ const lineInclude = {
 const slipInclude = {
   lines: { include: lineInclude, orderBy: { id: "asc" } },
   recipientUnit: { select: { id: true, name: true } },
-  buyerUser: { select: { id: true, username: true, profile: { select: { fullName: true } } } },
+  buyerUser: {
+    select: {
+      id: true,
+      username: true,
+      profile: { select: { fullName: true, department: true } },
+    },
+  },
 };
 
 function buyerNameFromSlip(slip) {
@@ -58,21 +64,21 @@ function buyerNameFromSlip(slip) {
   return String(user.username ?? "").trim();
 }
 
-function resolveNguoiMuaFromSlips(slips) {
+function resolveBuyerIdentityFromSlips(slips) {
   const ordered = [...(slips ?? [])].sort(
     (a, b) => (a.slipNo ?? 0) - (b.slipNo ?? 0) || Number(a.id ?? 0) - Number(b.id ?? 0),
   );
-  const names = new Set();
+  const named = [];
   for (const slip of ordered) {
     const name = buyerNameFromSlip(slip);
-    if (name) names.add(name);
+    if (!name) continue;
+    named.push({
+      name,
+      department: String(slip?.buyerUser?.profile?.department ?? "").trim(),
+    });
   }
-  if (names.size === 1) return [...names][0];
-  for (const slip of ordered) {
-    const name = buyerNameFromSlip(slip);
-    if (name) return name;
-  }
-  return "";
+  if (!named.length) return { name: "", department: "" };
+  return named[0];
 }
 
 function toFiniteNumber(value) {
@@ -180,15 +186,18 @@ export function resolvePdfHeaderSettings({
     return resolved;
   }
   const settings = normalizePlainObject(rawSettings);
+  const slipBuyer = resolveBuyerIdentityFromSlips(slips);
   const buyerName =
+    slipBuyer.name ||
     resolvedBkmhBuyer?.name ||
-    resolveNguoiMuaFromSlips(slips) ||
     normalizeText(bkmhHeaderSettings?.hoTenNguoiMua);
-  const boPhan =
-    resolvedBkmhBuyer?.title ||
+  const fallbackBoPhan =
     normalizeText(settings.boPhan) ||
     normalizeText(resolved.boPhan) ||
     normalizeText(bkmhHeaderSettings?.boPhan);
+  const boPhan = slipBuyer.name
+    ? slipBuyer.department || fallbackBoPhan
+    : resolvedBkmhBuyer?.title || fallbackBoPhan;
   return {
     ...resolved,
     signerNguoiMua: buyerName,
@@ -1104,7 +1113,12 @@ export async function resolveChungTuContext({
       ? getChungTuBkmhHeaderSettings({ categoryKey: meta.key })
       : null,
     meta.key === CHUNG_TU_CATEGORY_KEYS.BANG_KE_MUA_HANG && !resolvedBkmhBuyer
-      ? SIGNATURE_CATALOG["bkmh.nguoiMua"].resolve({ storageUnitId: unitId }).catch(() => null)
+      ? SIGNATURE_CATALOG["bkmh.nguoiMua"]
+          .resolve({
+            storageUnitId: unitId,
+            asOf: periodDate || (periodMonth ? lastDayOfMonth(periodMonth) : dateTo) || undefined,
+          })
+          .catch(() => null)
       : Promise.resolve(null),
   ]);
   const buyerForHeader = resolvedBkmhBuyer ?? catalogBuyer;
