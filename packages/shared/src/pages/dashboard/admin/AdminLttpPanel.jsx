@@ -1077,8 +1077,10 @@ export function AdminLttpPanel({
               {sub === "commodities" && canCRead ? (
                 <div className="space-y-3">
                   {canIssueSlipWrite && selectedUnitId != null ? (
-                    <LttpWarehouseBuyerCard unitId={selectedUnitId} unitLabel={selectedUnitLabel} />
-                    <LttpAiAutoAcceptCard unitId={selectedUnitId} unitLabel={selectedUnitLabel} />
+                    <>
+                      <LttpWarehouseBuyerCard unitId={selectedUnitId} unitLabel={selectedUnitLabel} />
+                      <LttpAiAutoAcceptCard unitId={selectedUnitId} unitLabel={selectedUnitLabel} />
+                    </>
                   ) : null}
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     Mặt hàng LTTP dùng chung kho đơn vị cấp 1 trong nhánh; đơn vị cấp 2 chỉ xem. Đối tác
