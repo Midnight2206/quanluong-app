@@ -450,15 +450,15 @@ export function useCreateLttpIssueSlipMutation() {
 
 export function useSuggestLttpIssueSlipAiMutation() {
   return useWrappedMutation({
-    mutationFn: (body) =>
-      apiRequest({ url: "/lttp/issue-slips/ai-suggest", method: "post", data: body }),
+    mutationFn: ({ signal, ...body }) =>
+      apiRequest({ url: "/lttp/issue-slips/ai-suggest", method: "post", data: body, signal }),
   });
 }
 
 export function useChatLttpIssueSlipAiMutation() {
   return useWrappedMutation({
-    mutationFn: (body) =>
-      apiRequest({ url: "/lttp/issue-slips/ai-chat", method: "post", data: body }),
+    mutationFn: ({ signal, ...body }) =>
+      apiRequest({ url: "/lttp/issue-slips/ai-chat", method: "post", data: body, signal }),
   });
 }
 
@@ -478,22 +478,24 @@ export function useLinkLttpIssueSlipAiMemoryMutation() {
 
 export function useProposeLttpIssueSlipAiDraftChatMutation() {
   return useWrappedMutation({
-    mutationFn: ({ id, ...body }) =>
+    mutationFn: ({ id, signal, ...body }) =>
       apiRequest({
         url: `/lttp/issue-slips/ai-drafts/${id}/chat`,
         method: "post",
         data: body,
+        signal,
       }),
   });
 }
 
 export function useApplyLttpIssueSlipAiDraftChatMutation() {
   return useWrappedMutation({
-    mutationFn: ({ id, ...body }) =>
+    mutationFn: ({ id, signal, ...body }) =>
       apiRequest({
         url: `/lttp/issue-slips/ai-drafts/${id}/chat/apply`,
         method: "post",
         data: body,
+        signal,
       }),
   });
 }

@@ -1,5 +1,7 @@
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
+import { loadConfirmedQtyRules } from "./lttp-issue-slip-ai-learn.js";
+import { bindSharedQtyRules, convertQuantity } from "./lttp-issue-slip-ai-uom.js";
 
 function initialLineStatus(line) {
   return line?.needsConfirm ? "needs_confirm" : "sure";
@@ -132,14 +134,38 @@ async function listEditingIssueSlipAiDrafts(prisma, { storageUnitId, recipientUn
   });
 }
 
+async function quantityForChosenSku(prisma, draft, stored, commodity) {
+  const rules = bindSharedQtyRules(
+    await loadConfirmedQtyRules(prisma, draft?.recipientUnitId, draft?.storageUnitId),
+    [commodity],
+  );
+  let habitUom = null;
+  if (prisma.lttpAiCommodityHabit?.findMany && draft?.recipientUnitId) {
+    const habits = await prisma.lttpAiCommodityHabit.findMany({
+      where: { recipientUnitId: draft.recipientUnitId, commodityId: commodity.id },
+    });
+    habitUom =
+      habits.sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0))[0]?.measureUnit || null;
+  }
+  return convertQuantity({
+    writtenQty: stored.writtenQty ?? stored.quantity,
+    writtenUom: stored.writtenUom,
+    stockUom: commodity.measureUnit,
+    habitUom,
+    commodityId: commodity.id,
+    rules,
+  });
+}
+
 async function updateIssueSlipAiDraftLine(prisma, input) {
-  await lockDraft(prisma, input);
+  const draft = await lockDraft(prisma, input);
   const stored = await prisma.lttpAiDraftLine.findFirst({
     where: { id: input.lineId, draftId: input.id },
   });
   if (!stored) notFound();
+  let commodity = null;
   if (input.commodityId) {
-    const commodity = await prisma.lttpCommodity.findFirst({
+    commodity = await prisma.lttpCommodity.findFirst({
       where: { id: input.commodityId, unitId: input.storageUnitId },
     });
     if (!commodity) {
@@ -150,7 +176,29 @@ async function updateIssueSlipAiDraftLine(prisma, input) {
       });
     }
   }
-  const quantity = input.quantity == null ? stored.quantity : input.quantity;
+  let quantity = input.quantity == null ? stored.quantity : input.quantity;
+  let measureUnit = input.measureUnit === undefined ? stored.measureUnit : input.measureUnit;
+  let status = "edited";
+  let qtyMeta = null;
+  if (commodity) {
+    const converted = await quantityForChosenSku(prisma, draft, stored, commodity);
+    qtyMeta = {
+      qtySource: converted.source,
+      qtyFactor: converted.factor ?? null,
+      qtyFromUom: converted.fromUom || null,
+      stockUom: commodity.measureUnit || null,
+      askRule: converted.source === "unknown-uom",
+    };
+    if (converted.source === "unknown-uom") {
+      status = "needs_confirm";
+      const written = Number(String(stored.writtenQty ?? "").replace(",", "."));
+      quantity = written > 0 ? written : stored.quantity;
+      measureUnit = stored.writtenUom || commodity.measureUnit;
+    } else if (converted.quantity > 0) {
+      quantity = converted.quantity;
+      measureUnit = converted.measureUnit || commodity.measureUnit;
+    }
+  }
   if (quantity != null && !(Number(quantity) > 0)) {
     throw new AppError({
       message: "Số lượng phải là số dương.",
@@ -165,10 +213,10 @@ async function updateIssueSlipAiDraftLine(prisma, input) {
       commodityName: input.commodityName === undefined ? stored.commodityName : input.commodityName,
       code: input.code === undefined ? stored.code : input.code,
       quantity,
-      measureUnit: input.measureUnit === undefined ? stored.measureUnit : input.measureUnit,
+      measureUnit,
       lttpSupplierId: input.lttpSupplierId === undefined ? stored.lttpSupplierId : input.lttpSupplierId,
       unitPrice: input.unitPrice === undefined ? stored.unitPrice : input.unitPrice,
-      status: "edited",
+      status,
     },
   });
   await prisma.lttpAiDraftLineEvent.create({
@@ -180,7 +228,12 @@ async function updateIssueSlipAiDraftLine(prisma, input) {
       actorUserId: input.actorUserId,
     },
   });
-  return getIssueSlipAiDraft(prisma, { id: input.id, storageUnitId: input.storageUnitId });
+  const draftOut = await getIssueSlipAiDraft(prisma, { id: input.id, storageUnitId: input.storageUnitId });
+  if (qtyMeta) {
+    const line = (draftOut?.lines || []).find((item) => item.id === stored.id);
+    if (line) Object.assign(line, qtyMeta);
+  }
+  return draftOut;
 }
 
 async function discardIssueSlipAiDraft(prisma, input) {

@@ -470,6 +470,30 @@ const LTTP_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "getAiAutoAccept",
+    method: "GET",
+    module: LTTP_MODULE_NAME,
+    path: "/ai-auto-accept",
+    pathRoute: "/api/lttp/ai-auto-accept",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_READ,
+      name: "Ngưỡng AI tự chốt mã (LTTP)",
+      description: "Mức điểm admin đã đặt và khoảng điểm gợi ý từ phiếu đã chốt của kho.",
+    },
+  },
+  {
+    key: "putAiAutoAccept",
+    method: "PUT",
+    module: LTTP_MODULE_NAME,
+    path: "/ai-auto-accept",
+    pathRoute: "/api/lttp/ai-auto-accept",
+    permission: {
+      code: LTTP_PERMISSIONS.ISSUE_SLIPS_WRITE,
+      name: "Cài ngưỡng AI tự chốt mã (LTTP)",
+      description: "Đặt mức điểm để AI tự chốt mã, không bắt chọn SKU.",
+    },
+  },
+  {
     key: "getWarehouseBuyer",
     method: "GET",
     module: LTTP_MODULE_NAME,

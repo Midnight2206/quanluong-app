@@ -12,6 +12,7 @@ import {
 import { assertLogicalUnitIsLevel1ForWrite } from "../../shared/units/unit-level.helpers.js";
 import { resolvePrivateStorageUnitId } from "../../shared/data-scope/unit-data-policy.service.js";
 import { markChungTuDocumentsStaleForLttpIssueSlipChange } from "../chung-tu-quyet-toan/chung-tu-document.service.js";
+import { loadAiAutoAccept, saveAiAutoAccept } from "./lttp-issue-slip-ai-accept.js";
 import {
   assertWarehouseBuyerUser,
   getEffectiveWarehouseBuyer,
@@ -2953,6 +2954,21 @@ async function putBuyerDefaultForUnit(
   return { unitId: storageUnitId, userId, slipsUpdated: 0, applyToAllSlips: false };
 }
 
+async function getAiAutoAcceptForUnit({ unitId }, scope, effectiveUnitIds, dataScope) {
+  assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  return loadAiAutoAccept(prisma, dataScope.storageUnitId);
+}
+
+async function putAiAutoAcceptForUnit({ unitId, percent }, scope, effectiveUnitIds, dataScope) {
+  assertLttpLogicalMatchesDataScope(unitId, dataScope);
+  assertUnitIdInScope(unitId, scope);
+  assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
+  await assertLogicalUnitIsLevel1ForWrite(dataScope.storageUnitId);
+  return saveAiAutoAccept(prisma, dataScope.storageUnitId, percent);
+}
+
 async function getWarehouseBuyerForUnit({ unitId, date }, scope, effectiveUnitIds, dataScope) {
   assertLttpLogicalMatchesDataScope(unitId, dataScope);
   assertUnitIdInScope(unitId, scope);
@@ -3803,6 +3819,8 @@ export {
   recalculateLttpPartnerDebtsForUnit,
   putRecipientDefaultUser,
   putBuyerDefaultForUnit,
+  getAiAutoAcceptForUnit,
+  putAiAutoAcceptForUnit,
   getWarehouseBuyerForUnit,
   putWarehouseBuyerForUnit,
   rewriteWarehouseSlipBuyers,

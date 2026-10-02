@@ -100,29 +100,65 @@ async function learnConfirmedOrder({
   return { proposals };
 }
 
-async function confirmUomRule({ prisma, recipientUnitId, commodityId, fromUom, factor }) {
+async function confirmUomRule({
+  prisma,
+  recipientUnitId,
+  commodityId,
+  fromUom,
+  factor,
+  sharedLevel1 = false,
+  commodityNameNorm = null,
+}) {
+  const shared = Boolean(sharedLevel1);
+  const nameNorm = shared ? commodityNameNorm || null : null;
   const existing = await prisma.lttpAiUomRule.findFirst({
     where: {
       recipientUnitId,
       commodityId: commodityId ?? null,
       fromUom,
+      sharedLevel1: shared,
+      ...(shared ? { commodityNameNorm: nameNorm } : {}),
     },
   });
   if (existing) {
-    return prisma.lttpAiUomRule.update({
+    const row = await prisma.lttpAiUomRule.update({
       where: { id: existing.id },
-      data: { factor, confirmed: true },
+      data: { factor, confirmed: true, sharedLevel1: shared, commodityNameNorm: nameNorm },
     });
+    return Object.assign(row, { created: false });
   }
-  return prisma.lttpAiUomRule.create({
+  const row = await prisma.lttpAiUomRule.create({
     data: {
       recipientUnitId,
       commodityId: commodityId ?? null,
       fromUom,
       factor,
       confirmed: true,
+      sharedLevel1: shared,
+      commodityNameNorm: nameNorm,
     },
   });
+  return Object.assign(row, { created: true });
 }
 
-export { confirmUomRule, learnConfirmedOrder };
+async function loadConfirmedQtyRules(prisma, recipientUnitId, storageUnitId) {
+  if (!prisma?.lttpAiUomRule) return [];
+  const own = recipientUnitId
+    ? await prisma.lttpAiUomRule.findMany({
+        where: { recipientUnitId, confirmed: true, sharedLevel1: false },
+      })
+    : [];
+  if (!storageUnitId || !prisma.unit?.findUnique) return own;
+  const storage = await prisma.unit.findUnique({
+    where: { id: Number(storageUnitId) },
+    select: { depth: true },
+  });
+  if (storage?.depth !== 0) return own;
+  const shared = await prisma.lttpAiUomRule.findMany({
+    where: { sharedLevel1: true, confirmed: true },
+  });
+  const seen = new Set(own.map((rule) => rule.id));
+  return [...own, ...shared.filter((rule) => rule?.id == null || !seen.has(rule.id))];
+}
+
+export { confirmUomRule, learnConfirmedOrder, loadConfirmedQtyRules };

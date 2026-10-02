@@ -969,17 +969,21 @@ model LttpAiAliasStat {
 }
 
 /// Hệ số: số lượng kho = số khách ghi × factor. commodityId null = mọi SKU của đơn vị.
+/// sharedLevel1: quy ước số lượng từ chat, dùng cho mọi kho cấp 1. Khớp mặt hàng bằng commodityNameNorm.
 model LttpAiUomRule {
-  id              Int      @id @default(autoincrement())
-  recipientUnitId Int
-  commodityId     Int?
-  fromUom         String   @db.VarChar(64)
-  factor          Decimal  @db.Decimal(18, 4)
-  confirmed       Boolean  @default(false)
-  recipientUnit   Unit          @relation(fields: [recipientUnitId], references: [id], onDelete: Cascade)
-  commodity       LttpCommodity? @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+  id                Int      @id @default(autoincrement())
+  recipientUnitId   Int
+  commodityId       Int?
+  fromUom           String   @db.VarChar(64)
+  factor            Decimal  @db.Decimal(18, 4)
+  confirmed         Boolean  @default(false)
+  sharedLevel1      Boolean  @default(false)
+  commodityNameNorm String?  @db.VarChar(191)
+  recipientUnit     Unit          @relation(fields: [recipientUnitId], references: [id], onDelete: Cascade)
+  commodity         LttpCommodity? @relation(fields: [commodityId], references: [id], onDelete: Cascade)
 
   @@index([recipientUnitId, fromUom])
+  @@index([sharedLevel1, fromUom])
 }
 
 model LttpAiOrderMessage {
@@ -1162,6 +1166,8 @@ model LttpUnitIssueFormDefaults {
   defaultRecipientUserId Int?
   /// User mặc định là người mua hàng (BKMH) theo đơn vị kho.
   defaultBuyerUserId     Int?
+  /// Ngưỡng % để AI tự chốt mã khi điểm cao hơn mức này. Mọi kho cấp 1 bắt đầu ở 100.
+  aiAutoAcceptPercent    Int?     @default(100)
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
   unit                   Unit  @relation("LttpIssueFormDefaultUnit", fields: [unitId], references: [id], onDelete: Cascade)

@@ -61,6 +61,8 @@ import {
   putIssueFormDefaultsController,
   putRecipientDefaultUserController,
   putBuyerDefaultForUnitController,
+  getAiAutoAcceptController,
+  putAiAutoAcceptController,
   getWarehouseBuyerController,
   putWarehouseBuyerController,
   rewriteWarehouseBuyerController,
@@ -126,6 +128,8 @@ import {
   priceTableParamsSchema,
   putRecipientDefaultUserBodySchema,
   putBuyerDefaultUserBodySchema,
+  aiAutoAcceptQuerySchema,
+  putAiAutoAcceptBodySchema,
   warehouseBuyerQuerySchema,
   putWarehouseBuyerBodySchema,
   rewriteWarehouseBuyerBodySchema,
@@ -458,6 +462,22 @@ lttpRouter.put(
   unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
   permissionMiddleware([routePermissions.putBuyerDefaultUser]),
   asyncHandler(putBuyerDefaultForUnitController),
+);
+
+lttpRouter.get(
+  "/ai-auto-accept",
+  validateRequest({ query: aiAutoAcceptQuerySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.getAiAutoAccept]),
+  asyncHandler(getAiAutoAcceptController),
+);
+
+lttpRouter.put(
+  "/ai-auto-accept",
+  validateRequest({ body: putAiAutoAcceptBodySchema }),
+  unitDataScopeMiddleware({ dataKind: LTTP_COMM }),
+  permissionMiddleware([routePermissions.putAiAutoAccept]),
+  asyncHandler(putAiAutoAcceptController),
 );
 
 lttpRouter.get(

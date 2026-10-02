@@ -1,3 +1,5 @@
+import { normalizeCommodityName } from "../kitchen-books/kitchen-books-menu-ai-map.js";
+
 function normUom(value) {
   return String(value ?? "")
     .normalize("NFD")
@@ -23,6 +25,8 @@ function parseMoneyAmount(quantity, uom) {
 function round1(value) {
   return Math.round(value * 10) / 10;
 }
+
+const OMITTED_UOM = "*";
 
 function findRule(rules, commodityId, fromUom) {
   const confirmed = (rules || []).filter(
@@ -64,28 +68,35 @@ function convertQuantity({
   const stock = normUom(stockUom);
   const usual = normUom(habitUom) || stock;
   if (!from) {
-    if (!usual || usual === stock) {
+    const omitted = findRule(rules, commodityId, OMITTED_UOM);
+    if (omitted) {
       return {
-        quantity: qty,
-        measureUnit: stockUom || habitUom || null,
-        needsConfirm: false,
-        source: "as-written",
-      };
-    }
-    const habitRule = findRule(rules, commodityId, usual);
-    if (habitRule) {
-      return {
-        quantity: round1(qty * Number(habitRule.factor)),
+        quantity: round1(qty * Number(omitted.factor)),
         measureUnit: stockUom || null,
         needsConfirm: false,
-        source: "habit-uom",
+        source: "rule",
+        factor: Number(omitted.factor),
+        fromUom: "",
       };
+    }
+    if (usual && usual !== stock) {
+      const habitRule = findRule(rules, commodityId, usual);
+      if (habitRule) {
+        return {
+          quantity: round1(qty * Number(habitRule.factor)),
+          measureUnit: stockUom || null,
+          needsConfirm: false,
+          source: "habit-uom",
+          factor: Number(habitRule.factor),
+          fromUom: String(habitUom || "").trim(),
+        };
+      }
     }
     return {
       quantity: qty,
-      measureUnit: habitUom,
-      needsConfirm: true,
-      source: "habit-uom",
+      measureUnit: stockUom || null,
+      needsConfirm: false,
+      source: "as-written",
     };
   }
   if (from === stock) {
@@ -103,6 +114,8 @@ function convertQuantity({
       measureUnit: stockUom || null,
       needsConfirm: false,
       source: "rule",
+      factor: Number(rule.factor),
+      fromUom: String(writtenUom || "").trim(),
     };
   }
   return {
@@ -111,6 +124,29 @@ function convertQuantity({
     needsConfirm: true,
     source: "unknown-uom",
   };
+}
+
+function bindSharedQtyRules(rules, commodities) {
+  const byName = new Map(
+    (commodities || [])
+      .map((item) => [normalizeCommodityName(item?.name), item.id])
+      .filter(([name]) => name),
+  );
+  const bound = [];
+  for (const rule of rules || []) {
+    if (!rule?.sharedLevel1) {
+      bound.push(rule);
+      continue;
+    }
+    if (!rule.commodityNameNorm) {
+      bound.push({ ...rule, commodityId: null });
+      continue;
+    }
+    const commodityId = byName.get(rule.commodityNameNorm);
+    if (!commodityId) continue;
+    bound.push({ ...rule, commodityId });
+  }
+  return bound;
 }
 
 function proposeUomFactor(writtenQty, writtenUom, stockQty, stockUom) {
@@ -125,4 +161,4 @@ function proposeUomFactor(writtenQty, writtenUom, stockQty, stockUom) {
   return rounded;
 }
 
-export { convertQuantity, parseMoneyAmount, proposeUomFactor };
+export { OMITTED_UOM, bindSharedQtyRules, convertQuantity, parseMoneyAmount, proposeUomFactor };

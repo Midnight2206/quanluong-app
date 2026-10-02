@@ -49,6 +49,7 @@ import httpClient from "@/services/httpClient";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 import { formatVnd } from "@/utils/formatVnd";
+import { LttpAiAutoAcceptCard } from "./LttpAiAutoAcceptCard";
 import { LttpWarehouseBuyerCard } from "./LttpWarehouseBuyerCard";
 
 const inputClass =
@@ -1077,6 +1078,7 @@ export function AdminLttpPanel({
                 <div className="space-y-3">
                   {canIssueSlipWrite && selectedUnitId != null ? (
                     <LttpWarehouseBuyerCard unitId={selectedUnitId} unitLabel={selectedUnitLabel} />
+                    <LttpAiAutoAcceptCard unitId={selectedUnitId} unitLabel={selectedUnitLabel} />
                   ) : null}
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     Mặt hàng LTTP dùng chung kho đơn vị cấp 1 trong nhánh; đơn vị cấp 2 chỉ xem. Đối tác

@@ -32,7 +32,7 @@ function buildDraftPatchPrompt({ rawText, lines, message }) {
     .join("\n");
   return {
     system:
-      'Sua cac dong da chon. Tra JSON {"explanation":"","patch":[{"line_id":0,"sku_id":null,"qty":null,"unit":null}],"rule_suggestion":null}. Chi dung line_id duoc gui. sku_id phai nam trong ung vien hoac sku hien tai. Ghi unit dung tu nguoi dung, khong quy doi. explanation ngan. rule_suggestion chi khi nguoi dung neu quy tac ap dung lan sau: {"type":"alias","raw":"","commodityId":0} hoac {"type":"uom","fromUom":"","factor":0,"commodityId":null}.',
+      'User dang neu quy tac quy doi don vi, khong sua ten hay so luong tuy y. Tra JSON {"explanation":"","patch":[],"rule_suggestion":{"type":"qty","fromUom":"","factor":1,"line_id":null}}. fromUom la don vi khach viet. factor so nguyen 1 den 500: so luong don vi he thong = so khach ghi x factor. line_id la dong neu quy tac cho mot mat hang, null neu cho moi dong da chon. Khong doi SKU. explanation ngan, nhac don vi he thong sau quy doi.',
     user: `Tin goc:\n${rawText}\nDong da chon:\n${body}\nChat:\n${message}`,
   };
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { normalizeRuleSuggestion, validateAndResolvePatch } from "./lttp-issue-slip-ai-draft-patch.js";
+import { normalizeRuleSuggestion, qtyRuleOps, scopeQtyRule, validateAndResolvePatch } from "./lttp-issue-slip-ai-draft-patch.js";
 
 const line = {
   id: 5,
@@ -56,6 +56,28 @@ test("unit change uses the stored conversion rule", () => {
   assert.equal(dropped.length, 0);
   assert.equal(kept[0].after.quantity, 24);
   assert.equal(kept[0].after.measureUnit, "chai");
+});
+
+test("qty chat rule scales the written amount onto the price-table unit", () => {
+  const rule = scopeQtyRule(
+    normalizeRuleSuggestion({ type: "qty", fromUom: "", factor: 10, line_id: 5 }),
+    [{ ...line, writtenQty: "2", commodityName: "Gạo tẻ" }],
+  );
+  assert.equal(rule.fromUom, "*");
+  assert.equal(rule.factor, 10);
+  assert.equal(rule.commodityId, 10);
+  const ops = qtyRuleOps(rule, [{ ...line, writtenQty: "2" }], [
+    { id: 10, measureUnit: "hop" },
+  ]);
+  const { kept } = validateAndResolvePatch({
+    tickedIds: [5],
+    lines: [line],
+    commodities: [{ id: 10, name: "Gạo tẻ", code: "GAO", measureUnit: "hop" }],
+    rules: [],
+    ops,
+  });
+  assert.equal(kept[0].after.quantity, 20);
+  assert.equal(kept[0].after.measureUnit, "hop");
 });
 
 test("rule suggestion only keeps alias or a round uom factor", () => {

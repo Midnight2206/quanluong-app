@@ -382,6 +382,15 @@ const putBuyerDefaultUserBodySchema = z.object({
   applyToAllSlips: z.boolean().optional(),
 });
 
+const aiAutoAcceptQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+});
+
+const putAiAutoAcceptBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  percent: z.number().int().min(50).max(100).nullable(),
+});
+
 const warehouseBuyerQuerySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -473,6 +482,8 @@ export {
   priceTableParamsSchema,
   putRecipientDefaultUserBodySchema,
   putBuyerDefaultUserBodySchema,
+  aiAutoAcceptQuerySchema,
+  putAiAutoAcceptBodySchema,
   warehouseBuyerQuerySchema,
   putWarehouseBuyerBodySchema,
   rewriteWarehouseBuyerBodySchema,

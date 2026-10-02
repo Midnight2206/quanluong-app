@@ -3,7 +3,14 @@ import { ERROR_CODES } from "../../errors/error-codes.js";
 import { completeMenuJson } from "../kitchen-books/kitchen-books-menu-ai-llm.js";
 import { buildDraftPatchPrompt } from "./lttp-issue-slip-ai-extract.js";
 import { getIssueSlipAiDraft, lockDraft } from "./lttp-issue-slip-ai-draft.js";
-import { normalizeRuleSuggestion, validateAndResolvePatch } from "./lttp-issue-slip-ai-draft-patch.js";
+import {
+  normalizeRuleSuggestion,
+  qtyRuleOps,
+  scopeQtyRule,
+  validateAndResolvePatch,
+} from "./lttp-issue-slip-ai-draft-patch.js";
+import { bindSharedQtyRules } from "./lttp-issue-slip-ai-uom.js";
+import { confirmUomRule, loadConfirmedQtyRules } from "./lttp-issue-slip-ai-learn.js";
 
 function draftChatError(error) {
   if (error instanceof AppError) throw error;
@@ -29,11 +36,10 @@ async function loadPatchContext(prisma, draft, tickedLines) {
         include: { lttpCommodityDefaultSupplier: true },
       })
     : [];
-  const rules = prisma.lttpAiUomRule
-    ? await prisma.lttpAiUomRule.findMany({
-        where: { recipientUnitId: draft.recipientUnitId, confirmed: true },
-      })
-    : [];
+  const rules = bindSharedQtyRules(
+    await loadConfirmedQtyRules(prisma, draft.recipientUnitId, draft.storageUnitId),
+    commodities,
+  );
   return {
     commodities: commodities.map((item) => ({
       id: item.id,
@@ -79,14 +85,20 @@ async function proposeIssueSlipAiDraftChat(prisma, input, opts = {}) {
     draftChatError(error);
   }
   const context = await loadPatchContext(prisma, draft, lines);
+  const ruleSuggestion = scopeQtyRule(normalizeRuleSuggestion(llm?.rule_suggestion), lines);
+  const ruleOps = qtyRuleOps(ruleSuggestion, lines, context.commodities);
+  const covered = new Set(ruleOps.map((op) => op.line_id));
+  const modelOps = (Array.isArray(llm?.patch) ? llm.patch : []).filter((op) => {
+    const id = Number(op?.line_id ?? op?.lineId);
+    return !covered.has(id);
+  });
   const resolved = validateAndResolvePatch({
-    ops: Array.isArray(llm?.patch) ? llm.patch : [],
+    ops: [...modelOps, ...ruleOps],
     tickedIds: [...ticked],
     lines,
     commodities: context.commodities,
     rules: context.rules,
   });
-  const ruleSuggestion = normalizeRuleSuggestion(llm?.rule_suggestion);
   const explanation = String(llm?.explanation || "").slice(0, 500);
   const proposedPatch = {
     ops: resolved.kept,
@@ -176,14 +188,29 @@ async function applyProposedDraftPatch(prisma, input) {
     });
   }
   const appliedVersion = Number(input.version) + 1;
+  const rule = turn.proposedPatch?.ruleSuggestion;
+  let ruleMeta = {};
+  if (rule?.type === "qty") {
+    const saved = await confirmUomRule({
+      prisma,
+      recipientUnitId: current.recipientUnitId,
+      commodityId: rule.commodityId ?? null,
+      fromUom: rule.fromUom,
+      factor: rule.factor,
+      sharedLevel1: true,
+      commodityNameNorm: rule.commodityNameNorm || null,
+    });
+    ruleMeta = { ruleId: saved?.id ?? null, ruleCreated: Boolean(saved?.created) };
+  }
   await prisma.lttpAiDraftChatTurn.update({
     where: { id: turn.id },
     data: {
       applied: true,
       proposedPatch: {
         ...turn.proposedPatch,
-        acceptRule: Boolean(input.acceptRule && turn.proposedPatch?.ruleSuggestion),
+        acceptRule: rule?.type === "qty" || Boolean(input.acceptRule && turn.proposedPatch?.ruleSuggestion),
         appliedVersion,
+        ...ruleMeta,
       },
     },
   });
@@ -228,11 +255,14 @@ async function undoLastDraftChatApply(prisma, input) {
       },
     });
   }
+  if (turn.proposedPatch?.ruleCreated && turn.proposedPatch?.ruleId && prisma.lttpAiUomRule?.delete) {
+    await prisma.lttpAiUomRule.delete({ where: { id: turn.proposedPatch.ruleId } });
+  }
   await prisma.lttpAiDraftChatTurn.update({
     where: { id: turn.id },
     data: {
       applied: false,
-      proposedPatch: { ...turn.proposedPatch, appliedVersion: null, acceptRule: false },
+      proposedPatch: { ...turn.proposedPatch, appliedVersion: null, acceptRule: false, ruleCreated: false },
     },
   });
   return getIssueSlipAiDraft(prisma, input);

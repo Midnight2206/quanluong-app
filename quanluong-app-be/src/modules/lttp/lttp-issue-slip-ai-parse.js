@@ -1,11 +1,15 @@
 import { hasTgsxSignal } from "./lttp-issue-slip-ai-tgsx.js";
 import { buildExtractPrompt, buildPickPrompt } from "./lttp-issue-slip-ai-extract.js";
+import { applyScoreGate } from "./lttp-issue-slip-ai-accept.js";
 import { applyLlmPick, decideMatch } from "./lttp-issue-slip-ai-match.js";
 import { convertQuantity } from "./lttp-issue-slip-ai-uom.js";
 
 function finishLine(item, decision, ctx) {
   const commodity = (ctx.commodities || []).find((row) => row.id === decision.commodityId) || null;
-  const habit = (ctx.habits || []).find((row) => row.commodityId === decision.commodityId) || null;
+  const habit =
+    (ctx.habits || [])
+      .filter((row) => row.commodityId === decision.commodityId)
+      .sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0))[0] || null;
   const price = decision.commodityId ? ctx.priceByCid.get(decision.commodityId) : null;
   const converted = convertQuantity({
     writtenQty: item?.quantity,
@@ -16,7 +20,9 @@ function finishLine(item, decision, ctx) {
     commodityId: decision.commodityId,
     rules: ctx.rules,
   });
-  const needsConfirm = Boolean(decision.needsConfirm || converted.needsConfirm || !decision.commodityId);
+  const skuReady = Boolean(decision.commodityId) && !decision.needsConfirm;
+  const askRule = converted.source === "unknown-uom";
+  const needsConfirm = Boolean(!skuReady || askRule);
   const priceKind = hasTgsxSignal(ctx.signalText) ? "tgsx" : "market";
   const resolved =
     decision.commodityId && !needsConfirm
@@ -39,7 +45,7 @@ function finishLine(item, decision, ctx) {
   return {
     commodityName: commodity?.name || String(item?.name || ""),
     code: commodity?.code || null,
-    commodityId: mapped ? Number(decision.commodityId) : null,
+    commodityId: skuReady ? Number(decision.commodityId) : null,
     quantity: converted.quantity,
     measureUnit: converted.measureUnit,
     priceKind,
@@ -54,6 +60,11 @@ function finishLine(item, decision, ctx) {
     rawName: String(item?.name || ""),
     writtenQty: item?.quantity ?? null,
     writtenUom: item?.uom ?? "",
+    stockUom: commodity?.measureUnit || null,
+    askRule,
+    qtySource: converted.source,
+    qtyFactor: converted.factor ?? null,
+    qtyFromUom: converted.fromUom || null,
   };
 }
 
@@ -70,6 +81,7 @@ async function parseOrderItems({
   complete,
   completeOpts,
   now = new Date(),
+  autoAcceptPercent = null,
 }) {
   const extracted = await complete(buildExtractPrompt({ text, examples: includeExamples ? examples : [] }), {
     ...completeOpts,
@@ -85,6 +97,9 @@ async function parseOrderItems({
         aliases,
         now,
       });
+      if (autoAcceptPercent != null) {
+        decision = applyScoreGate(decision, commodities, autoAcceptPercent);
+      }
       if (decision.needsLlm) {
         try {
           const pick = await complete(

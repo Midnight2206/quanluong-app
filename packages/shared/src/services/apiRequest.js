@@ -24,6 +24,7 @@ export async function apiRequest({
   responseType,
   returnHeaders,
   skipTargetUnitHeader,
+  signal,
   meta,
 } = {}) {
   const skip = Boolean(skipTargetUnitHeader || meta?.skipTargetUnitHeader);
@@ -35,6 +36,7 @@ export async function apiRequest({
       params,
       headers,
       responseType,
+      signal,
       skipTargetUnitHeader: skip,
     });
     if (responseType === "blob") {
@@ -49,6 +51,11 @@ export async function apiRequest({
     }
     return body;
   } catch (error) {
+    if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
+      const canceled = new Error("canceled");
+      canceled.canceled = true;
+      throw canceled;
+    }
     const hdr = error.response?.headers;
     const retryAfterSec = parseRetryAfter(hdr);
     const err = {

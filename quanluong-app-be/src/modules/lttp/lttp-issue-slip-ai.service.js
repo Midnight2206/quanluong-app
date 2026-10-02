@@ -8,8 +8,10 @@ import { assertMenuAiConfigured, completeMenuJson } from "../kitchen-books/kitch
 import { scopeSanitizeIssueSlipAiHeaderDraft } from "./lttp-issue-slip-ai-header-scope.js";
 import { formatMemoriesForPrompt } from "./lttp-issue-slip-ai-memory.js";
 import { createIssueSlipAiDraft } from "./lttp-issue-slip-ai-draft.js";
-import { confirmUomRule, learnConfirmedOrder } from "./lttp-issue-slip-ai-learn.js";
+import { confirmUomRule, learnConfirmedOrder, loadConfirmedQtyRules } from "./lttp-issue-slip-ai-learn.js";
 import { parseOrderItems } from "./lttp-issue-slip-ai-parse.js";
+import { bindSharedQtyRules } from "./lttp-issue-slip-ai-uom.js";
+import { readAutoAcceptPercent } from "./lttp-issue-slip-ai-accept.js";
 import {
   buildIssueSlipAiPrompt,
   formatIssueSlipHistoryForPrompt,
@@ -33,14 +35,14 @@ function getPrismaClient(opts) {
   return opts.prismaClient ?? prisma;
 }
 
-async function loadAiStats(recipientUnitId, recipientUserId, prismaClient) {
+async function loadAiStats(recipientUnitId, recipientUserId, prismaClient, storageUnitId) {
   if (!recipientUnitId || !prismaClient.lttpAiCommodityHabit) {
     return { habits: [], aliases: [], rules: [], examples: [] };
   }
   const [habits, aliases, rules] = await Promise.all([
     prismaClient.lttpAiCommodityHabit.findMany({ where: { recipientUnitId } }),
     prismaClient.lttpAiAliasStat.findMany({ where: { recipientUnitId } }),
-    prismaClient.lttpAiUomRule.findMany({ where: { recipientUnitId, confirmed: true } }),
+    loadConfirmedQtyRules(prismaClient, recipientUnitId, storageUnitId),
   ]);
   let examples = [];
   if (prismaClient.lttpAiOrderMessage) {
@@ -229,7 +231,7 @@ async function suggestIssueSlipAi(
   const loadCatalogFn = opts.loadCatalog ?? loadCatalog;
   const loadSuppliersFn = opts.loadDefaultSuppliers ?? loadDefaultSuppliers;
   const getEffectiveFn = opts.getEffectivePrices ?? getEffectivePrices;
-  const loadStatsFn = opts.loadAiStats ?? ((unit, userId) => loadAiStats(unit, userId, prismaClient));
+  const loadStatsFn = opts.loadAiStats ?? ((unit, userId) => loadAiStats(unit, userId, prismaClient, storageUnitId));
   const text = String(prompt ?? "").trim();
 
   await prismaClient.lttpIssueSlipAiMemory.create({
@@ -243,11 +245,12 @@ async function suggestIssueSlipAi(
     },
   });
 
-  const [{ commodities }, stats, eff, defaultSupplierByCid] = await Promise.all([
+  const [{ commodities }, stats, eff, defaultSupplierByCid, autoAcceptPercent] = await Promise.all([
     loadCatalogFn(storageUnitId),
     loadStatsFn(recipientUnitId, recipientUserId),
     getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
     loadSuppliersFn(storageUnitId),
+    readAutoAcceptPercent(prismaClient, storageUnitId),
   ]);
 
   const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
@@ -257,7 +260,7 @@ async function suggestIssueSlipAi(
     commodities,
     habits: stats.habits,
     aliases: stats.aliases,
-    rules: stats.rules,
+    rules: bindSharedQtyRules(stats.rules, commodities),
     examples: stats.examples,
     includeExamples: true,
     priceByCid,
@@ -265,6 +268,7 @@ async function suggestIssueSlipAi(
       resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid),
     complete,
     completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
+    autoAcceptPercent,
   });
 
   let orderMessageId = null;
@@ -353,15 +357,16 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
   const loadCatalogFn = opts.loadCatalog ?? loadCatalog;
   const loadSuppliersFn = opts.loadDefaultSuppliers ?? loadDefaultSuppliers;
   const getEffectiveFn = opts.getEffectivePrices ?? getEffectivePrices;
-  const loadStatsFn = opts.loadAiStats ?? ((unit, userId) => loadAiStats(unit, userId, prismaClient));
+  const loadStatsFn = opts.loadAiStats ?? ((unit, userId) => loadAiStats(unit, userId, prismaClient, storageUnitId));
   const text = String(message ?? "").trim();
   const habitUnitId = recipientUnitId ?? currentPreview?.headerDraft?.recipientUnitId ?? null;
   const effDate = resolveIssueSlipAiEffDate(currentPreview?.headerDraft?.issueDate, payload?.issueDate);
-  const [{ commodities }, stats, eff, defaultSupplierByCid] = await Promise.all([
+  const [{ commodities }, stats, eff, defaultSupplierByCid, autoAcceptPercent] = await Promise.all([
     loadCatalogFn(storageUnitId),
     loadStatsFn(habitUnitId, recipientUserId),
     getEffectiveFn({ unitId, date: effDate }, scope, effectiveUnitIds, dataScope),
     loadSuppliersFn(storageUnitId),
+    readAutoAcceptPercent(prismaClient, storageUnitId),
   ]);
 
   const priceByCid = new Map(eff.items.map((i) => [i.commodity.id, i]));
@@ -371,7 +376,7 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
     commodities,
     habits: stats.habits,
     aliases: stats.aliases,
-    rules: stats.rules,
+    rules: bindSharedQtyRules(stats.rules, commodities),
     examples: [],
     includeExamples: false,
     priceByCid,
@@ -380,6 +385,7 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
     complete,
     completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
     now: opts.now ? opts.now() : new Date(),
+    autoAcceptPercent,
   });
 
   const scopeSanitize =

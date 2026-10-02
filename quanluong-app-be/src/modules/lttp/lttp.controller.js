@@ -42,6 +42,8 @@ import {
   patchPriceTable,
   putRecipientDefaultUser,
   putBuyerDefaultForUnit,
+  getAiAutoAcceptForUnit,
+  putAiAutoAcceptForUnit,
   getWarehouseBuyerForUnit,
   putWarehouseBuyerForUnit,
   rewriteWarehouseSlipBuyers,
@@ -827,6 +829,26 @@ async function putBuyerDefaultForUnitController(req, res) {
   });
 }
 
+async function getAiAutoAcceptController(req, res) {
+  const data = await getAiAutoAcceptForUnit(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Ngưỡng AI tự chốt mã", data });
+}
+
+async function putAiAutoAcceptController(req, res) {
+  const data = await putAiAutoAcceptForUnit(
+    req.validatedBody,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã lưu ngưỡng AI tự chốt mã", data });
+}
+
 async function getWarehouseBuyerController(req, res) {
   const data = await getWarehouseBuyerForUnit(
     req.validatedQuery,
@@ -921,6 +943,8 @@ export {
   listBuyerDefaultsInScopeController,
   listBuyerUsersController,
   putBuyerDefaultForUnitController,
+  getAiAutoAcceptController,
+  putAiAutoAcceptController,
   getWarehouseBuyerController,
   putWarehouseBuyerController,
   rewriteWarehouseBuyerController,

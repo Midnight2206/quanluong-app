@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { applyLlmPick, decideMatch, pickAlias } from "./lttp-issue-slip-ai-match.js";
-import { convertQuantity, parseMoneyAmount, proposeUomFactor } from "./lttp-issue-slip-ai-uom.js";
+import { bindSharedQtyRules, convertQuantity, parseMoneyAmount, proposeUomFactor } from "./lttp-issue-slip-ai-uom.js";
 
 const gao = { id: 10, name: "Gạo tẻ", code: "GAO", measureUnit: "kg" };
 const nep = { id: 11, name: "Gạo nếp", code: "NEP", measureUnit: "kg" };
@@ -91,6 +91,22 @@ test("missing unit uses the unit this recipient usually orders", () => {
   });
   assert.equal(converted.quantity, 24);
   assert.equal(converted.source, "habit-uom");
+  assert.equal(converted.factor, 12);
+  assert.equal(converted.fromUom, "thung");
+});
+
+test("missing unit with no rule stays in the system unit", () => {
+  const converted = convertQuantity({
+    writtenQty: "15",
+    writtenUom: "",
+    stockUom: "qua",
+    habitUom: "vi",
+    commodityId: 4,
+    rules: [],
+  });
+  assert.equal(converted.quantity, 15);
+  assert.equal(converted.measureUnit, "qua");
+  assert.equal(converted.needsConfirm, false);
 });
 
 test("known conversion multiplies; unknown unit asks", () => {
@@ -102,6 +118,8 @@ test("known conversion multiplies; unknown unit asks", () => {
     rules: [{ commodityId: 4, fromUom: "lo", factor: 12, confirmed: true }],
   });
   assert.equal(known.quantity, 24);
+  assert.equal(known.factor, 12);
+  assert.equal(known.fromUom, "lo");
   const unknown = convertQuantity({
     writtenQty: "2",
     writtenUom: "lo",
@@ -110,6 +128,28 @@ test("known conversion multiplies; unknown unit asks", () => {
     rules: [],
   });
   assert.equal(unknown.needsConfirm, true);
+});
+
+test("omitted unit uses the shared qty rule before the habit unit", () => {
+  const converted = convertQuantity({
+    writtenQty: "3",
+    writtenUom: "",
+    stockUom: "hop",
+    habitUom: "thung",
+    commodityId: 8,
+    rules: [{ commodityId: 8, fromUom: "*", factor: 1, confirmed: true }],
+  });
+  assert.equal(converted.quantity, 3);
+  assert.equal(converted.measureUnit, "hop");
+  assert.equal(converted.source, "rule");
+});
+
+test("shared qty rule binds by commodity name inside each warehouse", () => {
+  const bound = bindSharedQtyRules(
+    [{ sharedLevel1: true, commodityNameNorm: "gao te", commodityId: 99, fromUom: "*", factor: 10, confirmed: true }],
+    [{ id: 4, name: "Gạo tẻ" }],
+  );
+  assert.equal(bound[0].commodityId, 4);
 });
 
 test("factor proposal only for a round integer", () => {

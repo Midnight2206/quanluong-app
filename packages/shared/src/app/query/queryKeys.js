@@ -57,6 +57,7 @@ export const qk = {
     buyerDefaultsList: () => ["lttp", "buyerDefaultsList"],
     buyerUsers: (unitId) => ["lttp", "buyerUsers", String(unitId)],
     warehouseBuyer: (unitId, date) => ["lttp", "warehouseBuyer", String(unitId), date ?? ""],
+    aiAutoAccept: (unitId) => ["lttp", "aiAutoAccept", String(unitId)],
     dailyOrderSummary: (unitId, date, supplierFilter) => [
       "lttp",
       "dailyOrderSummary",

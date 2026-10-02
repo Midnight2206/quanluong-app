@@ -2858,6 +2858,28 @@ export function LttpPhieuXuatTab({
           receivedDate={receivedDate}
           recipientUnitId={recipientUnitId}
           recipientUserId={recipientUserId}
+          recipientLabel={recipientUnitLabel}
+          canPickRecipient={Boolean(canPickUnits && units.length > 0)}
+          recipientOptions={units.map((unit) => ({
+            id: unit.id,
+            name: unit.name ?? `Đơn vị #${unit.id}`,
+          }))}
+          slipNote={slipNote}
+          onHeaderChange={(next) => {
+            markHeaderFieldTouched("issueDate");
+            markHeaderFieldTouched("receivedDate");
+            markHeaderFieldTouched("slipNote");
+            setIssueDate(next.issueDate || "");
+            setReceivedDate(next.receivedDate || "");
+            setSlipNote(next.slipNote ?? "");
+            if (String(next.recipientUnitId ?? "") !== String(recipientUnitId ?? "")) {
+              markHeaderFieldTouched("recipientUnitId");
+              setRecipientUserId("");
+              setRecipientName("");
+              setSignerRecipient("");
+              setRecipientUnitId(next.recipientUnitId ? Number(next.recipientUnitId) : null);
+            }
+          }}
           catalog={commodities.map((c) => ({
             id: c.id,
             name: c.name,

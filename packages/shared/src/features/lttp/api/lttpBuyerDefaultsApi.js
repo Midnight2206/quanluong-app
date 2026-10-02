@@ -47,6 +47,29 @@ export function useGetLttpWarehouseBuyerQuery(unitId, date, options = {}) {
   });
 }
 
+export function useGetLttpAiAutoAcceptQuery(unitId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.lttp.aiAutoAccept(unitId),
+    queryFn: () =>
+      apiRequest({ url: "/lttp/ai-auto-accept", method: "get", params: { unitId } }),
+    enabled: skip !== true && unitId != null && unitId !== "",
+    staleTime: 30 * 1000,
+    ...rest,
+  });
+}
+
+export function usePutLttpAiAutoAcceptMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/lttp/ai-auto-accept", method: "put", data: body }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: qk.lttp.aiAutoAccept(variables?.unitId) });
+    },
+  });
+}
+
 export function usePutLttpWarehouseBuyerMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({

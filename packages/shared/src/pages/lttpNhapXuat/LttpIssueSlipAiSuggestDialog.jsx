@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, Pause, Send } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   useApplyLttpIssueSlipAiDraftChatMutation,
@@ -14,22 +14,9 @@ import {
 } from "@/features/lttp/api/lttpApi";
 import { notifyError } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
-import { issueSlipPriceKindLabel } from "./lttpIssueSlipPriceKind.js";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
-
-function headerField(label, value) {
-  if (value == null || value === "") {
-    return null;
-  }
-  return (
-    <p className="text-sm">
-      <span className="text-muted-foreground">{label}: </span>
-      <span>{value}</span>
-    </p>
-  );
-}
 
 function normalizePreview(data) {
   if (!data) {
@@ -41,6 +28,23 @@ function normalizePreview(data) {
     warnings: Array.isArray(data.warnings) ? data.warnings : [],
     meta: data.meta ?? null,
   };
+}
+
+function confidenceClass(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "text-muted-foreground";
+  if (n >= 0.9) return "text-emerald-700 dark:text-emerald-300";
+  if (n >= 0.75) return "text-lime-700 dark:text-lime-300";
+  if (n >= 0.55) return "text-amber-700 dark:text-amber-300";
+  if (n >= 0.35) return "text-orange-700 dark:text-orange-300";
+  return "text-red-700 dark:text-red-300";
+}
+
+function qtyRuleLabel(rule) {
+  if (!rule || rule.type !== "qty") return "";
+  const from = !rule.fromUom || rule.fromUom === "*" ? "không ghi đơn vị" : rule.fromUom;
+  const scope = rule.commodityNameNorm ? "mặt hàng này" : "mọi mặt hàng";
+  return `Quy ước lần sau, mọi đơn vị cấp 1, ${scope}: ${from} × ${rule.factor} ra đơn vị bảng giá.`;
 }
 
 function lineStatusLabel(line) {
@@ -77,6 +81,18 @@ function mergeDraftLines(preview, draft) {
         code: stored.code,
         quantity: stored.quantity == null ? null : Number(stored.quantity),
         measureUnit: stored.measureUnit,
+        writtenUom: stored.writtenUom ?? line.writtenUom,
+        stockUom: stored.stockUom ?? line.stockUom ?? null,
+        qtySource: stored.qtySource ?? line.qtySource ?? null,
+        qtyFactor: stored.qtyFactor ?? line.qtyFactor ?? null,
+        qtyFromUom: stored.qtyFromUom ?? line.qtyFromUom ?? null,
+        askRule:
+          typeof stored.askRule === "boolean"
+            ? stored.askRule
+            : stored.status === "needs_confirm" &&
+              Boolean(stored.writtenUom ?? line.writtenUom) &&
+              Boolean(stored.stockUom ?? line.stockUom) &&
+              !sameUnit(stored.writtenUom ?? line.writtenUom, stored.stockUom ?? line.stockUom),
         lttpSupplierId: stored.lttpSupplierId ?? null,
         unitPrice: stored.unitPrice == null ? null : Number(stored.unitPrice),
         status: stored.status,
@@ -91,6 +107,103 @@ function mergeDraftLines(preview, draft) {
       draftVersion: draft.version,
     },
   };
+}
+
+const SUGGEST_PLAN = ["Đang đọc tin nhắn.", "Đang chấm điểm mặt hàng.", "Đang xử lý số lượng."];
+const CHAT_PLAN = ["Đang đọc yêu cầu.", "Đang xử lý quy tắc.", "Đang cập nhật dòng hàng."];
+const CLOSING_QUESTION = "Bạn có yêu cầu gì khác?";
+
+function sameUnit(a, b) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+}
+
+function conversionQuestions(lines) {
+  return (lines || []).flatMap((line, index) => {
+    const written = String(line.writtenUom || "").trim();
+    const stock = String(line.stockUom || "").trim();
+    if (!written || !stock || sameUnit(written, stock) || !line.askRule) return [];
+    const name = line.commodityName || line.rawName || "Mặt hàng";
+    return [
+      {
+        key: `rule:${line.draftLineId ?? index}:${written.toLowerCase()}`,
+        lineIndex: index,
+        draftLineId: line.draftLineId ?? null,
+        text: `${name} đang ghi «${written}». Quy đổi sang ${stock} thế nào?`,
+      },
+    ];
+  });
+}
+
+function formatFactor(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  return String(Math.round(n * 10) / 10);
+}
+
+function appliedQuestions(lines) {
+  return (lines || []).flatMap((line, index) => {
+    if (!line.commodityId) return [];
+    const stock = String(line.stockUom || line.measureUnit || "").trim();
+    const factor = formatFactor(line.qtyFactor);
+    const name = line.commodityName || line.rawName || "Mặt hàng";
+    if (!stock || !factor) return [];
+    if (line.qtySource === "rule") {
+      const from = String(line.qtyFromUom || line.writtenUom || "").trim();
+      if (!from || sameUnit(from, stock)) return [];
+      return [
+        {
+          kind: "applied",
+          key: `applied:rule:${line.draftLineId ?? index}:${from.toLowerCase()}`,
+          lineIndex: index,
+          draftLineId: line.draftLineId ?? null,
+          text: `${name}: tôi đã tách được đơn vị tính ${from}. Áp dụng quy tắc 1 ${from} = ${factor} ${stock}. Bạn có muốn thay đổi gì không?`,
+        },
+      ];
+    }
+    if (line.qtySource === "habit-uom") {
+      const from = String(line.qtyFromUom || "").trim();
+      if (!from) return [];
+      return [
+        {
+          kind: "applied",
+          key: `applied:habit:${line.draftLineId ?? index}:${from.toLowerCase()}`,
+          lineIndex: index,
+          draftLineId: line.draftLineId ?? null,
+          text: `${name} thường được đặt theo ${from}, nên tôi đã áp dụng đơn vị này và quy đổi ra ${stock}: 1 ${from} = ${factor} ${stock}. Bạn có muốn thay đổi gì không?`,
+        },
+      ];
+    }
+    return [];
+  });
+}
+
+function ruleQuestions(lines) {
+  return conversionQuestions(lines).filter((item) => lines[item.lineIndex]?.commodityId);
+}
+
+function displayYmd(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "—";
+}
+
+function summaryText(lines) {
+  const count = (lines || []).length;
+  const open = (lines || []).filter((line) => !line.commodityId).length;
+  if (!count) return "Chưa tách được dòng hàng nào.";
+  if (open) {
+    return `Đã tách ${count} dòng. Còn ${open} dòng chưa chốt mặt hàng — chọn ở khung bên phải.`;
+  }
+  return `Đã tách ${count} dòng và chốt mặt hàng.`;
+}
+
+function isCanceled(error) {
+  return error?.canceled === true || error?.data === "canceled";
+}
+
+function isDecline(text) {
+  return /^(không|khong|không có|khong co|không đổi|khong doi|giữ nguyên|giu nguyen|hết|het|không cần|khong can|thôi|thoi)\.?$/i.test(
+    String(text || "").trim(),
+  );
 }
 
 function mergePreviewMeta(baseMeta, nextMeta) {
@@ -115,9 +228,13 @@ export function LttpIssueSlipAiSuggestDialog({
   receivedDate,
   recipientUnitId,
   recipientUserId,
+  recipientLabel = "",
+  recipientOptions = [],
+  canPickRecipient = false,
+  slipNote = "",
+  onHeaderChange,
   catalog = [],
   onApply,
-  onCommit,
 }) {
   const [prompt, setPrompt] = useState("");
   const [preview, setPreview] = useState(null);
@@ -126,11 +243,18 @@ export function LttpIssueSlipAiSuggestDialog({
   const [turns, setTurns] = useState([]);
   const [draftVersion, setDraftVersion] = useState(null);
   const [skuQuery, setSkuQuery] = useState({});
-  const [ticked, setTicked] = useState([]);
-  const [pending, setPending] = useState(null);
-  const [acceptRule, setAcceptRule] = useState(false);
-  const [confirmAll, setConfirmAll] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
+  const [plan, setPlan] = useState(null);
+  const [headerOpen, setHeaderOpen] = useState(false);
+  const [activeLine, setActiveLine] = useState(null);
+  const askedRef = useRef([]);
+  const activeRef = useRef(null);
+  const planRef = useRef(null);
+  const planTimer = useRef([]);
+  const workRef = useRef(null);
+  const chatEndRef = useRef(null);
+  const abortRef = useRef(null);
+  const runRef = useRef(null);
   const [suggestAi, { isLoading: suggesting }] = useSuggestLttpIssueSlipAiMutation();
   const [chatAi, { isLoading: chatting }] = useChatLttpIssueSlipAiMutation();
   const [proposeChat, { isLoading: proposing }] = useProposeLttpIssueSlipAiDraftChatMutation();
@@ -139,7 +263,51 @@ export function LttpIssueSlipAiSuggestDialog({
   const [commitAi, { isLoading: committing }] = useCommitLttpIssueSlipAiMemoryMutation();
   const [patchDraftLine, { isLoading: patching }] = usePatchLttpIssueSlipAiDraftLineMutation();
 
+  function beginRun(kind, text) {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const id = {};
+    runRef.current = { id, kind, text, controller };
+    return { signal: controller.signal, id };
+  }
+
+  function stillRunning(id) {
+    return runRef.current?.id === id;
+  }
+
+  function stopSend() {
+    const run = runRef.current;
+    if (!run) return;
+    runRef.current = null;
+    run.controller.abort();
+    endPlan();
+    if (run.kind === "suggest") {
+      setTurns((prev) => prev.filter((turn) => !(turn.role === "user" && turn.text === run.text)));
+      return;
+    }
+    setChatMessage(run.text);
+    setTurns((prev) => {
+      const next = prev.slice();
+      const last = next[next.length - 1];
+      if (last?.role === "user" && last.text === run.text) next.pop();
+      return next;
+    });
+  }
+
+  function clearPlanTimer() {
+    planTimer.current.forEach(clearTimeout);
+    planTimer.current = [];
+  }
+
   function resetDialog() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    runRef.current = null;
+    clearPlanTimer();
+    askedRef.current = [];
+    activeRef.current = null;
+    planRef.current = null;
     setPrompt("");
     setPreview(null);
     setSessionId(null);
@@ -147,33 +315,104 @@ export function LttpIssueSlipAiSuggestDialog({
     setTurns([]);
     setDraftVersion(null);
     setSkuQuery({});
-    setTicked([]);
-    setPending(null);
-    setAcceptRule(false);
-    setConfirmAll(false);
     setCanUndo(false);
+    setPlan(null);
+    setHeaderOpen(false);
+    setActiveLine(null);
+  }
+
+  function beginPlan(steps) {
+    clearPlanTimer();
+    const next = { steps, cursor: 0 };
+    planRef.current = next;
+    setPlan(next);
+    steps.forEach((_, index) => {
+      if (index === 0) return;
+      planTimer.current.push(
+        setTimeout(() => {
+          setPlan((prev) => {
+            if (!prev) return prev;
+            const updated = { ...prev, cursor: Math.max(prev.cursor, index) };
+            planRef.current = updated;
+            return updated;
+          });
+        }, index * 800),
+      );
+    });
+  }
+
+  function endPlan() {
+    clearPlanTimer();
+    planRef.current = null;
+    setPlan(null);
+    setTurns((prev) => prev.filter((turn) => turn.role !== "plan"));
+  }
+
+  function patchHeader(patch) {
+    onHeaderChange?.({
+      issueDate: issueDate || "",
+      receivedDate: receivedDate || "",
+      recipientUnitId,
+      slipNote: slipNote || "",
+      ...patch,
+    });
+  }
+
+  function scrollWork(index) {
+    setActiveLine(index);
+    setTimeout(() => {
+      const root = workRef.current;
+      if (!root) return;
+      if (index == null) {
+        root.scrollTo({ top: root.scrollHeight, behavior: "smooth" });
+        return;
+      }
+      root.querySelector(`[data-line-index="${index}"]`)?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+    }, 60);
+  }
+
+  function askNext(lines) {
+    if (activeRef.current) return;
+    const openIndex = (lines || []).findIndex((line) => !line.commodityId);
+    if (openIndex >= 0) {
+      scrollWork(openIndex);
+      return;
+    }
+    const next =
+      [...ruleQuestions(lines), ...appliedQuestions(lines)].find(
+        (item) => !askedRef.current.includes(item.key),
+      ) ||
+      (!askedRef.current.includes("closing")
+        ? { key: "closing", lineIndex: null, draftLineId: null, text: CLOSING_QUESTION }
+        : null);
+    if (!next) return;
+    askedRef.current = [...askedRef.current, next.key];
+    activeRef.current = next;
+    setTurns((prev) => [...prev, { role: "assistant", text: next.text }]);
+    scrollWork(next.lineIndex);
   }
 
   useEffect(() => {
     if (!open) {
       resetDialog();
     }
+    return () => clearPlanTimer();
   }, [open]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [turns, plan]);
 
   if (!open) {
     return null;
   }
 
-  const busy = suggesting || chatting || proposing || applyingChat || undoing || committing || patching;
+  const sending = suggesting || chatting || proposing || applyingChat;
+  const busy = sending || undoing || committing || patching;
   const draftId = preview?.meta?.draftId ?? null;
-  const eligibleIds = (preview?.lines || [])
-    .filter((line) => draftId && line.draftLineId && lineStatusLabel(line) !== "cần xác nhận")
-    .map((line) => line.draftLineId);
-  const allTicked = eligibleIds.length > 0 && eligibleIds.every((id) => ticked.includes(id));
-  const historyCount = preview?.meta?.historySampleCount ?? 0;
-  const memoryCount = preview?.meta?.memorySampleCount ?? 0;
-  const unmapped =
-    preview?.lines?.filter((l) => !l?.mapped).length ?? 0;
   const pendingConfirm =
     preview?.lines?.some(
       (l) => l?.needsConfirm || l?.status === "needs_confirm" || l?.lineStatus === "needs_confirm",
@@ -234,8 +473,23 @@ export function LttpIssueSlipAiSuggestDialog({
       }).unwrap();
       setDraftVersion(data?.version ?? draftVersion);
       setCanUndo(false);
-      applyLocalChoice(index, choice);
+      const merged = mergeDraftLines(preview, data);
+      const lines = merged.lines.map((line, i) => {
+        if (i !== index) return line;
+        const stockUom = choice.measureUnit || line.stockUom || null;
+        const written = line.writtenUom;
+        return {
+          ...line,
+          stockUom,
+          askRule: Boolean(
+            line.needsConfirm && written && stockUom && !sameUnit(written, stockUom),
+          ),
+        };
+      });
+      const next = { ...merged, lines };
+      setPreview(next);
       setSkuQuery((prev) => ({ ...prev, [index]: "" }));
+      askNext(lines);
     } catch (e) {
       notifyError(e?.data?.message ?? "Không lưu được lựa chọn");
     }
@@ -247,8 +501,12 @@ export function LttpIssueSlipAiSuggestDialog({
       notifyError("Mô tả cần ít nhất 3 ký tự");
       return;
     }
+    setTurns([{ role: "user", text: trimmed }]);
+    beginPlan(SUGGEST_PLAN);
+    const run = beginRun("suggest", trimmed);
     try {
       const data = await suggestAi({
+        signal: run.signal,
         unitId,
         prompt: trimmed,
         ...(issueDate ? { issueDate } : {}),
@@ -260,18 +518,22 @@ export function LttpIssueSlipAiSuggestDialog({
           ? { recipientUserId: Number(recipientUserId) }
           : {}),
       }).unwrap();
+      if (!stillRunning(run.id)) return;
+      runRef.current = null;
+      const next = normalizePreview(data);
+      endPlan();
       setSessionId(data?.sessionId ?? null);
       setDraftVersion(data?.meta?.draftVersion ?? null);
       setSkuQuery({});
-      setPreview(normalizePreview(data));
+      setPreview(next);
       setChatMessage("");
-      setTurns([]);
-      setTicked([]);
-      setPending(null);
-      setAcceptRule(false);
-      setConfirmAll(false);
       setCanUndo(false);
+      setTurns((prev) => [...prev, { role: "assistant", text: summaryText(next?.lines) }]);
+      askNext(next?.lines || []);
     } catch (e) {
+      if (!stillRunning(run.id) || isCanceled(e)) return;
+      runRef.current = null;
+      endPlan();
       notifyError(e?.data?.message ?? "Gợi ý AI thất bại");
     }
   }
@@ -286,82 +548,106 @@ export function LttpIssueSlipAiSuggestDialog({
       notifyError("Nhập nội dung cần chỉnh");
       return;
     }
-    if (preview?.meta?.draftId) {
-      if (!ticked.length) {
-        notifyError("Chọn ít nhất một dòng để chat sửa");
-        return;
-      }
-      try {
-        const data = await proposeChat({
+    const question = activeRef.current;
+    const focusIndex = question?.lineIndex ?? null;
+    setTurns((prev) => [...prev, { role: "user", text: trimmed }]);
+    setChatMessage("");
+    if ((question?.key === "closing" || question?.kind === "applied") && isDecline(trimmed)) {
+      activeRef.current = null;
+      setTurns((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text:
+            question.kind === "applied"
+              ? "Giữ nguyên quy đổi này."
+              : "Được. Bấm Áp dụng khi muốn đưa vào phiếu.",
+        },
+      ]);
+      if (question.kind === "applied") askNext(preview.lines);
+      else scrollWork(null);
+      return;
+    }
+    const run = beginRun("chat", trimmed);
+    beginPlan(CHAT_PLAN);
+    try {
+      let nextPreview = preview;
+      if (preview?.meta?.draftId) {
+        const lineIds = question?.draftLineId
+          ? [question.draftLineId]
+          : (preview.lines || [])
+              .filter((line) => line.commodityId && line.draftLineId)
+              .map((line) => line.draftLineId);
+        if (!lineIds.length) {
+          runRef.current = null;
+          endPlan();
+          notifyError("Chốt mặt hàng trước khi ghi quy tắc");
+          return;
+        }
+        const proposed = await proposeChat({
+          signal: run.signal,
           id: preview.meta.draftId,
           unitId,
           message: trimmed,
-          lineIds: ticked,
+          lineIds,
         }).unwrap();
-        setPending(data);
-        setAcceptRule(false);
-        setChatMessage("");
-        setTurns((prev) => [
-          ...prev,
-          { role: "user", text: trimmed },
-          { role: "assistant", text: data?.explanation || "Đã có bản sửa. Xem diff rồi bấm Áp dụng hoặc Bỏ." },
-        ]);
-      } catch (e) {
-        notifyError(e?.data?.message ?? "Giữ nguyên bản nháp. Hãy thử lại hoặc dùng nút chọn.");
-      }
-      return;
-    }
-    try {
-      const data = await chatAi({
-        sessionId,
-        unitId,
-        message: trimmed,
-        currentPreview: preview,
-        ...(recipientUnitId != null && recipientUnitId !== ""
-          ? { recipientUnitId: Number(recipientUnitId) }
-          : {}),
-        ...(recipientUserId != null && recipientUserId !== ""
-          ? { recipientUserId: Number(recipientUserId) }
-          : {}),
-      }).unwrap();
-      setPreview((prev) => {
-        const next = normalizePreview(data);
-        if (!next) {
-          return next;
+        if (!stillRunning(run.id)) return;
+        const hasChange = (proposed.diff || []).length > 0 || Boolean(proposed.ruleSuggestion);
+        if (hasChange && proposed.turnId) {
+          const data = await applyChat({
+            signal: run.signal,
+            id: preview.meta.draftId,
+            unitId,
+            version: draftVersion,
+            turnId: proposed.turnId,
+          }).unwrap();
+          if (!stillRunning(run.id)) return;
+          nextPreview = mergeDraftLines(preview, data);
+          setPreview(nextPreview);
+          setDraftVersion(data?.version ?? draftVersion);
+          setCanUndo(true);
         }
-        return {
-          ...next,
-          meta: mergePreviewMeta(prev?.meta, next.meta),
-        };
-      });
-      setChatMessage("");
-      setTurns((prev) => [
-        ...prev,
-        { role: "user", text: trimmed },
-        { role: "assistant", text: "Đã cập nhật bản xem trước." },
-      ]);
+        endPlan();
+        const note = hasChange
+          ? qtyRuleLabel(proposed.ruleSuggestion) || proposed.explanation || "Đã cập nhật dòng hàng."
+          : proposed.explanation || "Chưa đổi được dòng nào. Gửi lại quy tắc.";
+        setTurns((prev) => [...prev, { role: "assistant", text: note }]);
+        if (!hasChange) {
+          scrollWork(focusIndex);
+          return;
+        }
+      } else {
+        const data = await chatAi({
+          signal: run.signal,
+          sessionId,
+          unitId,
+          message: trimmed,
+          currentPreview: preview,
+          ...(recipientUnitId != null && recipientUnitId !== ""
+            ? { recipientUnitId: Number(recipientUnitId) }
+            : {}),
+          ...(recipientUserId != null && recipientUserId !== ""
+            ? { recipientUserId: Number(recipientUserId) }
+            : {}),
+        }).unwrap();
+        if (!stillRunning(run.id)) return;
+        const normalized = normalizePreview(data);
+        nextPreview = normalized
+          ? { ...normalized, meta: mergePreviewMeta(preview?.meta, normalized.meta) }
+          : preview;
+        setPreview(nextPreview);
+        endPlan();
+        setTurns((prev) => [...prev, { role: "assistant", text: "Đã cập nhật dòng hàng." }]);
+      }
+      runRef.current = null;
+      activeRef.current = null;
+      scrollWork(focusIndex);
+      askNext(nextPreview?.lines || []);
     } catch (e) {
-      notifyError(e?.data?.message ?? "Chat AI thất bại");
-    }
-  }
-
-  async function handleApplyPending() {
-    if (!pending?.turnId || !draftId) return;
-    try {
-      const data = await applyChat({
-        id: draftId,
-        unitId,
-        version: draftVersion,
-        turnId: pending.turnId,
-        acceptRule,
-      }).unwrap();
-      setPreview((prev) => mergeDraftLines(prev, data));
-      setDraftVersion(data?.version ?? draftVersion);
-      setPending(null);
-      setAcceptRule(false);
-      setCanUndo(true);
-    } catch (e) {
-      notifyError(e?.data?.message ?? "Không áp dụng được bản sửa");
+      if (!stillRunning(run.id) || isCanceled(e)) return;
+      runRef.current = null;
+      endPlan();
+      notifyError(e?.data?.message ?? "Giữ nguyên bản nháp. Hãy gửi lại quy tắc.");
     }
   }
 
@@ -378,36 +664,6 @@ export function LttpIssueSlipAiSuggestDialog({
       setCanUndo(false);
     } catch (e) {
       notifyError(e?.data?.message ?? "Không hoàn tác được");
-    }
-  }
-
-  async function handleCommitDraft() {
-    if (!preview?.meta?.draftId || !onCommit) return;
-    if (pendingConfirm) {
-      notifyError("Còn dòng cần xác nhận trước khi chốt");
-      return;
-    }
-    try {
-      if (sessionId) {
-        await commitAi({
-          sessionId,
-          unitId,
-          finalPreview: preview,
-        }).unwrap();
-      }
-      await onCommit(preview, {
-        sessionId,
-        orderMessageId: preview.meta?.orderMessageId ?? null,
-        draftId: preview.meta.draftId,
-        draftVersion,
-        confirmAll,
-      });
-      resetDialog();
-      onClose?.();
-    } catch (e) {
-      if (!e?.notified) {
-        notifyError(e?.data?.message ?? "Không chốt được phiếu");
-      }
     }
   }
 
@@ -430,7 +686,7 @@ export function LttpIssueSlipAiSuggestDialog({
         orderMessageId: preview.meta?.orderMessageId ?? null,
         draftId: preview.meta?.draftId ?? null,
         draftVersion,
-        confirmAll,
+        confirmAll: false,
       });
       resetDialog();
       onClose?.();
@@ -444,166 +700,167 @@ export function LttpIssueSlipAiSuggestDialog({
     onClose?.();
   }
 
+  const draftText = preview ? chatMessage : prompt;
+  const sendDisabled = busy || (preview ? !chatMessage.trim() : prompt.trim().length < 3);
+  const recipientName =
+    recipientOptions.find((item) => String(item.id) === String(recipientUnitId))?.name ||
+    recipientLabel ||
+    "—";
+  const headerLine = `Giao ${displayYmd(issueDate)} · Nhận ${displayYmd(receivedDate)} · ${recipientName} · ${String(slipNote || "").trim() || "Không ghi chú"}`;
+
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg border border-border bg-card shadow-xl">
-        <div className="border-b border-border px-4 py-3">
-          <h3 className="font-semibold">AI gợi ý phiếu</h3>
-          <p className="text-xs text-muted-foreground">
-            {issueDate ? `Ngày phiếu: ${issueDate}` : "Tạo phiếu xuất mới"}
-            {preview ? ` · thói quen: ${historyCount}` : ""}
-            {preview ? ` · mẫu tin: ${memoryCount}` : ""}
-            {unmapped > 0 ? ` · chưa map: ${unmapped} dòng` : ""}
-          </p>
-        </div>
-        <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain p-4" data-local-scroll="true">
-          <label className="block space-y-1 text-xs">
-            Mô tả phiếu xuất
-            <textarea
-              className={`${inputClass} min-h-[5rem] resize-y`}
-              rows={4}
-              maxLength={2000}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Ví dụ: Xuất 10 kg gạo tẻ và 5 kg thịt heo cho bếp trưa ngày mai, giá mua TT…"
-              disabled={busy}
-            />
-          </label>
-          {(preview?.warnings || []).length > 0 ? (
-            <ul className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
-              {preview.warnings.map((w, i) => (
-                <li key={i}>{w}</li>
-              ))}
-            </ul>
+      <div className="flex h-[min(88vh,860px)] w-full max-w-6xl flex-col rounded-lg border border-border bg-card shadow-xl">
+        <div className="border-b border-border px-4 py-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="font-semibold">AI gợi ý phiếu</h3>
+              <p className="truncate text-xs text-muted-foreground">{headerLine}</p>
+            </div>
+            <Button type="button" variant="outline" onClick={() => setHeaderOpen((open) => !open)} disabled={busy}>
+              {headerOpen ? "Đóng" : "Sửa header"}
+            </Button>
+          </div>
+          {headerOpen ? (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className="space-y-1 text-xs">
+                Ngày giao
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={issueDate || ""}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    const received =
+                      !receivedDate || receivedDate === issueDate ? next : receivedDate;
+                    patchHeader({ issueDate: next, receivedDate: received });
+                  }}
+                />
+              </label>
+              <label className="space-y-1 text-xs">
+                Ngày nhận
+                <input
+                  type="date"
+                  className={inputClass}
+                  value={receivedDate || ""}
+                  disabled={busy}
+                  onChange={(e) => patchHeader({ receivedDate: e.target.value })}
+                />
+              </label>
+              {canPickRecipient ? (
+                <label className="space-y-1 text-xs sm:col-span-2">
+                  Đơn vị nhận
+                  <select
+                    className={inputClass}
+                    value={String(recipientUnitId ?? "")}
+                    disabled={busy}
+                    onChange={(e) => patchHeader({ recipientUnitId: Number(e.target.value) })}
+                  >
+                    {recipientOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name || `Đơn vị #${item.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <p className="text-xs text-muted-foreground sm:col-span-2">Đơn vị nhận: {recipientName}</p>
+              )}
+              <label className="space-y-1 text-xs sm:col-span-2">
+                Ghi chú
+                <textarea
+                  className={`${inputClass} min-h-[2.5rem] resize-y`}
+                  rows={2}
+                  maxLength={500}
+                  value={slipNote || ""}
+                  disabled={busy}
+                  onChange={(e) => patchHeader({ slipNote: e.target.value })}
+                />
+              </label>
+            </div>
           ) : null}
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <section className="flex h-[46%] min-h-0 w-full shrink-0 flex-col border-b border-border md:h-full md:w-[min(42%,34rem)] md:min-w-[22rem] md:border-b-0 md:border-r">
+            <header className="border-b border-border px-3 py-2 text-sm font-semibold">Trao đổi</header>
+            <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3" data-local-scroll="true">
+              {turns.length === 0 && !plan ? (
+                <p className="text-xs text-muted-foreground">
+                  Gửi tin đặt hàng. AI đọc, chấm điểm, rồi hỏi phần còn thiếu.
+                </p>
+              ) : null}
+              {turns.map((turn, i) => (
+                <div
+                  key={`${turn.role}-${i}`}
+                  className={
+                    turn.role === "user"
+                      ? "ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-sm text-primary-foreground"
+                      : "mr-10 max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm"
+                  }
+                >
+                  {turn.text}
+                </div>
+              ))}
+              {plan ? (
+                <div className="mr-8 rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm">
+                  <ul className="space-y-1">
+                    {plan.steps.map((step, i) => {
+                      const done = i < plan.cursor;
+                      const run = i === plan.cursor;
+                      return (
+                        <li key={step} className={done ? "text-muted-foreground" : run ? "font-medium" : "text-muted-foreground/60"}>
+                          {done ? "✓ " : ""}
+                          {step}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="space-y-2 border-t border-border p-3">
+              <div className="relative">
+                <textarea
+                  className={`${inputClass} max-h-40 min-h-[5.5rem] resize-y pb-12 pr-12`}
+                  rows={4}
+                  maxLength={2000}
+                  value={draftText}
+                  onChange={(e) => (preview ? setChatMessage(e.target.value) : setPrompt(e.target.value))}
+                  placeholder={preview ? "Ví dụ: 10 quả = 1 vỉ" : "Ví dụ: trứng vịt: 15 quả"}
+                  disabled={busy}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!sending) void (preview ? handleChat() : handleSuggest());
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label={sending ? "Dừng" : "Gửi"}
+                  className="absolute bottom-2 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm disabled:opacity-40"
+                  disabled={!sending && sendDisabled}
+                  onClick={() => {
+                    if (sending) stopSend();
+                    else void (preview ? handleChat() : handleSuggest());
+                  }}
+                >
+                  {sending ? <Pause className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                </button>
+              </div>
+              {draftId && canUndo ? (
+                <Button type="button" variant="outline" onClick={() => void handleUndoChat()} disabled={busy}>
+                  Hoàn tác
+                </Button>
+              ) : null}
+            </div>
+          </section>
+          <section ref={workRef} className="min-h-0 flex-1 overflow-y-auto" data-local-scroll="true">
           {preview ? (
             <>
-              <section className="space-y-2 rounded-md border border-border px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <header className="text-sm font-semibold">Trao đổi với AI</header>
-                  <span className="text-[11px] text-muted-foreground">Phiên: {sessionId}</span>
-                </div>
-                {turns.length > 0 ? (
-                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-md bg-muted/30 p-2 text-xs">
-                    {turns.map((turn, i) => (
-                      <div key={`${turn.role}-${i}`} className="rounded-md bg-background px-2 py-1">
-                        <span className="font-medium">
-                          {turn.role === "user" ? "Bạn" : "AI"}:
-                        </span>{" "}
-                        <span>{turn.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    {draftId
-                      ? "Tick dòng chắc hoặc đã sửa, rồi chat để sửa những dòng đó."
-                      : "Có thể chat để chỉnh lại preview sau khi đã gợi ý."}
-                  </p>
-                )}
-                {pending ? (
-                  <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2 text-xs">
-                    <p>{pending.explanation || "Bản sửa từ chat"}</p>
-                    {(pending.diff || []).map((op) => (
-                      <p key={op.lineId}>
-                        {op.before?.commodityName || "—"} {op.before?.quantity ?? "—"}{" "}
-                        {op.before?.measureUnit || ""} → {op.after?.commodityName || "—"}{" "}
-                        {op.after?.quantity ?? "—"} {op.after?.measureUnit || ""}
-                      </p>
-                    ))}
-                    {(pending.dropped || []).map((item, i) => (
-                      <p key={`${item.lineId}-${i}`} className="text-amber-800 dark:text-amber-200">
-                        Bỏ qua dòng {item.lineId}: {item.reason}
-                      </p>
-                    ))}
-                    {pending.ruleSuggestion ? (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={acceptRule}
-                          onChange={(e) => setAcceptRule(e.target.checked)}
-                        />
-                        Lưu cho lần sau?
-                      </label>
-                    ) : null}
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => void handleApplyPending()}
-                        disabled={busy || (!(pending.diff || []).length && !pending.ruleSuggestion)}
-                      >
-                        Áp dụng
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setPending(null);
-                          setAcceptRule(false);
-                        }}
-                        disabled={busy}
-                      >
-                        Bỏ
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    className={inputClass}
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder={
-                      draftId
-                        ? "Ví dụ: dòng đã chọn đổi thành 2 lô"
-                        : "Ví dụ: đổi 5 kg gạo tẻ thành 7 kg gạo nếp"
-                    }
-                    disabled={busy}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void handleChat();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => void handleChat()}
-                    disabled={busy || !chatMessage.trim()}
-                  >
-                    {chatting || proposing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-                    Gửi
-                  </Button>
-                  {draftId && canUndo ? (
-                    <Button type="button" variant="outline" onClick={() => void handleUndoChat()} disabled={busy}>
-                      Hoàn tác
-                    </Button>
-                  ) : null}
-                </div>
-              </section>
-              <section className="rounded-md border border-border px-3 py-2">
-                <header className="mb-2 text-sm font-semibold">Header</header>
-                <div className="space-y-0.5">
-                  {headerField("Ngày xuất", preview.headerDraft?.issueDate)}
-                  {headerField("Ngày nhận", preview.headerDraft?.receivedDate)}
-                  {headerField(
-                    "Đơn vị nhận",
-                    preview.headerDraft?.recipientDisplayName ??
-                      preview.headerDraft?.recipientUnitId,
-                  )}
-                  {headerField(
-                    "Người mua",
-                    preview.headerDraft?.buyerDisplayName ?? preview.headerDraft?.buyerUserId,
-                  )}
-                  {headerField("Chú thích", preview.headerDraft?.slipNote)}
-                  {!preview.headerDraft ||
-                  !Object.values(preview.headerDraft).some((v) => v != null && v !== "") ? (
-                    <p className="text-xs text-muted-foreground">— Không gợi ý header —</p>
-                  ) : null}
-                </div>
-              </section>
-              <section className="rounded-md border border-border">
+              <section className="m-3 rounded-md border border-border">
                 <header className="border-b border-border bg-muted/30 px-3 py-1.5 text-sm font-semibold">
                   Dòng hàng
                 </header>
@@ -611,143 +868,111 @@ export function LttpIssueSlipAiSuggestDialog({
                   <table className="w-full min-w-[520px] text-left text-sm">
                     <thead>
                       <tr className="text-xs text-muted-foreground">
-                        {draftId ? (
-                          <th className="px-3 py-1.5 font-medium">
-                            <input
-                              type="checkbox"
-                              aria-label="Chọn tất cả dòng chat được"
-                              checked={allTicked}
-                              onChange={() =>
-                                setTicked(allTicked ? [] : eligibleIds)
-                              }
-                            />
-                          </th>
-                        ) : null}
                         <th className="px-3 py-1.5 font-medium">LTTP</th>
                         <th className="px-3 py-1.5 font-medium">Mã</th>
                         <th className="px-3 py-1.5 font-medium">SL</th>
-                        <th className="px-3 py-1.5 font-medium">Loại giá</th>
                         <th className="px-3 py-1.5 font-medium">Đơn giá</th>
-                        <th className="px-3 py-1.5 font-medium">Map</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(preview.lines || []).length === 0 ? (
                         <tr>
-                          <td colSpan={draftId ? 7 : 6} className="px-3 py-2 text-xs text-muted-foreground">
+                          <td colSpan={4} className="px-3 py-2 text-xs text-muted-foreground">
                             Không có dòng gợi ý
                           </td>
                         </tr>
                       ) : (
                         preview.lines.map((line, i) => {
                           const needs = lineStatusLabel(line) === "cần xác nhận";
-                          const matches = needs ? catalogMatches(catalog, skuQuery[i]) : [];
+                          const matches = catalogMatches(catalog, skuQuery[i]);
+                          const pct = Number(line.confidence);
+                          const choiceCard = (choice, source) => (
+                            <button
+                              key={choice.commodityId ?? choice.id}
+                              type="button"
+                              className="rounded-lg border border-primary/50 bg-primary/10 px-2.5 py-1.5 text-left text-xs font-medium text-foreground shadow-sm hover:bg-primary/20 disabled:opacity-50"
+                              disabled={busy}
+                              onClick={() => void pickChoice(i, choice, source)}
+                            >
+                              {choice.name}
+                            </button>
+                          );
                           return (
                           <tr
                             key={line.draftLineId ?? i}
+                            data-line-index={i}
                             className={
-                              needs
-                                ? "border-t border-amber-500/40 bg-amber-500/10"
-                                : "border-t border-border/50"
+                              activeLine === i
+                                ? "border-t border-primary/50 bg-primary/10"
+                                : needs
+                                  ? "border-t border-amber-500/40 bg-amber-500/10"
+                                  : "border-t border-border/50"
                             }
                           >
-                            {draftId ? (
-                              <td className="px-3 py-1 align-top">
-                                <input
-                                  type="checkbox"
-                                  aria-label="Chọn dòng để chat sửa"
-                                  checked={Boolean(line.draftLineId) && ticked.includes(line.draftLineId)}
-                                  disabled={needs || !line.draftLineId}
-                                  onChange={() =>
-                                    setTicked((prev) =>
-                                      prev.includes(line.draftLineId)
-                                        ? prev.filter((id) => id !== line.draftLineId)
-                                        : [...prev, line.draftLineId],
-                                    )
-                                  }
-                                />
-                              </td>
-                            ) : null}
                             <td className="px-3 py-1 align-top">
                               <div>{line.commodityName || line.rawName || "—"}</div>
                               <div className="text-[11px] text-muted-foreground">
                                 <span className={needs ? "font-medium text-amber-800 dark:text-amber-200" : ""}>
                                   {lineStatusLabel(line)}
                                 </span>
-                                {line.confidence ? ` · ${Math.round(Number(line.confidence) * 100)}%` : ""}
+                                {Number.isFinite(pct) ? (
+                                  <span className={confidenceClass(pct)}>
+                                    {` · ${Math.round(pct * 100)}%`}
+                                  </span>
+                                ) : null}
                               </div>
-                              {needs ? (
-                                <div className="mt-1 space-y-1">
-                                  <div className="flex flex-col items-start gap-1">
-                                    {(line.choices || []).slice(0, 3).map((choice) => (
-                                      <button
-                                        key={choice.commodityId}
-                                        type="button"
-                                        className="text-left text-xs text-primary underline"
-                                        disabled={busy}
-                                        onClick={() => void pickChoice(i, choice, "choice")}
-                                      >
-                                        {choice.name}
-                                        {choice.stat ? ` (${choice.stat})` : ""}
-                                      </button>
-                                    ))}
+                              <div className="mt-1 space-y-1">
+                                {needs && (line.choices || []).length > 0 ? (
+                                  <div className="flex flex-wrap gap-1.5 rounded-lg border border-primary/40 bg-primary/5 p-1.5">
+                                    {(line.choices || []).slice(0, 3).map((choice) => choiceCard(choice, "choice"))}
                                   </div>
-                                  <input
-                                    className={inputClass}
-                                    value={skuQuery[i] || ""}
-                                    onChange={(e) =>
-                                      setSkuQuery((prev) => ({ ...prev, [i]: e.target.value }))
-                                    }
-                                    placeholder="Tìm SKU khác"
-                                    disabled={busy}
-                                  />
-                                  {matches.length > 0 ? (
-                                    <div className="flex flex-col items-start gap-1">
-                                      {matches.map((item) => (
-                                        <button
-                                          key={item.id}
-                                          type="button"
-                                          className="text-left text-xs underline"
-                                          disabled={busy}
-                                          onClick={() =>
-                                            void pickChoice(
-                                              i,
-                                              {
-                                                commodityId: item.id,
-                                                name: item.name,
-                                                code: item.code,
-                                                measureUnit: item.measureUnit,
-                                                lttpSupplierId: item.lttpSupplierId,
-                                                unitPrice: item.unitPrice,
-                                                tgsxPrice: item.tgsxPrice,
-                                              },
-                                              "manual",
-                                            )
-                                          }
-                                        >
-                                          {item.code ? `${item.code} · ` : ""}
-                                          {item.name}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  ) : null}
+                                ) : null}
+                                <input
+                                  className={inputClass}
+                                  value={skuQuery[i] || ""}
+                                  onChange={(e) =>
+                                    setSkuQuery((prev) => ({ ...prev, [i]: e.target.value }))
+                                  }
+                                  placeholder="Tìm SKU khác"
+                                  disabled={busy}
+                                />
+                                {matches.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {matches.map((item) =>
+                                      choiceCard(
+                                        {
+                                          commodityId: item.id,
+                                          name: item.name,
+                                          code: item.code,
+                                          measureUnit: item.measureUnit,
+                                          lttpSupplierId: item.lttpSupplierId,
+                                          unitPrice: item.unitPrice,
+                                          tgsxPrice: item.tgsxPrice,
+                                        },
+                                        "manual",
+                                      ),
+                                    )}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="px-3 py-1 align-top font-mono text-xs">{line.code || "—"}</td>
+                            <td className="px-3 py-1 align-top tabular-nums">
+                              <div>
+                                {line.quantity ?? "—"}
+                                {line.commodityId && line.writtenUom ? ` (${line.writtenUom})` : ""}
+                                {line.commodityId && !line.writtenUom && line.measureUnit
+                                  ? ` ${line.measureUnit}`
+                                  : ""}
+                              </div>
+                              {line.commodityId && needs && line.writtenUom ? (
+                                <div className="text-[11px] text-amber-800 dark:text-amber-200">
+                                  Chat quy tắc cho «{line.writtenUom}»
                                 </div>
                               ) : null}
                             </td>
-                            <td className="px-3 py-1 align-top font-mono text-xs">{line.code || "—"}</td>
-                            <td className="px-3 py-1 align-top tabular-nums">{line.quantity ?? "—"}</td>
-                            <td className="px-3 py-1 align-top text-xs">
-                              {line.priceKind ? issueSlipPriceKindLabel(line.priceKind) : "—"}
-                            </td>
                             <td className="px-3 py-1 align-top tabular-nums text-muted-foreground">
                               {line.unitPrice != null ? formatVnd(line.unitPrice) : "—"}
-                            </td>
-                            <td className="px-3 py-1 align-top">
-                              {line.mapped ? (
-                                <span className="text-xs text-emerald-700 dark:text-emerald-300">OK</span>
-                              ) : (
-                                <span className="text-xs text-amber-700 dark:text-amber-300">Chưa</span>
-                              )}
                             </td>
                           </tr>
                           );
@@ -758,37 +983,15 @@ export function LttpIssueSlipAiSuggestDialog({
                 </div>
               </section>
             </>
-          ) : null}
+          ) : (
+            <p className="p-6 text-sm text-muted-foreground">Kết quả gợi ý hiện ở đây.</p>
+          )}
+          </section>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3">
-          {draftId ? (
-            <label className="mr-auto flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={confirmAll}
-                onChange={(e) => setConfirmAll(e.target.checked)}
-                disabled={busy}
-              />
-              Xác nhận cả phiếu
-            </label>
-          ) : null}
+        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
           <Button type="button" variant="outline" onClick={handleClose} disabled={busy}>
             Hủy
           </Button>
-          <Button type="button" variant="secondary" onClick={() => void handleSuggest()} disabled={busy}>
-            {suggesting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-            Gợi ý
-          </Button>
-          {draftId ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void handleCommitDraft()}
-              disabled={busy || !preview || pendingConfirm}
-            >
-              Chốt phiếu
-            </Button>
-          ) : null}
           <Button type="button" onClick={() => void handleApply()} disabled={busy || !preview || pendingConfirm}>
             {committing ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Áp dụng

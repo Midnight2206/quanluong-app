@@ -1,4 +1,5 @@
-import { convertQuantity } from "./lttp-issue-slip-ai-uom.js";
+import { normalizeCommodityName } from "../kitchen-books/kitchen-books-menu-ai-map.js";
+import { OMITTED_UOM, convertQuantity } from "./lttp-issue-slip-ai-uom.js";
 
 function normalizePatchOp(raw) {
   const sku = raw?.sku_id ?? raw?.skuId;
@@ -28,7 +29,53 @@ function normalizeRuleSuggestion(raw) {
       commodityId: Number(raw.commodityId) > 0 ? Number(raw.commodityId) : null,
     };
   }
+  if (raw.type === "qty") {
+    const factor = Math.round(Number(raw.factor));
+    if (factor < 1 || factor > 500) return null;
+    const from = String(raw.fromUom || "").trim();
+    const lineId = Number(raw.line_id ?? raw.lineId);
+    return {
+      type: "qty",
+      fromUom: from ? from.slice(0, 64) : OMITTED_UOM,
+      factor,
+      lineId: lineId > 0 ? lineId : null,
+      commodityId: null,
+      commodityNameNorm: null,
+    };
+  }
   return null;
+}
+
+function scopeQtyRule(rule, lines) {
+  if (!rule || rule.type !== "qty") return rule ?? null;
+  const targets = (lines || []).filter((line) => !rule.lineId || rule.lineId === line.id);
+  const ids = [...new Set(targets.map((line) => line.commodityId).filter((id) => Number(id) > 0))];
+  if (ids.length !== 1) return { ...rule, commodityId: null, commodityNameNorm: null };
+  const line = targets.find((item) => item.commodityId === ids[0]);
+  return {
+    ...rule,
+    commodityId: ids[0],
+    commodityNameNorm: normalizeCommodityName(line?.commodityName || line?.rawName || "") || null,
+  };
+}
+
+function qtyRuleOps(rule, lines, commodities) {
+  if (!rule || rule.type !== "qty") return [];
+  const byId = new Map((commodities || []).map((item) => [item.id, item]));
+  const ops = [];
+  for (const line of lines || []) {
+    if (rule.lineId && rule.lineId !== line.id) continue;
+    if (line.status === "needs_confirm" && !(Number(line.commodityId) > 0)) continue;
+    const stock = byId.get(line.commodityId)?.measureUnit || line.measureUnit || null;
+    const written =
+      line.writtenQty != null && String(line.writtenQty).trim() !== "" ? line.writtenQty : line.quantity;
+    const qty = Number(String(written ?? "").replace(",", "."));
+    if (!(qty > 0) || !stock) continue;
+    const next = Math.round(qty * rule.factor * 10) / 10;
+    if (!(next > 0)) continue;
+    ops.push({ line_id: line.id, qty: next, unit: stock });
+  }
+  return ops;
 }
 
 function lineBefore(line) {
@@ -57,7 +104,7 @@ function validateAndResolvePatch({ ops, tickedIds, lines, commodities, rules }) 
       dropped.push({ lineId: op.lineId, reason: "Không thuộc dòng đã chọn" });
       continue;
     }
-    if (line.status === "needs_confirm") {
+    if (line.status === "needs_confirm" && !(Number(line.commodityId) > 0)) {
       dropped.push({ lineId: op.lineId, reason: "Dòng cần xác nhận dùng nút chọn" });
       continue;
     }
@@ -121,4 +168,4 @@ function validateAndResolvePatch({ ops, tickedIds, lines, commodities, rules }) 
   return { kept, dropped };
 }
 
-export { normalizeRuleSuggestion, validateAndResolvePatch };
+export { normalizeRuleSuggestion, qtyRuleOps, scopeQtyRule, validateAndResolvePatch };
