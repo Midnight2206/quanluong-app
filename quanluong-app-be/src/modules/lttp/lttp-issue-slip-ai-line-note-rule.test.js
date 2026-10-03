@@ -49,16 +49,13 @@ test("missing lttpAiLineNoteRule => false", async () => {
 });
 
 test("setter updates an existing line-note rule", async () => {
-  const updated = [];
+  const upserted = [];
   const prisma = {
     lttpAiLineNoteRule: {
       findUnique: async () => ({ id: 5, enabled: false }),
-      update: async ({ data }) => {
-        updated.push(data);
-        return { id: 5, enabled: data.enabled };
-      },
-      create: async () => {
-        throw new Error("should not create");
+      upsert: async (args) => {
+        upserted.push(args);
+        return { id: 5, enabled: args.update.enabled };
       },
     },
   };
@@ -66,20 +63,23 @@ test("setter updates an existing line-note rule", async () => {
     previous: false,
     created: false,
   });
-  assert.deepEqual(updated, [{ enabled: true }]);
+  assert.deepEqual(upserted, [
+    {
+      where: { kind: "originalQtyOnConvert" },
+      update: { enabled: true },
+      create: { kind: "originalQtyOnConvert", enabled: true },
+    },
+  ]);
 });
 
 test("setter creates the line-note rule when missing", async () => {
-  const created = [];
+  const upserted = [];
   const prisma = {
     lttpAiLineNoteRule: {
       findUnique: async () => null,
-      update: async () => {
-        throw new Error("should not update");
-      },
-      create: async ({ data }) => {
-        created.push(data);
-        return data;
+      upsert: async (args) => {
+        upserted.push(args);
+        return args.create;
       },
     },
   };
@@ -87,5 +87,11 @@ test("setter creates the line-note rule when missing", async () => {
     previous: false,
     created: true,
   });
-  assert.deepEqual(created, [{ kind: "originalQtyOnConvert", enabled: true }]);
+  assert.deepEqual(upserted, [
+    {
+      where: { kind: "originalQtyOnConvert" },
+      update: { enabled: true },
+      create: { kind: "originalQtyOnConvert", enabled: true },
+    },
+  ]);
 });

@@ -155,26 +155,19 @@ async function loadOriginalQtyOnConvert(prisma, storageUnitId) {
 }
 
 async function setOriginalQtyOnConvert(prisma, enabled) {
-  if (
-    !prisma?.lttpAiLineNoteRule?.findUnique ||
-    !prisma?.lttpAiLineNoteRule?.update ||
-    !prisma?.lttpAiLineNoteRule?.create
-  ) {
+  if (!prisma?.lttpAiLineNoteRule?.findUnique || !prisma?.lttpAiLineNoteRule?.upsert) {
     return { previous: false, created: false };
   }
   const existing = await prisma.lttpAiLineNoteRule.findUnique({ where: { kind: LINE_NOTE_KIND } });
   const previous = Boolean(existing?.enabled);
-  if (existing) {
-    await prisma.lttpAiLineNoteRule.update({
-      where: { id: existing.id },
-      data: { enabled: Boolean(enabled) },
-    });
-    return { previous, created: false };
-  }
-  await prisma.lttpAiLineNoteRule.create({
-    data: { kind: LINE_NOTE_KIND, enabled: Boolean(enabled) },
+  const created = !existing;
+  const nextEnabled = Boolean(enabled);
+  await prisma.lttpAiLineNoteRule.upsert({
+    where: { kind: LINE_NOTE_KIND },
+    update: { enabled: nextEnabled },
+    create: { kind: LINE_NOTE_KIND, enabled: nextEnabled },
   });
-  return { previous: false, created: true };
+  return { previous, created };
 }
 
 async function loadConfirmedQtyRules(prisma, recipientUnitId, storageUnitId) {
