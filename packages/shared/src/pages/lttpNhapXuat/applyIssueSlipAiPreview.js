@@ -96,7 +96,7 @@ function mapPreviewLineToRow(line, newEmptyRow) {
     unitPrice,
     tgsxPrice,
     priceKind,
-    lineNote: "",
+    lineNote: line.lineNote != null ? String(line.lineNote).trim().slice(0, 500) : "",
   };
 }
 

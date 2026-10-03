@@ -41,7 +41,13 @@ function confidenceClass(value) {
 }
 
 function qtyRuleLabel(rule) {
-  if (!rule || rule.type !== "qty") return "";
+  if (!rule) return "";
+  if (rule.type === "line_note") {
+    return rule.enabled
+      ? "Đã lưu cho mọi kho cấp 1: khi đổi đơn vị, ghi số lượng gốc vào ghi chú."
+      : "Đã tắt ghi số lượng gốc vào ghi chú.";
+  }
+  if (rule.type !== "qty") return "";
   const from = !rule.fromUom || rule.fromUom === "*" ? "không ghi đơn vị" : rule.fromUom;
   const scope = rule.commodityNameNorm ? "mặt hàng này" : "mọi mặt hàng";
   return `Quy ước lần sau, mọi đơn vị cấp 1, ${scope}: ${from} × ${rule.factor} ra đơn vị bảng giá.`;
@@ -86,6 +92,7 @@ function mergeDraftLines(preview, draft) {
         qtySource: stored.qtySource ?? line.qtySource ?? null,
         qtyFactor: stored.qtyFactor ?? line.qtyFactor ?? null,
         qtyFromUom: stored.qtyFromUom ?? line.qtyFromUom ?? null,
+        lineNote: stored.lineNote ?? line.lineNote ?? "",
         askRule:
           typeof stored.askRule === "boolean"
             ? stored.askRule
@@ -965,6 +972,9 @@ export function LttpIssueSlipAiSuggestDialog({
                                   ? ` ${line.measureUnit}`
                                   : ""}
                               </div>
+                              {line.lineNote ? (
+                                <div className="text-[11px] text-muted-foreground">{line.lineNote}</div>
+                              ) : null}
                               {line.commodityId && needs && line.writtenUom ? (
                                 <div className="text-[11px] text-amber-800 dark:text-amber-200">
                                   Chat quy tắc cho «{line.writtenUom}»
