@@ -986,6 +986,12 @@ model LttpAiUomRule {
   @@index([sharedLevel1, fromUom])
 }
 
+model LttpAiLineNoteRule {
+  id      Int     @id @default(autoincrement())
+  kind    String  @unique @db.VarChar(64)
+  enabled Boolean @default(false)
+}
+
 model LttpAiOrderMessage {
   id               Int       @id @default(autoincrement())
   recipientUserId  Int?

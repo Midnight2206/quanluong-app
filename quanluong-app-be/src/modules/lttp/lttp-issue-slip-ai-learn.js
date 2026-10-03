@@ -1,6 +1,8 @@
 import { normalizeCommodityName } from "../kitchen-books/kitchen-books-menu-ai-map.js";
 import { proposeUomFactor } from "./lttp-issue-slip-ai-uom.js";
 
+const LINE_NOTE_KIND = "originalQtyOnConvert";
+
 async function learnConfirmedOrder({
   prisma,
   recipientUnitId,
@@ -141,6 +143,17 @@ async function confirmUomRule({
   return Object.assign(row, { created: true });
 }
 
+async function loadOriginalQtyOnConvert(prisma, storageUnitId) {
+  if (!prisma?.lttpAiLineNoteRule || !prisma?.unit?.findUnique) return false;
+  const storage = await prisma.unit.findUnique({
+    where: { id: Number(storageUnitId) },
+    select: { depth: true },
+  });
+  if (storage?.depth !== 0) return false;
+  const row = await prisma.lttpAiLineNoteRule.findUnique({ where: { kind: LINE_NOTE_KIND } });
+  return Boolean(row?.enabled);
+}
+
 async function loadConfirmedQtyRules(prisma, recipientUnitId, storageUnitId) {
   if (!prisma?.lttpAiUomRule) return [];
   const own = recipientUnitId
@@ -161,4 +174,4 @@ async function loadConfirmedQtyRules(prisma, recipientUnitId, storageUnitId) {
   return [...own, ...shared.filter((rule) => rule?.id == null || !seen.has(rule.id))];
 }
 
-export { confirmUomRule, learnConfirmedOrder, loadConfirmedQtyRules };
+export { LINE_NOTE_KIND, confirmUomRule, learnConfirmedOrder, loadConfirmedQtyRules, loadOriginalQtyOnConvert };

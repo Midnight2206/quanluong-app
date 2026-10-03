@@ -8,7 +8,12 @@ import { assertMenuAiConfigured, completeMenuJson } from "../kitchen-books/kitch
 import { scopeSanitizeIssueSlipAiHeaderDraft } from "./lttp-issue-slip-ai-header-scope.js";
 import { formatMemoriesForPrompt } from "./lttp-issue-slip-ai-memory.js";
 import { createIssueSlipAiDraft } from "./lttp-issue-slip-ai-draft.js";
-import { confirmUomRule, learnConfirmedOrder, loadConfirmedQtyRules } from "./lttp-issue-slip-ai-learn.js";
+import {
+  confirmUomRule,
+  learnConfirmedOrder,
+  loadConfirmedQtyRules,
+  loadOriginalQtyOnConvert,
+} from "./lttp-issue-slip-ai-learn.js";
 import { parseOrderItems } from "./lttp-issue-slip-ai-parse.js";
 import { bindSharedQtyRules } from "./lttp-issue-slip-ai-uom.js";
 import { readAutoAcceptPercent } from "./lttp-issue-slip-ai-accept.js";
@@ -269,7 +274,10 @@ async function suggestIssueSlipAi(
     complete,
     completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
     autoAcceptPercent,
-    originalQtyOnConvert: Boolean(opts.originalQtyOnConvert),
+    originalQtyOnConvert:
+      opts.originalQtyOnConvert != null
+        ? Boolean(opts.originalQtyOnConvert)
+        : await loadOriginalQtyOnConvert(prismaClient, storageUnitId),
   });
 
   let orderMessageId = null;
@@ -387,7 +395,10 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
     completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
     now: opts.now ? opts.now() : new Date(),
     autoAcceptPercent,
-    originalQtyOnConvert: Boolean(opts.originalQtyOnConvert),
+    originalQtyOnConvert:
+      opts.originalQtyOnConvert != null
+        ? Boolean(opts.originalQtyOnConvert)
+        : await loadOriginalQtyOnConvert(prismaClient, storageUnitId),
   });
 
   const scopeSanitize =
