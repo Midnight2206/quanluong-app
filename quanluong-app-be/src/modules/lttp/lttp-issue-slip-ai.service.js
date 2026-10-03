@@ -269,6 +269,7 @@ async function suggestIssueSlipAi(
     complete,
     completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
     autoAcceptPercent,
+    originalQtyOnConvert: Boolean(opts.originalQtyOnConvert),
   });
 
   let orderMessageId = null;
@@ -386,6 +387,7 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
     completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
     now: opts.now ? opts.now() : new Date(),
     autoAcceptPercent,
+    originalQtyOnConvert: Boolean(opts.originalQtyOnConvert),
   });
 
   const scopeSanitize =

@@ -97,6 +97,7 @@ async function parseOrderItems({
   completeOpts,
   now = new Date(),
   autoAcceptPercent = null,
+  originalQtyOnConvert = false,
 }) {
   const extracted = await complete(buildExtractPrompt({ text, examples: includeExamples ? examples : [] }), {
     ...completeOpts,
@@ -141,6 +142,7 @@ async function parseOrderItems({
           priceByCid,
           resolveLine,
           signalText: text,
+          originalQtyOnConvert: Boolean(originalQtyOnConvert),
         }),
       };
     }),
