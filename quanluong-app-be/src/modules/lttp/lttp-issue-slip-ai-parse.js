@@ -106,8 +106,9 @@ async function parseOrderItems({
   const items = Array.isArray(extracted?.items) ? extracted.items.slice(0, 80) : [];
   const rows = await Promise.all(
     items.map(async (item, index) => {
+      const paren = takeLastParen(item?.name);
       let decision = decideMatch({
-        rawName: item?.name,
+        rawName: paren.name,
         commodities,
         habits,
         aliases,
@@ -119,7 +120,7 @@ async function parseOrderItems({
       if (decision.needsLlm) {
         try {
           const pick = await complete(
-            buildPickPrompt({ name: item?.name, choices: decision.choices }),
+            buildPickPrompt({ name: paren.name, choices: decision.choices }),
             { ...completeOpts, retryUserHint: "Hay tra JSON {sku,conf}." },
           );
           decision = applyLlmPick(decision, pick);

@@ -1,3 +1,5 @@
+import { normUom } from "./lttp-issue-slip-ai-uom.js";
+
 const NOTE_LIMIT = 500;
 
 function parseSumExpression(raw) {
@@ -24,8 +26,8 @@ function takeLastParen(name) {
 }
 
 function unitsDiffer(a, b) {
-  const left = String(a || "").trim().toLowerCase();
-  const right = String(b || "").trim().toLowerCase();
+  const left = normUom(a);
+  const right = normUom(b);
   return Boolean(left) && Boolean(right) && left !== right;
 }
 

@@ -1,5 +1,6 @@
 import { normalizeCommodityName } from "../kitchen-books/kitchen-books-menu-ai-map.js";
 import { OMITTED_UOM, convertQuantity } from "./lttp-issue-slip-ai-uom.js";
+import { quantityTokenForConvert } from "./lttp-issue-slip-ai-line-note.js";
 
 function normalizePatchOp(raw) {
   const sku = raw?.sku_id ?? raw?.skuId;
@@ -72,7 +73,7 @@ function qtyRuleOps(rule, lines, commodities) {
     const stock = byId.get(line.commodityId)?.measureUnit || line.measureUnit || null;
     const written =
       line.writtenQty != null && String(line.writtenQty).trim() !== "" ? line.writtenQty : line.quantity;
-    const qty = Number(String(written ?? "").replace(",", "."));
+    const qty = Number(String(quantityTokenForConvert(written) ?? "").replace(",", "."));
     if (!(qty > 0) || !stock) continue;
     const next = Math.round(qty * rule.factor * 10) / 10;
     if (!(next > 0)) continue;

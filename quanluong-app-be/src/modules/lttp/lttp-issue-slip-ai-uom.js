@@ -161,4 +161,4 @@ function proposeUomFactor(writtenQty, writtenUom, stockQty, stockUom) {
   return rounded;
 }
 
-export { OMITTED_UOM, bindSharedQtyRules, convertQuantity, parseMoneyAmount, proposeUomFactor };
+export { OMITTED_UOM, bindSharedQtyRules, convertQuantity, normUom, parseMoneyAmount, proposeUomFactor };

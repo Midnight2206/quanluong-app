@@ -20,6 +20,7 @@ test("parentheses fill the note only when there is no addition", () => {
 test("conversion note waits for the shared rule and loses to an addition", () => {
   assert.equal(lineNoteForItem({ writtenQty: "30", writtenUom: "quả", parenText: "", stockUom: "kg", originalQtyOnConvert: false }).lineNote, "");
   assert.equal(lineNoteForItem({ writtenQty: "30", writtenUom: "quả", parenText: "", stockUom: "kg", originalQtyOnConvert: true }).lineNote, "30 quả");
+  assert.equal(lineNoteForItem({ writtenQty: "30", writtenUom: "qua", parenText: "", stockUom: "quả", originalQtyOnConvert: true }).lineNote, "");
   assert.equal(lineNoteForItem({ writtenQty: "30", writtenUom: "kg", parenText: "", stockUom: "kg", originalQtyOnConvert: true }).lineNote, "");
   assert.equal(lineNoteForItem({ writtenQty: "4+6", writtenUom: "quả", parenText: "", stockUom: "kg", originalQtyOnConvert: true }).lineNote, "4+6");
 });
