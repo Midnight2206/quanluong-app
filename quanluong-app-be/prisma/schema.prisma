@@ -1069,6 +1069,7 @@ model LttpAiDraftLine {
   rawName         String   @default("") @db.VarChar(255)
   writtenQty      String?  @db.VarChar(64)
   writtenUom      String?  @db.VarChar(64)
+  parenText       String?  @db.VarChar(500)
   /// Ứng viên khi dòng cần xác nhận, để mở lại bản nháp.
   choices         Json
   lttpSupplierId  Int?

@@ -154,6 +154,29 @@ async function loadOriginalQtyOnConvert(prisma, storageUnitId) {
   return Boolean(row?.enabled);
 }
 
+async function setOriginalQtyOnConvert(prisma, enabled) {
+  if (
+    !prisma?.lttpAiLineNoteRule?.findUnique ||
+    !prisma?.lttpAiLineNoteRule?.update ||
+    !prisma?.lttpAiLineNoteRule?.create
+  ) {
+    return { previous: false, created: false };
+  }
+  const existing = await prisma.lttpAiLineNoteRule.findUnique({ where: { kind: LINE_NOTE_KIND } });
+  const previous = Boolean(existing?.enabled);
+  if (existing) {
+    await prisma.lttpAiLineNoteRule.update({
+      where: { id: existing.id },
+      data: { enabled: Boolean(enabled) },
+    });
+    return { previous, created: false };
+  }
+  await prisma.lttpAiLineNoteRule.create({
+    data: { kind: LINE_NOTE_KIND, enabled: Boolean(enabled) },
+  });
+  return { previous: false, created: true };
+}
+
 async function loadConfirmedQtyRules(prisma, recipientUnitId, storageUnitId) {
   if (!prisma?.lttpAiUomRule) return [];
   const own = recipientUnitId
@@ -174,4 +197,11 @@ async function loadConfirmedQtyRules(prisma, recipientUnitId, storageUnitId) {
   return [...own, ...shared.filter((rule) => rule?.id == null || !seen.has(rule.id))];
 }
 
-export { LINE_NOTE_KIND, confirmUomRule, learnConfirmedOrder, loadConfirmedQtyRules, loadOriginalQtyOnConvert };
+export {
+  LINE_NOTE_KIND,
+  confirmUomRule,
+  learnConfirmedOrder,
+  loadConfirmedQtyRules,
+  loadOriginalQtyOnConvert,
+  setOriginalQtyOnConvert,
+};

@@ -1,0 +1,2 @@
+ALTER TABLE `LttpAiDraftLine`
+ADD COLUMN `parenText` VARCHAR(500) NULL;

@@ -1,6 +1,7 @@
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
-import { loadConfirmedQtyRules } from "./lttp-issue-slip-ai-learn.js";
+import { lineNoteForItem, quantityTokenForConvert } from "./lttp-issue-slip-ai-line-note.js";
+import { loadConfirmedQtyRules, loadOriginalQtyOnConvert } from "./lttp-issue-slip-ai-learn.js";
 import { bindSharedQtyRules, convertQuantity } from "./lttp-issue-slip-ai-uom.js";
 
 function initialLineStatus(line) {
@@ -35,6 +36,7 @@ function buildDraftLineData(line, index) {
     rawName: String(line.rawName || "").slice(0, 255),
     writtenQty: line.writtenQty == null ? null : String(line.writtenQty).slice(0, 64),
     writtenUom: line.writtenUom ? String(line.writtenUom).slice(0, 64) : null,
+    parenText: line.parenText ? String(line.parenText).slice(0, 500) : null,
     choices: Array.isArray(line.choices) ? line.choices : [],
     lttpSupplierId: line.lttpSupplierId || null,
     unitPrice: line.unitPrice == null ? null : line.unitPrice,
@@ -117,6 +119,31 @@ async function getIssueSlipAiDraft(prisma, { id, storageUnitId }) {
     },
   });
   if (!draft || draft.storageUnitId !== storageUnitId) notFound();
+  const originalQtyOnConvert = await loadOriginalQtyOnConvert(prisma, storageUnitId);
+  const commodityIds = [
+    ...new Set((draft.lines || []).map((line) => Number(line.commodityId)).filter((lineId) => lineId > 0)),
+  ];
+  const stockUomByCommodityId =
+    commodityIds.length && prisma?.lttpCommodity?.findMany
+      ? new Map(
+          (
+            await prisma.lttpCommodity.findMany({
+              where: { id: { in: commodityIds }, unitId: storageUnitId },
+              select: { id: true, measureUnit: true },
+            })
+          ).map((commodity) => [commodity.id, commodity.measureUnit || null]),
+        )
+      : new Map();
+  draft.lines = (draft.lines || []).map((line) => ({
+    ...line,
+    lineNote: lineNoteForItem({
+      writtenQty: line.writtenQty,
+      writtenUom: line.writtenUom,
+      parenText: line.parenText,
+      stockUom: stockUomByCommodityId.get(Number(line.commodityId)) || null,
+      originalQtyOnConvert,
+    }).lineNote,
+  }));
   return draft;
 }
 
@@ -148,7 +175,7 @@ async function quantityForChosenSku(prisma, draft, stored, commodity) {
       habits.sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0))[0]?.measureUnit || null;
   }
   return convertQuantity({
-    writtenQty: stored.writtenQty ?? stored.quantity,
+    writtenQty: quantityTokenForConvert(stored.writtenQty ?? stored.quantity),
     writtenUom: stored.writtenUom,
     stockUom: commodity.measureUnit,
     habitUom,
