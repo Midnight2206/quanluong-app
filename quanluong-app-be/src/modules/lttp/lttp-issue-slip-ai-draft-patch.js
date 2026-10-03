@@ -43,6 +43,9 @@ function normalizeRuleSuggestion(raw) {
       commodityNameNorm: null,
     };
   }
+  if (raw.type === "line_note" && typeof raw.enabled === "boolean") {
+    return { type: "line_note", enabled: raw.enabled };
+  }
   return null;
 }
 

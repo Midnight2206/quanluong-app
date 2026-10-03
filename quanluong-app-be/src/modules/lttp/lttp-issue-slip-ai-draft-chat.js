@@ -10,7 +10,12 @@ import {
   validateAndResolvePatch,
 } from "./lttp-issue-slip-ai-draft-patch.js";
 import { bindSharedQtyRules } from "./lttp-issue-slip-ai-uom.js";
-import { confirmUomRule, loadConfirmedQtyRules } from "./lttp-issue-slip-ai-learn.js";
+import {
+  LINE_NOTE_KIND,
+  confirmUomRule,
+  loadConfirmedQtyRules,
+  setOriginalQtyOnConvert,
+} from "./lttp-issue-slip-ai-learn.js";
 
 function draftChatError(error) {
   if (error instanceof AppError) throw error;
@@ -201,6 +206,13 @@ async function applyProposedDraftPatch(prisma, input) {
       commodityNameNorm: rule.commodityNameNorm || null,
     });
     ruleMeta = { ruleId: saved?.id ?? null, ruleCreated: Boolean(saved?.created) };
+  } else if (rule?.type === "line_note") {
+    const saved = await setOriginalQtyOnConvert(prisma, rule.enabled);
+    ruleMeta = {
+      rulePrevious: saved.previous,
+      ruleCreated: saved.created,
+      lineNoteEnabled: Boolean(rule.enabled),
+    };
   }
   await prisma.lttpAiDraftChatTurn.update({
     where: { id: turn.id },
@@ -208,7 +220,10 @@ async function applyProposedDraftPatch(prisma, input) {
       applied: true,
       proposedPatch: {
         ...turn.proposedPatch,
-        acceptRule: rule?.type === "qty" || Boolean(input.acceptRule && turn.proposedPatch?.ruleSuggestion),
+        acceptRule:
+          rule?.type === "qty" ||
+          rule?.type === "line_note" ||
+          Boolean(input.acceptRule && turn.proposedPatch?.ruleSuggestion),
         appliedVersion,
         ...ruleMeta,
       },
@@ -257,6 +272,16 @@ async function undoLastDraftChatApply(prisma, input) {
   }
   if (turn.proposedPatch?.ruleCreated && turn.proposedPatch?.ruleId && prisma.lttpAiUomRule?.delete) {
     await prisma.lttpAiUomRule.delete({ where: { id: turn.proposedPatch.ruleId } });
+  }
+  if (turn.proposedPatch?.lineNoteEnabled != null && prisma.lttpAiLineNoteRule) {
+    if (turn.proposedPatch?.ruleCreated && prisma.lttpAiLineNoteRule?.delete) {
+      await prisma.lttpAiLineNoteRule.delete({ where: { kind: LINE_NOTE_KIND } });
+    } else if (prisma.lttpAiLineNoteRule?.update) {
+      await prisma.lttpAiLineNoteRule.update({
+        where: { kind: LINE_NOTE_KIND },
+        data: { enabled: Boolean(turn.proposedPatch?.rulePrevious) },
+      });
+    }
   }
   await prisma.lttpAiDraftChatTurn.update({
     where: { id: turn.id },

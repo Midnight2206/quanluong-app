@@ -28,16 +28,24 @@ function memoryPrisma() {
       code: "GAO",
       quantity: 2,
       measureUnit: "chai",
+      writtenQty: "2",
+      writtenUom: "lo",
       lttpSupplierId: 3,
       unitPrice: 10000,
       choices: [{ commodityId: 11, name: "Gạo nếp" }],
     },
   ];
   const turns = [];
+  let lineNoteRule = null;
   let nextTurn = 1;
   return {
     lines,
     turns,
+    unit: {
+      async findUnique() {
+        return { depth: 0 };
+      },
+    },
     lttpCommodity: {
       async findMany({ where }) {
         return (where.id?.in || [])
@@ -49,6 +57,23 @@ function memoryPrisma() {
             measureUnit: "chai",
             lttpCommodityDefaultSupplier: { lttpSupplierId: id === 11 ? 8 : 3 },
           }));
+      },
+    },
+    lttpAiLineNoteRule: {
+      async findUnique() {
+        return lineNoteRule;
+      },
+      async upsert({ create, update }) {
+        lineNoteRule = lineNoteRule ? { ...lineNoteRule, ...update } : { ...create };
+        return lineNoteRule;
+      },
+      async update({ data }) {
+        lineNoteRule = lineNoteRule ? { ...lineNoteRule, ...data } : null;
+        return lineNoteRule;
+      },
+      async delete({ where }) {
+        if (lineNoteRule?.kind === where.kind) lineNoteRule = null;
+        return null;
       },
     },
     lttpAiUomRule: {
@@ -142,4 +167,39 @@ test("propose keeps the draft line until apply, and undo restores it", async () 
   assert.equal(Number(undone.lines[0].quantity), 2);
   assert.equal(undone.lines[0].status, "sure");
   assert.equal(undone.version, 3);
+});
+
+test("line-note rule applies through chat and undo restores the previous flag", async () => {
+  const db = memoryPrisma();
+  const proposed = await proposeIssueSlipAiDraftChat(
+    db,
+    { id: 1, storageUnitId: 9, message: "bat ghi chu so luong goc", lineIds: [5], actorUserId: 1 },
+    {
+      complete: async (prompt) => {
+        assert.match(prompt.system, /line_note/);
+        return {
+          explanation: "Bat ghi chu so luong goc",
+          patch: [],
+          rule_suggestion: { type: "line_note", enabled: true },
+        };
+      },
+    },
+  );
+  assert.deepEqual(proposed.ruleSuggestion, { type: "line_note", enabled: true });
+  const applied = await applyProposedDraftPatch(db, {
+    id: 1,
+    storageUnitId: 9,
+    version: 1,
+    turnId: proposed.turnId,
+    acceptRule: false,
+    actorUserId: 1,
+  });
+  assert.equal(applied.lines[0].lineNote, "2 lo");
+  const undone = await undoLastDraftChatApply(db, {
+    id: 1,
+    storageUnitId: 9,
+    version: 2,
+    actorUserId: 1,
+  });
+  assert.equal(undone.lines[0].lineNote, "");
 });

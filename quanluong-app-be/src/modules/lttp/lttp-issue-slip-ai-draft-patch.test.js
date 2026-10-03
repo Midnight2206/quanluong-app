@@ -86,3 +86,12 @@ test("rule suggestion only keeps alias or a round uom factor", () => {
   assert.equal(normalizeRuleSuggestion({ type: "uom", fromUom: "lo", factor: 1.2 }), null);
   assert.equal(normalizeRuleSuggestion({ type: "note" }), null);
 });
+
+test("line note rule is a boolean and the old note type stays rejected", () => {
+  assert.equal(normalizeRuleSuggestion({ type: "note" }), null);
+  assert.deepEqual(normalizeRuleSuggestion({ type: "line_note", enabled: true }), {
+    type: "line_note",
+    enabled: true,
+  });
+  assert.equal(normalizeRuleSuggestion({ type: "line_note", enabled: "yes" }), null);
+});
