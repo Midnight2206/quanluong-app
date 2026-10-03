@@ -5,7 +5,7 @@ function buildExtractPrompt({ text, examples = [] }) {
     .join("\n");
   return {
     system:
-      "Tach tin dat hang thanh JSON {\"items\":[{\"name\":\"\",\"quantity\":\"\",\"uom\":\"\"}]}. Giu dung tu khach viet. Khong doi ten hang, khong quy doi don vi, khong them dong khach khong viet.",
+      "Tach tin dat hang thanh JSON {\"items\":[{\"name\":\"\",\"quantity\":\"\",\"uom\":\"\"}]}. Giu dung tu khach viet. Neu khach viet phep cong nhu 4+6, quantity giu dung chu 4+6, khong tinh tong. Neu co ngoac, giu ngoac trong name. Khong doi ten hang, khong quy doi don vi, khong them dong khach khong viet.",
     user: `${shots ? `Vi du da xac nhan:\n${shots}\n` : ""}Tin:\n${text}`,
   };
 }

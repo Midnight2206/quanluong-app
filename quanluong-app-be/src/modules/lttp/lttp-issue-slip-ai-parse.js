@@ -2,6 +2,11 @@ import { hasTgsxSignal } from "./lttp-issue-slip-ai-tgsx.js";
 import { buildExtractPrompt, buildPickPrompt } from "./lttp-issue-slip-ai-extract.js";
 import { applyScoreGate } from "./lttp-issue-slip-ai-accept.js";
 import { applyLlmPick, decideMatch } from "./lttp-issue-slip-ai-match.js";
+import {
+  lineNoteForItem,
+  quantityTokenForConvert,
+  takeLastParen,
+} from "./lttp-issue-slip-ai-line-note.js";
 import { convertQuantity } from "./lttp-issue-slip-ai-uom.js";
 
 function finishLine(item, decision, ctx) {
@@ -11,14 +16,22 @@ function finishLine(item, decision, ctx) {
       .filter((row) => row.commodityId === decision.commodityId)
       .sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0))[0] || null;
   const price = decision.commodityId ? ctx.priceByCid.get(decision.commodityId) : null;
+  const paren = takeLastParen(item?.name);
   const converted = convertQuantity({
-    writtenQty: item?.quantity,
+    writtenQty: quantityTokenForConvert(item?.quantity),
     writtenUom: item?.uom,
     unitPrice: price?.unitPrice ?? null,
     stockUom: commodity?.measureUnit,
     habitUom: habit?.measureUnit,
     commodityId: decision.commodityId,
     rules: ctx.rules,
+  });
+  const note = lineNoteForItem({
+    writtenQty: item?.quantity,
+    writtenUom: item?.uom,
+    parenText: paren.parenText,
+    stockUom: commodity?.measureUnit,
+    originalQtyOnConvert: Boolean(ctx.originalQtyOnConvert),
   });
   const skuReady = Boolean(decision.commodityId) && !decision.needsConfirm;
   const askRule = converted.source === "unknown-uom";
@@ -57,9 +70,11 @@ function finishLine(item, decision, ctx) {
     source: decision.source || "none",
     confidence: decision.confidence ?? 0,
     choices,
-    rawName: String(item?.name || ""),
+    rawName: paren.name,
     writtenQty: item?.quantity ?? null,
     writtenUom: item?.uom ?? "",
+    parenText: paren.parenText,
+    lineNote: note.lineNote,
     stockUom: commodity?.measureUnit || null,
     askRule,
     qtySource: converted.source,

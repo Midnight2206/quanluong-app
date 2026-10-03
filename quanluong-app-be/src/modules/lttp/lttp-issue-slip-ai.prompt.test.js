@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { buildExtractPrompt } from "./lttp-issue-slip-ai-extract.js";
 import { buildIssueSlipAiChatPrompt, buildIssueSlipAiPrompt } from "./lttp-issue-slip-ai.prompt.js";
 
 test("buildIssueSlipAiPrompt includes memory section when memoryText is present", () => {
@@ -50,4 +51,11 @@ test("buildIssueSlipAiChatPrompt includes catalog preview turns and new message"
   assert.match(user, /user: xuat gao nep/);
   assert.match(user, /Tin nhan moi \(uu tien noi dung nay\):/);
   assert.match(user, /doi dong 1 thanh gao te/);
+});
+
+test("buildExtractPrompt keeps quantity expressions and parentheses in name", () => {
+  const { system } = buildExtractPrompt({ text: "4+6 trung ga (loai 1)" });
+
+  assert.match(system, /quantity giu dung chu 4\+6/i);
+  assert.match(system, /giu ngoac trong name/i);
 });
