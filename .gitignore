@@ -7,8 +7,10 @@ dist/
 *.log
 .env*.local
 .superpowers/
+.worktrees/
 ops/backup/secrets/
 
 # Serwist build output (@quanluong/web)
 apps/web/public/sw*
 apps/web/public/swe-worker*
+.worktrees/
