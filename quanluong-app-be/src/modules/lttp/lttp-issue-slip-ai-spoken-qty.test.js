@@ -66,6 +66,10 @@ test("resolve uses the asked line, otherwise one whole commodity name", () => {
   });
   assert.equal(named.rule.commodityId, 8);
   assert.equal(named.rule.commodityNameNorm.includes("trung"), true);
+  assert.deepEqual(
+    resolveSpokenQtyRule({ message: "đổi dòng trứng thành 5 kg", lines, commodities }),
+    { error: "none" },
+  );
 });
 
 test("confirming an omitted unit clears the flag on the other shared rule", async () => {

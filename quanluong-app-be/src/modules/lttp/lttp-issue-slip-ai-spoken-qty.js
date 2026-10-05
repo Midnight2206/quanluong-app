@@ -5,11 +5,17 @@ function round4(value) {
   return Math.round(value * 10000) / 10000;
 }
 
+const RATIO = /(\d+(?:\.\d+)?)\s*(\p{L}+)\s*=\s*(\d+(?:\.\d+)?)\s*(\p{L}+)/u;
+
+function cleanText(text) {
+  return String(text ?? "").replace(/,/g, ".").replace(/\s+/g, " ").trim();
+}
+
 function parseSpokenQtyRule(text, stockUom) {
   const stock = normUom(stockUom);
-  const raw = String(text ?? "").replace(/,/g, ".").replace(/\s+/g, " ").trim();
+  const raw = cleanText(text);
   if (!stock || !raw) return null;
-  const match = /(\d+(?:\.\d+)?)\s*(\p{L}+)\s*=\s*(\d+(?:\.\d+)?)\s*(\p{L}+)/u.exec(raw);
+  const match = RATIO.exec(raw);
   if (!match) return null;
   const leftQty = Number(match[1]);
   const rightQty = Number(match[3]);
@@ -41,6 +47,7 @@ function parseSpokenQtyRule(text, stockUom) {
 }
 
 function resolveSpokenQtyRule({ message, lines, commodities }) {
+  if (!RATIO.test(cleanText(message))) return { error: "none" };
   const open = (lines || []).filter((line) => Number(line.commodityId) > 0);
   let target = null;
   if (open.length === 1) target = open[0];

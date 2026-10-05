@@ -60,3 +60,20 @@ test("parseOrderItems strips trailing parentheses before the LLM pick prompt", a
   assert.equal(lines[0].commodityId, 1);
   assert.equal(lines[0].rawName, "Chuối");
 });
+
+test("writtenUom is only filled from the omitted-unit rule, not from a habit unit", async () => {
+  const run = (rules, habits) =>
+    parseOrderItems({
+      ...baseArgs,
+      rules,
+      habits,
+      complete: async () => ({ items: [{ name: "Chuối", quantity: "10", uom: "" }] }),
+    });
+  const omit = { commodityId: 1, fromUom: "*", factor: 2, confirmed: true };
+  const habitRule = { commodityId: 1, fromUom: "nai", factor: 3, confirmed: true };
+  const habit = { commodityId: 1, measureUnit: "nai", orderCount: 1 };
+  assert.equal((await run([habitRule], [habit])).lines[0].writtenUom, "");
+  assert.equal((await run([omit], [])).lines[0].writtenUom, "");
+  const implicit = { commodityId: 1, fromUom: "quả", factor: 0.5, confirmed: true, omitUsesFromUom: true };
+  assert.equal((await run([implicit], [])).lines[0].writtenUom, "quả");
+});

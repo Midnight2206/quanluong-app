@@ -72,7 +72,7 @@ function finishLine(item, decision, ctx) {
     choices,
     rawName: paren.name,
     writtenQty: item?.quantity ?? null,
-    writtenUom: item?.uom ? item.uom : converted.fromUom || "",
+    writtenUom: item?.uom ? item.uom : converted.source === "rule" ? converted.fromUom || "" : "",
     parenText: paren.parenText,
     lineNote: note.lineNote,
     stockUom: commodity?.measureUnit || null,

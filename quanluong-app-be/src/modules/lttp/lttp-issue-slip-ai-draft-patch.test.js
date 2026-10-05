@@ -108,3 +108,16 @@ test("line note rule is a boolean and the old note type stays rejected", () => {
   });
   assert.equal(normalizeRuleSuggestion({ type: "line_note", enabled: "yes" }), null);
 });
+
+test("a decimal qty in the stock unit stays a quantity, not grouped thousands", () => {
+  const { kept } = validateAndResolvePatch({
+    tickedIds: [5],
+    lines: [line],
+    commodities: [{ id: 10, name: "Gạo tẻ", code: "GAO", measureUnit: "kg" }],
+    rules: [],
+    ops: [{ line_id: 5, qty: 0.625, unit: "kg", writtenUom: " quả " }],
+  });
+  assert.equal(kept[0].after.quantity, 0.625);
+  assert.equal(kept[0].after.measureUnit, "kg");
+  assert.equal(kept[0].after.writtenUom, "quả");
+});

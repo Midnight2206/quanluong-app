@@ -289,3 +289,83 @@ test("spoken 16 quả = 1 kg beats a model factor of 1", async () => {
   assert.equal(again.ruleSuggestion.omitUsesFromUom, true);
   assert.equal(again.diff[0].after.writtenUom, "quả");
 });
+
+function eggDb() {
+  const db = memoryPrisma();
+  Object.assign(db.lines[0], {
+    commodityName: "Trứng gà",
+    measureUnit: "kg",
+    quantity: 10,
+    writtenQty: "10",
+    writtenUom: null,
+  });
+  db.lttpCommodity.findMany = async () => [
+    { id: 10, name: "Trứng gà", code: "TRUNG", measureUnit: "kg", lttpCommodityDefaultSupplier: { lttpSupplierId: 3 } },
+  ];
+  return db;
+}
+
+async function applySpoken(db, message) {
+  const proposed = await proposeIssueSlipAiDraftChat(
+    db,
+    { id: 1, storageUnitId: 9, message, lineIds: [5], actorUserId: 1 },
+    { complete: async () => assert.fail("model phải không được gọi") },
+  );
+  await applyProposedDraftPatch(db, {
+    id: 1,
+    storageUnitId: 9,
+    version: 1,
+    turnId: proposed.turnId,
+    actorUserId: 1,
+  });
+  db.afterApply = JSON.parse(JSON.stringify(db.lttpAiUomRule.rows));
+  return undoLastDraftChatApply(db, { id: 1, storageUnitId: 9, version: 2, actorUserId: 1 });
+}
+
+test("undo of a spoken qty rule deletes a rule the turn created", async () => {
+  const db = eggDb();
+  const undone = await applySpoken(db, "16 quả = 1 kg");
+  assert.equal(db.afterApply.length, 1);
+  assert.equal(db.lttpAiUomRule.rows.length, 0);
+  assert.equal(Number(undone.lines[0].quantity), 10);
+});
+
+test("undo of a spoken qty rule restores the previous factor and omit flag", async () => {
+  const db = eggDb();
+  db.lttpAiUomRule.rows.push({
+    id: 1,
+    recipientUnitId: 4,
+    commodityId: 10,
+    fromUom: "quả",
+    factor: 1,
+    confirmed: true,
+    sharedLevel1: true,
+    commodityNameNorm: "trung ga",
+    omitUsesFromUom: false,
+  });
+  await applySpoken(db, "không có đơn vị tính thì đơn vị tính là quả và 16 quả = 1 kg");
+  assert.equal(db.afterApply[0].factor, 0.0625);
+  assert.equal(db.afterApply[0].omitUsesFromUom, true);
+  const row = db.lttpAiUomRule.rows[0];
+  assert.equal(db.lttpAiUomRule.rows.length, 1);
+  assert.equal(row.factor, 1);
+  assert.equal(row.omitUsesFromUom, false);
+});
+
+test("free chat without a ratio reaches the model when several lines are ticked", async () => {
+  const db = memoryPrisma();
+  db.lines.push({ ...db.lines[0], id: 6, sortOrder: 1, commodityId: 11, commodityName: "Gạo nếp", code: "NEP" });
+  let called = false;
+  const proposed = await proposeIssueSlipAiDraftChat(
+    db,
+    { id: 1, storageUnitId: 9, message: "đổi dòng gạo thành 5 kg", lineIds: [5, 6], actorUserId: 1 },
+    {
+      complete: async () => {
+        called = true;
+        return { explanation: "ok", patch: [] };
+      },
+    },
+  );
+  assert.equal(called, true);
+  assert.equal(proposed.explanation, "ok");
+});

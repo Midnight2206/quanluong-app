@@ -1,5 +1,5 @@
 import { normalizeCommodityName } from "../kitchen-books/kitchen-books-menu-ai-map.js";
-import { OMITTED_UOM, convertQuantity, normUom } from "./lttp-issue-slip-ai-uom.js";
+import { OMITTED_UOM, convertQuantity } from "./lttp-issue-slip-ai-uom.js";
 import { quantityTokenForConvert } from "./lttp-issue-slip-ai-line-note.js";
 
 function normalizePatchOp(raw) {
@@ -10,6 +10,7 @@ function normalizePatchOp(raw) {
     skuId: sku == null || sku === "" ? null : Number(sku),
     qty: qty == null || qty === "" ? null : Number(qty),
     unit: raw?.unit == null ? null : String(raw.unit).trim(),
+    writtenUom: raw?.writtenUom == null ? null : String(raw.writtenUom).trim(),
   };
 }
 
@@ -135,10 +136,7 @@ function validateAndResolvePatch({ ops, tickedIds, lines, commodities, rules }) 
       quantity = op.qty;
     }
     const stockUom = commodity?.measureUnit || line.measureUnit;
-    // Same unit needs no conversion; convertQuantity would read a number like 0.625 as "0.625" thousands.
-    if (op.unit && normUom(op.unit) === normUom(stockUom)) {
-      measureUnit = stockUom;
-    } else if (op.unit) {
+    if (op.unit) {
       const converted = convertQuantity({
         writtenQty: quantity,
         writtenUom: op.unit,
@@ -147,20 +145,21 @@ function validateAndResolvePatch({ ops, tickedIds, lines, commodities, rules }) 
         commodityId: skuId,
         rules,
         unitPrice: line.unitPrice,
+        skipMoney: true,
       });
       if (converted.needsConfirm || !(converted.quantity > 0)) {
         dropped.push({ lineId: op.lineId, reason: "Chưa quy đổi được đơn vị" });
         continue;
       }
       quantity = converted.quantity;
-      measureUnit = converted.measureUnit;
+      measureUnit = converted.measureUnit ?? measureUnit;
     }
     if (!(quantity > 0)) {
       dropped.push({ lineId: op.lineId, reason: "Số lượng không hợp lệ" });
       continue;
     }
     const sameSku = skuId === line.commodityId;
-    const writtenUom = String(raw?.writtenUom ?? "").trim();
+    const writtenUom = op.writtenUom || "";
     kept.push({
       lineId: op.lineId,
       before: lineBefore(line),

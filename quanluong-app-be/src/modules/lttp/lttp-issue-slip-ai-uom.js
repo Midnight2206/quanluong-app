@@ -61,8 +61,9 @@ function convertQuantity({
   commodityId,
   rules,
   _allowImplicitFromRule = true,
+  skipMoney = false, // true when writtenQty is already a number, not user-typed text
 }) {
-  const money = parseMoneyAmount(writtenQty, writtenUom);
+  const money = skipMoney ? null : parseMoneyAmount(writtenQty, writtenUom);
   if (money != null) {
     if (!(Number(unitPrice) > 0)) {
       return { quantity: null, measureUnit: stockUom || null, needsConfirm: true, source: "money" };
@@ -94,6 +95,7 @@ function convertQuantity({
           commodityId,
           rules,
           _allowImplicitFromRule: false,
+          skipMoney,
         });
       }
     }
