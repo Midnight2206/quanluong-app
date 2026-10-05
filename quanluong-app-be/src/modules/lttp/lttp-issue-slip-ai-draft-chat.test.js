@@ -77,8 +77,41 @@ function memoryPrisma() {
       },
     },
     lttpAiUomRule: {
-      async findMany() {
-        return [{ commodityId: 10, fromUom: "lo", factor: 12, confirmed: true }];
+      rows: [],
+      async findFirst({ where }) {
+        return (
+          this.rows.find(
+            (row) =>
+              row.fromUom === where.fromUom &&
+              row.commodityNameNorm === where.commodityNameNorm &&
+              row.sharedLevel1 === where.sharedLevel1,
+          ) || null
+        );
+      },
+      async findMany({ where } = {}) {
+        if (where?.omitUsesFromUom) {
+          return this.rows.filter(
+            (row) =>
+              row.omitUsesFromUom && row.id !== where.NOT?.id && row.commodityNameNorm === where.commodityNameNorm,
+          );
+        }
+        if (where?.sharedLevel1 === false) {
+          return [{ commodityId: 10, fromUom: "lo", factor: 12, confirmed: true, sharedLevel1: false }];
+        }
+        return this.rows.filter((row) => row.sharedLevel1);
+      },
+      async update({ where, data }) {
+        const row = this.rows.find((item) => item.id === where.id);
+        Object.assign(row, data);
+        return row;
+      },
+      async create({ data }) {
+        const row = { ...data, id: this.rows.length + 7 };
+        this.rows.push(row);
+        return row;
+      },
+      async delete({ where }) {
+        this.rows = this.rows.filter((row) => row.id !== where.id);
       },
     },
     lttpAiOrderDraft: {
@@ -202,4 +235,57 @@ test("line-note rule applies through chat and undo restores the previous flag", 
     actorUserId: 1,
   });
   assert.equal(undone.lines[0].lineNote, "");
+});
+
+test("spoken 16 quả = 1 kg beats a model factor of 1", async () => {
+  const db = memoryPrisma();
+  db.lines[0].commodityName = "Trứng gà";
+  db.lines[0].measureUnit = "kg";
+  db.lttpCommodity.findMany = async () => [
+    {
+      id: 10,
+      name: "Trứng gà",
+      code: "TRUNG",
+      measureUnit: "kg",
+      lttpCommodityDefaultSupplier: { lttpSupplierId: 3 },
+    },
+  ];
+  db.lines[0].quantity = 10;
+  db.lines[0].writtenQty = "10";
+  db.lines[0].writtenUom = null;
+  const noModel = {
+    complete: async () => {
+      throw new Error("model phải không được gọi");
+    },
+  };
+  const proposed = await proposeIssueSlipAiDraftChat(
+    db,
+    { id: 1, storageUnitId: 9, message: "16 quả = 1 kg", lineIds: [5], actorUserId: 1 },
+    noModel,
+  );
+  assert.equal(proposed.ruleSuggestion.factor, 0.0625);
+  assert.equal(proposed.ruleSuggestion.omitUsesFromUom, false);
+  assert.equal(proposed.diff[0].after.quantity, 0.625);
+  const applied = await applyProposedDraftPatch(db, {
+    id: 1,
+    storageUnitId: 9,
+    version: 1,
+    turnId: proposed.turnId,
+    actorUserId: 1,
+  });
+  assert.equal(Number(applied.lines[0].quantity), 0.625);
+  assert.equal(applied.lines[0].writtenUom, null);
+  const again = await proposeIssueSlipAiDraftChat(
+    db,
+    {
+      id: 1,
+      storageUnitId: 9,
+      message: "không có đơn vị tính thì đơn vị tính là quả và 16 quả = 1 kg",
+      lineIds: [5],
+      actorUserId: 1,
+    },
+    noModel,
+  );
+  assert.equal(again.ruleSuggestion.omitUsesFromUom, true);
+  assert.equal(again.diff[0].after.writtenUom, "quả");
 });

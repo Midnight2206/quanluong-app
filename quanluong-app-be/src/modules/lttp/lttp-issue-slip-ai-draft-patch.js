@@ -1,5 +1,5 @@
 import { normalizeCommodityName } from "../kitchen-books/kitchen-books-menu-ai-map.js";
-import { OMITTED_UOM, convertQuantity } from "./lttp-issue-slip-ai-uom.js";
+import { OMITTED_UOM, convertQuantity, normUom } from "./lttp-issue-slip-ai-uom.js";
 import { quantityTokenForConvert } from "./lttp-issue-slip-ai-line-note.js";
 
 function normalizePatchOp(raw) {
@@ -75,9 +75,11 @@ function qtyRuleOps(rule, lines, commodities) {
       line.writtenQty != null && String(line.writtenQty).trim() !== "" ? line.writtenQty : line.quantity;
     const qty = Number(String(quantityTokenForConvert(written) ?? "").replace(",", "."));
     if (!(qty > 0) || !stock) continue;
-    const next = Math.round(qty * rule.factor * 10) / 10;
+    const next = Math.round(qty * rule.factor * 10000) / 10000;
     if (!(next > 0)) continue;
-    ops.push({ line_id: line.id, qty: next, unit: stock });
+    const op = { line_id: line.id, qty: next, unit: stock };
+    if (rule.omitUsesFromUom && !line.writtenUom) op.writtenUom = rule.fromUom;
+    ops.push(op);
   }
   return ops;
 }
@@ -89,6 +91,8 @@ function lineBefore(line) {
     code: line.code ?? null,
     quantity: line.quantity == null ? null : Number(line.quantity),
     measureUnit: line.measureUnit ?? null,
+    writtenUom: line.writtenUom ?? null,
+    writtenQty: line.writtenQty ?? null,
     lttpSupplierId: line.lttpSupplierId ?? null,
     unitPrice: line.unitPrice == null ? null : Number(line.unitPrice),
     status: line.status,
@@ -130,11 +134,15 @@ function validateAndResolvePatch({ ops, tickedIds, lines, commodities, rules }) 
       }
       quantity = op.qty;
     }
-    if (op.unit) {
+    const stockUom = commodity?.measureUnit || line.measureUnit;
+    // Same unit needs no conversion; convertQuantity would read a number like 0.625 as "0.625" thousands.
+    if (op.unit && normUom(op.unit) === normUom(stockUom)) {
+      measureUnit = stockUom;
+    } else if (op.unit) {
       const converted = convertQuantity({
         writtenQty: quantity,
         writtenUom: op.unit,
-        stockUom: commodity?.measureUnit || line.measureUnit,
+        stockUom,
         habitUom: line.measureUnit,
         commodityId: skuId,
         rules,
@@ -152,6 +160,7 @@ function validateAndResolvePatch({ ops, tickedIds, lines, commodities, rules }) 
       continue;
     }
     const sameSku = skuId === line.commodityId;
+    const writtenUom = String(raw?.writtenUom ?? "").trim();
     kept.push({
       lineId: op.lineId,
       before: lineBefore(line),
@@ -161,6 +170,7 @@ function validateAndResolvePatch({ ops, tickedIds, lines, commodities, rules }) 
         code: commodity?.code || line.code || null,
         quantity,
         measureUnit,
+        ...(writtenUom ? { writtenUom: writtenUom.slice(0, 64) } : {}),
         lttpSupplierId: sameSku
           ? line.lttpSupplierId ?? null
           : commodity?.lttpSupplierId ?? null,

@@ -9,6 +9,7 @@ import {
   scopeQtyRule,
   validateAndResolvePatch,
 } from "./lttp-issue-slip-ai-draft-patch.js";
+import { resolveSpokenQtyRule } from "./lttp-issue-slip-ai-spoken-qty.js";
 import { bindSharedQtyRules } from "./lttp-issue-slip-ai-uom.js";
 import {
   LINE_NOTE_KIND,
@@ -76,21 +77,34 @@ async function proposeIssueSlipAiDraftChat(prisma, input, opts = {}) {
     });
   }
   const complete = opts.complete ?? completeMenuJson;
-  let llm;
-  try {
-    llm = await complete(
-      buildDraftPatchPrompt({
-        rawText: draft.rawText,
-        lines,
-        message: input.message,
-      }),
-      opts.completeOpts,
-    );
-  } catch (error) {
-    draftChatError(error);
-  }
   const context = await loadPatchContext(prisma, draft, lines);
-  const ruleSuggestion = scopeQtyRule(normalizeRuleSuggestion(llm?.rule_suggestion), lines);
+  const spoken = resolveSpokenQtyRule({ message: input.message, lines, commodities: context.commodities });
+  let llm = null;
+  let ruleSuggestion = null;
+  let explanation = "";
+  if (spoken.rule) {
+    ruleSuggestion = spoken.rule;
+    explanation = `Quy ước ${spoken.rule.fromUom} × ${spoken.rule.factor}.`;
+  } else if (spoken.error === "unit") {
+    explanation = "Đơn vị không khớp mặt hàng.";
+  } else if (spoken.error === "commodity") {
+    explanation = "Chưa khớp một mặt hàng.";
+  } else {
+    try {
+      llm = await complete(
+        buildDraftPatchPrompt({
+          rawText: draft.rawText,
+          lines,
+          message: input.message,
+        }),
+        opts.completeOpts,
+      );
+    } catch (error) {
+      draftChatError(error);
+    }
+    ruleSuggestion = scopeQtyRule(normalizeRuleSuggestion(llm?.rule_suggestion), lines);
+    explanation = String(llm?.explanation || "").slice(0, 500);
+  }
   const ruleOps = qtyRuleOps(ruleSuggestion, lines, context.commodities);
   const covered = new Set(ruleOps.map((op) => op.line_id));
   const modelOps = (Array.isArray(llm?.patch) ? llm.patch : []).filter((op) => {
@@ -104,7 +118,6 @@ async function proposeIssueSlipAiDraftChat(prisma, input, opts = {}) {
     commodities: context.commodities,
     rules: context.rules,
   });
-  const explanation = String(llm?.explanation || "").slice(0, 500);
   const proposedPatch = {
     ops: resolved.kept,
     dropped: resolved.dropped,
@@ -171,6 +184,7 @@ async function applyProposedDraftPatch(prisma, input) {
         code: op.after.code,
         quantity: op.after.quantity,
         measureUnit: op.after.measureUnit,
+        ...(op.after.writtenUom ? { writtenUom: op.after.writtenUom } : {}),
         lttpSupplierId: op.after.lttpSupplierId,
         unitPrice: op.after.unitPrice,
         status: "edited",
@@ -204,8 +218,14 @@ async function applyProposedDraftPatch(prisma, input) {
       factor: rule.factor,
       sharedLevel1: true,
       commodityNameNorm: rule.commodityNameNorm || null,
+      omitUsesFromUom: Boolean(rule.omitUsesFromUom),
     });
-    ruleMeta = { ruleId: saved?.id ?? null, ruleCreated: Boolean(saved?.created) };
+    ruleMeta = {
+      ruleId: saved?.id ?? null,
+      ruleCreated: Boolean(saved?.created),
+      rulePrevious: saved?.previous ?? null,
+      ruleCleared: saved?.cleared ?? [],
+    };
   } else if (rule?.type === "line_note") {
     const saved = await setOriginalQtyOnConvert(prisma, rule.enabled);
     ruleMeta = {
@@ -255,6 +275,7 @@ async function undoLastDraftChatApply(prisma, input) {
         code: op.before.code,
         quantity: op.before.quantity,
         measureUnit: op.before.measureUnit,
+        ...("writtenUom" in op.before ? { writtenUom: op.before.writtenUom } : {}),
         lttpSupplierId: op.before.lttpSupplierId,
         unitPrice: op.before.unitPrice,
         status: op.before.status,
@@ -270,8 +291,22 @@ async function undoLastDraftChatApply(prisma, input) {
       },
     });
   }
-  if (turn.proposedPatch?.ruleCreated && turn.proposedPatch?.ruleId && prisma.lttpAiUomRule?.delete) {
-    await prisma.lttpAiUomRule.delete({ where: { id: turn.proposedPatch.ruleId } });
+  const { ruleId, ruleCreated, rulePrevious, ruleCleared } = turn.proposedPatch || {};
+  if (ruleId && prisma.lttpAiUomRule) {
+    if (ruleCreated) {
+      await prisma.lttpAiUomRule.delete({ where: { id: ruleId } });
+    } else if (turn.proposedPatch?.lineNoteEnabled == null && rulePrevious) {
+      await prisma.lttpAiUomRule.update({
+        where: { id: ruleId },
+        data: { factor: rulePrevious.factor, omitUsesFromUom: rulePrevious.omitUsesFromUom },
+      });
+    }
+    for (const row of ruleCleared || []) {
+      await prisma.lttpAiUomRule.update({
+        where: { id: row.id },
+        data: { omitUsesFromUom: row.omitUsesFromUom },
+      });
+    }
   }
   if (turn.proposedPatch?.lineNoteEnabled != null && prisma.lttpAiLineNoteRule) {
     if (turn.proposedPatch?.ruleCreated && prisma.lttpAiLineNoteRule?.delete) {
