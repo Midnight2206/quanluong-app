@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { confirmUomRule } from "./lttp-issue-slip-ai-learn.js";
 import { parseSpokenQtyRule, resolveSpokenQtyRule } from "./lttp-issue-slip-ai-spoken-qty.js";
 
 test("both sentence shapes become 0.0625 kg per quả", () => {
@@ -65,4 +66,48 @@ test("resolve uses the asked line, otherwise one whole commodity name", () => {
   });
   assert.equal(named.rule.commodityId, 8);
   assert.equal(named.rule.commodityNameNorm.includes("trung"), true);
+});
+
+test("confirming an omitted unit clears the flag on the other shared rule", async () => {
+  const rows = [
+    { id: 1, recipientUnitId: 4, commodityId: 8, fromUom: "qua", factor: 1, confirmed: true, sharedLevel1: true, commodityNameNorm: "trung ga", omitUsesFromUom: false },
+    { id: 2, recipientUnitId: 4, commodityId: 8, fromUom: "hop", factor: 2, confirmed: true, sharedLevel1: true, commodityNameNorm: "trung ga", omitUsesFromUom: true },
+  ];
+  const prisma = {
+    lttpAiUomRule: {
+      async findFirst({ where }) {
+        return rows.find((row) => row.fromUom === where.fromUom && row.commodityNameNorm === where.commodityNameNorm) || null;
+      },
+      async findMany({ where }) {
+        return rows.filter((row) => row.omitUsesFromUom && row.commodityNameNorm === where.commodityNameNorm && row.id !== where.NOT.id);
+      },
+      async update({ where, data }) {
+        const row = rows.find((item) => item.id === where.id);
+        Object.assign(row, data);
+        return row;
+      },
+      async create({ data }) {
+        const row = { ...data, id: 3 };
+        rows.push(row);
+        return row;
+      },
+    },
+  };
+  const saved = await confirmUomRule({
+    prisma,
+    recipientUnitId: 4,
+    commodityId: 8,
+    fromUom: "qua",
+    factor: 0.0625,
+    sharedLevel1: true,
+    commodityNameNorm: "trung ga",
+    omitUsesFromUom: true,
+  });
+  assert.equal(saved.created, false);
+  assert.equal(saved.previous.factor, 1);
+  assert.equal(saved.previous.omitUsesFromUom, false);
+  assert.equal(rows[0].factor, 0.0625);
+  assert.equal(rows[0].omitUsesFromUom, true);
+  assert.equal(rows[1].omitUsesFromUom, false);
+  assert.deepEqual(saved.cleared, [{ id: 2, omitUsesFromUom: true }]);
 });

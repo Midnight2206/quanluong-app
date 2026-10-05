@@ -979,6 +979,7 @@ model LttpAiUomRule {
   confirmed         Boolean  @default(false)
   sharedLevel1      Boolean  @default(false)
   commodityNameNorm String?  @db.VarChar(191)
+  omitUsesFromUom   Boolean  @default(false)
   recipientUnit     Unit          @relation(fields: [recipientUnitId], references: [id], onDelete: Cascade)
   commodity         LttpCommodity? @relation(fields: [commodityId], references: [id], onDelete: Cascade)
 

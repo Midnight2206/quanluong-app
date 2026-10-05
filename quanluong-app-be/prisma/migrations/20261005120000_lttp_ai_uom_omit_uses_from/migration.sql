@@ -1,0 +1,1 @@
+ALTER TABLE `LttpAiUomRule` ADD COLUMN `omitUsesFromUom` BOOLEAN NOT NULL DEFAULT false;

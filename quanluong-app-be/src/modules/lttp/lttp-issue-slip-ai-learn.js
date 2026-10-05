@@ -110,6 +110,7 @@ async function confirmUomRule({
   factor,
   sharedLevel1 = false,
   commodityNameNorm = null,
+  omitUsesFromUom = false,
 }) {
   const shared = Boolean(sharedLevel1);
   const nameNorm = shared ? commodityNameNorm || null : null;
@@ -123,11 +124,34 @@ async function confirmUomRule({
     },
   });
   if (existing) {
+    const previous = {
+      factor: Number(existing.factor),
+      omitUsesFromUom: Boolean(existing.omitUsesFromUom),
+    };
     const row = await prisma.lttpAiUomRule.update({
       where: { id: existing.id },
-      data: { factor, confirmed: true, sharedLevel1: shared, commodityNameNorm: nameNorm },
+      data: {
+        factor,
+        confirmed: true,
+        sharedLevel1: shared,
+        commodityNameNorm: nameNorm,
+        ...(omitUsesFromUom ? { omitUsesFromUom: true } : {}),
+      },
     });
-    return Object.assign(row, { created: false });
+    const cleared = [];
+    if (omitUsesFromUom && nameNorm) {
+      const others = await prisma.lttpAiUomRule.findMany({
+        where: { sharedLevel1: true, commodityNameNorm: nameNorm, omitUsesFromUom: true, NOT: { id: row.id } },
+      });
+      for (const other of others) {
+        await prisma.lttpAiUomRule.update({
+          where: { id: other.id },
+          data: { omitUsesFromUom: false },
+        });
+        cleared.push({ id: other.id, omitUsesFromUom: true });
+      }
+    }
+    return Object.assign(row, { created: false, previous, cleared });
   }
   const row = await prisma.lttpAiUomRule.create({
     data: {
@@ -138,9 +162,23 @@ async function confirmUomRule({
       confirmed: true,
       sharedLevel1: shared,
       commodityNameNorm: nameNorm,
+      omitUsesFromUom: Boolean(omitUsesFromUom),
     },
   });
-  return Object.assign(row, { created: true });
+  const cleared = [];
+  if (omitUsesFromUom && nameNorm) {
+    const others = await prisma.lttpAiUomRule.findMany({
+      where: { sharedLevel1: true, commodityNameNorm: nameNorm, omitUsesFromUom: true, NOT: { id: row.id } },
+    });
+    for (const other of others) {
+      await prisma.lttpAiUomRule.update({
+        where: { id: other.id },
+        data: { omitUsesFromUom: false },
+      });
+      cleared.push({ id: other.id, omitUsesFromUom: true });
+    }
+  }
+  return Object.assign(row, { created: true, previous: null, cleared });
 }
 
 async function loadOriginalQtyOnConvert(prisma, storageUnitId) {
