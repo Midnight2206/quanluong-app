@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { userAskQuestions, withUserAsk } from "./lttpIssueSlipAskQueue.js";
+import { clearUserAsk, userAskQuestions, withUserAsk } from "./lttpIssueSlipAskQueue.js";
 
 test("ticking a chosen line queues one question", () => {
   const lines = withUserAsk(
@@ -12,6 +12,7 @@ test("ticking a chosen line queues one question", () => {
   );
   assert.equal(lines[0].askUser, true);
   assert.equal(withUserAsk(lines, 1)[1].askUser, undefined);
+  assert.equal(clearUserAsk(lines, 0)[0].askUser, false);
   assert.deepEqual(userAskQuestions(lines), [
     {
       key: "user:5",

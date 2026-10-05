@@ -79,7 +79,8 @@ function qtyRuleOps(rule, lines, commodities) {
     const next = Math.round(qty * rule.factor * 10000) / 10000;
     if (!(next > 0)) continue;
     const op = { line_id: line.id, qty: next, unit: stock };
-    if (rule.omitUsesFromUom && !line.writtenUom) op.writtenUom = rule.fromUom;
+    // Keep the customer unit so the slip note can show "8 lit" after 1 lit = 6 hộp.
+    if (!line.writtenUom && rule.fromUom && rule.fromUom !== "*") op.writtenUom = rule.fromUom;
     ops.push(op);
   }
   return ops;

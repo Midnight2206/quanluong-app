@@ -14,7 +14,8 @@ import {
 } from "@/features/lttp/api/lttpApi";
 import { notifyError } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
-import { userAskQuestions, withUserAsk } from "./lttpIssueSlipAskQueue.js";
+import { conversionNote } from "./applyIssueSlipAiPreview.js";
+import { clearUserAsk, userAskQuestions, withUserAsk } from "./lttpIssueSlipAskQueue.js";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -88,6 +89,7 @@ function mergeDraftLines(preview, draft) {
         code: stored.code,
         quantity: stored.quantity == null ? null : Number(stored.quantity),
         measureUnit: stored.measureUnit,
+        writtenQty: stored.writtenQty ?? line.writtenQty,
         writtenUom: stored.writtenUom ?? line.writtenUom,
         stockUom: stored.stockUom ?? line.stockUom ?? null,
         qtySource: stored.qtySource ?? line.qtySource ?? null,
@@ -119,7 +121,6 @@ function mergeDraftLines(preview, draft) {
 
 const SUGGEST_PLAN = ["Đang đọc tin nhắn.", "Đang chấm điểm mặt hàng.", "Đang xử lý số lượng."];
 const CHAT_PLAN = ["Đang đọc yêu cầu.", "Đang xử lý quy tắc.", "Đang cập nhật dòng hàng."];
-const CLOSING_QUESTION = "Bạn có yêu cầu gì khác?";
 
 function sameUnit(a, b) {
   return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
@@ -382,20 +383,29 @@ export function LttpIssueSlipAiSuggestDialog({
     }, 60);
   }
 
-  function askNext(lines) {
+  function deferActiveQuestion() {
+    const current = activeRef.current;
+    if (!current) return;
+    askedRef.current = askedRef.current.filter((key) => key !== current.key);
+    activeRef.current = null;
+    setTurns((prev) => {
+      const last = prev[prev.length - 1];
+      if (last?.role === "assistant" && last.text === current.text) return prev.slice(0, -1);
+      return prev;
+    });
+  }
+
+  function askNext(lines, preferKey) {
     if (activeRef.current) return;
     const openIndex = (lines || []).findIndex((line) => !line.commodityId);
     if (openIndex >= 0) {
       scrollWork(openIndex);
       return;
     }
+    const queued = [...userAskQuestions(lines), ...ruleQuestions(lines), ...appliedQuestions(lines)];
     const next =
-      [...ruleQuestions(lines), ...userAskQuestions(lines), ...appliedQuestions(lines)].find(
-        (item) => !askedRef.current.includes(item.key),
-      ) ||
-      (!askedRef.current.includes("closing")
-        ? { key: "closing", lineIndex: null, draftLineId: null, text: CLOSING_QUESTION }
-        : null);
+      (preferKey && queued.find((item) => item.key === preferKey && !askedRef.current.includes(item.key))) ||
+      queued.find((item) => !askedRef.current.includes(item.key));
     if (!next) return;
     askedRef.current = [...askedRef.current, next.key];
     activeRef.current = next;
@@ -510,6 +520,7 @@ export function LttpIssueSlipAiSuggestDialog({
       return;
     }
     setTurns([{ role: "user", text: trimmed }]);
+    setPrompt("");
     beginPlan(SUGGEST_PLAN);
     const run = beginRun("suggest", trimmed);
     try {
@@ -560,20 +571,10 @@ export function LttpIssueSlipAiSuggestDialog({
     const focusIndex = question?.lineIndex ?? null;
     setTurns((prev) => [...prev, { role: "user", text: trimmed }]);
     setChatMessage("");
-    if ((question?.key === "closing" || question?.kind === "applied") && isDecline(trimmed)) {
+    if (question?.kind === "applied" && isDecline(trimmed)) {
       activeRef.current = null;
-      setTurns((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text:
-            question.kind === "applied"
-              ? "Giữ nguyên quy đổi này."
-              : "Được. Bấm Áp dụng khi muốn đưa vào phiếu.",
-        },
-      ]);
+      setTurns((prev) => [...prev, { role: "assistant", text: "Giữ nguyên quy đổi này." }]);
       askNext(preview.lines);
-      if (question.key === "closing" && !activeRef.current) scrollWork(null);
       return;
     }
     const run = beginRun("chat", trimmed);
@@ -931,19 +932,31 @@ export function LttpIssueSlipAiSuggestDialog({
                               </div>
                               <div className="mt-1 space-y-1">
                                 {line.commodityId ? (
-                                  <button
+                                  <Button
                                     type="button"
-                                    className="text-[11px] text-primary"
+                                    variant={line.askUser ? "dangerGhost" : "secondary"}
+                                    className="mt-0.5 px-2.5 py-1 text-xs"
+                                    aria-pressed={Boolean(line.askUser)}
                                     disabled={busy}
                                     onClick={() => {
+                                      const key = `user:${line.draftLineId ?? i}`;
+                                      if (line.askUser) {
+                                        const lines = clearUserAsk(preview.lines, i);
+                                        setPreview({ ...preview, lines });
+                                        if (activeRef.current?.key === key) deferActiveQuestion();
+                                        else askedRef.current = askedRef.current.filter((item) => item !== key);
+                                        askNext(lines);
+                                        return;
+                                      }
                                       const lines = withUserAsk(preview.lines, i);
-                                      const next = { ...preview, lines };
-                                      setPreview(next);
-                                      if (!activeRef.current) askNext(lines);
+                                      setPreview({ ...preview, lines });
+                                      deferActiveQuestion();
+                                      askedRef.current = askedRef.current.filter((item) => item !== key);
+                                      askNext(lines, key);
                                     }}
                                   >
-                                    Chưa đúng
-                                  </button>
+                                    {line.askUser ? "Hủy" : "Chưa đúng"}
+                                  </Button>
                                 ) : null}
                                 {needs && (line.choices || []).length > 0 ? (
                                   <div className="flex flex-wrap gap-1.5 rounded-lg border border-primary/40 bg-primary/5 p-1.5">
@@ -983,13 +996,12 @@ export function LttpIssueSlipAiSuggestDialog({
                             <td className="px-3 py-1 align-top tabular-nums">
                               <div>
                                 {line.quantity ?? "—"}
-                                {line.commodityId && line.writtenUom ? ` (${line.writtenUom})` : ""}
-                                {line.commodityId && !line.writtenUom && line.measureUnit
-                                  ? ` ${line.measureUnit}`
+                                {line.commodityId && (line.measureUnit || line.stockUom)
+                                  ? ` ${line.measureUnit || line.stockUom}`
                                   : ""}
                               </div>
-                              {line.lineNote ? (
-                                <div className="text-[11px] text-muted-foreground">{line.lineNote}</div>
+                              {conversionNote(line) ? (
+                                <div className="text-[11px] text-muted-foreground">{conversionNote(line)}</div>
                               ) : null}
                               {line.commodityId && needs && line.writtenUom ? (
                                 <div className="text-[11px] text-amber-800 dark:text-amber-200">

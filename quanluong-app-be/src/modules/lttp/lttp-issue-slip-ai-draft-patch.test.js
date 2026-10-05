@@ -80,6 +80,24 @@ test("qty chat rule scales the written amount onto the price-table unit", () => 
   assert.equal(kept[0].after.measureUnit, "hop");
 });
 
+test("qty chat rule keeps the named input unit even when the omit flag is off", () => {
+  const rule = {
+    type: "qty",
+    fromUom: "lit",
+    factor: 6,
+    omitUsesFromUom: false,
+    lineId: 5,
+    commodityId: 10,
+  };
+  const ops = qtyRuleOps(
+    rule,
+    [{ ...line, quantity: 8, measureUnit: "hộp", writtenQty: "8", writtenUom: null }],
+    [{ id: 10, measureUnit: "hộp" }],
+  );
+  assert.equal(ops[0].qty, 48);
+  assert.equal(ops[0].writtenUom, "lit");
+});
+
 test("qty chat rule scales addition expressions instead of skipping them", () => {
   const rule = scopeQtyRule(
     normalizeRuleSuggestion({ type: "qty", fromUom: "", factor: 2, line_id: 5 }),

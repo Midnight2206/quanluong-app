@@ -23,4 +23,6 @@ test("conversion note waits for the shared rule and loses to an addition", () =>
   assert.equal(lineNoteForItem({ writtenQty: "30", writtenUom: "qua", parenText: "", stockUom: "quả", originalQtyOnConvert: true }).lineNote, "");
   assert.equal(lineNoteForItem({ writtenQty: "30", writtenUom: "kg", parenText: "", stockUom: "kg", originalQtyOnConvert: true }).lineNote, "");
   assert.equal(lineNoteForItem({ writtenQty: "4+6", writtenUom: "quả", parenText: "", stockUom: "kg", originalQtyOnConvert: true }).lineNote, "4+6");
+  assert.equal(lineNoteForItem({ writtenQty: "15k", writtenUom: "", parenText: "", stockUom: "kg", originalQtyOnConvert: true }).lineNote, "");
+  assert.equal(lineNoteForItem({ writtenQty: "15", writtenUom: "k", parenText: "", stockUom: "kg", originalQtyOnConvert: true }).lineNote, "");
 });

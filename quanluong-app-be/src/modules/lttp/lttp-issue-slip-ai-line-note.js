@@ -1,4 +1,4 @@
-import { normUom } from "./lttp-issue-slip-ai-uom.js";
+import { normUom, parseMoneyAmount } from "./lttp-issue-slip-ai-uom.js";
 
 const NOTE_LIMIT = 500;
 
@@ -38,7 +38,12 @@ function lineNoteForItem({ writtenQty, writtenUom, parenText, stockUom, original
   if (paren) return { lineNote: paren.slice(0, NOTE_LIMIT) };
   const qty = String(writtenQty ?? "").replace(/\s+/g, "");
   const uom = String(writtenUom ?? "").trim();
-  if (originalQtyOnConvert && /^\d+(?:[.,]\d+)?$/.test(qty) && unitsDiffer(uom, stockUom)) {
+  if (
+    originalQtyOnConvert &&
+    parseMoneyAmount(qty, uom) == null &&
+    /^\d+(?:[.,]\d+)?$/.test(qty) &&
+    unitsDiffer(uom, stockUom)
+  ) {
     return { lineNote: `${qty} ${uom}`.slice(0, NOTE_LIMIT) };
   }
   return { lineNote: "" };

@@ -6,6 +6,11 @@ export function withUserAsk(lines, index) {
   return (lines || []).map((item, i) => (i === index ? { ...item, askUser: true } : item));
 }
 
+export function clearUserAsk(lines, index) {
+  if (!lines?.[index]?.askUser) return lines;
+  return lines.map((item, i) => (i === index ? { ...item, askUser: false } : item));
+}
+
 export function userAskQuestions(lines) {
   return (lines || []).flatMap((line, lineIndex) => {
     if (!line.askUser || !line.commodityId) return [];

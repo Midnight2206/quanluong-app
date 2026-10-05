@@ -140,7 +140,7 @@ async function getIssueSlipAiDraft(prisma, { id, storageUnitId }) {
       writtenQty: line.writtenQty,
       writtenUom: line.writtenUom,
       parenText: line.parenText,
-      stockUom: stockUomByCommodityId.get(Number(line.commodityId)) || null,
+      stockUom: stockUomByCommodityId.get(Number(line.commodityId)) || line.measureUnit || null,
       originalQtyOnConvert,
     }).lineNote,
   }));

@@ -71,6 +71,18 @@ function finitePriceOrNull(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+export function conversionNote(line) {
+  const existing = line?.lineNote != null ? String(line.lineNote).trim() : "";
+  if (existing) return existing.slice(0, 500);
+  const qty = String(line?.writtenQty ?? "").replace(/\s+/g, "");
+  const uom = String(line?.writtenUom ?? "").trim();
+  const stock = String(line?.measureUnit || line?.stockUom || "").trim();
+  if (!/^\d+(?:[.,]\d+)?$/.test(qty) || !uom || !stock) return "";
+  if (/^(k|nghìn|nghin)$/i.test(uom)) return "";
+  if (uom.toLowerCase() === stock.toLowerCase()) return "";
+  return `${qty} ${uom}`.slice(0, 500);
+}
+
 function mapPreviewLineToRow(line, newEmptyRow) {
   const base = newEmptyRow();
   const quantity = Number(line.quantity);
@@ -96,7 +108,7 @@ function mapPreviewLineToRow(line, newEmptyRow) {
     unitPrice,
     tgsxPrice,
     priceKind,
-    lineNote: line.lineNote != null ? String(line.lineNote).trim().slice(0, 500) : "",
+    lineNote: conversionNote(line),
   };
 }
 

@@ -274,7 +274,8 @@ test("spoken 16 quả = 1 kg beats a model factor of 1", async () => {
     actorUserId: 1,
   });
   assert.equal(Number(applied.lines[0].quantity), 0.625);
-  assert.equal(applied.lines[0].writtenUom, null);
+  assert.equal(applied.lines[0].writtenUom, "quả");
+  db.lines[0].writtenUom = null;
   const again = await proposeIssueSlipAiDraftChat(
     db,
     {
