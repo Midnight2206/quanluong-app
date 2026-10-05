@@ -26,6 +26,10 @@ function round1(value) {
   return Math.round(value * 10) / 10;
 }
 
+function round4(value) {
+  return Math.round(value * 10000) / 10000;
+}
+
 const OMITTED_UOM = "*";
 
 function findRule(rules, commodityId, fromUom) {
@@ -39,6 +43,15 @@ function findRule(rules, commodityId, fromUom) {
   );
 }
 
+function findOmittedFromRule(rules, commodityId) {
+  const confirmed = (rules || []).filter((rule) => rule.confirmed && rule.omitUsesFromUom);
+  const exact = confirmed.filter((rule) => rule.commodityId === commodityId);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return null;
+  const shared = confirmed.filter((rule) => rule.commodityId == null);
+  return shared.length === 1 ? shared[0] : null;
+}
+
 function convertQuantity({
   writtenQty,
   writtenUom,
@@ -47,6 +60,7 @@ function convertQuantity({
   habitUom,
   commodityId,
   rules,
+  _allowImplicitFromRule = true,
 }) {
   const money = parseMoneyAmount(writtenQty, writtenUom);
   if (money != null) {
@@ -68,10 +82,25 @@ function convertQuantity({
   const stock = normUom(stockUom);
   const usual = normUom(habitUom) || stock;
   if (!from) {
+    if (_allowImplicitFromRule) {
+      const implicitRule = findOmittedFromRule(rules, commodityId);
+      if (implicitRule?.fromUom) {
+        return convertQuantity({
+          writtenQty,
+          writtenUom: implicitRule.fromUom,
+          unitPrice,
+          stockUom,
+          habitUom,
+          commodityId,
+          rules,
+          _allowImplicitFromRule: false,
+        });
+      }
+    }
     const omitted = findRule(rules, commodityId, OMITTED_UOM);
     if (omitted) {
       return {
-        quantity: round1(qty * Number(omitted.factor)),
+        quantity: round4(qty * Number(omitted.factor)),
         measureUnit: stockUom || null,
         needsConfirm: false,
         source: "rule",
@@ -83,7 +112,7 @@ function convertQuantity({
       const habitRule = findRule(rules, commodityId, usual);
       if (habitRule) {
         return {
-          quantity: round1(qty * Number(habitRule.factor)),
+          quantity: round4(qty * Number(habitRule.factor)),
           measureUnit: stockUom || null,
           needsConfirm: false,
           source: "habit-uom",
@@ -110,7 +139,7 @@ function convertQuantity({
   const rule = findRule(rules, commodityId, from);
   if (rule) {
     return {
-      quantity: round1(qty * Number(rule.factor)),
+      quantity: round4(qty * Number(rule.factor)),
       measureUnit: stockUom || null,
       needsConfirm: false,
       source: "rule",

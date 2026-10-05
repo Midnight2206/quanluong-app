@@ -144,6 +144,43 @@ test("omitted unit uses the shared qty rule before the habit unit", () => {
   assert.equal(converted.source, "rule");
 });
 
+test("an omitted-unit flag converts trứng 10 into 0.625 kg", () => {
+  const converted = convertQuantity({
+    writtenQty: "10",
+    writtenUom: "",
+    stockUom: "kg",
+    commodityId: 8,
+    rules: [{ commodityId: 8, fromUom: "quả", factor: 0.0625, confirmed: true, omitUsesFromUom: true }],
+  });
+  assert.equal(converted.quantity, 0.625);
+  assert.equal(converted.measureUnit, "kg");
+  assert.equal(converted.fromUom, "quả");
+  assert.equal(converted.source, "rule");
+});
+
+test("two omitted-unit flags do not guess, and a written quả still multiplies", () => {
+  const ambiguous = convertQuantity({
+    writtenQty: "10",
+    writtenUom: "",
+    stockUom: "kg",
+    commodityId: 8,
+    rules: [
+      { commodityId: 8, fromUom: "quả", factor: 0.0625, confirmed: true, omitUsesFromUom: true },
+      { commodityId: 8, fromUom: "hộp", factor: 0.5, confirmed: true, omitUsesFromUom: true },
+    ],
+  });
+  assert.equal(ambiguous.quantity, 10);
+  assert.equal(ambiguous.source, "as-written");
+  const written = convertQuantity({
+    writtenQty: "10",
+    writtenUom: "quả",
+    stockUom: "kg",
+    commodityId: 8,
+    rules: [{ commodityId: 8, fromUom: "quả", factor: 0.0625, confirmed: true, omitUsesFromUom: false }],
+  });
+  assert.equal(written.quantity, 0.625);
+});
+
 test("shared qty rule binds by commodity name inside each warehouse", () => {
   const bound = bindSharedQtyRules(
     [{ sharedLevel1: true, commodityNameNorm: "gao te", commodityId: 99, fromUom: "*", factor: 10, confirmed: true }],
