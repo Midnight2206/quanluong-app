@@ -572,8 +572,8 @@ export function LttpIssueSlipAiSuggestDialog({
               : "Được. Bấm Áp dụng khi muốn đưa vào phiếu.",
         },
       ]);
-      if (question.kind === "applied") askNext(preview.lines);
-      else scrollWork(null);
+      askNext(preview.lines);
+      if (question.key === "closing" && !activeRef.current) scrollWork(null);
       return;
     }
     const run = beginRun("chat", trimmed);
