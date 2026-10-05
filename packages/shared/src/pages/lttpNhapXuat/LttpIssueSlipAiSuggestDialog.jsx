@@ -14,6 +14,7 @@ import {
 } from "@/features/lttp/api/lttpApi";
 import { notifyError } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
+import { userAskQuestions, withUserAsk } from "./lttpIssueSlipAskQueue.js";
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -144,7 +145,7 @@ function conversionQuestions(lines) {
 function formatFactor(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return "";
-  return String(Math.round(n * 10) / 10);
+  return String(Math.round(n * 10000) / 10000);
 }
 
 function appliedQuestions(lines) {
@@ -389,7 +390,7 @@ export function LttpIssueSlipAiSuggestDialog({
       return;
     }
     const next =
-      [...ruleQuestions(lines), ...appliedQuestions(lines)].find(
+      [...ruleQuestions(lines), ...userAskQuestions(lines), ...appliedQuestions(lines)].find(
         (item) => !askedRef.current.includes(item.key),
       ) ||
       (!askedRef.current.includes("closing")
@@ -929,6 +930,21 @@ export function LttpIssueSlipAiSuggestDialog({
                                 ) : null}
                               </div>
                               <div className="mt-1 space-y-1">
+                                {line.commodityId ? (
+                                  <button
+                                    type="button"
+                                    className="text-[11px] text-primary"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      const lines = withUserAsk(preview.lines, i);
+                                      const next = { ...preview, lines };
+                                      setPreview(next);
+                                      if (!activeRef.current) askNext(lines);
+                                    }}
+                                  >
+                                    Chưa đúng
+                                  </button>
+                                ) : null}
                                 {needs && (line.choices || []).length > 0 ? (
                                   <div className="flex flex-wrap gap-1.5 rounded-lg border border-primary/40 bg-primary/5 p-1.5">
                                     {(line.choices || []).slice(0, 3).map((choice) => choiceCard(choice, "choice"))}
