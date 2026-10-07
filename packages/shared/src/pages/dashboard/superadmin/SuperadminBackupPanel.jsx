@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -7,8 +8,10 @@ import { useConfirm } from "@/contexts/ConfirmProvider";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import {
   useRestoreSystemBackupMutation,
+  useRunSystemBackupMutation,
   useSystemBackupQuery,
 } from "@/features/system-backup/api/systemBackupApi";
+import { apiRequest } from "@/services/apiRequest";
 import { notifyError, notifySuccess } from "@/services/notify";
 
 function formatDay(iso) {
@@ -50,6 +53,46 @@ export function SuperadminBackupPanel() {
   const { data, isLoading, isError } = useSystemBackupQuery();
   const running = data?.status?.state === "running";
   const [restore, { isLoading: restoring }] = useRestoreSystemBackupMutation();
+  const [runBackup, { isLoading: backingUp }] = useRunSystemBackupMutation();
+  const [logLines, setLogLines] = useState(null);
+  const [logLoading, setLogLoading] = useState(false);
+
+  async function onRunBackup() {
+    if (!isSuperadmin || backingUp) {
+      return;
+    }
+    const ok = await confirm({
+      title: "Chạy backup ngay",
+      message:
+        "Lệnh được xếp hàng. Container backup chạy trong vòng khoảng 20 giây. App vẫn chạy. Nếu lần backup trước chưa xong, lệnh này lỗi và có email.",
+      confirmLabel: "Chạy backup",
+      cancelLabel: "Huỷ",
+    });
+    if (!ok) {
+      return;
+    }
+    try {
+      await runBackup();
+      notifySuccess("Đã nhận lệnh backup.");
+    } catch (error) {
+      notifyError(error?.data?.message || "Không gửi được lệnh backup.");
+    }
+  }
+
+  async function onShowLog() {
+    if (!isSuperadmin || logLoading) {
+      return;
+    }
+    setLogLoading(true);
+    try {
+      const data = await apiRequest({ url: "/system-backup/log", method: "get" });
+      setLogLines(Array.isArray(data?.lines) ? data.lines : []);
+    } catch (error) {
+      notifyError(error?.data?.message || "Không tải được log backup.");
+    } finally {
+      setLogLoading(false);
+    }
+  }
 
   async function onRestore(row) {
     if (!isComplete(row) || running || restoring) {
@@ -84,6 +127,33 @@ export function SuperadminBackupPanel() {
             Mỗi đêm 02:15 giữ 10 bản gần nhất trên Drive. Bấm một ngày để tạo lại toàn bộ dữ liệu của ngày đó.
           </p>
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            className="px-3 py-1.5 text-xs"
+            disabled={!isSuperadmin || backingUp}
+            onClick={onRunBackup}
+          >
+            {backingUp ? "Đang gửi" : "Chạy backup"}
+          </Button>
+          <Button
+            variant="ghost"
+            className="px-3 py-1.5 text-xs"
+            disabled={!isSuperadmin || logLoading}
+            onClick={onShowLog}
+          >
+            {logLoading ? "Đang tải" : "Xem log"}
+          </Button>
+        </div>
+        {logLines ? (
+          logLines.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Chưa có log.</p>
+          ) : (
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-border p-3 text-xs">
+              {logLines.join("\n")}
+            </pre>
+          )
+        ) : null}
 
         {data?.status?.message ? (
           <p className="text-xs text-foreground sm:text-sm">{data.status.message}</p>

@@ -21,3 +21,11 @@ export function useRestoreSystemBackupMutation() {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.systemBackup.root }),
   });
 }
+
+export function useRunSystemBackupMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: () => apiRequest({ url: "/system-backup/backup", method: "post" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.systemBackup.root }),
+  });
+}
