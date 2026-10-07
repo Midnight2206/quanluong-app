@@ -28,6 +28,41 @@ function dockerGet(pathname, socketPath = process.env.DOCKER_SOCKET || "/var/run
   });
 }
 
+function dockerPost(pathname, socketPath = process.env.DOCKER_SOCKET || "/var/run/docker.sock", timeout = 20000) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      { socketPath, path: pathname, method: "POST", timeout },
+      (res) => {
+        res.on("end", () => {
+          if (res.statusCode !== 204) {
+            reject(new Error(`docker ${res.statusCode}`));
+            return;
+          }
+          resolve(res.statusCode);
+        });
+        res.resume();
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error("docker timeout")));
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+async function listContainerIds(get = dockerGet) {
+  const list = await get("/containers/json?all=1");
+  const ids = new Map();
+  for (const item of list || []) {
+    for (const raw of item.Names || []) {
+      const name = String(raw).replace(/^\//, "");
+      if (item.Id) {
+        ids.set(name, item.Id);
+      }
+    }
+  }
+  return ids;
+}
+
 async function listWatchedContainers(get = dockerGet) {
   const wanted = new Set(WATCHED_CONTAINERS);
   const list = await get("/containers/json?all=1");
@@ -53,4 +88,4 @@ async function listWatchedContainers(get = dockerGet) {
   return new Map(rows);
 }
 
-export { dockerGet, listWatchedContainers };
+export { dockerGet, dockerPost, listContainerIds, listWatchedContainers };
