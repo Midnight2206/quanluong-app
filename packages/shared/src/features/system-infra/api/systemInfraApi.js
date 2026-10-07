@@ -8,6 +8,7 @@ export function useSystemInfraQuery() {
   return useQuery({
     queryKey: qk.systemInfra.state(),
     queryFn: () => apiRequest({ url: "/system-infra", method: "get" }),
+    staleTime: 0,
     refetchInterval: 30000,
   });
 }
