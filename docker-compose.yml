@@ -38,6 +38,8 @@ services:
     volumes:
       - media_data:/data/media
       - backup_data:/var/backups/quanluong
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /:/host:ro
     healthcheck:
       test:
         [
