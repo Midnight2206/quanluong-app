@@ -21,6 +21,7 @@ export const qk = {
   unitLevelCaps: { root: ["unitLevelCaps"], matrix: () => ["unitLevelCaps", "matrix"] },
   mealAllowanceRates: { root: ["mealAllowanceRates"], list: () => ["mealAllowanceRates", "list"] },
   systemBackup: { root: ["systemBackup"], state: () => ["systemBackup", "state"] },
+  systemInfra: { root: ["systemInfra"], state: () => ["systemInfra", "state"] },
   lttp: {
     root: ["lttp"],
     foodGroups: () => ["lttp", "foodGroups"],

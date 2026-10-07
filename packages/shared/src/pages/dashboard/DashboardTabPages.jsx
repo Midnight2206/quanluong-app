@@ -23,6 +23,7 @@ import { SuperadminPermissionMatrixPanel } from "@/pages/dashboard/superadmin/Su
 import { SuperadminUnitsPanel } from "@/pages/dashboard/superadmin/SuperadminUnitsPanel";
 import { SuperadminMealAllowanceRatesPanel } from "@/pages/dashboard/superadmin/SuperadminMealAllowanceRatesPanel";
 import { SuperadminBackupPanel } from "@/pages/dashboard/superadmin/SuperadminBackupPanel";
+import { SuperadminInfraPanel } from "@/pages/dashboard/superadmin/SuperadminInfraPanel";
 import { SuperadminChungTuPdfTemplatesPanel } from "@/pages/dashboard/superadmin/SuperadminChungTuPdfTemplatesPanel";
 import { SuperadminUsersPanel } from "@/pages/dashboard/superadmin/SuperadminUsersPanel";
 import { cn } from "@/utils/cn";
@@ -162,6 +163,14 @@ export function DashboardBackupPage() {
   return (
     <div className="min-w-0">
       <SuperadminBackupPanel />
+    </div>
+  );
+}
+
+export function DashboardInfraPage() {
+  return (
+    <div className="min-w-0">
+      <SuperadminInfraPanel />
     </div>
   );
 }

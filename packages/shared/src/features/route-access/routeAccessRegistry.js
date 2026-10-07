@@ -103,6 +103,10 @@ export const ROUTE_ACCESS_RULES = {
     description: "Backup dữ liệu — superadmin chọn một ngày để khôi phục",
     requiredPermissions: [],
   },
+  "dashboard-infra": {
+    description: "Hạ tầng — superadmin xem đĩa, backup đêm và container",
+    requiredPermissions: [],
+  },
   "nav-meal-roster": {
     description: "Trang Chấm cơm / danh sách bảo đảm quân lương",
     requiredPermissions: [PERMISSIONS.MEAL_ROSTER_ACCESS],

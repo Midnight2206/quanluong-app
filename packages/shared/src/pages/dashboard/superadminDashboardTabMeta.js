@@ -1,4 +1,5 @@
 import {
+  Activity,
   BookOpen,
   Building2,
   DatabaseBackup,
@@ -90,5 +91,13 @@ export const DASHBOARD_SUPERADMIN_TAB_META = [
     section: "Hệ thống",
     icon: DatabaseBackup,
     routeAccessKey: "dashboard-backup",
+  },
+  {
+    path: "infra",
+    label: "Hạ tầng",
+    shortLabel: "Hạ tầng",
+    section: "Hệ thống",
+    icon: Activity,
+    routeAccessKey: "dashboard-infra",
   },
 ];
