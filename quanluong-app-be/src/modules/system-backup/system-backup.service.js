@@ -120,6 +120,14 @@ async function queueRestore(date, root = backupRoot()) {
 }
 
 async function queueBackup(root = backupRoot(), now = new Date()) {
+  const state = await readBackupState(root);
+  if (!state.mounted) {
+    throw new AppError({
+      message: "Chưa gắn thư mục backup.",
+      statusCode: 503,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
   const reqDir = path.join(root, "requests");
   await mkdir(reqDir, { recursive: true });
   try {

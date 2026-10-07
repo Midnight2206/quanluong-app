@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -40,6 +40,16 @@ test("queueRestore ghi đúng một request cho ngày có trong manifest", async
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("queueBackup từ chối khi chưa gắn thư mục backup", async () => {
+  const root = path.join(tmpdir(), `ql-backup-unmounted-${Date.now()}`);
+  await assert.rejects(queueBackup(root), (error) => {
+    assert.equal(error.statusCode, 503);
+    assert.equal(error.message, "Chưa gắn thư mục backup.");
+    return true;
+  });
+  await assert.rejects(access(root), (error) => error.code === "ENOENT");
 });
 
 test("queueBackup ghi requestedAt và từ chối khi phiếu còn", async () => {
