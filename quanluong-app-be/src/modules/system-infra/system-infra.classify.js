@@ -61,4 +61,93 @@ function classifyContainer(row) {
   return { status: "ok", message: "đang chạy" };
 }
 
-export { WATCHED_CONTAINERS, classifyDisk, classifyContainer };
+
+const SLOT_MINUTES = 2 * 60 + 15;
+const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+
+function zonedParts(date) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(date).map((part) => [part.type, part.value]));
+  let hour = Number(parts.hour);
+  if (hour === 24) hour = 0;
+  return {
+    day: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: hour * 60 + Number(parts.minute),
+  };
+}
+
+function slotDay(now) {
+  const parts = zonedParts(now);
+  if (parts.minutes >= SLOT_MINUTES) return parts.day;
+  return zonedParts(new Date(now.getTime() - 24 * 60 * 60 * 1000)).day;
+}
+
+function classifyBackupLog(log, now) {
+  if (log == null) {
+    return { status: "unknown", message: "Không đọc được log backup", lastSuccessDay: null };
+  }
+  const attempts = [];
+  let lastSuccessDay = null;
+  for (const raw of String(log).split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const iso = /^(\d{4}-\d{2}-\d{2}T\S+)/.exec(line);
+    const at = iso ? new Date(iso[1]) : null;
+    const started = /backup bắt đầu day=(\d{4}-\d{2}-\d{2})/.exec(line);
+    if (started) {
+      attempts.push({
+        day: started[1],
+        at: at && !Number.isNaN(at.getTime()) ? at : null,
+        outcome: "open",
+      });
+      continue;
+    }
+    if (!line.includes("backup xong") && !line.includes("BACKUP_FAILED")) continue;
+    const open = attempts.findLast((item) => item.outcome === "open");
+    if (!open) continue;
+    open.outcome = line.includes("BACKUP_FAILED") ? "fail" : "ok";
+    if (open.outcome === "ok") lastSuccessDay = open.day;
+  }
+  const slot = slotDay(now);
+  const latest = attempts.at(-1);
+  if (!latest || (latest.outcome === "ok" && latest.day < slot)) {
+    return {
+      status: "warn",
+      message: "Chưa có backup xong cho mốc 02:15 gần nhất",
+      lastSuccessDay,
+    };
+  }
+  if (latest.outcome === "open") {
+    const age = latest.at ? now.getTime() - latest.at.getTime() : Number.POSITIVE_INFINITY;
+    if (latest.day >= slot && age >= 0 && age < THREE_HOURS_MS) {
+      return { status: "warn", message: "Backup đang chạy", lastSuccessDay };
+    }
+    return {
+      status: "warn",
+      message: "Backup bắt đầu nhưng không thấy kết thúc",
+      lastSuccessDay,
+    };
+  }
+  if (latest.outcome === "fail") {
+    return {
+      status: "warn",
+      message: `Backup lỗi ngày ${latest.day}`,
+      lastSuccessDay,
+    };
+  }
+  return {
+    status: "ok",
+    message: `Backup xong ngày ${latest.day}`,
+    lastSuccessDay,
+  };
+}
+
+export { WATCHED_CONTAINERS, classifyDisk, classifyContainer, classifyBackupLog };
