@@ -16,7 +16,19 @@ async function restartContainer(name, deps = {}) {
   }
   const list = deps.list ?? listContainerIds;
   const post = deps.post ?? dockerPost;
-  const ids = await list();
+  let ids;
+  try {
+    ids = await list();
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw new AppError({
+      message: "Không restart được container.",
+      statusCode: 503,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
   const id = ids.get(name);
   if (!id) {
     throw new AppError({
