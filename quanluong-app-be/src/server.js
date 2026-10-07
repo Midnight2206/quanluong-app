@@ -11,6 +11,7 @@ import { REFRESH_TOKEN_CLEANUP_SCHEDULE } from "./modules/auth/auth.constants.js
 import { bootstrapAuthSystem, cleanupExpiredRefreshTokens } from "./modules/auth/auth.service.js";
 import { rebuildCommodityHabits } from "./modules/lttp/lttp-issue-slip-ai-backfill.js";
 import { drainBackupNotify } from "./modules/system-backup/system-backup.notify.js";
+import { INFRA_HEALTH_MAIL_SCHEDULE, runInfraHealthMail } from "./modules/system-infra/system-infra.alert-mail.js";
 import { prisma } from "./infra/database/prisma/prisma.client.js";
 import { logger } from "./shared/utils/logger.js";
 
@@ -85,6 +86,12 @@ async function bootstrapServer() {
     "* * * * *",
     () => drainBackupNotify(),
     { name: "backup-report-mail" },
+  );
+
+  registerSchedule(
+    INFRA_HEALTH_MAIL_SCHEDULE,
+    () => runInfraHealthMail(),
+    { name: "infra-health-mail" },
   );
 
   registerSchedule(

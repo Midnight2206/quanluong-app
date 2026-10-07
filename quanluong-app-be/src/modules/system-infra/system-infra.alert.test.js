@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import cron from "node-cron";
 import { buildInfraAlertMail } from "../../infra/mail/send-infra-alert-email.js";
-import { deliverInfraAlert } from "./system-infra.alert-mail.js";
+import { deliverInfraAlert, INFRA_HEALTH_MAIL_SCHEDULE, runInfraHealthMail } from "./system-infra.alert-mail.js";
 import { infraAlertLines } from "./system-infra.alert.js";
 
 test("bỏ qua khi chỉ có ok và backup warn", () => {
@@ -114,4 +115,35 @@ test("một địa chỉ lỗi vẫn gửi địa chỉ sau", async () => {
   });
   assert.deepEqual(calls, ["a@example.com", "b@example.com"]);
   assert.equal(result.sent, 1);
+});
+
+test("lịch là bốn mốc 02 08 14 20", () => {
+  assert.equal(INFRA_HEALTH_MAIL_SCHEDULE, "0 2,8,14,20 * * *");
+  assert.equal(cron.validate(INFRA_HEALTH_MAIL_SCHEDULE), true);
+});
+
+test("report toàn ok không tải người nhận", async () => {
+  await runInfraHealthMail({
+    readInfra: async () => okReport,
+    loadRecipients: async () => {
+      throw new Error("không được tải người nhận");
+    },
+    send: async () => {
+      throw new Error("không được gửi");
+    },
+  });
+});
+
+test("report warn gửi đúng người nhận đã tải", async () => {
+  const seen = [];
+  const result = await runInfraHealthMail({
+    readInfra: async () => warnReport,
+    loadRecipients: async () => ["a@example.com"],
+    send: async ({ to, lines }) => {
+      seen.push({ to, lines });
+      return true;
+    },
+  });
+  assert.equal(result.sent, 1);
+  assert.deepEqual(seen, [{ to: "a@example.com", lines: ["Đã dùng 80%"] }]);
 });
