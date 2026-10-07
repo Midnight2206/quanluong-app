@@ -17,6 +17,7 @@ import { chatRouter } from "../modules/chat/chat.routes.js";
 import { chungTuQuyetToanRouter } from "../modules/chung-tu-quyet-toan/chung-tu-quyet-toan.routes.js";
 import { documentDevRouter } from "../modules/document-dev/document-dev.routes.js";
 import { systemBackupRouter } from "../modules/system-backup/system-backup.routes.js";
+import { systemInfraRouter } from "../modules/system-infra/system-infra.routes.js";
 import { respondSuccess } from "../shared/utils/responders.js";
 
 const router = express.Router();
@@ -48,6 +49,7 @@ router.use("/chat", chatRouter);
 router.use("/chungtuquyettoan", chungTuQuyetToanRouter);
 router.use("/document-dev", documentDevRouter);
 router.use("/system-backup", systemBackupRouter);
+router.use("/system-infra", systemInfraRouter);
 /** Cùng handler — tương thích client/clone cũ gọi `/api/lrtp/*` sau khi đã deploy code mới. */
 router.use("/lrtp", lttpRouter);
 
