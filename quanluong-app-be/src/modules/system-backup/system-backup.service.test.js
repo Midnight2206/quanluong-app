@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { isBackupDate, queueRestore, readBackupState } from "./system-backup.service.js";
+import {
+  isBackupDate,
+  queueBackup,
+  queueRestore,
+  readBackupLogTail,
+  readBackupState,
+} from "./system-backup.service.js";
 
 test("isBackupDate chỉ nhận YYYY-MM-DD", () => {
   assert.equal(isBackupDate("2026-10-03"), true);
@@ -31,6 +37,54 @@ test("queueRestore ghi đúng một request cho ngày có trong manifest", async
     const listed = await readBackupState(root);
     assert.equal(listed.versions.length, 1);
     assert.equal(listed.status.state, "running");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("queueBackup ghi requestedAt và từ chối khi phiếu còn", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "ql-backup-run-"));
+  try {
+    const first = await queueBackup(root, new Date("2026-10-07T07:00:00.000Z"));
+    assert.equal(first.requestedAt, "2026-10-07T07:00:00.000Z");
+    const body = JSON.parse(await readFile(path.join(root, "requests", "backup.json"), "utf8"));
+    assert.deepEqual(body, { requestedAt: "2026-10-07T07:00:00.000Z" });
+    await assert.rejects(queueBackup(root), (error) => {
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.message, "Đang có một lệnh backup.");
+      return true;
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("queueBackup không ghi khi đang có phiếu khôi phục", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "ql-backup-busy-"));
+  try {
+    await mkdir(path.join(root, "requests"), { recursive: true });
+    await writeFile(path.join(root, "requests", "restore.json"), '{"date":"2026-10-07"}\n');
+    await assert.rejects(queueBackup(root), (error) => {
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.message, "Đang có một lần khôi phục.");
+      return true;
+    });
+    await assert.rejects(readFile(path.join(root, "requests", "backup.json"), "utf8"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("readBackupLogTail lấy 80 dòng cuối và file thiếu thì rỗng", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "ql-backup-log-"));
+  try {
+    assert.deepEqual(await readBackupLogTail(root), []);
+    const lines = Array.from({ length: 100 }, (_, i) => `dong ${i + 1}`);
+    await writeFile(path.join(root, "backup.log"), `${lines.join("\n")}\n`);
+    const tail = await readBackupLogTail(root);
+    assert.equal(tail.length, 80);
+    assert.equal(tail[0], "dong 21");
+    assert.equal(tail[79], "dong 100");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

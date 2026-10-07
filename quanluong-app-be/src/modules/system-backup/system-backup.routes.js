@@ -6,7 +6,9 @@ import { superadminMiddleware } from "../../middlewares/superadmin.middleware.js
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
 import {
   getSystemBackupController,
+  getSystemBackupLogController,
   restoreSystemBackupController,
+  runSystemBackupController,
 } from "./system-backup.controller.js";
 
 const restoreBodySchema = z.object({
@@ -24,5 +26,8 @@ systemBackupRouter.post(
   validateRequest({ body: restoreBodySchema }),
   asyncHandler(restoreSystemBackupController),
 );
+
+systemBackupRouter.post("/backup", asyncHandler(runSystemBackupController));
+systemBackupRouter.get("/log", asyncHandler(getSystemBackupLogController));
 
 export { systemBackupRouter };

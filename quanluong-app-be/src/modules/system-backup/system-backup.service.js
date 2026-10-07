@@ -119,4 +119,54 @@ async function queueRestore(date, root = backupRoot()) {
   return status;
 }
 
-export { backupRoot, isBackupDate, queueRestore, readBackupState };
+async function queueBackup(root = backupRoot(), now = new Date()) {
+  const reqDir = path.join(root, "requests");
+  await mkdir(reqDir, { recursive: true });
+  try {
+    await stat(path.join(reqDir, "restore.json"));
+    throw new AppError({
+      message: "Đang có một lần khôi phục.",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+  }
+  const requestedAt = now.toISOString();
+  try {
+    await writeFile(path.join(reqDir, "backup.json"), JSON.stringify({ requestedAt }), { flag: "wx" });
+  } catch (error) {
+    if (error?.code === "EEXIST") {
+      throw new AppError({
+        message: "Đang có một lệnh backup.",
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
+      });
+    }
+    throw error;
+  }
+  return { requestedAt };
+}
+
+async function readBackupLogTail(root = backupRoot(), limit = 80) {
+  try {
+    const text = await readFile(path.join(root, "backup.log"), "utf8");
+    const lines = text.split("\n");
+    if (lines.at(-1) === "") {
+      lines.pop();
+    }
+    return lines.slice(-limit);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+}
+
+export { backupRoot, isBackupDate, queueBackup, queueRestore, readBackupLogTail, readBackupState };
