@@ -99,3 +99,15 @@ test("readBackupLogTail lấy 80 dòng cuối và file thiếu thì rỗng", asy
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("watch_loop xóa phiếu backup rồi chạy sau nhánh khôi phục", async () => {
+  const file = path.resolve(import.meta.dirname, "../../../../ops/backup/backup.sh");
+  const text = await readFile(file, "utf8");
+  const restoreAt = text.indexOf('"$BACKUP_DIR/requests/restore.json"');
+  const backupAt = text.indexOf('"$BACKUP_DIR/requests/backup.json"');
+  const manifestAt = text.indexOf('"$0" manifest');
+  assert.ok(restoreAt !== -1 && backupAt > restoreAt && manifestAt > backupAt);
+  const branch = text.slice(backupAt, manifestAt);
+  assert.match(branch, /rm -f "\$BACKUP_DIR\/requests\/backup.json"/);
+  assert.match(branch, /"\$0" backup/);
+});

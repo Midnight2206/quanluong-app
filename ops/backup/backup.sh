@@ -469,6 +469,10 @@ watch_loop() {
     if [[ -f "$BACKUP_DIR/requests/restore.json" ]]; then
       "$0" restore
     fi
+    if [[ -f "$BACKUP_DIR/requests/backup.json" ]]; then
+      rm -f "$BACKUP_DIR/requests/backup.json"
+      "$0" backup
+    fi
     "$0" manifest
     sleep 20
   done
