@@ -20,6 +20,13 @@ import {
 } from "@/features/users/api/usersApi";
 import { cn } from "@/utils/cn";
 import { notifyError, notifySuccess } from "@/services/notify";
+import {
+  supplierCreateBlockReason,
+  supplierCreateBody,
+  supplierEditBlockReason,
+  supplierEditPatch,
+  supplierIdsFromLinks,
+} from "./supplierUserForm.js";
 
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -152,30 +159,30 @@ export function SuperadminUsersPanel() {
 
   async function onCreateUser(e) {
     e.preventDefault();
-    if (
-      !username.trim() ||
-      !email.trim() ||
-      password.length < 8 ||
-      !fullName.trim() ||
-      !typeId
-    ) {
-      notifyError("Điền đủ: username, email, mật khẩu (≥8), họ tên, vai trò.");
-      return;
-    }
-    if (isSupplierCreateType && supplierIds.length === 0) {
-      notifyError("Chọn ít nhất một nhà cung cấp.");
+    const blockReason = supplierCreateBlockReason({
+      isSupplierCreateType,
+      supplierIds,
+      username,
+      email,
+      password,
+      fullName,
+      typeId,
+    });
+    if (blockReason) {
+      notifyError(blockReason);
       return;
     }
     try {
-      await createUser({
-        username: username.trim(),
-        email: email.trim(),
+      await createUser(supplierCreateBody({
+        isSupplierCreateType,
+        supplierIds,
+        unitId,
+        username,
+        email,
         password,
-        typeId: Number(typeId),
-        unitId: isSupplierCreateType ? null : unitId ? Number(unitId) : null,
-        ...(isSupplierCreateType ? { supplierIds } : {}),
-        profile: { fullName: fullName.trim() },
-      }).unwrap();
+        fullName,
+        typeId,
+      })).unwrap();
       notifySuccess("Đã tạo người dùng.");
       setUsername("");
       setEmail("");
@@ -213,13 +220,7 @@ export function SuperadminUsersPanel() {
       const data = await queryClient.fetchQuery(
         getLttpSupplierUserLinksQueryOptions(user.id),
       );
-      setEditingSupplierIds(
-        Array.isArray(data?.links)
-          ? data.links
-            .map((link) => Number(link?.supplierId))
-            .filter((id) => Number.isFinite(id))
-          : [],
-      );
+      setEditingSupplierIds(supplierIdsFromLinks(data));
       setEditingSupplierUser(user);
     } catch (err) {
       notifyError(err?.data?.message || "Không tải được danh sách nhà cung cấp.");
@@ -237,16 +238,14 @@ export function SuperadminUsersPanel() {
     if (!editingSupplierUser) {
       return;
     }
-    if (editingSupplierIds.length === 0) {
-      notifyError("Chọn ít nhất một nhà cung cấp.");
+    const blockReason = supplierEditBlockReason(editingSupplierIds);
+    if (blockReason) {
+      notifyError(blockReason);
       return;
     }
     setSavingSupplierUserId(editingSupplierUser.id);
     try {
-      await patchUser({
-        id: editingSupplierUser.id,
-        supplierIds: editingSupplierIds,
-      }).unwrap();
+      await patchUser(supplierEditPatch(editingSupplierUser.id, editingSupplierIds)).unwrap();
       notifySuccess("Đã cập nhật nhà cung cấp.");
       closeSupplierEditor();
     } catch (err) {

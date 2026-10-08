@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const source = readFileSync(
-  new URL("./SuperadminUsersPanel.jsx", import.meta.url),
-  "utf8",
-);
+const source = [
+  readFileSync(new URL("./SuperadminUsersPanel.jsx", import.meta.url), "utf8"),
+  readFileSync(new URL("./supplierUserForm.js", import.meta.url), "utf8"),
+].join("\n");
 
 test("supplier create form sends supplierIds and hides the unit select", () => {
   assert.match(source, /lttp_supplier/);
@@ -14,6 +14,9 @@ test("supplier create form sends supplierIds and hides the unit select", () => {
   assert.match(source, /\/lttp-supplier\/catalog/);
   assert.match(source, /Sửa nhà cung cấp/);
   assert.match(source, /\/lttp-supplier\/users\//);
+  assert.match(source, /supplierCreateBody/);
+  assert.match(source, /supplierEditPatch/);
+  assert.match(source, /supplierIdsFromLinks/);
 });
 
 test("declares unitId state before deriving selected unit depth", () => {
