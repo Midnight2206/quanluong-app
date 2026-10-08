@@ -9,6 +9,9 @@ import { ordersQuerySchema } from "./lttp-supplier.validator.js";
 
 test("orders query rejects a bad date", () => {
   assert.equal(ordersQuerySchema.safeParse({ date: "08-10-2026", supplierId: "3" }).success, false);
+  assert.equal(ordersQuerySchema.safeParse({ date: "2026-13-40", supplierId: "3" }).success, false);
+  assert.equal(ordersQuerySchema.safeParse({ date: "2026-02-29", supplierId: "3" }).success, false);
+  assert.equal(ordersQuerySchema.safeParse({ date: "2024-02-29", supplierId: "3" }).success, true);
   assert.equal(ordersQuerySchema.safeParse({ date: "2026-10-08", supplierId: "3" }).success, true);
 });
 
