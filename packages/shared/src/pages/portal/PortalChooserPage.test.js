@@ -10,4 +10,6 @@ test("PortalChooserPage offers work and admin CTAs", () => {
   assert.match(src, /getSuperadminAppOrigin/);
   assert.match(src, /\/dashboard/);
   assert.match(src, /isSuperadminUser/);
+  assert.match(src, /isLttpSupplierUser/);
+  assert.match(src, /\/dat-hang/);
 });

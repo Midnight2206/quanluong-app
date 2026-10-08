@@ -2,6 +2,7 @@
 
 import { Building2, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   useAuthInitialized,
@@ -9,8 +10,17 @@ import {
   useIsAuthenticated,
 } from "@/features/auth/model/authSlice";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
-import { isSuperadminUser } from "@/utils/postLoginPath";
+import { isLttpSupplierUser, isSuperadminUser } from "@/utils/postLoginPath";
+import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
+
+function SupplierPortalRedirect() {
+  useEffect(() => {
+    window.location.replace(`${getSupplierAppOrigin()}/dat-hang`);
+  }, []);
+
+  return null;
+}
 
 export function PortalChooserPage() {
   const router = useRouter();
@@ -23,6 +33,9 @@ export function PortalChooserPage() {
   }
   if (!isAuthenticated) {
     return <ClientRedirect href="/login?from=%2Fchon-cong" replace />;
+  }
+  if (isLttpSupplierUser(user)) {
+    return <SupplierPortalRedirect />;
   }
   if (!isSuperadminUser(user)) {
     return <ClientRedirect href="/" replace />;
