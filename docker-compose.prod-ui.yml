@@ -14,6 +14,7 @@ services:
         NEXT_PUBLIC_API_BASE_URL: /api
         NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
         NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+        NEXT_PUBLIC_SUPPLIER_ORIGIN: ${UI_SUPPLIER_ORIGIN:-http://localhost:8082}
     image: quanluong-ui:latest
     container_name: quanluong-app-ui
     restart: unless-stopped
@@ -37,11 +38,36 @@ services:
         NEXT_PUBLIC_API_BASE_URL: /api
         NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
         NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+        NEXT_PUBLIC_SUPPLIER_ORIGIN: ${UI_SUPPLIER_ORIGIN:-http://localhost:8082}
     image: quanluong-ui-superadmin:latest
     container_name: quanluong-app-ui-superadmin
     restart: unless-stopped
     ports:
       - "8081:80"
+    volumes:
+      - media_data:/data/media:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      API_BASE_URL_INTERNAL: http://app:3000/api
+      MIDNIGHT_SECRET_PASSWORD: ${MIDNIGHT_SECRET_PASSWORD}
+
+  ui-supplier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ui-supplier
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api
+        NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
+        NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+        NEXT_PUBLIC_SUPPLIER_ORIGIN: ${UI_SUPPLIER_ORIGIN:-http://localhost:8082}
+    image: quanluong-ui-supplier:latest
+    container_name: quanluong-app-ui-supplier
+    restart: unless-stopped
+    ports:
+      - "8082:80"
     volumes:
       - media_data:/data/media:ro
     depends_on:

@@ -73,6 +73,7 @@ services:
       NEXT_PUBLIC_SOCKET_BASE_URL: http://localhost:3030
       NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
       NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+      NEXT_PUBLIC_SUPPLIER_ORIGIN: ${UI_SUPPLIER_ORIGIN:-http://localhost:8082}
       WATCHPACK_POLLING: "true"
     volumes:
       - ./packages/shared:/app/packages/shared
@@ -99,6 +100,7 @@ services:
       NEXT_PUBLIC_SOCKET_BASE_URL: http://localhost:3030
       NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
       NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+      NEXT_PUBLIC_SUPPLIER_ORIGIN: ${UI_SUPPLIER_ORIGIN:-http://localhost:8082}
       WATCHPACK_POLLING: "true"
     volumes:
       - ./packages/shared:/app/packages/shared
@@ -111,6 +113,34 @@ services:
       ui:
         condition: service_started
 
+  ui-supplier:
+    image: quanluong-ui:dev
+    container_name: quanluong-app-ui-supplier
+    restart: unless-stopped
+    ports:
+      - "8082:3002"
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3000/api
+      API_BASE_URL_INTERNAL: http://app:3000/api
+      MIDNIGHT_SECRET_PASSWORD: ${MIDNIGHT_SECRET_PASSWORD}
+      NEXT_PUBLIC_SOCKET_BASE_URL: http://localhost:3030
+      NEXT_PUBLIC_MAIN_APP_ORIGIN: ${UI_MAIN_ORIGIN:-http://localhost:8080}
+      NEXT_PUBLIC_SUPERADMIN_ORIGIN: ${UI_SUPERADMIN_ORIGIN:-http://localhost:8081}
+      NEXT_PUBLIC_SUPPLIER_ORIGIN: ${UI_SUPPLIER_ORIGIN:-http://localhost:8082}
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./packages/shared:/app/packages/shared
+      - ./apps/supplier:/app/apps/supplier
+      - ui_supplier_next:/app/apps/supplier/.next
+    command: ["npm", "run", "dev", "--workspace=@quanluong/supplier", "--", "-H", "0.0.0.0"]
+    depends_on:
+      app:
+        condition: service_healthy
+      ui:
+        condition: service_started
+
 volumes:
   ui_web_next:
   ui_superadmin_next:
+  ui_supplier_next:

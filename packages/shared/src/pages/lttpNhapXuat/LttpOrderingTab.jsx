@@ -9,6 +9,7 @@ import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { captureElementToPngBlob, shareOrDownloadPng } from "@/utils/captureElementToPng";
 import { cn } from "@/utils/cn";
+import { buildOrderingMatrix, slipRefLabel } from "./lttpOrderingMatrix.js";
 
 function todayIsoDate() {
   const d = new Date();
@@ -32,13 +33,6 @@ function formatViDate(ymd) {
   } catch {
     return ymd;
   }
-}
-
-/** Quyển + số phiếu — nhãn phân biệt khi cùng đơn vị nhiều phiếu. */
-function slipRefLabel(bookMmyy, slipNo) {
-  const sn = slipNo != null && Number.isFinite(Number(slipNo)) ? String(Number(slipNo)).padStart(4, "0") : "—";
-  const b = bookMmyy != null && String(bookMmyy).trim() !== "" ? String(bookMmyy).trim() : "—";
-  return `Q.${b}-${sn}`;
 }
 
 /** Tránh nhầm khi copy: tên không chứa `:` hay `;` hay xuống dòng. */
@@ -303,45 +297,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
     }
   }, [summary?.availableSuppliers, supplierFilterKey]);
 
-  const matrix = useMemo(() => {
-    if (!summary?.grandTotals?.length && !summary?.slipColumns?.length) {
-      return null;
-    }
-
-    const slips = [...(summary.slipColumns || [])];
-
-    /** @type {{ key: string; slipId: number; recipientUnitName: string; caption: string|null; refLabel: string; styleIdx: number }[]} */
-    const columns = slips.map((col, i) => ({
-      key: `slip-${col.slipId}`,
-      slipId: col.slipId,
-      recipientUnitName: col.recipientUnitName,
-      caption: col.note != null && String(col.note).trim() !== "" ? String(col.note).trim() : null,
-      refLabel: slipRefLabel(col.bookMmyy, col.slipNo),
-      styleIdx: i % SLIP_COLUMN_STYLES.length,
-    }));
-
-    const rows = [...(summary.grandTotals || [])].sort((a, b) => a.name.localeCompare(b.name, "vi"));
-
-    /** @type {Map<string, Map<number, { quantityFormatted: string; lineNote: string | null }>>} */
-    const qtyBySlip = new Map();
-    for (const s of slips) {
-      const k = `slip-${s.slipId}`;
-      const m = new Map();
-      for (const line of s.lines || []) {
-        const ln =
-          line.lineNote != null && String(line.lineNote).trim() !== ""
-            ? String(line.lineNote).trim()
-            : null;
-        m.set(line.commodityId, {
-          quantityFormatted: line.quantityFormatted,
-          lineNote: ln,
-        });
-      }
-      qtyBySlip.set(k, m);
-    }
-
-    return { columns, rows, qtyBySlip };
-  }, [summary]);
+  const matrix = useMemo(() => buildOrderingMatrix(summary), [summary]);
 
   const supplierFilterLabel = useMemo(() => {
     if (!summary?.supplierFilter) return "Tất cả đối tác";

@@ -9,6 +9,9 @@ case "${NEXT_UI_APP:-web}" in
   superadmin)
     node /app/apps/superadmin/server.js &
     ;;
+  supplier)
+    node /app/apps/supplier/server.js &
+    ;;
   *)
     node /app/apps/web/server.js &
     ;;

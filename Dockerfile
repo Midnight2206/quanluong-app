@@ -63,19 +63,21 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/web/package.json apps/web/
 COPY apps/superadmin/package.json apps/superadmin/
+COPY apps/supplier/package.json apps/supplier/
 RUN npm ci
 
 FROM next-deps AS next-sources
 COPY packages/shared ./packages/shared
 COPY apps/web ./apps/web
 COPY apps/superadmin ./apps/superadmin
+COPY apps/supplier ./apps/supplier
 
 # =============================================================================
 # UI dev — Next.js `next dev`, không Nginx (docker-compose.dev.yml ghi đè CMD / cổng).
 # =============================================================================
 FROM next-sources AS ui-dev
 ENV NODE_ENV=development
-EXPOSE 3000 3001
+EXPOSE 3000 3001 3002
 CMD ["npm", "run", "dev", "--workspace=@quanluong/web", "--", "-H", "0.0.0.0"]
 
 # =============================================================================
@@ -85,19 +87,34 @@ FROM next-sources AS next-web-built
 ARG NEXT_PUBLIC_API_BASE_URL=/api
 ARG NEXT_PUBLIC_MAIN_APP_ORIGIN=http://localhost:8080
 ARG NEXT_PUBLIC_SUPERADMIN_ORIGIN=http://localhost:8081
+ARG NEXT_PUBLIC_SUPPLIER_ORIGIN=http://localhost:8082
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_MAIN_APP_ORIGIN=$NEXT_PUBLIC_MAIN_APP_ORIGIN
 ENV NEXT_PUBLIC_SUPERADMIN_ORIGIN=$NEXT_PUBLIC_SUPERADMIN_ORIGIN
+ENV NEXT_PUBLIC_SUPPLIER_ORIGIN=$NEXT_PUBLIC_SUPPLIER_ORIGIN
 RUN npm run build --workspace=@quanluong/web
 
 FROM next-sources AS next-superadmin-built
 ARG NEXT_PUBLIC_API_BASE_URL=/api
 ARG NEXT_PUBLIC_MAIN_APP_ORIGIN=http://localhost:8080
 ARG NEXT_PUBLIC_SUPERADMIN_ORIGIN=http://localhost:8081
+ARG NEXT_PUBLIC_SUPPLIER_ORIGIN=http://localhost:8082
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_MAIN_APP_ORIGIN=$NEXT_PUBLIC_MAIN_APP_ORIGIN
 ENV NEXT_PUBLIC_SUPERADMIN_ORIGIN=$NEXT_PUBLIC_SUPERADMIN_ORIGIN
+ENV NEXT_PUBLIC_SUPPLIER_ORIGIN=$NEXT_PUBLIC_SUPPLIER_ORIGIN
 RUN npm run build --workspace=@quanluong/superadmin
+
+FROM next-sources AS next-supplier-built
+ARG NEXT_PUBLIC_API_BASE_URL=/api
+ARG NEXT_PUBLIC_MAIN_APP_ORIGIN=http://localhost:8080
+ARG NEXT_PUBLIC_SUPERADMIN_ORIGIN=http://localhost:8081
+ARG NEXT_PUBLIC_SUPPLIER_ORIGIN=http://localhost:8082
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_MAIN_APP_ORIGIN=$NEXT_PUBLIC_MAIN_APP_ORIGIN
+ENV NEXT_PUBLIC_SUPERADMIN_ORIGIN=$NEXT_PUBLIC_SUPERADMIN_ORIGIN
+ENV NEXT_PUBLIC_SUPPLIER_ORIGIN=$NEXT_PUBLIC_SUPPLIER_ORIGIN
+RUN npm run build --workspace=@quanluong/supplier
 
 # =============================================================================
 # UI chính → Nginx :80 + Next :3000 (target: ui)
@@ -144,6 +161,31 @@ RUN chmod +x /entrypoint.sh
 
 ENV NODE_ENV=production
 ENV NEXT_UI_APP=superadmin
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+EXPOSE 80
+ENTRYPOINT ["/entrypoint.sh"]
+
+# =============================================================================
+# UI supplier (target: ui-supplier)
+# =============================================================================
+FROM node:22-bookworm-slim AS ui-supplier
+RUN apt-get update -y && apt-get install -y --no-install-recommends nginx \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -f /etc/nginx/conf.d/default.conf \
+  && rm -f /etc/nginx/sites-enabled/default
+
+WORKDIR /app
+COPY --from=next-supplier-built /app/apps/supplier/.next/standalone ./
+COPY --from=next-supplier-built /app/apps/supplier/.next/static ./apps/supplier/.next/static
+
+COPY docker/nginx/next-spa-api.conf /etc/nginx/conf.d/default.conf
+COPY docker/docker-entrypoint-next-ui.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENV NODE_ENV=production
+ENV NEXT_UI_APP=supplier
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
