@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Loader2, Power, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -6,7 +7,10 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { DashboardUserRowCard } from "@/pages/dashboard/components/DashboardUserRowCard";
+import {
+  getLttpSupplierUserLinksQueryOptions,
+  useLttpSupplierCatalogQuery,
+} from "@/features/lttp-supplier/api/lttpSupplierApi";
 import { useGetTypesQuery } from "@/features/types/api/typesApi";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import {
@@ -24,7 +28,14 @@ function sortUnitsByPath(units) {
   return [...units].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
+function toggleSupplierId(list, supplierId) {
+  return list.includes(supplierId)
+    ? list.filter((id) => id !== supplierId)
+    : [...list, supplierId];
+}
+
 export function SuperadminUsersPanel() {
+  const queryClient = useQueryClient();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const { data: users = [], isLoading, isError } = useGetUsersQuery();
   const { data: types = [] } = useGetTypesQuery();
@@ -36,6 +47,7 @@ export function SuperadminUsersPanel() {
   const [fullName, setFullName] = useState("");
   const [typeId, setTypeId] = useState("");
   const [unitId, setUnitId] = useState("");
+  const [supplierIds, setSupplierIds] = useState([]);
   const selectedUnitDepth = useMemo(() => {
     if (!unitId) return null;
     return sortedUnits.find((u) => String(u.id) === String(unitId))?.depth ?? null;
@@ -46,10 +58,27 @@ export function SuperadminUsersPanel() {
     }
     return types;
   }, [types, selectedUnitDepth]);
+  const selectedTypeName = useMemo(
+    () => typesForCreate.find((t) => String(t.id) === String(typeId))?.name ?? "",
+    [typeId, typesForCreate],
+  );
+  const isSupplierCreateType = selectedTypeName === "lttp_supplier";
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [patchUser, { isLoading: isPatching }] = usePatchUserMutation();
   const [togglingUserId, setTogglingUserId] = useState(null);
+  const [editingSupplierUser, setEditingSupplierUser] = useState(null);
+  const [editingSupplierIds, setEditingSupplierIds] = useState([]);
+  const [loadingSupplierUserId, setLoadingSupplierUserId] = useState(null);
+  const [savingSupplierUserId, setSavingSupplierUserId] = useState(null);
+  const shouldLoadSupplierCatalog = isSupplierCreateType || editingSupplierUser != null;
+  // Load /lttp-supplier/catalog only when the create/editor supplier UI is visible.
+  const { data: supplierCatalogData, isLoading: isSupplierCatalogLoading } =
+    useLttpSupplierCatalogQuery({ skip: !shouldLoadSupplierCatalog });
+  const suppliers = useMemo(
+    () => (Array.isArray(supplierCatalogData?.suppliers) ? supplierCatalogData.suppliers : []),
+    [supplierCatalogData],
+  );
 
   const {
     draft: createUserDraft,
@@ -82,6 +111,13 @@ export function SuperadminUsersPanel() {
       if (s.unitId !== undefined) {
         setUnitId(s.unitId);
       }
+      if (Array.isArray(s.supplierIds)) {
+        setSupplierIds(
+          s.supplierIds
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id)),
+        );
+      }
     }
     createUserReadyRef.current = true;
   }, [createUserPersistReady]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -96,6 +132,7 @@ export function SuperadminUsersPanel() {
       fullName,
       typeId,
       unitId,
+      supplierIds,
     });
   }, [
     username,
@@ -103,6 +140,7 @@ export function SuperadminUsersPanel() {
     fullName,
     typeId,
     unitId,
+    supplierIds,
     createUserPersistReady,
     persistCreateUser,
   ]);
@@ -119,13 +157,18 @@ export function SuperadminUsersPanel() {
       notifyError("Điền đủ: username, email, mật khẩu (≥8), họ tên, vai trò.");
       return;
     }
+    if (isSupplierCreateType && supplierIds.length === 0) {
+      notifyError("Chọn ít nhất một nhà cung cấp.");
+      return;
+    }
     try {
       await createUser({
         username: username.trim(),
         email: email.trim(),
         password,
         typeId: Number(typeId),
-        unitId: unitId ? Number(unitId) : null,
+        unitId: isSupplierCreateType ? null : unitId ? Number(unitId) : null,
+        ...(isSupplierCreateType ? { supplierIds } : {}),
         profile: { fullName: fullName.trim() },
       }).unwrap();
       notifySuccess("Đã tạo người dùng.");
@@ -135,6 +178,7 @@ export function SuperadminUsersPanel() {
       setFullName("");
       setTypeId("");
       setUnitId("");
+      setSupplierIds([]);
       void clearCreateUserDraft();
     } catch (err) {
       notifyError(err?.data?.message || "Không tạo được người dùng.");
@@ -154,6 +198,56 @@ export function SuperadminUsersPanel() {
       notifyError(err?.data?.message || "Không cập nhật được trạng thái.");
     } finally {
       setTogglingUserId(null);
+    }
+  }
+
+  async function openSupplierEditor(user) {
+    setLoadingSupplierUserId(user.id);
+    try {
+      // Fetch /lttp-supplier/users/:id/links before opening the editor.
+      const data = await queryClient.fetchQuery(
+        getLttpSupplierUserLinksQueryOptions(user.id),
+      );
+      setEditingSupplierIds(
+        Array.isArray(data?.links)
+          ? data.links
+            .map((link) => Number(link?.supplierId))
+            .filter((id) => Number.isFinite(id))
+          : [],
+      );
+      setEditingSupplierUser(user);
+    } catch (err) {
+      notifyError(err?.data?.message || "Không tải được danh sách nhà cung cấp.");
+    } finally {
+      setLoadingSupplierUserId(null);
+    }
+  }
+
+  function closeSupplierEditor() {
+    setEditingSupplierUser(null);
+    setEditingSupplierIds([]);
+  }
+
+  async function saveSupplierEditor() {
+    if (!editingSupplierUser) {
+      return;
+    }
+    if (editingSupplierIds.length === 0) {
+      notifyError("Chọn ít nhất một nhà cung cấp.");
+      return;
+    }
+    setSavingSupplierUserId(editingSupplierUser.id);
+    try {
+      await patchUser({
+        id: editingSupplierUser.id,
+        supplierIds: editingSupplierIds,
+      }).unwrap();
+      notifySuccess("Đã cập nhật nhà cung cấp.");
+      closeSupplierEditor();
+    } catch (err) {
+      notifyError(err?.data?.message || "Không cập nhật được nhà cung cấp.");
+    } finally {
+      setSavingSupplierUserId(null);
     }
   }
 
@@ -237,35 +331,68 @@ export function SuperadminUsersPanel() {
               ))}
             </select>
           </label>
-          <label className="space-y-0.5" htmlFor="ql-sa-users-create-unitId">
-            <span className="text-[11px] font-medium text-muted-foreground">
-              Đơn vị
-            </span>
-            <select
-              id="ql-sa-users-create-unitId"
-              name="unitId"
-              className={cn(inputClass, "py-1.5")}
-              value={unitId}
-              onChange={(e) => {
-                const next = e.target.value;
-                setUnitId(next);
-                const depth = sortedUnits.find((u) => String(u.id) === String(next))?.depth;
-                if (depth != null && depth !== 0) {
-                  const adminType = types.find((t) => t.name === "admin");
-                  if (adminType && String(typeId) === String(adminType.id)) {
-                    setTypeId("");
+          {isSupplierCreateType ? (
+            <fieldset className="space-y-1 rounded-lg border border-border/70 px-3 py-2 sm:col-span-2">
+              <legend className="px-1 text-[11px] font-medium text-muted-foreground">
+                Nhà cung cấp
+              </legend>
+              {isSupplierCatalogLoading ? (
+                <p className="text-xs text-muted-foreground">Đang tải nhà cung cấp…</p>
+              ) : suppliers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Chưa có nhà cung cấp.</p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {suppliers.map((supplier) => {
+                    const supplierId = Number(supplier.id);
+                    return (
+                      <label
+                        key={supplier.id}
+                        className="flex items-start gap-2 rounded-md border border-border/60 px-2 py-1.5 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={supplierIds.includes(supplierId)}
+                          onChange={() => setSupplierIds((current) => toggleSupplierId(current, supplierId))}
+                        />
+                        <span>{supplier.level1UnitName} — {supplier.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </fieldset>
+          ) : (
+            <label className="space-y-0.5" htmlFor="ql-sa-users-create-unitId">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Đơn vị
+              </span>
+              <select
+                id="ql-sa-users-create-unitId"
+                name="unitId"
+                className={cn(inputClass, "py-1.5")}
+                value={unitId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setUnitId(next);
+                  const depth = sortedUnits.find((u) => String(u.id) === String(next))?.depth;
+                  if (depth != null && depth !== 0) {
+                    const adminType = types.find((t) => t.name === "admin");
+                    if (adminType && String(typeId) === String(adminType.id)) {
+                      setTypeId("");
+                    }
                   }
-                }
-              }}
-            >
-              <option value="">— Không gán —</option>
-              {sortedUnits.map((unit) => (
-                <option key={unit.id} value={unit.id}>
-                  {"—".repeat(unit.depth + 1)} {unit.name}
-                </option>
-              ))}
-            </select>
-          </label>
+                }}
+              >
+                <option value="">— Không gán —</option>
+                {sortedUnits.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {"—".repeat(unit.depth + 1)} {unit.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="flex items-end sm:col-span-2 lg:col-span-3">
             <Button
               type="submit"
@@ -330,15 +457,28 @@ export function SuperadminUsersPanel() {
                         </td>
                         <td className="px-2 py-1.5">{u.isActive ? "✓" : "—"}</td>
                         <td className="px-2 py-1.5 text-right">
-                          <IconButton
-                            label={u.isActive ? "Vô hiệu" : "Kích hoạt"}
-                            variant={u.isActive ? "danger" : "primary"}
-                            disabled={isPatching || togglingUserId != null}
-                            loading={togglingUserId === u.id}
-                            onClick={() => toggleActive(u)}
-                          >
-                            <Power aria-hidden />
-                          </IconButton>
+                          <div className="flex justify-end gap-2">
+                            {u.type?.name === "lttp_supplier" ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="px-3 py-1.5 text-xs"
+                                disabled={isPatching || loadingSupplierUserId != null}
+                                onClick={() => openSupplierEditor(u)}
+                              >
+                                {loadingSupplierUserId === u.id ? "Đang tải…" : "Sửa nhà cung cấp"}
+                              </Button>
+                            ) : null}
+                            <IconButton
+                              label={u.isActive ? "Vô hiệu" : "Kích hoạt"}
+                              variant={u.isActive ? "danger" : "primary"}
+                              disabled={isPatching || togglingUserId != null || loadingSupplierUserId != null}
+                              loading={togglingUserId === u.id}
+                              onClick={() => toggleActive(u)}
+                            >
+                              <Power aria-hidden />
+                            </IconButton>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -349,18 +489,156 @@ export function SuperadminUsersPanel() {
           ) : (
             <div className="space-y-0 px-3 sm:space-y-2 sm:px-0">
               {users.map((u) => (
-                <DashboardUserRowCard
+                <article
                   key={u.id}
-                  user={u}
-                  isPatching={isPatching}
-                  togglingUserId={togglingUserId}
-                  onToggleActive={toggleActive}
-                />
+                  className="-mx-3 rounded-none border-x-0 border-y border-border/70 bg-card/40 p-3 shadow-sm first:border-t sm:mx-0 sm:rounded-xl sm:border sm:border-border/70"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {u.profile?.fullName || u.username}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                    </div>
+                    <span
+                      className="shrink-0 rounded-md bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground"
+                      aria-label={u.isActive ? "Đang hoạt động" : "Đã vô hiệu"}
+                    >
+                      {u.isActive ? "HT" : "—"}
+                    </span>
+                  </div>
+
+                  <dl className="mt-2 space-y-1 text-[11px]">
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-muted-foreground">Vai trò</dt>
+                      <dd className="min-w-0 flex-1 text-right capitalize text-foreground">
+                        {u.type?.name ?? "—"}
+                      </dd>
+                    </div>
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-muted-foreground">Đơn vị</dt>
+                      <dd className="min-w-0 flex-1 truncate text-right text-foreground">
+                        {u.unit?.name ?? "—"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-3 flex justify-end gap-2 border-t border-border/60 pt-3">
+                    {u.type?.name === "lttp_supplier" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="px-3 py-1.5 text-xs"
+                        disabled={isPatching || loadingSupplierUserId != null}
+                        onClick={() => openSupplierEditor(u)}
+                      >
+                        {loadingSupplierUserId === u.id ? "Đang tải…" : "Sửa nhà cung cấp"}
+                      </Button>
+                    ) : null}
+                    <IconButton
+                      label={u.isActive ? "Vô hiệu" : "Kích hoạt"}
+                      variant={u.isActive ? "danger" : "primary"}
+                      disabled={isPatching || togglingUserId != null || loadingSupplierUserId != null}
+                      loading={togglingUserId === u.id}
+                      onClick={() => toggleActive(u)}
+                    >
+                      <Power aria-hidden />
+                    </IconButton>
+                  </div>
+                </article>
               ))}
             </div>
           )
         ) : null}
       </CardContent>
+
+      {editingSupplierUser ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
+          role="presentation"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-background/80 backdrop-blur-[1px]"
+            aria-label="Đóng"
+            onClick={closeSupplierEditor}
+            disabled={savingSupplierUserId != null}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="supplier-editor-title"
+            className="relative w-full max-w-lg rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+          >
+            <div className="space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">
+              <p
+                id="supplier-editor-title"
+                className="text-[10px] font-semibold uppercase tracking-wide text-primary"
+              >
+                Sửa nhà cung cấp
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Người dùng:{" "}
+                <span className="font-medium text-foreground">
+                  {editingSupplierUser.profile?.fullName || editingSupplierUser.username}
+                </span>
+              </p>
+            </div>
+
+            <div className="space-y-3 px-4 py-4 sm:px-5">
+              {isSupplierCatalogLoading ? (
+                <p className="text-sm text-muted-foreground">Đang tải nhà cung cấp…</p>
+              ) : suppliers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Chưa có nhà cung cấp.</p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {suppliers.map((supplier) => {
+                    const supplierId = Number(supplier.id);
+                    return (
+                      <label
+                        key={supplier.id}
+                        className="flex items-start gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={editingSupplierIds.includes(supplierId)}
+                          onChange={() =>
+                            setEditingSupplierIds((current) => toggleSupplierId(current, supplierId))
+                          }
+                          disabled={savingSupplierUserId != null}
+                        />
+                        <span>{supplier.level1UnitName} — {supplier.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3 sm:px-5">
+              <Button
+                type="button"
+                variant="ghost"
+                className="px-3 py-1.5 text-xs"
+                disabled={savingSupplierUserId != null}
+                onClick={closeSupplierEditor}
+              >
+                Huỷ
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                className="px-3 py-1.5 text-xs"
+                disabled={savingSupplierUserId != null || isSupplierCatalogLoading || suppliers.length === 0}
+                onClick={saveSupplierEditor}
+              >
+                {savingSupplierUserId != null ? "Đang lưu…" : "Lưu"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }
