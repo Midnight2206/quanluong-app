@@ -7,6 +7,11 @@ import {
   entityUnitIdWhere,
   UNIT_SCOPE_MODES,
 } from "../../shared/units/unit-scope.service.js";
+import {
+  blankUnitFieldsForSupplier,
+  LTTP_SUPPLIER_TYPE_NAME,
+  syncLttpSupplierAssignment,
+} from "../lttp-supplier/lttp-supplier.links.js";
 
 const USER_INCLUDE = {
   type: true,
@@ -18,6 +23,19 @@ const USER_INCLUDE = {
 
 const ADMIN_TYPE_NAME = "admin";
 const SUPERADMIN_TYPE_NAME = "superadmin";
+
+function assertSuperadminMayAssignSupplier(typeName, scope) {
+  if (typeName !== LTTP_SUPPLIER_TYPE_NAME) {
+    return;
+  }
+  if (scope?.mode !== UNIT_SCOPE_MODES.ALL) {
+    throw new AppError({
+      message: "Chỉ superadmin được tạo tài khoản nhà cung cấp.",
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+  }
+}
 
 async function assertAdminOnlyOnLevel1(typeId, unitId) {
   if (unitId == null || typeId == null) {
@@ -274,12 +292,22 @@ async function createUser(payload, scope, effectiveUnitIds) {
     },
     scope,
   );
+  assertSuperadminMayAssignSupplier(relations.type?.name, scope);
   await ensureUniqueUserFields({
     username: payload.username,
     email: payload.email,
   });
 
-  const effectiveUnitId = payload.unitId || relations.assignedUnit?.unitId || null;
+  const cleared = blankUnitFieldsForSupplier(relations.type?.name, {
+    unitId: payload.unitId || null,
+    assignedUnitId: payload.assignedUnitId || null,
+    jobTitleId: payload.jobTitleId || null,
+  });
+
+  const effectiveUnitId =
+    cleared.unitId ||
+    (cleared.assignedUnitId ? relations.assignedUnit?.unitId : null) ||
+    null;
   if (scope?.mode !== UNIT_SCOPE_MODES.ALL) {
     if (effectiveUnitId == null) {
       throw new AppError({
@@ -306,21 +334,24 @@ async function createUser(payload, scope, effectiveUnitIds) {
 
   const hashedPassword = await bcrypt.hash(payload.password, 10);
 
-  const resolvedUnitId = payload.unitId || relations.assignedUnit?.unitId || null;
+  const resolvedUnitId =
+    cleared.unitId ||
+    (cleared.assignedUnitId ? relations.assignedUnit?.unitId : null) ||
+    null;
   await assertAdminOnlyOnLevel1(payload.typeId, resolvedUnitId);
-  if (payload.jobTitleId && resolvedUnitId) {
-    await assertJobTitleAssignableToUser(payload.jobTitleId, resolvedUnitId);
+  if (cleared.jobTitleId && resolvedUnitId) {
+    await assertJobTitleAssignableToUser(cleared.jobTitleId, resolvedUnitId);
   }
 
-  return prisma.user.create({
+  const created = await prisma.user.create({
     data: {
       username: payload.username,
       email: payload.email,
       password: hashedPassword,
       typeId: payload.typeId,
       unitId: resolvedUnitId,
-      assignedUnitId: payload.assignedUnitId || null,
-      jobTitleId: payload.jobTitleId || null,
+      assignedUnitId: cleared.assignedUnitId,
+      jobTitleId: cleared.jobTitleId,
       registrationStatus: "APPROVED",
       emailVerifiedAt: relations.type?.name === SUPERADMIN_TYPE_NAME ? new Date() : null,
       profile: {
@@ -329,11 +360,21 @@ async function createUser(payload, scope, effectiveUnitIds) {
     },
     include: USER_INCLUDE,
   });
+  await syncLttpSupplierAssignment(
+    created.id,
+    {
+      nextTypeName: relations.type?.name,
+      mode: "create",
+      supplierIds: payload.supplierIds,
+    },
+    prisma,
+  );
+  return created;
 }
 
 async function patchUser(userId, payload, scope, options = {}) {
   const { actorId = null, effectiveUnitIds } = options;
-  await getUserById(userId, scope, effectiveUnitIds);
+  const existingUser = await getUserById(userId, scope, effectiveUnitIds);
 
   if (
     actorId != null &&
@@ -375,13 +416,27 @@ async function patchUser(userId, payload, scope, options = {}) {
     }
   }
 
-  if (Object.hasOwn(payload, "unitId")) {
+  const nextTypeId = payload.typeId ?? existingUser?.typeId;
+  const nextType = nextTypeId
+    ? await prisma.type.findUnique({
+        where: { id: nextTypeId },
+        select: { name: true },
+      })
+    : null;
+  const nextTypeName = nextType?.name ?? null;
+  assertSuperadminMayAssignSupplier(nextTypeName, scope);
+
+  if (
+    nextTypeName !== LTTP_SUPPLIER_TYPE_NAME &&
+    Object.hasOwn(payload, "unitId")
+  ) {
     assertUnitIdInScope(payload.unitId ?? null, scope, {
       allowNull: scope?.mode === UNIT_SCOPE_MODES.ALL,
     });
   }
 
   if (
+    nextTypeName !== LTTP_SUPPLIER_TYPE_NAME &&
     effectiveUnitIds != null &&
     effectiveUnitIds.length > 0 &&
     Object.hasOwn(payload, "unitId") &&
@@ -395,27 +450,24 @@ async function patchUser(userId, payload, scope, options = {}) {
     });
   }
 
-  if (Object.hasOwn(payload, "jobTitleId") && payload.jobTitleId) {
-    const row = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { unitId: true },
-    });
-    if (row?.unitId) {
-      await assertJobTitleAssignableToUser(payload.jobTitleId, row.unitId);
+  if (
+    nextTypeName !== LTTP_SUPPLIER_TYPE_NAME &&
+    Object.hasOwn(payload, "jobTitleId") &&
+    payload.jobTitleId
+  ) {
+    if (existingUser?.unitId) {
+      await assertJobTitleAssignableToUser(payload.jobTitleId, existingUser.unitId);
     }
   }
 
-  const existingForAdmin = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { typeId: true, unitId: true },
-  });
-  const nextTypeId = payload.typeId ?? existingForAdmin?.typeId;
   const nextUnitId = Object.hasOwn(payload, "unitId")
-    ? payload.unitId
-    : existingForAdmin?.unitId;
+    ? nextTypeName === LTTP_SUPPLIER_TYPE_NAME
+      ? null
+      : payload.unitId
+    : existingUser?.unitId;
   await assertAdminOnlyOnLevel1(nextTypeId, nextUnitId);
 
-  const data = {
+  const data = blankUnitFieldsForSupplier(nextTypeName, {
     ...(payload.username ? { username: payload.username } : {}),
     ...(payload.email ? { email: payload.email } : {}),
     ...(payload.typeId ? { typeId: payload.typeId } : {}),
@@ -439,15 +491,27 @@ async function patchUser(userId, payload, scope, options = {}) {
           },
         }
       : {}),
-  };
+  });
 
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: {
       id: userId,
     },
     data,
     include: USER_INCLUDE,
   });
+  await syncLttpSupplierAssignment(
+    updated.id,
+    {
+      nextTypeName,
+      mode: "patch",
+      supplierIds: Object.hasOwn(payload, "supplierIds")
+        ? payload.supplierIds
+        : undefined,
+    },
+    prisma,
+  );
+  return updated;
 }
 
 async function replaceUser(userId, payload, scope, effectiveUnitIds) {
@@ -461,13 +525,23 @@ async function replaceUser(userId, payload, scope, effectiveUnitIds) {
     },
     scope,
   );
+  assertSuperadminMayAssignSupplier(relations.type?.name, scope);
   await ensureUniqueUserFields({
     username: payload.username,
     email: payload.email,
     excludeUserId: userId,
   });
 
-  const effectiveUnitId = payload.unitId || relations.assignedUnit?.unitId || null;
+  const cleared = blankUnitFieldsForSupplier(relations.type?.name, {
+    unitId: payload.unitId || null,
+    assignedUnitId: payload.assignedUnitId || null,
+    jobTitleId: payload.jobTitleId || null,
+  });
+
+  const effectiveUnitId =
+    cleared.unitId ||
+    (cleared.assignedUnitId ? relations.assignedUnit?.unitId : null) ||
+    null;
   if (scope?.mode !== UNIT_SCOPE_MODES.ALL) {
     if (effectiveUnitId == null) {
       throw new AppError({
@@ -479,13 +553,13 @@ async function replaceUser(userId, payload, scope, effectiveUnitIds) {
     assertUnitIdInScope(effectiveUnitId, scope);
   }
 
-  if (payload.jobTitleId && effectiveUnitId) {
-    await assertJobTitleAssignableToUser(payload.jobTitleId, effectiveUnitId);
+  if (cleared.jobTitleId && effectiveUnitId) {
+    await assertJobTitleAssignableToUser(cleared.jobTitleId, effectiveUnitId);
   }
 
   await assertAdminOnlyOnLevel1(payload.typeId, effectiveUnitId);
 
-  return prisma.user.update({
+  const updated = await prisma.user.update({
     where: {
       id: userId,
     },
@@ -495,8 +569,8 @@ async function replaceUser(userId, payload, scope, effectiveUnitIds) {
       password: await bcrypt.hash(payload.password, 10),
       typeId: payload.typeId,
       unitId: effectiveUnitId,
-      assignedUnitId: payload.assignedUnitId || null,
-      jobTitleId: payload.jobTitleId || null,
+      assignedUnitId: cleared.assignedUnitId,
+      jobTitleId: cleared.jobTitleId,
       profile: {
         upsert: {
           update: payload.profile,
@@ -506,6 +580,16 @@ async function replaceUser(userId, payload, scope, effectiveUnitIds) {
     },
     include: USER_INCLUDE,
   });
+  await syncLttpSupplierAssignment(
+    updated.id,
+    {
+      nextTypeName: relations.type?.name,
+      mode: "replace",
+      supplierIds: payload.supplierIds,
+    },
+    prisma,
+  );
+  return updated;
 }
 
 async function softDeleteUser(userId, scope, effectiveUnitIds) {

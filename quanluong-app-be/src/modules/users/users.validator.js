@@ -19,6 +19,7 @@ const createUserBodySchema = z.object({
   unitId: z.number().int().positive().optional().nullable(),
   assignedUnitId: z.number().int().positive().optional().nullable(),
   jobTitleId: z.number().int().positive().optional().nullable(),
+  supplierIds: z.array(z.number().int().positive()).optional(),
   profile: userProfileSchema,
 });
 

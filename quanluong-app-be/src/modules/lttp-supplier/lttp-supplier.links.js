@@ -57,9 +57,40 @@ async function clearUserLttpSupplierLinks(userId, db) {
   await db.userLttpSupplier.deleteMany({ where: { userId } });
 }
 
+function blankUnitFieldsForSupplier(typeName, fields) {
+  if (typeName !== LTTP_SUPPLIER_TYPE_NAME) {
+    return fields;
+  }
+  return { ...fields, unitId: null, assignedUnitId: null, jobTitleId: null };
+}
+
+async function syncLttpSupplierAssignment(
+  userId,
+  { nextTypeName, mode, supplierIds },
+  db,
+) {
+  if (nextTypeName !== LTTP_SUPPLIER_TYPE_NAME) {
+    await clearUserLttpSupplierLinks(userId, db);
+    return;
+  }
+  if (supplierIds === undefined) {
+    if (mode === "patch") {
+      return;
+    }
+    throw new AppError({
+      message: "Chọn ít nhất một nhà cung cấp.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  await replaceUserLttpSupplierLinks(userId, supplierIds, db);
+}
+
 export {
+  blankUnitFieldsForSupplier,
   LTTP_SUPPLIER_TYPE_NAME,
   clearUserLttpSupplierLinks,
   replaceUserLttpSupplierLinks,
+  syncLttpSupplierAssignment,
   uniqueSupplierIds,
 };
