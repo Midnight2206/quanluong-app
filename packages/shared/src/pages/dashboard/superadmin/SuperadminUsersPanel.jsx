@@ -73,12 +73,17 @@ export function SuperadminUsersPanel() {
   const [savingSupplierUserId, setSavingSupplierUserId] = useState(null);
   const shouldLoadSupplierCatalog = isSupplierCreateType || editingSupplierUser != null;
   // Load /lttp-supplier/catalog only when the create/editor supplier UI is visible.
-  const { data: supplierCatalogData, isLoading: isSupplierCatalogLoading } =
+  const {
+    data: supplierCatalogData,
+    isLoading: isSupplierCatalogLoading,
+    isError: isSupplierCatalogError,
+  } =
     useLttpSupplierCatalogQuery({ skip: !shouldLoadSupplierCatalog });
   const suppliers = useMemo(
     () => (Array.isArray(supplierCatalogData?.suppliers) ? supplierCatalogData.suppliers : []),
     [supplierCatalogData],
   );
+  const hasEmptySupplierCatalog = !isSupplierCatalogLoading && !isSupplierCatalogError && suppliers.length === 0;
 
   const {
     draft: createUserDraft,
@@ -338,7 +343,11 @@ export function SuperadminUsersPanel() {
               </legend>
               {isSupplierCatalogLoading ? (
                 <p className="text-xs text-muted-foreground">Đang tải nhà cung cấp…</p>
-              ) : suppliers.length === 0 ? (
+              ) : isSupplierCatalogError ? (
+                <p className="text-xs text-muted-foreground">
+                  Không tải được danh sách nhà cung cấp.
+                </p>
+              ) : hasEmptySupplierCatalog ? (
                 <p className="text-xs text-muted-foreground">Chưa có nhà cung cấp.</p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -588,7 +597,11 @@ export function SuperadminUsersPanel() {
             <div className="space-y-3 px-4 py-4 sm:px-5">
               {isSupplierCatalogLoading ? (
                 <p className="text-sm text-muted-foreground">Đang tải nhà cung cấp…</p>
-              ) : suppliers.length === 0 ? (
+              ) : isSupplierCatalogError ? (
+                <p className="text-sm text-muted-foreground">
+                  Không tải được danh sách nhà cung cấp.
+                </p>
+              ) : hasEmptySupplierCatalog ? (
                 <p className="text-sm text-muted-foreground">Chưa có nhà cung cấp.</p>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -630,7 +643,12 @@ export function SuperadminUsersPanel() {
                 type="button"
                 variant="primary"
                 className="px-3 py-1.5 text-xs"
-                disabled={savingSupplierUserId != null || isSupplierCatalogLoading || suppliers.length === 0}
+                disabled={
+                  savingSupplierUserId != null ||
+                  isSupplierCatalogLoading ||
+                  isSupplierCatalogError ||
+                  suppliers.length === 0
+                }
                 onClick={saveSupplierEditor}
               >
                 {savingSupplierUserId != null ? "Đang lưu…" : "Lưu"}

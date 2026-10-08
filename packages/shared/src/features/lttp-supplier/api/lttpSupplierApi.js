@@ -13,6 +13,31 @@ export function useLttpSupplierCatalogQuery(options = {}) {
   });
 }
 
+export function useLttpSupplierLinksQuery(options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: ["lttp-supplier", "links"],
+    queryFn: () => apiRequest({ url: "/lttp-supplier/links", method: "get" }),
+    enabled: skip !== true,
+    ...rest,
+  });
+}
+
+export function useLttpSupplierOrdersQuery({ date, supplierId }, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: ["lttp-supplier", "orders", date, supplierId],
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp-supplier/orders",
+        method: "get",
+        params: { date, supplierId },
+      }),
+    enabled: skip !== true && Boolean(date) && supplierId != null,
+    ...rest,
+  });
+}
+
 export function getLttpSupplierUserLinksQueryOptions(userId) {
   return {
     queryKey: ["lttp-supplier", "user-links", userId],
