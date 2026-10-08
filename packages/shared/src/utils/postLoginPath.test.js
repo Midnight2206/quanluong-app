@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   SUPERADMIN_PORTAL_CHOOSER_PATH,
-  chooserDestination,
   isLttpSupplierUser,
   isSuperadminUser,
   navigateAfterLogin,
   resolvePostLoginPath,
   safeInternalPath,
+  supplierChooserHandoff,
 } from "./postLoginPath.js";
 
 test("safeInternalPath rejects open redirects", () => {
@@ -77,8 +77,24 @@ test("navigateAfterLogin uses replace for internal paths", () => {
   assert.deepEqual(calls, [["replace", "/profile"]]);
 });
 
-test("chooserDestination returns supplier, home, or chooser", () => {
-  assert.equal(chooserDestination({ type: { name: "lttp_supplier" } }), "supplier");
-  assert.equal(chooserDestination({ type: { name: "admin" } }), "home");
-  assert.equal(chooserDestination({ type: { name: "superadmin" } }), "chooser");
+test("supplierChooserHandoff sends supplier users to one external url", () => {
+  const result = supplierChooserHandoff(
+    { type: { name: "lttp_supplier" } },
+    "http://localhost:8082",
+  );
+  assert.deepEqual(result, { external: "http://localhost:8082/dat-hang" });
+  assert.equal("internal" in result, false);
+});
+
+test("supplierChooserHandoff sends admin users home with no external url", () => {
+  const result = supplierChooserHandoff({ type: { name: "admin" } }, "http://localhost:8082");
+  assert.deepEqual(result, { internal: "/" });
+  assert.equal("external" in result, false);
+});
+
+test("supplierChooserHandoff keeps superadmin on the chooser", () => {
+  assert.deepEqual(
+    supplierChooserHandoff({ type: { name: "superadmin" } }, "http://localhost:8082"),
+    { stay: true },
+  );
 });

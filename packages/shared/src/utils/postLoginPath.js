@@ -32,14 +32,16 @@ export function navigateAfterLogin(next, { assign, replace }) {
   replace(next);
 }
 
-export function chooserDestination(user) {
-  if (isSuperadminUser(user)) {
-    return "chooser";
-  }
+export function supplierChooserHandoff(user, supplierOrigin) {
   if (isLttpSupplierUser(user)) {
-    return "supplier";
+    return {
+      external: `${String(supplierOrigin).replace(/\/+$/, "")}/dat-hang`,
+    };
   }
-  return "home";
+  if (isSuperadminUser(user)) {
+    return { stay: true };
+  }
+  return { internal: "/" };
 }
 
 /**

@@ -10,14 +10,14 @@ import {
   useCurrentUser,
 } from "@/features/auth/model/authSlice";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
-import { chooserDestination } from "@/utils/postLoginPath";
+import { supplierChooserHandoff } from "@/utils/postLoginPath";
 import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
-function SupplierPortalRedirect() {
+function ExternalRedirect({ href }) {
   useEffect(() => {
-    window.location.replace(`${getSupplierAppOrigin()}/dat-hang`);
-  }, []);
+    window.location.replace(href);
+  }, [href]);
 
   return null;
 }
@@ -34,11 +34,12 @@ export function PortalChooserPage() {
   if (!isAuthenticated) {
     return <ClientRedirect href="/login?from=%2Fchon-cong" replace />;
   }
-  if (chooserDestination(user) === "supplier") {
-    return <SupplierPortalRedirect />;
+  const handoff = supplierChooserHandoff(user, getSupplierAppOrigin());
+  if (handoff.external) {
+    return <ExternalRedirect href={handoff.external} />;
   }
-  if (chooserDestination(user) === "home") {
-    return <ClientRedirect href="/" replace />;
+  if (handoff.internal) {
+    return <ClientRedirect href={handoff.internal} replace />;
   }
 
   return (
