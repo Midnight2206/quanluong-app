@@ -48,6 +48,26 @@ function fakeDb(rows) {
   return db;
 }
 
+function fakeDbWithoutTransaction(rows) {
+  const calls = [];
+  return {
+    calls,
+    lttpSupplier: {
+      async findMany() {
+        return rows;
+      },
+    },
+    userLttpSupplier: {
+      async deleteMany(args) {
+        calls.push(["delete", args]);
+      },
+      async createMany(args) {
+        calls.push(["create", args]);
+      },
+    },
+  };
+}
+
 test("replace rejects a supplier outside level 1 and does not write", async () => {
   const db = fakeDb([{ id: 5, unit: { depth: 1 } }]);
   await assert.rejects(
@@ -70,6 +90,21 @@ test("replace rewrites the exact id set", async () => {
     { userId: 9, lttpSupplierId: 5 },
     { userId: 9, lttpSupplierId: 8 },
   ] }]);
+});
+
+test("replace rewrites links without opening a nested transaction", async () => {
+  const db = fakeDbWithoutTransaction([
+    { id: 5, unit: { depth: 0 } },
+    { id: 8, unit: { depth: 0 } },
+  ]);
+  await replaceUserLttpSupplierLinks(9, [5, 5, 8], db);
+  assert.deepEqual(db.calls, [
+    ["delete", { where: { userId: 9 } }],
+    ["create", { data: [
+      { userId: 9, lttpSupplierId: 5 },
+      { userId: 9, lttpSupplierId: 8 },
+    ] }],
+  ]);
 });
 
 test("clear deletes by user", async () => {

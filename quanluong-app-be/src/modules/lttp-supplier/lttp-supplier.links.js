@@ -45,11 +45,19 @@ async function replaceUserLttpSupplierLinks(userId, supplierIds, db) {
       code: ERROR_CODES.VALIDATION_ERROR,
     });
   }
-  await db.$transaction(async (tx) => {
-    await tx.userLttpSupplier.deleteMany({ where: { userId } });
-    await tx.userLttpSupplier.createMany({
-      data: ids.map((lttpSupplierId) => ({ userId, lttpSupplierId })),
+  if (typeof db.$transaction === "function") {
+    await db.$transaction(async (tx) => {
+      await tx.userLttpSupplier.deleteMany({ where: { userId } });
+      await tx.userLttpSupplier.createMany({
+        data: ids.map((lttpSupplierId) => ({ userId, lttpSupplierId })),
+      });
     });
+    return;
+  }
+
+  await db.userLttpSupplier.deleteMany({ where: { userId } });
+  await db.userLttpSupplier.createMany({
+    data: ids.map((lttpSupplierId) => ({ userId, lttpSupplierId })),
   });
 }
 

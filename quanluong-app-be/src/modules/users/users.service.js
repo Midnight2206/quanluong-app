@@ -343,32 +343,35 @@ async function createUser(payload, scope, effectiveUnitIds) {
     await assertJobTitleAssignableToUser(cleared.jobTitleId, resolvedUnitId);
   }
 
-  const created = await prisma.user.create({
-    data: {
-      username: payload.username,
-      email: payload.email,
-      password: hashedPassword,
-      typeId: payload.typeId,
-      unitId: resolvedUnitId,
-      assignedUnitId: cleared.assignedUnitId,
-      jobTitleId: cleared.jobTitleId,
-      registrationStatus: "APPROVED",
-      emailVerifiedAt: relations.type?.name === SUPERADMIN_TYPE_NAME ? new Date() : null,
-      profile: {
-        create: payload.profile,
+  const created = await prisma.$transaction(async (tx) => {
+    const createdUser = await tx.user.create({
+      data: {
+        username: payload.username,
+        email: payload.email,
+        password: hashedPassword,
+        typeId: payload.typeId,
+        unitId: resolvedUnitId,
+        assignedUnitId: cleared.assignedUnitId,
+        jobTitleId: cleared.jobTitleId,
+        registrationStatus: "APPROVED",
+        emailVerifiedAt: relations.type?.name === SUPERADMIN_TYPE_NAME ? new Date() : null,
+        profile: {
+          create: payload.profile,
+        },
       },
-    },
-    include: USER_INCLUDE,
+      include: USER_INCLUDE,
+    });
+    await syncLttpSupplierAssignment(
+      createdUser.id,
+      {
+        nextTypeName: relations.type?.name,
+        mode: "create",
+        supplierIds: payload.supplierIds,
+      },
+      tx,
+    );
+    return createdUser;
   });
-  await syncLttpSupplierAssignment(
-    created.id,
-    {
-      nextTypeName: relations.type?.name,
-      mode: "create",
-      supplierIds: payload.supplierIds,
-    },
-    prisma,
-  );
   return created;
 }
 
@@ -493,24 +496,27 @@ async function patchUser(userId, payload, scope, options = {}) {
       : {}),
   });
 
-  const updated = await prisma.user.update({
-    where: {
-      id: userId,
-    },
-    data,
-    include: USER_INCLUDE,
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedUser = await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data,
+      include: USER_INCLUDE,
+    });
+    await syncLttpSupplierAssignment(
+      updatedUser.id,
+      {
+        nextTypeName,
+        mode: "patch",
+        supplierIds: Object.hasOwn(payload, "supplierIds")
+          ? payload.supplierIds
+          : undefined,
+      },
+      tx,
+    );
+    return updatedUser;
   });
-  await syncLttpSupplierAssignment(
-    updated.id,
-    {
-      nextTypeName,
-      mode: "patch",
-      supplierIds: Object.hasOwn(payload, "supplierIds")
-        ? payload.supplierIds
-        : undefined,
-    },
-    prisma,
-  );
   return updated;
 }
 
@@ -559,36 +565,41 @@ async function replaceUser(userId, payload, scope, effectiveUnitIds) {
 
   await assertAdminOnlyOnLevel1(payload.typeId, effectiveUnitId);
 
-  const updated = await prisma.user.update({
-    where: {
-      id: userId,
-    },
-    data: {
-      username: payload.username,
-      email: payload.email,
-      password: await bcrypt.hash(payload.password, 10),
-      typeId: payload.typeId,
-      unitId: effectiveUnitId,
-      assignedUnitId: cleared.assignedUnitId,
-      jobTitleId: cleared.jobTitleId,
-      profile: {
-        upsert: {
-          update: payload.profile,
-          create: payload.profile,
+  const hashedPassword = await bcrypt.hash(payload.password, 10);
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedUser = await tx.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        username: payload.username,
+        email: payload.email,
+        password: hashedPassword,
+        typeId: payload.typeId,
+        unitId: effectiveUnitId,
+        assignedUnitId: cleared.assignedUnitId,
+        jobTitleId: cleared.jobTitleId,
+        profile: {
+          upsert: {
+            update: payload.profile,
+            create: payload.profile,
+          },
         },
       },
-    },
-    include: USER_INCLUDE,
+      include: USER_INCLUDE,
+    });
+    await syncLttpSupplierAssignment(
+      updatedUser.id,
+      {
+        nextTypeName: relations.type?.name,
+        mode: "replace",
+        supplierIds: payload.supplierIds,
+      },
+      tx,
+    );
+    return updatedUser;
   });
-  await syncLttpSupplierAssignment(
-    updated.id,
-    {
-      nextTypeName: relations.type?.name,
-      mode: "replace",
-      supplierIds: payload.supplierIds,
-    },
-    prisma,
-  );
   return updated;
 }
 
