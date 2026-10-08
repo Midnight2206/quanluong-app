@@ -161,6 +161,7 @@ export function SuperadminUsersPanel() {
     e.preventDefault();
     const blockReason = supplierCreateBlockReason({
       isSupplierCreateType,
+      catalogFailed: isSupplierCatalogError,
       supplierIds,
       username,
       email,
@@ -404,7 +405,10 @@ export function SuperadminUsersPanel() {
           <div className="flex items-end sm:col-span-2 lg:col-span-3">
             <Button
               type="submit"
-              disabled={isCreating}
+              disabled={
+                isCreating
+                || (isSupplierCreateType && (isSupplierCatalogLoading || isSupplierCatalogError))
+              }
               className="gap-1.5 px-3 py-1.5 text-xs"
               title="Tạo người dùng"
             >

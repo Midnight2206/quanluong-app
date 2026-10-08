@@ -22,6 +22,15 @@ test("create supplier account blocks an empty selection and sends a null unit", 
     supplierCreateBlockReason({
       ...filled,
       isSupplierCreateType: true,
+      catalogFailed: true,
+      supplierIds: [],
+    }),
+    "Không tải được danh sách nhà cung cấp.",
+  );
+  assert.equal(
+    supplierCreateBlockReason({
+      ...filled,
+      isSupplierCreateType: true,
       supplierIds: [],
     }),
     "Chọn ít nhất một nhà cung cấp.",

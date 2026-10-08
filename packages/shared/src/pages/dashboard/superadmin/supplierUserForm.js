@@ -1,5 +1,6 @@
 export function supplierCreateBlockReason({
   isSupplierCreateType,
+  catalogFailed = false,
   supplierIds,
   username,
   email,
@@ -15,6 +16,9 @@ export function supplierCreateBlockReason({
     !typeId
   ) {
     return "Điền đủ: username, email, mật khẩu (≥8), họ tên, vai trò.";
+  }
+  if (isSupplierCreateType && catalogFailed) {
+    return "Không tải được danh sách nhà cung cấp.";
   }
   if (isSupplierCreateType && supplierIds.length === 0) {
     return "Chọn ít nhất một nhà cung cấp.";
