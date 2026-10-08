@@ -24,6 +24,24 @@ export function isLttpSupplierUser(user) {
   return user?.type?.name === "lttp_supplier";
 }
 
+export function navigateAfterLogin(next, { assign, replace }) {
+  if (/^https?:\/\//i.test(next)) {
+    assign(next);
+    return;
+  }
+  replace(next);
+}
+
+export function chooserDestination(user) {
+  if (isSuperadminUser(user)) {
+    return "chooser";
+  }
+  if (isLttpSupplierUser(user)) {
+    return "supplier";
+  }
+  return "home";
+}
+
 /**
  * Đích sau login mật khẩu (path nội bộ app chính).
  * Superadmin luôn vào trang chọn — bỏ qua `from`.

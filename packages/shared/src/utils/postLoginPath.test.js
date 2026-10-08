@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   SUPERADMIN_PORTAL_CHOOSER_PATH,
+  chooserDestination,
   isLttpSupplierUser,
   isSuperadminUser,
+  navigateAfterLogin,
   resolvePostLoginPath,
   safeInternalPath,
 } from "./postLoginPath.js";
@@ -47,4 +49,36 @@ test("resolvePostLoginPath sends supplier to the supplier app and ignores from",
     ),
     "http://localhost:8082/dat-hang",
   );
+});
+
+test("navigateAfterLogin uses assign for absolute http urls", () => {
+  const calls = [];
+  navigateAfterLogin("http://localhost:8082/dat-hang", {
+    assign(value) {
+      calls.push(["assign", value]);
+    },
+    replace(value) {
+      calls.push(["replace", value]);
+    },
+  });
+  assert.deepEqual(calls, [["assign", "http://localhost:8082/dat-hang"]]);
+});
+
+test("navigateAfterLogin uses replace for internal paths", () => {
+  const calls = [];
+  navigateAfterLogin("/profile", {
+    assign(value) {
+      calls.push(["assign", value]);
+    },
+    replace(value) {
+      calls.push(["replace", value]);
+    },
+  });
+  assert.deepEqual(calls, [["replace", "/profile"]]);
+});
+
+test("chooserDestination returns supplier, home, or chooser", () => {
+  assert.equal(chooserDestination({ type: { name: "lttp_supplier" } }), "supplier");
+  assert.equal(chooserDestination({ type: { name: "admin" } }), "home");
+  assert.equal(chooserDestination({ type: { name: "superadmin" } }), "chooser");
 });

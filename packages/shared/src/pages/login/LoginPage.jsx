@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
+  navigateAfterLogin,
   isSuperadminUser,
   resolvePostLoginPath,
   SUPERADMIN_PORTAL_CHOOSER_PATH,
@@ -38,10 +39,6 @@ const GOOGLE_LOGIN_ERROR_MESSAGES = {
   profile: "Không lấy được thông tin tài khoản Google. Thử lại sau.",
   unknown: "Đăng nhập Google thất bại. Hãy thử lại.",
 };
-
-function isAbsoluteHttpUrl(value) {
-  return /^https?:\/\//i.test(value);
-}
 
 function GoogleIcon({ className }) {
   return (
@@ -111,11 +108,10 @@ export function LoginPage() {
       const next = resolvePostLoginPath(user, searchParams.get("from"), {
         supplierOrigin: getSupplierAppOrigin(),
       });
-      if (isAbsoluteHttpUrl(next)) {
-        window.location.assign(next);
-        return;
-      }
-      router.replace(next);
+      navigateAfterLogin(next, {
+        assign: window.location.assign.bind(window.location),
+        replace: router.replace.bind(router),
+      });
     } catch (error) {
       notifyError(error?.data?.message || "Đăng nhập thất bại.");
     }

@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import {
+  useIsAuthenticated,
   useAuthInitialized,
   useCurrentUser,
-  useIsAuthenticated,
 } from "@/features/auth/model/authSlice";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
-import { isLttpSupplierUser, isSuperadminUser } from "@/utils/postLoginPath";
+import { chooserDestination } from "@/utils/postLoginPath";
 import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
@@ -34,10 +34,10 @@ export function PortalChooserPage() {
   if (!isAuthenticated) {
     return <ClientRedirect href="/login?from=%2Fchon-cong" replace />;
   }
-  if (isLttpSupplierUser(user)) {
+  if (chooserDestination(user) === "supplier") {
     return <SupplierPortalRedirect />;
   }
-  if (!isSuperadminUser(user)) {
+  if (chooserDestination(user) === "home") {
     return <ClientRedirect href="/" replace />;
   }
 
