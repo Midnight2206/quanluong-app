@@ -174,6 +174,7 @@ model User {
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
   kitchenMenuSamplesCreated              KitchenMenuSample[] @relation("KitchenMenuSampleCreatedBy")
+  lttpSupplierLinks UserLttpSupplier[]
 
   @@index([typeId])
   @@index([unitId])
@@ -850,8 +851,20 @@ model LttpSupplier {
   lttpPartnerDebts            LttpPartnerDebt[]
   lttpPartnerPayments         LttpPartnerPayment[]
   lttpPartnerPaymentTotals    LttpPartnerPaymentTotal[]
+  userLinks UserLttpSupplier[]
 
   @@index([unitId])
+}
+
+model UserLttpSupplier {
+  userId         Int
+  lttpSupplierId Int
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lttpSupplier   LttpSupplier @relation(fields: [lttpSupplierId], references: [id], onDelete: Cascade)
+
+  @@id([userId, lttpSupplierId])
+  @@index([lttpSupplierId])
 }
 
 /// Đối tác cung cấp mặc định theo từng mặt hàng (bảng liên kết, cập nhật thường xuyên).

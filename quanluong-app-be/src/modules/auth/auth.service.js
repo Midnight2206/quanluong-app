@@ -75,6 +75,7 @@ const SYSTEM_TYPE_NAMES = {
   SUPERADMIN: "superadmin",
   ADMIN: "admin",
   USER: "user",
+  LTTP_SUPPLIER: "lttp_supplier",
 };
 
 const DEFAULT_REGISTRATION_UNIT_NAME = "Đơn vị mặc định";
@@ -735,7 +736,7 @@ async function syncPermissionsFromRoutes(routeDefinitions = []) {
 }
 
 async function ensureSystemTypes() {
-  const [superadminType, adminType, userType] = await Promise.all([
+  const [superadminType, adminType, userType, lttpSupplierType] = await Promise.all([
     prisma.type.upsert({
       where: {
         name: SYSTEM_TYPE_NAMES.SUPERADMIN,
@@ -776,11 +777,23 @@ async function ensureSystemTypes() {
         name: SYSTEM_TYPE_NAMES.USER,
         isSystem: true,
         description: "Default user role waiting for permission assignment.",
+      },
+    }),
+    prisma.type.upsert({
+      where: { name: SYSTEM_TYPE_NAMES.LTTP_SUPPLIER },
+      update: {
+        isSystem: true,
+        description: "Nhà cung cấp LTTP, chỉ xem đặt hàng của các nhà cung cấp được gắn.",
+      },
+      create: {
+        name: SYSTEM_TYPE_NAMES.LTTP_SUPPLIER,
+        isSystem: true,
+        description: "Nhà cung cấp LTTP, chỉ xem đặt hàng của các nhà cung cấp được gắn.",
       },
     }),
   ]);
 
-  return { superadminType, adminType, userType };
+  return { superadminType, adminType, userType, lttpSupplierType };
 }
 
 async function ensureDefaultRegistrationUnit() {
