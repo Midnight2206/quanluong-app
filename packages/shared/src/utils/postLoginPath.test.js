@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   SUPERADMIN_PORTAL_CHOOSER_PATH,
+  isLttpSupplierUser,
   isSuperadminUser,
   resolvePostLoginPath,
   safeInternalPath,
@@ -33,4 +34,17 @@ test("resolvePostLoginPath keeps safe from for others", () => {
     "/profile",
   );
   assert.equal(resolvePostLoginPath({ type: { name: "user" } }, null), "/");
+});
+
+test("resolvePostLoginPath sends supplier to the supplier app and ignores from", () => {
+  assert.equal(isLttpSupplierUser({ type: { name: "lttp_supplier" } }), true);
+  assert.equal(isLttpSupplierUser({ type: { name: "admin" } }), false);
+  assert.equal(
+    resolvePostLoginPath(
+      { type: { name: "lttp_supplier" } },
+      "/dashboard",
+      { supplierOrigin: "http://localhost:8082" },
+    ),
+    "http://localhost:8082/dat-hang",
+  );
 });

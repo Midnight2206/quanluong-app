@@ -1,5 +1,6 @@
 import "./globals.css";
 import { AppProviders } from "@/app/providers/AppProviders";
+import { LttpSupplierRedirect } from "@/hocs/LttpSupplierRedirect";
 import { QUANLUONG_SITE_NAME } from "@/lib/quanLuongPageMeta";
 
 /** @param {string} url */
@@ -67,7 +68,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="vi">
       <body className="min-h-screen antialiased">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <LttpSupplierRedirect />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );

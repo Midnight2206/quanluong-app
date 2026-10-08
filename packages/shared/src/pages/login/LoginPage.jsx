@@ -16,6 +16,7 @@ import { useLoginMutation } from "@/features/auth/api/authApi";
 import { loginSchema } from "@/features/auth/schemas/authSchemas";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { getApiBaseUrl } from "@/utils/runtimeEnv";
+import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 const GOOGLE_LOGIN_ERROR_MESSAGES = {
@@ -37,6 +38,10 @@ const GOOGLE_LOGIN_ERROR_MESSAGES = {
   profile: "Không lấy được thông tin tài khoản Google. Thử lại sau.",
   unknown: "Đăng nhập Google thất bại. Hãy thử lại.",
 };
+
+function isAbsoluteHttpUrl(value) {
+  return /^https?:\/\//i.test(value);
+}
 
 function GoogleIcon({ className }) {
   return (
@@ -103,7 +108,13 @@ export function LoginPage() {
         window.location.assign(`${getSuperadminAppOrigin()}/dashboard`);
         return;
       }
-      const next = resolvePostLoginPath(user, searchParams.get("from"));
+      const next = resolvePostLoginPath(user, searchParams.get("from"), {
+        supplierOrigin: getSupplierAppOrigin(),
+      });
+      if (isAbsoluteHttpUrl(next)) {
+        window.location.assign(next);
+        return;
+      }
       router.replace(next);
     } catch (error) {
       notifyError(error?.data?.message || "Đăng nhập thất bại.");

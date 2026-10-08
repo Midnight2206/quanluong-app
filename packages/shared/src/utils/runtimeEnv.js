@@ -93,3 +93,8 @@ export function getMainAppOriginEnv() {
   const v = process.env.NEXT_PUBLIC_MAIN_APP_ORIGIN;
   return v && String(v).trim() !== "" ? v : undefined;
 }
+
+export function getSupplierOriginEnv() {
+  const v = process.env.NEXT_PUBLIC_SUPPLIER_ORIGIN;
+  return v && String(v).trim() !== "" ? v : undefined;
+}
