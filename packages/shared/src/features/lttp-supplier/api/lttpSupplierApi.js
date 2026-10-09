@@ -38,6 +38,21 @@ export function useLttpSupplierOrdersQuery({ date, supplierId }, options = {}) {
   });
 }
 
+export function useLttpSupplierLedgerQuery({ from, to, supplierId }, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: ["lttp-supplier", "ledger", from, to, supplierId],
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp-supplier/ledger",
+        method: "get",
+        params: { from, to, supplierId },
+      }),
+    enabled: skip !== true && Boolean(from) && Boolean(to) && supplierId != null,
+    ...rest,
+  });
+}
+
 export function getLttpSupplierUserLinksQueryOptions(userId) {
   return {
     queryKey: ["lttp-supplier", "user-links", userId],

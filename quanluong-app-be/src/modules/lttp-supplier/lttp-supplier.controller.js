@@ -4,6 +4,7 @@ import { getDailyOrderSummary } from "../lttp/lttp.service.js";
 import {
   listLttpSupplierCatalog,
   listLttpSupplierLinks,
+  readLttpSupplierLedger,
   readLttpSupplierOrders,
 } from "./lttp-supplier.service.js";
 
@@ -49,9 +50,25 @@ async function getLttpSupplierOrdersController(req, res) {
   });
 }
 
+async function getLttpSupplierLedgerController(req, res) {
+  const data = await readLttpSupplierLedger({
+    userId: req.user.id,
+    supplierId: req.validatedQuery.supplierId,
+    from: req.validatedQuery.from,
+    to: req.validatedQuery.to,
+    db: prisma,
+  });
+
+  return respondSuccess(res, {
+    message: "Sổ công nợ",
+    data,
+  });
+}
+
 export {
   getLttpSupplierCatalogController,
   getLttpSupplierLinksController,
   getLttpSupplierLinksForUserController,
+  getLttpSupplierLedgerController,
   getLttpSupplierOrdersController,
 };

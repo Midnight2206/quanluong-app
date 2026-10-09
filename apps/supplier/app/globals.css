@@ -1,1 +1,10 @@
 @import "../../../packages/shared/src/index.css";
+
+/* Shared index.css locks body for the main app shell. This portal scrolls the window,
+   so sticky header and table stay on the viewport. */
+html,
+body {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}

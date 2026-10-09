@@ -20,6 +20,8 @@ import {
 const PREFERENCE_DRAFT_TYPES = new Set([
   "lich-su-filters",
   "ordering-filters",
+  "supplier-order",
+  "supplier-ledger",
   "kitchen-shell",
   "meal-roster-shell",
   "shared-manual-unit",

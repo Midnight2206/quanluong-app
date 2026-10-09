@@ -13,6 +13,23 @@ export function pairLabel(link) {
   return `${link?.level1UnitName ?? ""} — ${link?.supplierName ?? ""}`;
 }
 
+/**
+ * Keep a saved recipient selection when those units still exist.
+ * No saved list selects every unit. A saved list that matches nothing selects every unit.
+ * An explicit empty list stays empty.
+ * @param {string[]} availableKeys
+ * @param {string[] | null | undefined} savedKeys
+ */
+export function nextRecipientSelection(availableKeys, savedKeys) {
+  const available = (availableKeys ?? []).map((key) => String(key));
+  if (!Array.isArray(savedKeys)) return available;
+  if (available.length === 0) return savedKeys.map((key) => String(key));
+  const allowed = new Set(available);
+  const kept = savedKeys.map((key) => String(key)).filter((key) => allowed.has(key));
+  if (kept.length === 0 && savedKeys.length > 0) return available;
+  return kept;
+}
+
 export function recipientKeys(summary) {
   const seen = new Set();
   const keys = [];

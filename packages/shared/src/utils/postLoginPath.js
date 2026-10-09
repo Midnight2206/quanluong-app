@@ -35,7 +35,7 @@ export function navigateAfterLogin(next, { assign, replace }) {
 export function supplierChooserHandoff(user, supplierOrigin) {
   if (isLttpSupplierUser(user)) {
     return {
-      external: `${String(supplierOrigin).replace(/\/+$/, "")}/dat-hang`,
+      external: `${String(supplierOrigin).replace(/\/+$/, "")}/`,
     };
   }
   if (isSuperadminUser(user)) {
@@ -54,7 +54,7 @@ export function resolvePostLoginPath(user, fromRaw, origins = {}) {
   }
   if (isLttpSupplierUser(user)) {
     const origin = String(origins.supplierOrigin || "http://localhost:3002").replace(/\/+$/, "");
-    return `${origin}/dat-hang`;
+    return `${origin}/`;
   }
   return safeInternalPath(fromRaw);
 }

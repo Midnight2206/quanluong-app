@@ -7,10 +7,11 @@ import {
   getLttpSupplierCatalogController,
   getLttpSupplierLinksController,
   getLttpSupplierLinksForUserController,
+  getLttpSupplierLedgerController,
   getLttpSupplierOrdersController,
 } from "./lttp-supplier.controller.js";
 import { lttpSupplierMiddleware } from "./lttp-supplier.middleware.js";
-import { ordersQuerySchema, userLinksParamsSchema } from "./lttp-supplier.validator.js";
+import { ledgerQuerySchema, ordersQuerySchema, userLinksParamsSchema } from "./lttp-supplier.validator.js";
 
 const lttpSupplierRouter = express.Router();
 
@@ -34,6 +35,14 @@ lttpSupplierRouter.get(
   authMiddleware,
   lttpSupplierMiddleware,
   asyncHandler(getLttpSupplierLinksController),
+);
+
+lttpSupplierRouter.get(
+  "/ledger",
+  authMiddleware,
+  lttpSupplierMiddleware,
+  validateRequest({ query: ledgerQuerySchema }),
+  asyncHandler(getLttpSupplierLedgerController),
 );
 
 lttpSupplierRouter.get(

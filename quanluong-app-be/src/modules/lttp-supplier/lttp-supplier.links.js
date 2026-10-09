@@ -45,20 +45,23 @@ async function replaceUserLttpSupplierLinks(userId, supplierIds, db) {
       code: ERROR_CODES.VALIDATION_ERROR,
     });
   }
-  if (typeof db.$transaction === "function") {
-    await db.$transaction(async (tx) => {
-      await tx.userLttpSupplier.deleteMany({ where: { userId } });
-      await tx.userLttpSupplier.createMany({
-        data: ids.map((lttpSupplierId) => ({ userId, lttpSupplierId })),
-      });
+  await writeUserLttpSupplierLinks(userId, ids, db);
+}
+
+async function writeUserLttpSupplierLinks(userId, ids, db) {
+  const run = async (client) => {
+    await client.userLttpSupplier.deleteMany({ where: { userId } });
+    await client.userLttpSupplier.createMany({
+      data: ids.map((lttpSupplierId) => ({ userId, lttpSupplierId })),
     });
+  };
+  // A transaction client still has $transaction. Another one would leave the
+  // user row. $connect exists only on the root client.
+  if (typeof db.$connect === "function" && typeof db.$transaction === "function") {
+    await db.$transaction(run);
     return;
   }
-
-  await db.userLttpSupplier.deleteMany({ where: { userId } });
-  await db.userLttpSupplier.createMany({
-    data: ids.map((lttpSupplierId) => ({ userId, lttpSupplierId })),
-  });
+  await run(db);
 }
 
 async function clearUserLttpSupplierLinks(userId, db) {

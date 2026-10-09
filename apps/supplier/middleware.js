@@ -1,6 +1,17 @@
+import { NextResponse } from "next/server";
 import { createAuthMiddleware } from "@quanluong/shared/next-auth-middleware";
 
-export default createAuthMiddleware();
+const authMiddleware = createAuthMiddleware();
+
+export default function middleware(request) {
+  const { pathname } = request.nextUrl;
+  // Profile and settings are protected on the main app. Here the client gate
+  // sends a signed-out visitor to the main login instead of this origin's /login.
+  if (pathname === "/profile" || pathname === "/settings") {
+    return NextResponse.next();
+  }
+  return authMiddleware(request);
+}
 
 export const config = {
   matcher: [

@@ -64,8 +64,14 @@ export function generateMetadata() {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{if(localStorage.getItem("quanluong-ui:theme")==="dark"){document.documentElement.classList.add("dark")}}catch(e){}})()',
+          }}
+        />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

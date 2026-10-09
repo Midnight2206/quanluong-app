@@ -9,7 +9,11 @@ import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { captureElementToPngBlob, shareOrDownloadPng } from "@/utils/captureElementToPng";
 import { cn } from "@/utils/cn";
-import { buildOrderingMatrix, slipRefLabel } from "./lttpOrderingMatrix.js";
+import {
+  buildOrderingMatrix,
+  buildOrderSharePlainText,
+  orderSupplierFilterLabel,
+} from "./lttpOrderingMatrix.js";
 
 function todayIsoDate() {
   const d = new Date();
@@ -33,64 +37,6 @@ function formatViDate(ymd) {
   } catch {
     return ymd;
   }
-}
-
-/** Tránh nhầm khi copy: tên không chứa `:` hay `;` hay xuống dòng. */
-function sanitizeOrderTextToken(s) {
-  return String(s ?? "")
-    .replace(/[\r\n:;]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Mỗi phiếu: dòng 1 = đơn vị nhận + số phiếu (+ chú thích); dòng 2 = `mặt1:sl;mặt2:sl`.
- * Các phiếu liền nhau, cách nhau bằng một `\n` (khối 2 dòng → giữa hai phiếu là một dòng trống nếu ghép `\n` + `\n`).
- * Ở đây ghép bằng `\n` giữa từng khối 2 dòng → giữa phiếu A (hết dòng 2) và phiếu B (dòng 1) chỉ một xuống dòng.
- */
-function buildOrderSharePlainText({ orderDate, storageUnitName, supplierFilterLabel, slipColumns }) {
-  if (!Array.isArray(slipColumns) || slipColumns.length === 0) {
-    return "";
-  }
-  const meta = [
-    `Tổng hợp đặt hàng LTTP — ${orderDate}`,
-    storageUnitName ? `Kho cấp phát: ${storageUnitName}` : null,
-    `Lọc đối tác (dòng phiếu): ${supplierFilterLabel}`,
-  ].filter(Boolean);
-
-  const slipBlocks = slipColumns.map((col) => {
-    const refLabel = slipRefLabel(col.bookMmyy, col.slipNo);
-    const caption =
-      col.note != null && String(col.note).trim() !== "" ? String(col.note).trim().replace(/[\r\n]+/g, " ") : null;
-    const head = caption
-      ? `${sanitizeOrderTextToken(col.recipientUnitName)} | ${refLabel} (${caption})`
-      : `${sanitizeOrderTextToken(col.recipientUnitName)} | ${refLabel}`;
-    const pairs = (col.lines || [])
-      .filter((ln) => {
-        const q = Number(ln.quantity);
-        return Number.isFinite(q) && q !== 0;
-      })
-      .map((ln) => {
-        const nm = sanitizeOrderTextToken(ln.name);
-        const qf = String(ln.quantityFormatted ?? "").trim() || "0";
-        const nt =
-          ln.lineNote != null && String(ln.lineNote).trim() !== ""
-            ? sanitizeOrderTextToken(ln.lineNote)
-            : "";
-        return nt ? `${nm}:${qf} (${nt})` : `${nm}:${qf}`;
-      })
-      .join(";");
-    const bodyText = pairs
-      ? pairs
-          .split(";")
-          .map((it) => it.trim())
-          .filter(Boolean)
-          .join("\n")
-      : "(Không có mặt hàng)";
-    return `${head}\n${bodyText}`;
-  });
-
-  return `${meta.join("\n")}\n\n${slipBlocks.join("\n\n")}`;
 }
 
 /**
@@ -299,14 +245,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
 
   const matrix = useMemo(() => buildOrderingMatrix(summary), [summary]);
 
-  const supplierFilterLabel = useMemo(() => {
-    if (!summary?.supplierFilter) return "Tất cả đối tác";
-    if (summary.supplierFilter === "all") return "Tất cả đối tác";
-    if (summary.supplierFilter === "none") return "Chưa gán đối tác trên dòng phiếu";
-    const sid = summary.supplierFilter;
-    const row = summary.availableSuppliers?.find((s) => s.id != null && Number(s.id) === Number(sid));
-    return row?.name ?? `Đối tác #${sid}`;
-  }, [summary]);
+  const supplierFilterLabel = useMemo(() => orderSupplierFilterLabel(summary), [summary]);
 
   const orderSharePlainText = useMemo(() => {
     if (!summary?.slipColumns?.length) {

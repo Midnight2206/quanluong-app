@@ -35,6 +35,7 @@ function fakeDb(rows) {
         calls.push(["create", args, inTransaction]);
       },
     },
+    $connect() {},
     async $transaction(fn) {
       db.transactionEntered = true;
       inTransaction = true;

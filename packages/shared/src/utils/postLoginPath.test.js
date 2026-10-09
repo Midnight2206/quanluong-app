@@ -47,7 +47,7 @@ test("resolvePostLoginPath sends supplier to the supplier app and ignores from",
       "/dashboard",
       { supplierOrigin: "http://localhost:8082" },
     ),
-    "http://localhost:8082/dat-hang",
+    "http://localhost:8082/",
   );
 });
 
@@ -82,7 +82,7 @@ test("supplierChooserHandoff sends supplier users to one external url", () => {
     { type: { name: "lttp_supplier" } },
     "http://localhost:8082",
   );
-  assert.deepEqual(result, { external: "http://localhost:8082/dat-hang" });
+  assert.deepEqual(result, { external: "http://localhost:8082/" });
   assert.equal("internal" in result, false);
 });
 

@@ -4,8 +4,17 @@ import {
   filterOrderSummaryByRecipientUnits,
   initialSupplierId,
   pairLabel,
+  nextRecipientSelection,
   recipientKeys,
 } from "./supplierOrderView.js";
+
+test("saved recipient picks stay when the units are still on the day", () => {
+  assert.deepEqual(nextRecipientSelection(["10", "11"], ["10"]), ["10"]);
+  assert.deepEqual(nextRecipientSelection(["10", "11"], []), []);
+  assert.deepEqual(nextRecipientSelection(["10", "11"], null), ["10", "11"]);
+  assert.deepEqual(nextRecipientSelection(["11"], ["10"]), ["11"]);
+  assert.deepEqual(nextRecipientSelection([], ["10"]), ["10"]);
+});
 
 test("one link is selected and two links wait", () => {
   const one = [{ supplierId: 3, level1UnitName: "Kho", supplierName: "A" }];

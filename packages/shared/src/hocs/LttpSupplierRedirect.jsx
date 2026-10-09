@@ -16,7 +16,7 @@ export function LttpSupplierRedirect() {
     if (!initialized || !isLttpSupplierUser(user)) {
       return;
     }
-    window.location.replace(`${getSupplierAppOrigin()}/dat-hang`);
+    window.location.replace(`${getSupplierAppOrigin()}/`);
   }, [initialized, user]);
 
   return null;

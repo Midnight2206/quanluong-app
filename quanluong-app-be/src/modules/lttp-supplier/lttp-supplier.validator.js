@@ -21,4 +21,12 @@ const userLinksParamsSchema = z.object({
   userId: z.coerce.number().int().positive(),
 });
 
-export { ordersQuerySchema, userLinksParamsSchema };
+const ledgerQuerySchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isCalendarDate),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(isCalendarDate),
+  supplierId: z.coerce.number().int().positive(),
+}).refine((query) => query.to >= query.from, {
+  message: "Ngày kết thúc phải sau hoặc trùng ngày bắt đầu",
+});
+
+export { ledgerQuerySchema, ordersQuerySchema, userLinksParamsSchema };
