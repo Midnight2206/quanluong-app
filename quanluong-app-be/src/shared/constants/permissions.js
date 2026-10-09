@@ -39,6 +39,14 @@ const PERMISSIONS = {
   MEAL_ROSTER_ACCESS: "mealRoster.access",
   /** Sổ sách bếp ăn — danh mục món và thực đơn ngày. */
   KITCHEN_BOOKS_ACCESS: "kitchenBooks.access",
+  MIDNIGHT_PRICES_READ: "midnight.prices.read",
+  MIDNIGHT_PRICES_WRITE: "midnight.prices.write",
+  MIDNIGHT_MATRIX_READ: "midnight.matrix.read",
+  MIDNIGHT_DEBTS_READ: "midnight.debts.read",
+  MIDNIGHT_DEBTS_WRITE: "midnight.debts.write",
+  SYSTEM_BACKUP_MANAGE: "system.backup.manage",
+  SYSTEM_INFRA_MANAGE: "system.infra.manage",
+  CHUNG_TU_PDF_TEMPLATES_MANAGE: "chungTu.pdfTemplates.manage",
 };
 
 export { PERMISSIONS };

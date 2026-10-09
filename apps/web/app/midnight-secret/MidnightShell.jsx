@@ -3,7 +3,7 @@
 import { MidnightMainPanel } from "./MidnightMainPanel";
 import { UnifiedPageScrollRoot } from "@/hocs/withUnifiedPageScroll";
 
-export function MidnightShell() {
+export function MidnightShell({ grants }) {
   async function onExit() {
     await fetch("/api/midnight-secret/exit", { method: "POST", credentials: "include" });
     window.location.reload();
@@ -31,7 +31,7 @@ export function MidnightShell() {
           </div>
         </header>
         <div className="mx-auto max-w-6xl pb-12">
-          <MidnightMainPanel />
+          <MidnightMainPanel grants={grants} />
         </div>
       </UnifiedPageScrollRoot>
     </div>

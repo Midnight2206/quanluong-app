@@ -12,6 +12,7 @@ import {
   LTTP_SUPPLIER_TYPE_NAME,
   syncLttpSupplierAssignment,
 } from "../lttp-supplier/lttp-supplier.links.js";
+import { superadminTypeAssignError } from "./user-type-assign.js";
 
 const USER_INCLUDE = {
   type: true,
@@ -35,6 +36,18 @@ function assertSuperadminMayAssignSupplier(typeName, scope) {
       code: ERROR_CODES.FORBIDDEN,
     });
   }
+}
+
+function assertSuperadminMayAssignSuperadminType(typeName, scope) {
+  const message = superadminTypeAssignError(typeName, scope?.mode);
+  if (!message) {
+    return;
+  }
+  throw new AppError({
+    message,
+    statusCode: 403,
+    code: ERROR_CODES.FORBIDDEN,
+  });
 }
 
 async function assertAdminOnlyOnLevel1(typeId, unitId) {
@@ -293,6 +306,7 @@ async function createUser(payload, scope, effectiveUnitIds) {
     scope,
   );
   assertSuperadminMayAssignSupplier(relations.type?.name, scope);
+  assertSuperadminMayAssignSuperadminType(relations.type?.name, scope);
   await ensureUniqueUserFields({
     username: payload.username,
     email: payload.email,
@@ -428,6 +442,7 @@ async function patchUser(userId, payload, scope, options = {}) {
     : null;
   const nextTypeName = nextType?.name ?? null;
   assertSuperadminMayAssignSupplier(nextTypeName, scope);
+  assertSuperadminMayAssignSuperadminType(nextTypeName, scope);
 
   if (
     nextTypeName !== LTTP_SUPPLIER_TYPE_NAME &&
@@ -532,6 +547,7 @@ async function replaceUser(userId, payload, scope, effectiveUnitIds) {
     scope,
   );
   assertSuperadminMayAssignSupplier(relations.type?.name, scope);
+  assertSuperadminMayAssignSuperadminType(relations.type?.name, scope);
   await ensureUniqueUserFields({
     username: payload.username,
     email: payload.email,

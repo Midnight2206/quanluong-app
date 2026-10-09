@@ -36,4 +36,12 @@ export const PERMISSIONS = {
   MEAL_ALLOWANCE_RATES_MANAGE: "mealAllowanceRates.manage",
   MEAL_ROSTER_ACCESS: "mealRoster.access",
   KITCHEN_BOOKS_ACCESS: "kitchenBooks.access",
+  MIDNIGHT_PRICES_READ: "midnight.prices.read",
+  MIDNIGHT_PRICES_WRITE: "midnight.prices.write",
+  MIDNIGHT_MATRIX_READ: "midnight.matrix.read",
+  MIDNIGHT_DEBTS_READ: "midnight.debts.read",
+  MIDNIGHT_DEBTS_WRITE: "midnight.debts.write",
+  SYSTEM_BACKUP_MANAGE: "system.backup.manage",
+  SYSTEM_INFRA_MANAGE: "system.infra.manage",
+  CHUNG_TU_PDF_TEMPLATES_MANAGE: "chungTu.pdfTemplates.manage",
 };

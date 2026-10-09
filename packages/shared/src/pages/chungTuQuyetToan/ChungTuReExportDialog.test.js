@@ -30,6 +30,9 @@ test("history workspace wires Xuất lại", () => {
   assert.match(historySource, /Xuất lại/);
   assert.match(historySource, /ChungTuReExportDialog/);
   assert.match(historySource, /useReExportPdfBatchMutation|useReExportBkmhMonthlyMutation/);
+  assert.match(historySource, /File PDF không còn trên máy chủ/);
+  assert.match(historySource, /handleRestorePdfFiles/);
+  assert.match(historySource, /refreshData: false/);
 });
 
 test("API clients expose re-export endpoints", () => {

@@ -53,12 +53,19 @@ def _folder_file_item(file: FolderFile) -> dict:
     }
 
 
+def _files_present(files: list[FolderFile]) -> bool:
+    if not files:
+        return False
+    return all(absolute_pdf_path(file.pdf_path).is_file() for file in files)
+
+
 def _folder_item(folder: Folder, files: list[FolderFile]) -> dict:
     ordered_files = sorted(files, key=_file_sort_key)
     return {
         "id": folder.id,
         "name": folder.name,
         "created_at": folder.created_at,
+        "files_present": _files_present(ordered_files),
         "files": [_folder_file_item(file) for file in ordered_files],
     }
 

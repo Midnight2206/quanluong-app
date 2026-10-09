@@ -179,6 +179,40 @@ const PERMISSION_CATALOG_VI = {
     description:
       "Danh mục món và thực đơn ngày theo buổi; tính số lượng LTTP từ quân số chấm cơm; dữ liệu theo kho LTTP của đơn vị.",
   },
+  "midnight.prices.read": {
+    name: "Xem giá đối tác (báo cáo nội bộ)",
+    description:
+      "Xem bảng giá đối tác của đơn vị mình. Vào trang báo cáo nội bộ còn cần mật khẩu cổng sau khi đã có quyền này.",
+  },
+  "midnight.prices.write": {
+    name: "Sửa giá đối tác (báo cáo nội bộ)",
+    description: "Lưu phiên bản bảng giá đối tác của đơn vị mình, sau khi đã qua mật khẩu cổng.",
+  },
+  "midnight.matrix.read": {
+    name: "Xem báo cáo tiền theo ngày (nội bộ)",
+    description:
+      "Xem ma trận tiền đối tác theo ngày và đơn vị nhận. Cần thêm mật khẩu cổng sau quyền này.",
+  },
+  "midnight.debts.read": {
+    name: "Xem công nợ đối tác (nội bộ)",
+    description: "Xem công nợ và lịch sử thanh toán đối tác của đơn vị mình, sau mật khẩu cổng.",
+  },
+  "midnight.debts.write": {
+    name: "Ghi thanh toán công nợ đối tác (nội bộ)",
+    description: "Ghi một khoản thanh toán công nợ đối tác của đơn vị mình, sau mật khẩu cổng.",
+  },
+  "system.backup.manage": {
+    name: "Backup và khôi phục dữ liệu",
+    description: "Xem lịch backup, chạy backup và khôi phục một ngày. Không nằm trong gói admin mặc định.",
+  },
+  "system.infra.manage": {
+    name: "Xem hạ tầng và khởi động lại container",
+    description: "Xem đĩa, backup đêm và khởi động lại container. Không nằm trong gói admin mặc định.",
+  },
+  "chungTu.pdfTemplates.manage": {
+    name: "Quản lý mẫu PDF chứng từ",
+    description: "Tải, xem thử, xuất bản và ngưng mẫu PDF chứng từ. Không nằm trong gói admin mặc định.",
+  },
 };
 
 function getPermissionVi(code) {

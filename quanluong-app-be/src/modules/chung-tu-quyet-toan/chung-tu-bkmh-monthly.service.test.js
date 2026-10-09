@@ -176,6 +176,8 @@ mock.module("../../services/document-service.client.js", {
     streamDocumentFolderFile,
     streamDocumentFolderMergedPdf,
     streamDocumentFolderZip,
+    withPdfFilesPresent: async (items) =>
+      (items ?? []).map((item) => ({ ...item, pdfFilesPresent: true })),
   },
 });
 

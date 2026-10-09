@@ -11,6 +11,7 @@ import {
 } from "@/features/lttp/api/lttpApi";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { notifyNoDeletePermission, notifyNoWritePermission } from "@/features/permissions/permissionUi";
 import { formatVnd } from "@/utils/formatVnd";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { LttpLichSuXuatSlipCard } from "./LttpLichSuXuatSlipCard";
@@ -412,28 +413,38 @@ export function LttpLichSuXuatTab({
                           <Printer className="size-3.5" />
                         )}
                       </IconButton>
-                      {canWrite && typeof onRequestEdit === "function" ? (
+                      {typeof onRequestEdit === "function" ? (
                         <IconButton
                           label="Sửa phiếu"
                           variant="ghost"
                           className="h-7"
-                          onClick={() => onRequestEdit(s)}
+                          onClick={() => {
+                            if (!canWrite) {
+                              notifyNoWritePermission();
+                              return;
+                            }
+                            onRequestEdit(s);
+                          }}
                           disabled={delBusy}
                         >
                           <Pencil className="size-3.5" />
                         </IconButton>
                       ) : null}
-                      {canWrite ? (
-                        <IconButton
-                          label="Thu hồi"
-                          variant="danger"
-                          className="h-7"
-                          onClick={() => onRecall(s)}
-                          disabled={delBusy}
-                        >
-                          <RotateCcw className="size-3.5" />
-                        </IconButton>
-                      ) : null}
+                      <IconButton
+                        label="Thu hồi"
+                        variant="danger"
+                        className="h-7"
+                        onClick={() => {
+                          if (!canWrite) {
+                            notifyNoDeletePermission();
+                            return;
+                          }
+                          onRecall(s);
+                        }}
+                        disabled={delBusy}
+                      >
+                        <RotateCcw className="size-3.5" />
+                      </IconButton>
                     </div>
                   </td>
                 </tr>

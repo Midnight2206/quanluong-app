@@ -272,6 +272,27 @@ async function getDocumentFolder(folderId) {
   return readJsonResponse(response);
 }
 
+async function readFolderPdfFilesPresent(folderId) {
+  if (folderId == null) return false;
+  try {
+    const folder = await getDocumentFolder(folderId);
+    if (typeof folder?.files_present !== "boolean") return true;
+    return folder.files_present;
+  } catch (error) {
+    if (error?.statusCode === 404) return false;
+    return true;
+  }
+}
+
+async function withPdfFilesPresent(items) {
+  return Promise.all(
+    (items ?? []).map(async (item) => ({
+      ...item,
+      pdfFilesPresent: await readFolderPdfFilesPresent(item?.folderId),
+    })),
+  );
+}
+
 async function renderToDocumentFolder(folderId, body = {}) {
   const {
     templateId,
@@ -334,6 +355,8 @@ export {
   exportWorkbook,
   getDocument,
   getDocumentFolder,
+  readFolderPdfFilesPresent,
+  withPdfFilesPresent,
   getTemplate,
   getTemplateFields,
   isDocumentServiceConfigured,

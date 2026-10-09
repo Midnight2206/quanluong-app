@@ -97,15 +97,15 @@ export const ROUTE_ACCESS_RULES = {
   },
   "dashboard-chung-tu-pdf-templates": {
     description: "Quản lý mẫu PDF chứng từ quyết toán (upload Excel)",
-    requiredPermissions: [],
+    requiredPermissions: [PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE],
   },
   "dashboard-backup": {
     description: "Backup dữ liệu — superadmin chọn một ngày để khôi phục",
-    requiredPermissions: [],
+    requiredPermissions: [PERMISSIONS.SYSTEM_BACKUP_MANAGE],
   },
   "dashboard-infra": {
     description: "Hạ tầng — superadmin xem đĩa, backup đêm và container",
-    requiredPermissions: [],
+    requiredPermissions: [PERMISSIONS.SYSTEM_INFRA_MANAGE],
   },
   "nav-meal-roster": {
     description: "Trang Chấm cơm / danh sách bảo đảm quân lương",
@@ -114,6 +114,14 @@ export const ROUTE_ACCESS_RULES = {
   "nav-kitchen-books": {
     description: "Sổ sách bếp ăn — chấm cơm, sổ LTTP bếp, danh mục món",
     requiredPermissions: [PERMISSIONS.KITCHEN_BOOKS_ACCESS, PERMISSIONS.MEAL_ROSTER_ACCESS],
+  },
+  "nav-midnight-report": {
+    description: "Báo cáo nội bộ — ẩn cả trang khi không có quyền xem nào",
+    requiredPermissions: [
+      PERMISSIONS.MIDNIGHT_PRICES_READ,
+      PERMISSIONS.MIDNIGHT_MATRIX_READ,
+      PERMISSIONS.MIDNIGHT_DEBTS_READ,
+    ],
   },
 };
 

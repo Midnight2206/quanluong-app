@@ -110,6 +110,22 @@ def test_get_folder_lists_files(monkeypatch, tmp_path):
         "2026-06-01.pdf",
         "2026-06-02.pdf",
     ]
+    assert body["files_present"] is True
+
+
+def test_get_folder_reports_files_missing_when_pdf_deleted(monkeypatch, tmp_path):
+    _database(monkeypatch, tmp_path)
+    template_id = _upload_template()
+    assert _publish(template_id).status_code == 200
+    folder_id = _create_folder()
+    _add_document(folder_id, template_id, "2026-06-01.pdf", "2026-06-01")
+    pdf_path = tmp_path / "folders" / str(folder_id) / "2026-06-01.pdf"
+    pdf_path.unlink()
+
+    response = client.get(f"/v1/folders/{folder_id}", headers=AUTH_HEADERS)
+
+    assert response.status_code == 200
+    assert response.json()["files_present"] is False
 
 
 def test_folder_zip_and_merged_pdf_return_valid_bytes(monkeypatch, tmp_path):

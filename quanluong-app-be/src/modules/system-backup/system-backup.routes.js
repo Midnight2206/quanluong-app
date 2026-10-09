@@ -2,7 +2,8 @@ import express from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../shared/utils/async-handler.js";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
-import { superadminMiddleware } from "../../middlewares/superadmin.middleware.js";
+import { permissionMiddleware } from "../../middlewares/permission.middleware.js";
+import { PERMISSIONS } from "../../shared/constants/permissions.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
 import {
   getSystemBackupController,
@@ -17,7 +18,7 @@ const restoreBodySchema = z.object({
 
 const systemBackupRouter = express.Router();
 
-systemBackupRouter.use(authMiddleware, superadminMiddleware);
+systemBackupRouter.use(authMiddleware, permissionMiddleware([PERMISSIONS.SYSTEM_BACKUP_MANAGE]));
 
 systemBackupRouter.get("/", asyncHandler(getSystemBackupController));
 

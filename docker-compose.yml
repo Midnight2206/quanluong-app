@@ -172,6 +172,8 @@ services:
     environment:
       DOCUMENT_SERVICE_KEY: ${DOCUMENT_SERVICE_KEY:-dev-document-key-change-me}
       DOCUMENT_DATABASE_URL: postgresql+psycopg://${DOCUMENT_DB_USER:-document}:${DOCUMENT_DB_PASSWORD:-document}@document-db:5432/${DOCUMENT_DB_NAME:-document}
+    volumes:
+      - document_storage_data:/data/document-storage
     depends_on:
       document-db:
         condition: service_healthy
@@ -248,6 +250,7 @@ volumes:
   mariadb_data:
   redis_data:
   document_pg_data:
+  document_storage_data:
   media_data:
   backup_data:
   qdrant_data:

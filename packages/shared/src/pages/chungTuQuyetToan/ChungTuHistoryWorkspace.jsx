@@ -25,6 +25,7 @@ import {
   useReExportPdfBatchMutation,
 } from "@/features/chung-tu-quyet-toan/api/chungTuPdfApi";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { notifyNoDeletePermission, notifyNoWritePermission } from "@/features/permissions/permissionUi";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { formatPeriodLabel, formatPeriodMonth } from "@/pages/chungTuQuyetToan/chungTuFormat";
 import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScope";
@@ -36,6 +37,18 @@ import { formatVnd } from "@/utils/formatVnd";
 
 const fieldClass =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
+
+const PDF_FILES_MISSING_MESSAGE =
+  "File PDF không còn trên máy chủ. Bấm Xuất lại để tạo lại từ dữ liệu lần xuất trước.";
+
+function PdfFilesMissingNotice({ show }) {
+  if (!show) return null;
+  return (
+    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-foreground">
+      {PDF_FILES_MISSING_MESSAGE}
+    </p>
+  );
+}
 
 const exportTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "short",
@@ -71,8 +84,8 @@ function formatCreatorLabel(item, currentUser) {
  * }} props
  */
 export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
-  // Cùng điều kiện vào trang CTQT: mọi acc đơn vị đều xuất lại/xóa được (không khóa theo người tạo).
   const canManageHistory = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_READ);
+  const canWriteHistory = useHasPermission(PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE);
   const currentUser = useCurrentUser();
   const { confirm } = useConfirm();
   const { canPickUnits, unitsForDropdown, effectiveUnitId, persistManualUnitId } = useChungTuUnitScope();
@@ -130,7 +143,15 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
     [],
   );
 
+  const rejectMissingPdfFiles = (item) => {
+    if (item?.pdfFilesPresent !== false) return false;
+    setActionError(PDF_FILES_MISSING_MESSAGE);
+    notifyError(PDF_FILES_MISSING_MESSAGE);
+    return true;
+  };
+
   const handleDownloadZip = async (item) => {
+    if (rejectMissingPdfFiles(item)) return;
     setActionError(null);
     setBusyActionKey(`zip:${item.batchKey}`);
     try {
@@ -145,6 +166,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const handlePrintBatch = async (item) => {
+    if (rejectMissingPdfFiles(item)) return;
     setActionError(null);
     const tab = window.open("about:blank", "_blank");
     if (!tab) {
@@ -178,6 +200,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const handleDownloadMonthlyZip = async (item) => {
+    if (rejectMissingPdfFiles(item)) return;
     setActionError(null);
     setBusyActionKey(`zip:${item.id}`);
     try {
@@ -192,6 +215,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const handlePrintMonthly = async (item) => {
+    if (rejectMissingPdfFiles(item)) return;
     setActionError(null);
     const tab = window.open("about:blank", "_blank");
     if (!tab) {
@@ -225,6 +249,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const handleDownloadFile = async (item, file) => {
+    if (rejectMissingPdfFiles(item)) return;
     setActionError(null);
     setBusyActionKey(`file:${item.batchKey}:${file.fileId}`);
     try {
@@ -239,6 +264,10 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const handleDeleteBatch = async (item) => {
+    if (!canWriteHistory) {
+      notifyNoDeletePermission();
+      return;
+    }
     const ok = await confirm({
       title: "Xóa folder PDF?",
       message: "Folder PDF này sẽ bị xóa khỏi lịch sử đã xuất.",
@@ -268,6 +297,10 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
   };
 
   const handleReExportSubmit = async ({ pdfTemplateId, refreshData }) => {
+    if (!canWriteHistory) {
+      notifyNoWritePermission();
+      return;
+    }
     if (!reExportTarget) return;
     setActionError(null);
     try {
@@ -298,7 +331,54 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
     }
   };
 
+  const handleRestorePdfFiles = async (item) => {
+    if (!canWriteHistory) {
+      notifyNoWritePermission();
+      return;
+    }
+    if (!item?.pdfTemplateId) {
+      const message = "Không có mẫu PDF của lần xuất trước.";
+      setActionError(message);
+      notifyError(message);
+      return;
+    }
+    setActionError(null);
+    const payload = {
+      pdfTemplateId: item.pdfTemplateId,
+      refreshData: false,
+      signatures: item.signatures,
+      signatureDates: item.signatureDates,
+      signatureBlock: item.signatureBlock ?? undefined,
+    };
+    try {
+      if (item.batchKey) {
+        await reExportPdfBatch({
+          ...payload,
+          batchKey: item.batchKey,
+          unitId: effectiveUnitId,
+          categoryKey,
+        }).unwrap();
+      } else {
+        await reExportBkmhMonthly({
+          ...payload,
+          id: item.id,
+          storageUnitId: effectiveUnitId,
+          periodMonth: item.periodMonth,
+        }).unwrap();
+      }
+      notifySuccess("Đã xuất lại chứng từ từ dữ liệu lần xuất trước.");
+    } catch (e) {
+      const message = e?.data?.message || e?.message || "Xuất lại thất bại.";
+      setActionError(message);
+      notifyError(message);
+    }
+  };
+
   const handleDeleteMonthly = async (item) => {
+    if (!canWriteHistory) {
+      notifyNoDeletePermission();
+      return;
+    }
     const ok = await confirm({
       title: "Xóa lịch sử tháng BKMH?",
       message: "Tháng BKMH này sẽ bị xóa khỏi lịch sử đã lưu.",
@@ -511,6 +591,8 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                       </div>
                     </dl>
 
+                    <PdfFilesMissingNotice show={item.pdfFilesPresent === false} />
+
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -561,14 +643,22 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                           variant="secondary"
                           className="h-10 gap-1.5 text-xs"
                           disabled={busyActionKey !== "" || deletingBkmhMonthly || reExportBusy}
-                          onClick={() =>
+                          onClick={() => {
+                            if (!canWriteHistory) {
+                              notifyNoWritePermission();
+                              return;
+                            }
+                            if (item.pdfFilesPresent === false) {
+                              handleRestorePdfFiles(item);
+                              return;
+                            }
                             setReExportTarget({
                               kind: "bkmh",
                               id: item.id,
                               periodMonth: item.periodMonth,
                               pdfTemplateId: item.pdfTemplateId,
-                            })
-                          }
+                            });
+                          }}
                         >
                           <RefreshCw className="size-3.5" aria-hidden />
                           Xuất lại
@@ -681,6 +771,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                 return (
                   <div key={item.batchKey} className="space-y-3 rounded-xl border border-border/70 bg-card/30 p-3 sm:p-4">
                     {batchHeader}
+                    <PdfFilesMissingNotice show={item.pdfFilesPresent === false} />
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
@@ -726,13 +817,21 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                           variant="secondary"
                           className="h-10 gap-1.5 text-xs"
                           disabled={busyActionKey !== "" || deletingExportBatch || reExportBusy}
-                          onClick={() =>
+                          onClick={() => {
+                            if (!canWriteHistory) {
+                              notifyNoWritePermission();
+                              return;
+                            }
+                            if (item.pdfFilesPresent === false) {
+                              handleRestorePdfFiles(item);
+                              return;
+                            }
                             setReExportTarget({
                               kind: "batch",
                               batchKey: item.batchKey,
                               pdfTemplateId: item.pdfTemplateId,
-                            })
-                          }
+                            });
+                          }}
                         >
                           <RefreshCw className="size-3.5" aria-hidden />
                           Xuất lại
@@ -764,8 +863,9 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                   key={item.batchKey}
                   className="rounded-xl border border-border/70 bg-card/30"
                 >
-                  <summary className="cursor-pointer list-none px-3 py-3 sm:px-4">
+                  <summary className="cursor-pointer list-none space-y-3 px-3 py-3 sm:px-4">
                     {batchHeader}
+                    <PdfFilesMissingNotice show={item.pdfFilesPresent === false} />
                   </summary>
 
                   <div className="space-y-3 border-t border-border/70 px-3 py-3 sm:px-4">
@@ -804,13 +904,21 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
                           variant="secondary"
                           className="h-10 gap-1.5 text-xs"
                           disabled={busyActionKey !== "" || deletingExportBatch || reExportBusy}
-                          onClick={() =>
+                          onClick={() => {
+                            if (!canWriteHistory) {
+                              notifyNoWritePermission();
+                              return;
+                            }
+                            if (item.pdfFilesPresent === false) {
+                              handleRestorePdfFiles(item);
+                              return;
+                            }
                             setReExportTarget({
                               kind: "batch",
                               batchKey: item.batchKey,
                               pdfTemplateId: item.pdfTemplateId,
-                            })
-                          }
+                            });
+                          }}
                         >
                           <RefreshCw className="size-3.5" aria-hidden />
                           Xuất lại

@@ -15,6 +15,7 @@ const {
   createDocumentFolder,
   exportWorkbook,
   getDocumentFolder,
+  readFolderPdfFilesPresent,
   getTemplateFields,
   isDocumentServiceConfigured,
   listTemplates,
@@ -460,5 +461,31 @@ test("getDocumentFolder maps upstream 404 to AppError 404", async () => {
     );
   } finally {
     restore();
+  }
+});
+
+test("readFolderPdfFilesPresent is false only when document-service says files are gone", async () => {
+  const missing = mockFetch(async () =>
+    new Response(JSON.stringify({ id: 1, files_present: false, files: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  try {
+    assert.equal(await readFolderPdfFilesPresent(1), false);
+  } finally {
+    missing();
+  }
+
+  const unknown = mockFetch(async () =>
+    new Response(JSON.stringify({ id: 1, files: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  try {
+    assert.equal(await readFolderPdfFilesPresent(1), true);
+  } finally {
+    unknown();
   }
 });

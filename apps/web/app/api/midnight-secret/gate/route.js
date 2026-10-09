@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import {
   getCurrentUserUnitIdForMidnight,
   getMidnightGateCookieValue,
+  midnightPermissionDenial,
   MIDNIGHT_GATE_COOKIE,
   MIDNIGHT_GATE_MAX_AGE_SECONDS,
+  MIDNIGHT_TAB_READ_CODES,
 } from "../../../../lib/midnightSecretServer.js";
 
 export async function POST(request) {
@@ -20,6 +22,11 @@ export async function POST(request) {
   } catch {
     return NextResponse.json({ success: false, error: { message: "Body không hợp lệ" } }, { status: 400 });
   }
+  const cookie = request.headers.get("cookie") || "";
+  const denied = await midnightPermissionDenial(cookie, MIDNIGHT_TAB_READ_CODES);
+  if (denied) {
+    return NextResponse.json(denied.body, { status: denied.status });
+  }
   const pwd = String(body?.password ?? "");
   const exp = process.env.MIDNIGHT_SECRET_PASSWORD;
   const a = Buffer.from(pwd, "utf8");
@@ -27,7 +34,6 @@ export async function POST(request) {
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     return NextResponse.json({ success: false, error: { message: "Mật khẩu không đúng" } }, { status: 401 });
   }
-  const cookie = request.headers.get("cookie") || "";
   const current = await getCurrentUserUnitIdForMidnight(cookie);
   if (current.error) {
     return NextResponse.json(

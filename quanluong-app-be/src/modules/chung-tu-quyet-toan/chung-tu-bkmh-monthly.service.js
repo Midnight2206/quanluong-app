@@ -23,6 +23,7 @@ import {
   streamDocumentFolderFile,
   streamDocumentFolderMergedPdf,
   streamDocumentFolderZip,
+  withPdfFilesPresent,
 } from "../../services/document-service.client.js";
 import { extractTemplateKeys } from "./chung-tu-pdf-export.service.js";
 import { getChungTuSignatureSettings } from "./chung-tu-signature-settings.service.js";
@@ -113,12 +114,18 @@ function mapSliceRow(monthlyId, row) {
 }
 
 function mapMonthlyRow(row) {
+  const signaturesMeta =
+    row.signaturesJson && typeof row.signaturesJson === "object" ? row.signaturesJson : {};
   return {
     id: row.id,
     storageUnitId: row.storageUnitId,
     periodMonth: row.periodMonth,
     aggregationMode: row.aggregationMode,
     unitIds: normalizeMonthUnitIds(row.unitIdsJson),
+    pdfTemplateId: row.pdfTemplateId,
+    signatures: signaturesMeta.signatures ?? {},
+    signatureDates: signaturesMeta.signatureDates ?? {},
+    signatureBlock: signaturesMeta.signatureBlock ?? null,
     displayName: row.displayName,
     tongTienThang: row.tongTienThang == null ? null : Number(row.tongTienThang),
     sliceCount: row.sliceCount,
@@ -562,7 +569,7 @@ async function listChungTuBkmhMonthly({ storageUnitId, periodMonth, effectiveUni
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
     take: 200,
   });
-  return rows.map(mapMonthlyRow);
+  return withPdfFilesPresent(rows.map(mapMonthlyRow));
 }
 
 async function getChungTuBkmhMonthly({ id, effectiveUnitIds }) {

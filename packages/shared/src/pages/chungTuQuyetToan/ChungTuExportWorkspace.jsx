@@ -6,6 +6,7 @@ import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { notifyNoWritePermission } from "@/features/permissions/permissionUi";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
@@ -1183,22 +1184,26 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         {previewing ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
         Xem trước dữ liệu LTTP
       </Button>
-      {canWrite ? (
-        <Button
+      <Button
           type="button"
           size="sm"
           className="h-10 w-full gap-1.5 text-xs sm:w-auto"
           disabled={
             !effectiveUnitId || !canRun || busy || templateFieldsLoading || signatureSettingsLoading
           }
-          onClick={handleCreate}
+          onClick={() => {
+            if (!canWrite) {
+              notifyNoWritePermission();
+              return;
+            }
+            handleCreate();
+          }}
         >
           {creatingBkmhMonthly || creatingBatch ? (
             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
           ) : null}
           Xuất PDF
         </Button>
-      ) : null}
     </>
   );
 

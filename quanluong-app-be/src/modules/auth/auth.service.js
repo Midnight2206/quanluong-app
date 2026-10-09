@@ -19,6 +19,7 @@ import { LTTP_MODULE_NAME } from "../lttp/lttp.constants.js";
 import { isTransactionalMailConfigured } from "../../infra/mail/mail-capabilities.js";
 import { dispatchVerificationEmail } from "../../infra/mail/verification-email.dispatcher.js";
 import { logger } from "../../shared/utils/logger.js";
+import { grantedPermissionRecords } from "./auth-granted-permissions.js";
 
 /** Đổi mã quyền cũ `lrtp.*` thành `lttp.*` tại chỗ để giữ `permissionId` và TypePermission. */
 const LEGACY_LRTP_TO_LTTP_PERMISSION_CODE = {
@@ -80,21 +81,6 @@ const SYSTEM_TYPE_NAMES = {
 
 const DEFAULT_REGISTRATION_UNIT_NAME = "Đơn vị mặc định";
 
-function mergePermissionRecords(typePermissions, jobTitlePermissions) {
-  const byCode = new Map();
-  for (const p of typePermissions || []) {
-    if (p?.code) {
-      byCode.set(p.code, p);
-    }
-  }
-  for (const p of jobTitlePermissions || []) {
-    if (p?.code) {
-      byCode.set(p.code, p);
-    }
-  }
-  return [...byCode.values()];
-}
-
 async function normalizeUser(user) {
   if (!user) {
     return null;
@@ -102,7 +88,7 @@ async function normalizeUser(user) {
 
   const typePerms = user.type?.permissions?.map(({ permission }) => permission) || [];
   const jobPerms = user.jobTitle?.permissions?.map(({ permission }) => permission) || [];
-  let permissions = mergePermissionRecords(typePerms, jobPerms);
+  let permissions = grantedPermissionRecords(user, typePerms, jobPerms);
 
   if (user.type?.name === SYSTEM_TYPE_NAMES.SUPERADMIN) {
     return {

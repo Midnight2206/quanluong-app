@@ -7,7 +7,9 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { DashboardMealRateCard } from "@/pages/dashboard/components/DashboardMealRateCard";
-import { useCurrentUser } from "@/features/auth/model/authSlice";
+import { useHasPermission } from "@/features/auth/model/authSlice";
+import { PERMISSIONS } from "@/features/permissions/constants/permissions";
+import { notifyNoDeletePermission, notifyNoWritePermission } from "@/features/permissions/permissionUi";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import {
   useCreateMealAllowanceRateMutation,
@@ -40,8 +42,7 @@ const emptyDraft = () => ({
 export function SuperadminMealAllowanceRatesPanel() {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const { confirm } = useConfirm();
-  const user = useCurrentUser();
-  const isSuperadmin = user?.type?.name === "superadmin";
+  const canManage = useHasPermission(PERMISSIONS.MEAL_ALLOWANCE_RATES_MANAGE);
   const { data: rows = [], isLoading, isError } = useGetMealAllowanceRatesQuery();
   const [createRow, { isLoading: creating }] = useCreateMealAllowanceRateMutation();
   const [patchRow, { isLoading: patching }] = usePatchMealAllowanceRateMutation();
@@ -104,6 +105,10 @@ export function SuperadminMealAllowanceRatesPanel() {
   }, [rows, filterType]);
 
   function openAddModal() {
+    if (!canManage) {
+      notifyNoWritePermission();
+      return;
+    }
     setDraft({
       ...emptyDraft(),
       type: filterType === "an_them" ? "an_them" : "an_tieu_chuan",
@@ -117,6 +122,10 @@ export function SuperadminMealAllowanceRatesPanel() {
   }
 
   function startEdit(row) {
+    if (!canManage) {
+      notifyNoWritePermission();
+      return;
+    }
     setEditingId(row.id);
     setEditForm({
       doiTuong: row.doiTuong,
@@ -184,6 +193,10 @@ export function SuperadminMealAllowanceRatesPanel() {
   }
 
   async function onDelete(id) {
+    if (!canManage) {
+      notifyNoDeletePermission();
+      return;
+    }
     const ok = await confirm({
       title: "Xóa mục",
       message: "Xóa mục mức tiền ăn này?",
@@ -235,12 +248,10 @@ export function SuperadminMealAllowanceRatesPanel() {
               </button>
             ))}
           </div>
-          {isSuperadmin ? (
-            <Button type="button" className="h-8 gap-1 px-3 text-xs sm:ml-auto" onClick={openAddModal}>
-              <Plus className="size-3.5" aria-hidden />
-              Thêm mục
-            </Button>
-          ) : null}
+          <Button type="button" className="h-8 gap-1 px-3 text-xs sm:ml-auto" onClick={openAddModal}>
+            <Plus className="size-3.5" aria-hidden />
+            Thêm mục
+          </Button>
         </div>
 
         {isLoading ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
@@ -255,14 +266,14 @@ export function SuperadminMealAllowanceRatesPanel() {
                     <th className="px-2 py-2 font-medium">Loại</th>
                     <th className="min-w-[12rem] px-2 py-2 font-medium">Đối tượng</th>
                     <th className="whitespace-nowrap px-2 py-2 font-medium">Mức (đ/ngày)</th>
-                    {isSuperadmin ? <th className="px-2 py-2 text-right font-medium">Thao tác</th> : null}
+                    <th className="px-2 py-2 text-right font-medium">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={isSuperadmin ? 4 : 3}
+                        colSpan={4}
                         className="px-3 py-6 text-center text-muted-foreground"
                       >
                         Chưa có dữ liệu. Chạy seed backend hoặc thêm mục mới.
@@ -276,23 +287,21 @@ export function SuperadminMealAllowanceRatesPanel() {
                           <span className="whitespace-pre-wrap leading-snug">{row.doiTuong}</span>
                         </td>
                         <td className="px-2 py-2 tabular-nums">{formatVnd(row.mucTienAn)}</td>
-                        {isSuperadmin ? (
-                          <td className="px-2 py-2 text-right">
-                            <div className="flex justify-end gap-1">
-                              <IconButton label="Sửa" variant="surface" onClick={() => startEdit(row)}>
-                                <Pencil aria-hidden />
-                              </IconButton>
-                              <IconButton
-                                label="Xóa"
-                                variant="danger"
-                                disabled={deleting}
-                                onClick={() => onDelete(row.id)}
-                              >
-                                <Trash2 aria-hidden />
-                              </IconButton>
-                            </div>
-                          </td>
-                        ) : null}
+                        <td className="px-2 py-2 text-right">
+                          <div className="flex justify-end gap-1">
+                            <IconButton label="Sửa" variant="surface" onClick={() => startEdit(row)}>
+                              <Pencil aria-hidden />
+                            </IconButton>
+                            <IconButton
+                              label="Xóa"
+                              variant="danger"
+                              disabled={deleting}
+                              onClick={() => onDelete(row.id)}
+                            >
+                              <Trash2 aria-hidden />
+                            </IconButton>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -311,7 +320,6 @@ export function SuperadminMealAllowanceRatesPanel() {
                     key={row.id}
                     row={row}
                     typeLabel={typeLabel}
-                    isSuperadmin={isSuperadmin}
                     deleting={deleting}
                     onEdit={startEdit}
                     onDelete={onDelete}
@@ -323,7 +331,7 @@ export function SuperadminMealAllowanceRatesPanel() {
         ) : null}
       </CardContent>
 
-      {addOpen && isSuperadmin ? (
+      {addOpen && canManage ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
           role="presentation"
@@ -411,7 +419,7 @@ export function SuperadminMealAllowanceRatesPanel() {
         </div>
       ) : null}
 
-      {editOpen && isSuperadmin ? (
+      {editOpen && canManage ? (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
           role="presentation"

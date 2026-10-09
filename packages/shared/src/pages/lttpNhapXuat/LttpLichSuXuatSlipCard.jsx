@@ -2,6 +2,7 @@
 
 import { Loader2, Pencil, Printer, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { notifyNoDeletePermission, notifyNoWritePermission } from "@/features/permissions/permissionUi";
 import { formatVnd } from "@/utils/formatVnd";
 
 function slipRefLabel(bookMmyy, slipNo) {
@@ -80,30 +81,40 @@ export function LttpLichSuXuatSlipCard({
           )}
           In PDF
         </Button>
-        {canWrite && typeof onEdit === "function" ? (
+        {typeof onEdit === "function" ? (
           <Button
             type="button"
             variant="outline"
             className="h-9 flex-1 gap-1.5 text-xs sm:flex-none"
             disabled={actionsDisabled}
-            onClick={onEdit}
+            onClick={() => {
+              if (!canWrite) {
+                notifyNoWritePermission();
+                return;
+              }
+              onEdit();
+            }}
           >
             <Pencil className="size-3.5" aria-hidden />
             Sửa
           </Button>
         ) : null}
-        {canWrite ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 flex-1 gap-1.5 text-xs text-destructive hover:text-destructive sm:flex-none"
-            disabled={actionsDisabled}
-            onClick={onRecall}
-          >
-            <RotateCcw className="size-3.5" aria-hidden />
-            Thu hồi
-          </Button>
-        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 flex-1 gap-1.5 text-xs text-destructive hover:text-destructive sm:flex-none"
+          disabled={actionsDisabled}
+          onClick={() => {
+            if (!canWrite) {
+              notifyNoDeletePermission();
+              return;
+            }
+            onRecall();
+          }}
+        >
+          <RotateCcw className="size-3.5" aria-hidden />
+          Thu hồi
+        </Button>
       </div>
     </article>
   );

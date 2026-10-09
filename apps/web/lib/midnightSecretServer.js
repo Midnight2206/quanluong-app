@@ -145,6 +145,58 @@ export function getMidnightSecretHeader() {
   return s;
 }
 
+export const MIDNIGHT_TAB_READ_CODES = [
+  "midnight.prices.read",
+  "midnight.matrix.read",
+  "midnight.debts.read",
+];
+
+export async function getMidnightActor(cookieHeader) {
+  const base = getBackendBaseForMidnight();
+  const r = await fetch(`${base}/auth/current-user`, {
+    headers: { Cookie: cookieHeader || "" },
+    cache: "no-store",
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    return { error: json, status: r.status };
+  }
+  return { user: json?.data ?? null };
+}
+
+export function userHasAnyPermission(user, codes) {
+  if (user?.type?.name === "superadmin") {
+    return true;
+  }
+  const have = new Set((user?.permissions || []).map((permission) => permission.code));
+  return codes.some((code) => have.has(code));
+}
+
+export function midnightGrantsFromUser(user) {
+  const allow = (code) => userHasAnyPermission(user, [code]);
+  return {
+    pricesRead: allow("midnight.prices.read"),
+    pricesWrite: allow("midnight.prices.write"),
+    matrixRead: allow("midnight.matrix.read"),
+    debtsRead: allow("midnight.debts.read"),
+    debtsWrite: allow("midnight.debts.write"),
+  };
+}
+
+export async function midnightPermissionDenial(cookieHeader, codes) {
+  const actor = await getMidnightActor(cookieHeader);
+  if (actor.error) {
+    return { status: actor.status || 401, body: actor.error };
+  }
+  if (!userHasAnyPermission(actor.user, codes)) {
+    return {
+      status: 403,
+      body: { success: false, error: { message: "Không có quyền truy cập." } },
+    };
+  }
+  return null;
+}
+
 export async function getCurrentUserUnitIdForMidnight(cookieHeader) {
   const base = getBackendBaseForMidnight();
   const r = await fetch(`${base}/auth/current-user`, {

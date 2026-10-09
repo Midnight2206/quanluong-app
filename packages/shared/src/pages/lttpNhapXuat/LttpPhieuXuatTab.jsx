@@ -1478,6 +1478,10 @@ export function LttpPhieuXuatTab({
 
   async function onSubmit(e, source) {
     e?.preventDefault();
+    if (!canWrite) {
+      notifyError("Bạn không có quyền lập/sửa/xóa phiếu.");
+      return;
+    }
     function stopSubmit(message) {
       notifyError(message);
       if (!source?.draftCommit) return false;
@@ -1706,7 +1710,7 @@ export function LttpPhieuXuatTab({
   }
 
   async function onResyncSlipPricesFromEffectiveTable() {
-    if (!editingSlip?.id) {
+    if (!canWrite || !editingSlip?.id) {
       return;
     }
     try {
@@ -1879,6 +1883,7 @@ export function LttpPhieuXuatTab({
                       value={printHeaderLine1}
                       onChange={(e) => setPrintHeaderLine1(e.target.value)}
                       placeholder={profileDonViCapTren || "VD: TRUNG ĐOÀN …"}
+                      disabled={!canWrite}
                     />
                   </label>
                   <label className="text-[10px] text-muted-foreground">
@@ -1888,6 +1893,7 @@ export function LttpPhieuXuatTab({
                       value={printHeaderLine2}
                       onChange={(e) => setPrintHeaderLine2(e.target.value)}
                       placeholder={profileDonVi || "VD: QUÂN NHU"}
+                      disabled={!canWrite}
                     />
                   </label>
                 </div>
@@ -1898,6 +1904,7 @@ export function LttpPhieuXuatTab({
                       className={cn(inputClass, "mt-0.5")}
                       value={formMauSo}
                       onChange={(e) => setFormMauSo(e.target.value)}
+                      disabled={!canWrite}
                     />
                   </label>
                   <label className="text-[10px] text-muted-foreground">
@@ -1906,6 +1913,7 @@ export function LttpPhieuXuatTab({
                       className={cn(inputClass, "mt-0.5")}
                       value={warehouseFrom}
                       onChange={(e) => setWarehouseFrom(e.target.value)}
+                      disabled={!canWrite}
                     />
                   </label>
                 </div>
@@ -1954,6 +1962,7 @@ export function LttpPhieuXuatTab({
                       className={cn(inputClass, "mt-0.5")}
                       value={signerStorekeeper}
                       onChange={(e) => setSignerStorekeeper(e.target.value)}
+                      disabled={!canWrite}
                     />
                   </label>
                   <label className="text-[10px] text-muted-foreground">
@@ -1962,6 +1971,7 @@ export function LttpPhieuXuatTab({
                       className={cn(inputClass, "mt-0.5")}
                       value={signerApprover}
                       onChange={(e) => setSignerApprover(e.target.value)}
+                      disabled={!canWrite}
                     />
                   </label>
                 </div>
@@ -2062,7 +2072,7 @@ export function LttpPhieuXuatTab({
                   !prev || prev === issueDate ? next : prev,
                 );
               }}
-              disabled={isEditMode}
+              disabled={isEditMode || !canWrite}
               readOnly={isEditMode}
               title={isEditMode ? "Ngày phiếu giữ nguyên khi sửa." : undefined}
             />
@@ -2077,6 +2087,7 @@ export function LttpPhieuXuatTab({
                 markHeaderFieldTouched("receivedDate");
                 setReceivedDate(e.target.value);
               }}
+              disabled={!canWrite}
             />
           </label>
           {canPickUnits && units.length > 0 ? (
@@ -2092,6 +2103,7 @@ export function LttpPhieuXuatTab({
                   setSignerRecipient("");
                   setRecipientUnitId(Number(e.target.value));
                 }}
+                disabled={!canWrite}
               >
                 {units.map((u) => (
                   <option key={u.id} value={u.id}>
@@ -2400,6 +2412,7 @@ export function LttpPhieuXuatTab({
                             lttpSupplierId: e.target.value,
                           })
                         }
+                        disabled={!canWrite}
                       >
                         <option value="">—</option>
                         {suppliers.map((s) => (
@@ -2437,6 +2450,7 @@ export function LttpPhieuXuatTab({
                             }
                           }}
                           placeholder="Mã"
+                          disabled={!canWrite}
                         />
                         <span
                           className={cn(
@@ -2623,6 +2637,7 @@ export function LttpPhieuXuatTab({
                           applyRowPatch(r.key, { lineNote: e.target.value })
                         }
                         placeholder="—"
+                        disabled={!canWrite}
                       />
                     </td>
                     <td className="px-0 py-1 text-right">

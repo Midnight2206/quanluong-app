@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { notifyNoWritePermission } from "@/features/permissions/permissionUi";
 
 function localYmd(d = new Date()) {
   const y = d.getFullYear();
@@ -16,7 +17,7 @@ function formatVnd(n) {
   return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(n));
 }
 
-export function MidnightTabPartnerPrices({ units, unitId, onUnitId }) {
+export function MidnightTabPartnerPrices({ units, unitId, onUnitId, canWrite = false }) {
   const [asOf, setAsOf] = useState(localYmd);
   const [effSave, setEffSave] = useState(localYmd);
   const [data, setData] = useState(null);
@@ -62,6 +63,10 @@ export function MidnightTabPartnerPrices({ units, unitId, onUnitId }) {
 
   async function onSave(e) {
     e.preventDefault();
+    if (!canWrite) {
+      notifyNoWritePermission();
+      return;
+    }
     if (!unitId) {
       return;
     }

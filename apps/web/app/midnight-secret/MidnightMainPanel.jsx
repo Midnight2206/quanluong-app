@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PermissionSectionDenied } from "@/features/permissions/permissionUi";
 import { MidnightTabMatrix } from "./MidnightTabMatrix";
 import { MidnightTabPartnerDebts } from "./MidnightTabPartnerDebts";
 import { MidnightTabPartnerPrices } from "./MidnightTabPartnerPrices";
@@ -11,7 +12,7 @@ const TABS = [
   { id: "debts", label: "Công nợ đối tác" },
 ];
 
-export function MidnightMainPanel() {
+export function MidnightMainPanel({ grants }) {
   const [tab, setTab] = useState("prices");
   const [units, setUnits] = useState([]);
   const [unitId, setUnitId] = useState("");
@@ -73,11 +74,26 @@ export function MidnightMainPanel() {
       </div>
 
       {tab === "prices" ? (
-        <MidnightTabPartnerPrices units={units} unitId={unitId} onUnitId={setUnitId} />
+        grants?.pricesRead ? (
+          <MidnightTabPartnerPrices
+            units={units}
+            unitId={unitId}
+            onUnitId={setUnitId}
+            canWrite={Boolean(grants?.pricesWrite)}
+          />
+        ) : (
+          <PermissionSectionDenied />
+        )
       ) : tab === "matrix" ? (
-        <MidnightTabMatrix units={units} unitId={unitId} onUnitId={setUnitId} />
+        grants?.matrixRead ? (
+          <MidnightTabMatrix units={units} unitId={unitId} onUnitId={setUnitId} />
+        ) : (
+          <PermissionSectionDenied />
+        )
+      ) : grants?.debtsRead ? (
+        <MidnightTabPartnerDebts canWrite={Boolean(grants?.debtsWrite)} />
       ) : (
-        <MidnightTabPartnerDebts />
+        <PermissionSectionDenied />
       )}
     </div>
   );

@@ -11,6 +11,9 @@ import { MEAL_ALLOWANCE_RATES_ROUTE_DEFINITIONS } from "../modules/meal-allowanc
 import { MEAL_ROSTER_ROUTE_DEFINITIONS } from "../modules/meal-roster/meal-roster.route-definitions.js";
 import { KITCHEN_BOOKS_ROUTE_DEFINITIONS } from "../modules/kitchen-books/kitchen-books.route-definitions.js";
 import { CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS } from "../modules/chung-tu-quyet-toan/chung-tu-quyet-toan.route-definitions.js";
+import { MIDNIGHT_ROUTE_DEFINITIONS } from "../modules/midnight-secret/midnight-secret.route-definitions.js";
+import { SYSTEM_BACKUP_ROUTE_DEFINITIONS } from "../modules/system-backup/system-backup.route-definitions.js";
+import { SYSTEM_INFRA_ROUTE_DEFINITIONS } from "../modules/system-infra/system-infra.route-definitions.js";
 import { getPermissionVi } from "../shared/constants/permission-catalog.vi.js";
 
 const ROUTE_PERMISSION_DEFINITIONS = [
@@ -27,6 +30,9 @@ const ROUTE_PERMISSION_DEFINITIONS = [
   ...MEAL_ROSTER_ROUTE_DEFINITIONS,
   ...KITCHEN_BOOKS_ROUTE_DEFINITIONS,
   ...CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS,
+  ...MIDNIGHT_ROUTE_DEFINITIONS,
+  ...SYSTEM_BACKUP_ROUTE_DEFINITIONS,
+  ...SYSTEM_INFRA_ROUTE_DEFINITIONS,
 ]
   .filter((route) => route.permission)
   .map((route) => {

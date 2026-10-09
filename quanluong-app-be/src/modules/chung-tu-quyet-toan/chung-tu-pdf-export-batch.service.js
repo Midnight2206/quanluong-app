@@ -19,6 +19,7 @@ import {
   deleteDocumentFolder,
   getDocumentFolder,
   getTemplateFields,
+  withPdfFilesPresent,
   renderToDocumentFolder,
   streamDocumentFolderFile,
   streamDocumentFolderMergedPdf,
@@ -532,7 +533,7 @@ async function listChungTuPdfExportBatches({ unitId, categoryKey, effectiveUnitI
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 200,
   });
-  return rows.map(mapBatchRow);
+  return withPdfFilesPresent(rows.map(mapBatchRow));
 }
 
 async function getChungTuPdfExportBatch({ batchKey, effectiveUnitIds }) {

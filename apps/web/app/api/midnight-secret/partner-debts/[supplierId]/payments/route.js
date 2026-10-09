@@ -4,6 +4,7 @@ import {
   getCurrentUserUnitIdForMidnight,
   getMidnightSecretHeader,
   isMidnightGateCookieValid,
+  midnightPermissionDenial,
   MIDNIGHT_GATE_COOKIE,
 } from "../../../../../../lib/midnightSecretServer.js";
 
@@ -27,6 +28,11 @@ function validateUnlocked(request) {
 }
 
 export async function GET(request, { params }) {
+  const cookie = request.headers.get("cookie") || "";
+  const denied = await midnightPermissionDenial(cookie, ["midnight.debts.read"]);
+  if (denied) {
+    return NextResponse.json(denied.body, { status: denied.status });
+  }
   const checked = validateUnlocked(request);
   if (checked instanceof NextResponse) {
     return checked;
@@ -41,6 +47,7 @@ export async function GET(request, { params }) {
     headers: {
       "X-Midnight-Secret": checked.secret,
       "X-Midnight-User-Unit-Id": String(current.unitId),
+      Cookie: checked.cookie,
     },
     cache: "no-store",
   });
@@ -49,6 +56,11 @@ export async function GET(request, { params }) {
 }
 
 export async function POST(request, { params }) {
+  const cookie = request.headers.get("cookie") || "";
+  const denied = await midnightPermissionDenial(cookie, ["midnight.debts.write"]);
+  if (denied) {
+    return NextResponse.json(denied.body, { status: denied.status });
+  }
   const checked = validateUnlocked(request);
   if (checked instanceof NextResponse) {
     return checked;
@@ -66,6 +78,7 @@ export async function POST(request, { params }) {
       "Content-Type": "application/json",
       "X-Midnight-Secret": checked.secret,
       "X-Midnight-User-Unit-Id": String(current.unitId),
+      Cookie: checked.cookie,
     },
     body: JSON.stringify(body),
     cache: "no-store",

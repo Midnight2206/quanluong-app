@@ -28,7 +28,10 @@ function midnightSecretMiddleware(req, res, next) {
 }
 
 function midnightUserUnitMiddleware(req, _res, next) {
-  const unitId = Number(req.get("x-midnight-user-unit-id"));
+  const fromUser = Number(req.user?.unitId ?? req.user?.unit?.id);
+  const unitId = Number.isInteger(fromUser) && fromUser > 0
+    ? fromUser
+    : Number(req.get("x-midnight-user-unit-id"));
   if (!Number.isInteger(unitId) || unitId <= 0) {
     return next(
       new AppError({

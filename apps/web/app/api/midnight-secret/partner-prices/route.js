@@ -4,12 +4,17 @@ import {
   getCurrentUserUnitIdForMidnight,
   getMidnightSecretHeader,
   isMidnightGateCookieValid,
+  midnightPermissionDenial,
   MIDNIGHT_GATE_COOKIE,
 } from "../../../../lib/midnightSecretServer.js";
 
 export async function GET(request) {
-  const c = request.cookies.get(MIDNIGHT_GATE_COOKIE);
   const cookie = request.headers.get("cookie") || "";
+  const denied = await midnightPermissionDenial(cookie, ["midnight.prices.read"]);
+  if (denied) {
+    return NextResponse.json(denied.body, { status: denied.status });
+  }
+  const c = request.cookies.get(MIDNIGHT_GATE_COOKIE);
   if (!isMidnightGateCookieValid(c?.value, cookie)) {
     return NextResponse.json(
       { success: false, error: { message: "Chưa mở khóa trang" } },
@@ -30,7 +35,11 @@ export async function GET(request) {
     return NextResponse.json(current.error, { status: current.status });
   }
   const r = await fetch(`${base}/midnight-secret/partner-prices${search}`, {
-    headers: { "X-Midnight-Secret": secret, "X-Midnight-User-Unit-Id": String(current.unitId) },
+    headers: {
+      "X-Midnight-Secret": secret,
+      "X-Midnight-User-Unit-Id": String(current.unitId),
+      Cookie: cookie,
+    },
     cache: "no-store",
   });
   const json = await r.json().catch(() => ({}));
@@ -38,8 +47,12 @@ export async function GET(request) {
 }
 
 export async function PUT(request) {
-  const c = request.cookies.get(MIDNIGHT_GATE_COOKIE);
   const cookie = request.headers.get("cookie") || "";
+  const denied = await midnightPermissionDenial(cookie, ["midnight.prices.write"]);
+  if (denied) {
+    return NextResponse.json(denied.body, { status: denied.status });
+  }
+  const c = request.cookies.get(MIDNIGHT_GATE_COOKIE);
   if (!isMidnightGateCookieValid(c?.value, cookie)) {
     return NextResponse.json(
       { success: false, error: { message: "Chưa mở khóa trang" } },
@@ -65,6 +78,7 @@ export async function PUT(request) {
       "Content-Type": "application/json",
       "X-Midnight-Secret": secret,
       "X-Midnight-User-Unit-Id": String(current.unitId),
+      Cookie: cookie,
     },
     body: JSON.stringify(body),
     cache: "no-store",

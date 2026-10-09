@@ -10,7 +10,6 @@ import { formatVnd } from "@/utils/formatVnd";
 export function DashboardMealRateCard({
   row,
   typeLabel,
-  isSuperadmin,
   deleting,
   onEdit,
   onDelete,
@@ -28,8 +27,7 @@ export function DashboardMealRateCard({
       <p className="mt-1.5 whitespace-pre-wrap text-xs leading-snug text-foreground">
         {row.doiTuong}
       </p>
-      {isSuperadmin ? (
-        <div className="mt-3 flex justify-end gap-1 border-t border-border/60 pt-3">
+      <div className="mt-3 flex justify-end gap-1 border-t border-border/60 pt-3">
           <IconButton label="Sửa" variant="surface" onClick={() => onEdit(row)}>
             <Pencil aria-hidden />
           </IconButton>
@@ -41,8 +39,7 @@ export function DashboardMealRateCard({
           >
             <Trash2 aria-hidden />
           </IconButton>
-        </div>
-      ) : null}
+      </div>
     </article>
   );
 }

@@ -1,4 +1,4 @@
-import { BookOpen, FileText, Home, LayoutDashboard, Users, Warehouse } from "lucide-react";
+import { BookOpen, FileText, Home, LayoutDashboard, Lock, Users, Warehouse } from "lucide-react";
 import { DASHBOARD_SUPERADMIN_TAB_META } from "@/pages/dashboard/superadminDashboardTabMeta";
 import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
@@ -44,6 +44,13 @@ export const mainNavItems = [
     requiresAuth: true,
     routeAccessKey: "nav-kitchen-books",
   },
+  {
+    to: "/midnight-secret",
+    label: "Báo cáo nội bộ",
+    icon: Lock,
+    requiresAuth: true,
+    routeAccessKey: "nav-midnight-report",
+  },
 ];
 
 /**
@@ -81,6 +88,13 @@ export const superadminNavItems = [
     icon: BookOpen,
     requiresAuth: true,
     routeAccessKey: "nav-kitchen-books",
+  },
+  {
+    to: "/midnight-secret",
+    label: "Báo cáo nội bộ",
+    icon: Lock,
+    requiresAuth: true,
+    routeAccessKey: "nav-midnight-report",
   },
 ];
 

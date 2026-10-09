@@ -12,6 +12,9 @@ const PERMISSION_MODULE_LABELS_VI = {
   permissions: "Danh mục quyền",
   unitLevel: "Cấp đơn vị",
   unitLevelCaps: "Trần quyền theo cấp",
+  midnight: "Báo cáo nội bộ",
+  systemBackup: "Backup dữ liệu",
+  systemInfra: "Hạ tầng",
   other: "Khác",
 };
 

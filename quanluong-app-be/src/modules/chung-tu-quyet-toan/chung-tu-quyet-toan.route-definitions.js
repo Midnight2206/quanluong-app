@@ -57,7 +57,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/template-fill-rules/:driveFileId",
     pathRoute: "/api/chungtuquyettoan/template-fill-rules/:driveFileId",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
       description: "Truy cập hệ thống API chứng từ quyết toán.",
     },
@@ -69,7 +69,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/drive-import",
     pathRoute: "/api/chungtuquyettoan/drive-import",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
       description: "Truy cập hệ thống API chứng từ quyết toán.",
     },
@@ -106,7 +106,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-templates",
     pathRoute: "/api/chungtuquyettoan/pdf-templates",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      code: PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE,
       name: "Chứng từ quyết toán",
       description: "Superadmin: tải mẫu PDF Excel lên Document service và lưu metadata.",
     },
@@ -118,7 +118,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-templates/:id",
     pathRoute: "/api/chungtuquyettoan/pdf-templates/:id",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      code: PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE,
       name: "Chứng từ quyết toán",
       description: "Superadmin: retire mẫu PDF đã tải lên (alias DELETE).",
     },
@@ -130,7 +130,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-templates/:id/preview",
     pathRoute: "/api/chungtuquyettoan/pdf-templates/:id/preview",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      code: PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE,
       name: "Chứng từ quyết toán",
       description: "Superadmin: xem preview PDF của mẫu trên Document service.",
     },
@@ -142,7 +142,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-templates/:id/publish",
     pathRoute: "/api/chungtuquyettoan/pdf-templates/:id/publish",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      code: PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE,
       name: "Chứng từ quyết toán",
       description: "Superadmin: publish mẫu PDF nháp.",
     },
@@ -154,7 +154,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-templates/:id/retire",
     pathRoute: "/api/chungtuquyettoan/pdf-templates/:id/retire",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      code: PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE,
       name: "Chứng từ quyết toán",
       description: "Superadmin: retire mẫu PDF đã publish hoặc còn nháp.",
     },
@@ -178,7 +178,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-templates/:id/field-labels",
     pathRoute: "/api/chungtuquyettoan/pdf-templates/:id/field-labels",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
+      code: PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE,
       name: "Chứng từ quyết toán",
       description: "Superadmin: lưu nhãn field theo từng phiên bản mẫu PDF.",
     },
@@ -262,8 +262,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-export-batches/:batchKey/re-export",
     pathRoute: "/api/chungtuquyettoan/pdf-export-batches/:batchKey/re-export",
     permission: {
-      // Cùng quyền vào trang CTQT: mọi acc đơn vị đều xuất lại được (không khóa theo người tạo).
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
       description: "Xuất lại lô PDF tại chỗ trong đơn vị (giữ folder và số chứng từ).",
     },
@@ -335,8 +334,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/pdf-export-batches/:batchKey",
     pathRoute: "/api/chungtuquyettoan/pdf-export-batches/:batchKey",
     permission: {
-      // Cùng quyền vào trang CTQT: mọi acc đơn vị đều xóa folder được (không khóa theo người tạo).
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
       description: "Xóa lô xuất PDF trong đơn vị và folder trên document-service.",
     },
@@ -384,7 +382,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/bkmh-monthly/:id/re-export",
     pathRoute: "/api/chungtuquyettoan/bkmh-monthly/:id/re-export",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
       description: "Xuất lại BKMH tháng tại chỗ trong đơn vị (giữ folder và số chứng từ).",
     },
@@ -444,7 +442,7 @@ const CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS = [
     path: "/bkmh-monthly/:id",
     pathRoute: "/api/chungtuquyettoan/bkmh-monthly/:id",
     permission: {
-      code: PERMISSIONS.LTTP_ISSUE_SLIPS_READ,
+      code: PERMISSIONS.LTTP_ISSUE_SLIPS_WRITE,
       name: "Chứng từ quyết toán",
       description: "Xóa BKMH tháng trong đơn vị và folder trên document-service.",
     },

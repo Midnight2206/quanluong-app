@@ -7,7 +7,7 @@ import { effectiveUnitScopeMiddleware } from "../../middlewares/effective-unit-s
 import { permissionMiddleware } from "../../middlewares/permission.middleware.js";
 import { unitDataScopeMiddleware } from "../../middlewares/unit-data-scope.middleware.js";
 import { DATA_SCOPE_KINDS } from "../../shared/data-scope/data-scope.registry.js";
-import { superadminMiddleware } from "../../middlewares/superadmin.middleware.js";
+import { PERMISSIONS } from "../../shared/constants/permissions.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
@@ -196,35 +196,35 @@ chungTuQuyetToanRouter.put(
 
 chungTuQuyetToanRouter.get(
   "/template-catalog/manage",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ query: templateCatalogManageQuerySchema }),
   asyncHandler(listTemplateCatalogManageController),
 );
 
 chungTuQuyetToanRouter.get(
   "/template-catalog/field-registry",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ query: templateFieldRegistryQuerySchema }),
   asyncHandler(templateCatalogFieldRegistryController),
 );
 
 chungTuQuyetToanRouter.get(
   "/super/spreadsheet-named-ranges/:driveFileId",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ params: driveFileIdParamsSchema }),
   asyncHandler(listSpreadsheetNamedRangesSuperadminController),
 );
 
 chungTuQuyetToanRouter.post(
   "/template-catalog",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ body: templateCatalogCreateBodySchema }),
   asyncHandler(createTemplateCatalogController),
 );
 
 chungTuQuyetToanRouter.post(
   "/template-catalog/upload",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   driveImportMulterMiddleware,
   validateRequest({ body: templateCatalogUploadBodySchema }),
   asyncHandler(uploadTemplateCatalogOfficeController),
@@ -232,14 +232,14 @@ chungTuQuyetToanRouter.post(
 
 chungTuQuyetToanRouter.patch(
   "/template-catalog/:id",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ params: templateCatalogIdParamSchema, body: templateCatalogPatchBodySchema }),
   asyncHandler(patchTemplateCatalogController),
 );
 
 chungTuQuyetToanRouter.delete(
   "/template-catalog/:id",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ params: templateCatalogIdParamSchema }),
   asyncHandler(deleteTemplateCatalogController),
 );
@@ -260,7 +260,7 @@ chungTuQuyetToanRouter.get(
 
 chungTuQuyetToanRouter.post(
   "/pdf-templates",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   driveImportMulterMiddleware,
   validateRequest({ body: chungTuPdfTemplateUploadBodySchema }),
   asyncHandler(createChungTuPdfTemplateController),
@@ -268,28 +268,28 @@ chungTuQuyetToanRouter.post(
 
 chungTuQuyetToanRouter.delete(
   "/pdf-templates/:id",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
   asyncHandler(retireChungTuPdfTemplateController),
 );
 
 chungTuQuyetToanRouter.get(
   "/pdf-templates/:id/preview",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
   asyncHandler(previewChungTuPdfTemplateController),
 );
 
 chungTuQuyetToanRouter.post(
   "/pdf-templates/:id/publish",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
   asyncHandler(publishChungTuPdfTemplateController),
 );
 
 chungTuQuyetToanRouter.post(
   "/pdf-templates/:id/retire",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({ params: chungTuPdfTemplateIdParamSchema }),
   asyncHandler(retireChungTuPdfTemplateController),
 );
@@ -303,7 +303,7 @@ chungTuQuyetToanRouter.get(
 
 chungTuQuyetToanRouter.put(
   "/pdf-templates/:id/field-labels",
-  superadminMiddleware,
+  permissionMiddleware([PERMISSIONS.CHUNG_TU_PDF_TEMPLATES_MANAGE]),
   validateRequest({
     params: chungTuPdfTemplateIdParamSchema,
     body: chungTuPdfTemplateFieldLabelsPutBodySchema,

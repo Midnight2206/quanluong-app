@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { notifyNoWritePermission } from "@/features/permissions/permissionUi";
 
 function localYmd(d = new Date()) {
   const y = d.getFullYear();
@@ -45,7 +46,7 @@ function Modal({ title, children, onClose }) {
   );
 }
 
-export function MidnightTabPartnerDebts() {
+export function MidnightTabPartnerDebts({ canWrite = false }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -112,6 +113,10 @@ export function MidnightTabPartnerDebts() {
   }
 
   function openPayment(partner) {
+    if (!canWrite) {
+      notifyNoWritePermission();
+      return;
+    }
     setPayPartner(partner);
     setPaymentDate(localYmd());
     setAmount("");
@@ -121,6 +126,10 @@ export function MidnightTabPartnerDebts() {
 
   async function submitPayment(e) {
     e.preventDefault();
+    if (!canWrite) {
+      notifyNoWritePermission();
+      return;
+    }
     if (!payPartner) {
       return;
     }
