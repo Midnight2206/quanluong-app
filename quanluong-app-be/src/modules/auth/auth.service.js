@@ -259,6 +259,19 @@ async function issueSessionForUser({ req, user, ipAddress, userAgent }) {
   };
 }
 
+async function issueZaloSession({ req, user, ipAddress, userAgent }) {
+  assertActiveUser(user);
+  if (user.email || !user.phoneVerifiedAt) {
+    assertEmailVerifiedForLogin(user);
+  }
+  return issueSessionForUser({
+    req,
+    user,
+    ipAddress,
+    userAgent,
+  });
+}
+
 async function login({ req, identifier, password, ipAddress, userAgent }) {
   const raw = await prisma.user.findFirst({
     where: {
@@ -269,6 +282,10 @@ async function login({ req, identifier, password, ipAddress, userAgent }) {
   });
 
   if (!raw) {
+    throw createAuthError();
+  }
+
+  if (!raw.password) {
     throw createAuthError();
   }
 
@@ -946,6 +963,7 @@ export {
   getCurrentUser,
   getRegisterUnits,
   getUserById,
+  issueZaloSession,
   login,
   loginWithGoogleAccount,
   logout,

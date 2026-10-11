@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyPhone,
   buildZaloAuthorizeUrl,
   exchangeZaloCode,
   exchangeZaloPhone,
@@ -65,4 +66,53 @@ test("exchangeZaloCode đọc access_token từ JSON giả", async () => {
     },
   });
   assert.equal(token, "tok-from-json");
+});
+
+test("applyPhone một user đã duyệt thì phiếu sẵn sàng nhập mật khẩu", () => {
+  const attempt = {
+    ticket: "t1",
+    zaloUserId: "z-new",
+    portal: "main",
+    mode: "login",
+    status: "await_phone",
+    expiresAt: Date.now() + 60_000,
+  };
+  const next = applyPhone({
+    attempt,
+    miniAppUserId: "z-new",
+    rawPhone: "0987654321",
+    matches: [{ id: 7, typeName: "user", registrationStatus: "APPROVED", isActive: true, deletedAt: null, zaloUserId: null }],
+  });
+  assert.equal(next.branch, "password");
+  assert.equal(next.targetUserId, 7);
+  assert.equal(next.phone, "84987654321");
+});
+
+test("applyPhone mode link từ chối khi mã Zalo đã thuộc người khác", () => {
+  const next = applyPhone({
+    attempt: {
+      zaloUserId: "z-new",
+      status: "await_phone",
+      expiresAt: Date.now() + 1000,
+      portal: "main",
+      mode: "link",
+      linkUserId: 3,
+    },
+    miniAppUserId: "z-new",
+    rawPhone: "0987654321",
+    matches: [],
+    ownerUserId: 9,
+  });
+  assert.equal(next.errorCode, "taken");
+});
+
+test("applyPhone lệch id Mini App thì failed", () => {
+  const next = applyPhone({
+    attempt: { zaloUserId: "z1", status: "await_phone", expiresAt: Date.now() + 1000, portal: "main", mode: "login" },
+    miniAppUserId: "other",
+    rawPhone: "0987654321",
+    matches: [],
+  });
+  assert.equal(next.status, "failed");
+  assert.equal(next.errorCode, "id_mismatch");
 });

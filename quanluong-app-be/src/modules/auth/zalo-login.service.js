@@ -1,4 +1,7 @@
 import crypto from "node:crypto";
+import { getAttempt, putAttempt } from "./zalo-attempt.store.js";
+import { decideZaloOauth, decideZaloPhone } from "./zalo-login.decision.js";
+import { normalizeVnPhone } from "./zalo-phone.js";
 
 function createPkcePair() {
   const codeVerifier = crypto.randomBytes(32).toString("base64url");
@@ -81,9 +84,157 @@ function assertZaloConfigured(zalo) {
   }
 }
 
+function loadAttempt({ ticket, attempt }) {
+  if (attempt) return attempt;
+  if (!ticket) return null;
+  return getAttempt(ticket);
+}
+
+function applyOauthProfile({ attemptDraft, existingUser }) {
+  const decision = decideZaloOauth(existingUser);
+  if (decision.kind === "session" || decision.kind === "pending") {
+    return { kind: decision.kind, userId: decision.userId };
+  }
+  if (decision.kind === "error") {
+    const attempt = putAttempt({
+      ...attemptDraft,
+      status: "failed",
+      errorCode: decision.code,
+    });
+    return { kind: "error", code: decision.code, attempt };
+  }
+  const attempt = putAttempt({
+    ...attemptDraft,
+    status: "await_phone",
+  });
+  return { kind: "await_phone", attempt };
+}
+
+function applyPhone({ ticket, attempt, miniAppUserId, rawPhone, matches, ownerUserId }) {
+  const current = loadAttempt({ ticket, attempt });
+  if (!current || current.expiresAt <= Date.now()) {
+    return { ...(current ?? {}), status: "failed", errorCode: "expired" };
+  }
+  if (miniAppUserId !== current.zaloUserId) {
+    return { ...current, status: "failed", errorCode: "id_mismatch" };
+  }
+  const phone = normalizeVnPhone(rawPhone);
+  if (!phone) {
+    return { ...current, status: "failed", errorCode: "no_phone" };
+  }
+  if (current.mode === "link") {
+    if (ownerUserId != null && ownerUserId !== current.linkUserId) {
+      return { ...current, phone, status: "failed", errorCode: "taken" };
+    }
+    return { ...current, phone, status: "ready", branch: "link", targetUserId: current.linkUserId };
+  }
+  const decision = decideZaloPhone({ matches });
+  if (decision.kind === "error") {
+    return { ...current, phone, status: "failed", errorCode: decision.code };
+  }
+  if (decision.kind === "register") {
+    return { ...current, phone, status: "ready", branch: "register" };
+  }
+  return {
+    ...current,
+    phone,
+    status: "ready",
+    branch: decision.kind,
+    targetUserId: decision.userId,
+  };
+}
+
+function completeZaloPassword({ ticket, attempt, passwordOk, now = new Date() }) {
+  const current = loadAttempt({ ticket, attempt });
+  if (!current || current.branch !== "password" || current.status !== "ready") {
+    return { ok: false, attempt: current };
+  }
+  if (passwordOk !== true) {
+    return { ok: false, attempt: current };
+  }
+  return {
+    ok: true,
+    attempt: { ...current, status: "consumed" },
+    userUpdate: {
+      id: current.targetUserId,
+      zaloUserId: current.zaloUserId,
+      phoneVerifiedAt: now,
+      profile: { phoneNumber: current.phone },
+    },
+  };
+}
+
+async function approvalRequired(registrationRequiresApproval) {
+  if (typeof registrationRequiresApproval === "boolean") return registrationRequiresApproval;
+  const { config } = await import("../../config/config.js");
+  return config.auth.registrationRequiresApproval;
+}
+
+async function completeZaloRegister({
+  ticket,
+  attempt,
+  username,
+  unitId,
+  createUser,
+  registrationRequiresApproval,
+  now = new Date(),
+}) {
+  const current = loadAttempt({ ticket, attempt });
+  if (!current || current.branch !== "register" || current.status !== "ready") {
+    return { ok: false, attempt: current };
+  }
+  const profile = {
+    fullName: current.displayName ?? "",
+    phoneNumber: current.phone,
+  };
+  const common = {
+    username,
+    email: null,
+    password: null,
+    zaloUserId: current.zaloUserId,
+    phoneVerifiedAt: now,
+    profile,
+  };
+  let draft;
+  let issueSession = false;
+  if (current.portal === "supplier") {
+    draft = {
+      ...common,
+      typeName: "lttp_supplier",
+      unitId: null,
+      registrationStatus: "PENDING_APPROVAL",
+      isActive: false,
+    };
+  } else {
+    if (unitId == null || unitId === "") {
+      return { ok: false, errorCode: "unit_required", attempt: current };
+    }
+    const pending = await approvalRequired(registrationRequiresApproval);
+    draft = {
+      ...common,
+      typeName: "user",
+      unitId,
+      registrationStatus: pending ? "PENDING_APPROVAL" : "APPROVED",
+      isActive: !pending,
+    };
+    issueSession = !pending;
+  }
+  const user = await createUser(draft);
+  return {
+    ok: true,
+    issueSession,
+    attempt: { ...current, status: "consumed" },
+    user,
+  };
+}
+
 export {
+  applyOauthProfile,
+  applyPhone,
   assertZaloConfigured,
   buildZaloAuthorizeUrl,
+  completeZaloPassword,
+  completeZaloRegister,
   createPkcePair,
   exchangeZaloCode,
   exchangeZaloPhone,
