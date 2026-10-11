@@ -1,0 +1,9 @@
+{
+  "name": "@quanluong/zalo-miniapp",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "react": "^19.0.0",
+    "zmp-sdk": "^2.53.0"
+  }
+}
