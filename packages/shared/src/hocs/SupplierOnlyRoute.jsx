@@ -14,7 +14,7 @@ export function SupplierOnlyRoute({ children }) {
       return;
     }
     if (!isAuthenticated) {
-      window.location.replace(`${getMainAppOrigin()}/login`);
+      window.location.replace("/login");
       return;
     }
     if (user?.type?.name !== "lttp_supplier") {

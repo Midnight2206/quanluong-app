@@ -10,6 +10,7 @@ import {
   navigateAfterLogin,
   isSuperadminUser,
   resolvePostLoginPath,
+  safeInternalPath,
   SUPERADMIN_PORTAL_CHOOSER_PATH,
 } from "@/utils/postLoginPath";
 import { Button } from "@/components/ui/Button";
@@ -40,6 +41,19 @@ const GOOGLE_LOGIN_ERROR_MESSAGES = {
   unknown: "Đăng nhập Google thất bại. Hãy thử lại.",
 };
 
+const ZALO_LOGIN_ERROR_MESSAGES = {
+  denied: "Bạn đã huỷ đăng nhập Zalo.",
+  missing: "Zalo không trả về mã xác thực. Hãy thử lại.",
+  state: "Phiên Zalo không hợp lệ hoặc đã hết hạn. Hãy thử lại.",
+  config: "Máy chủ chưa cấu hình đăng nhập Zalo.",
+  token: "Zalo từ chối mã đăng nhập. Hãy thử lại.",
+  profile: "Không lấy được thông tin tài khoản Zalo. Thử lại sau.",
+  forbidden: "Không thể đăng nhập bằng Zalo với tài khoản này.",
+  inactive: "Tài khoản không hoạt động hoặc chưa được duyệt.",
+  superadmin: "Không đăng nhập superadmin bằng Zalo.",
+  unknown: "Đăng nhập Zalo thất bại. Hãy thử lại.",
+};
+
 function GoogleIcon({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
@@ -63,12 +77,26 @@ function GoogleIcon({ className }) {
   );
 }
 
+function ZaloIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <rect width="24" height="24" rx="6" fill="#0068FF" />
+      <path
+        fill="#fff"
+        d="M6.8 7.2h6.4c2.5 0 4 1.3 4 3.3 0 1.5-.8 2.5-2.1 3l2.6 3.3h-2.5l-2.4-3.2H9.1v3.2H6.8V7.2zm2.3 1.7v2.6h3.7c1.2 0 1.9-.5 1.9-1.3s-.7-1.3-1.9-1.3H9.1z"
+      />
+    </svg>
+  );
+}
+
 export function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const apiBase = getApiBaseUrl();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isGoogleBusy, setIsGoogleBusy] = useState(false);
+  const [isZaloBusy, setIsZaloBusy] = useState(false);
+  const [showZaloLogin, setShowZaloLogin] = useState(false);
   const [login, { isLoading }] = useLoginMutation();
 
   const {
@@ -94,6 +122,18 @@ export function LoginPage() {
         GOOGLE_LOGIN_ERROR_MESSAGES[reason] ||
         GOOGLE_LOGIN_ERROR_MESSAGES.unknown,
     );
+  }, [searchParams]);
+
+  useEffect(() => {
+    setShowZaloLogin(window.location.origin !== getSuperadminAppOrigin());
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.get("zalo") !== "error") {
+      return;
+    }
+    const reason = searchParams.get("reason") || "unknown";
+    notifyError(ZALO_LOGIN_ERROR_MESSAGES[reason] || ZALO_LOGIN_ERROR_MESSAGES.unknown);
   }, [searchParams]);
 
   async function onSubmit(values) {
@@ -143,7 +183,35 @@ export function LoginPage() {
     }
   }
 
-  const isBusy = isLoading || isGoogleBusy;
+  async function handleZaloLogin() {
+    setIsZaloBusy(true);
+    try {
+      const portal = window.location.origin === getSupplierAppOrigin() ? "supplier" : "main";
+      const from = safeInternalPath(searchParams.get("from"));
+      const params = new URLSearchParams({ portal, mode: "login", from });
+      const res = await fetch(`${apiBase}/auth/zalo/login/authorize-url?${params}`, {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notifyError(body?.message || "Không bắt đầu được đăng nhập Zalo.");
+        return;
+      }
+      const url = body?.data?.url;
+      if (typeof url !== "string" || !url.startsWith("https://")) {
+        notifyError("Máy chủ không trả về URL Zalo hợp lệ.");
+        return;
+      }
+      window.location.assign(url);
+    } catch {
+      notifyError("Lỗi mạng. Kiểm tra kết nối rồi thử lại.");
+    } finally {
+      setIsZaloBusy(false);
+    }
+  }
+
+  const isBusy = isLoading || isGoogleBusy || isZaloBusy;
 
   return (
     <div className="space-y-6">
@@ -170,6 +238,24 @@ export function LoginPage() {
         )}
         <span>{isGoogleBusy ? "Đang chuyển tới Google…" : "Đăng nhập bằng Google"}</span>
       </Button>
+
+      {showZaloLogin ? (
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full gap-2"
+          disabled={isBusy}
+          onClick={handleZaloLogin}
+          title="Đăng nhập bằng Zalo"
+        >
+          {isZaloBusy ? (
+            <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+          ) : (
+            <ZaloIcon className="size-4 shrink-0" />
+          )}
+          <span>{isZaloBusy ? "Đang chuyển tới Zalo…" : "Đăng nhập bằng Zalo"}</span>
+        </Button>
+      ) : null}
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
