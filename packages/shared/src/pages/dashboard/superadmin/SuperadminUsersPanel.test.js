@@ -19,6 +19,14 @@ test("supplier create form sends supplierIds and hides the unit select", () => {
   assert.match(source, /supplierIdsFromLinks/);
 });
 
+test("create form shows phone except when the selected type is superadmin", () => {
+  assert.match(source, /Số điện thoại/);
+  assert.match(source, /selectedTypeName !== "superadmin"/);
+  assert.match(source, /includePhone/);
+  assert.match(source, /profile\.phoneNumber|phoneNumber: phone/);
+  assert.doesNotMatch(source, /phoneVerifiedAt/);
+});
+
 test("declares unitId state before deriving selected unit depth", () => {
   const stateDeclaration = source.indexOf("const [unitId, setUnitId] = useState");
   const derivedDepth = source.indexOf("const selectedUnitDepth = useMemo");

@@ -18,8 +18,16 @@ export function useGetPendingRegistrationsQuery(_arg, options = {}) {
 export function useApproveRegistrationMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({
-    mutationFn: (userId) =>
-      apiRequest({ url: `/registrations/${userId}/approve`, method: "post" }),
+    mutationFn: (arg) => {
+      const withSupplier = arg != null && typeof arg === "object";
+      const userId = withSupplier ? arg.userId : arg;
+      const lttpSupplierId = withSupplier ? arg.lttpSupplierId : undefined;
+      return apiRequest({
+        url: `/registrations/${userId}/approve`,
+        method: "post",
+        ...(lttpSupplierId != null ? { data: { lttpSupplierId } } : {}),
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.registrations.root });
       qc.invalidateQueries({ queryKey: qk.users.root });

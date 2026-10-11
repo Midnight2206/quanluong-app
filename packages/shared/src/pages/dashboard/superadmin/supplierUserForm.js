@@ -35,7 +35,10 @@ export function supplierCreateBody({
   password,
   fullName,
   typeId,
+  phoneNumber,
+  includePhone = true,
 }) {
+  const phone = typeof phoneNumber === "string" ? phoneNumber.trim() : "";
   return {
     username: username.trim(),
     email: email.trim(),
@@ -43,7 +46,10 @@ export function supplierCreateBody({
     typeId: Number(typeId),
     unitId: isSupplierCreateType ? null : unitId ? Number(unitId) : null,
     ...(isSupplierCreateType ? { supplierIds } : {}),
-    profile: { fullName: fullName.trim() },
+    profile: {
+      fullName: fullName.trim(),
+      ...(includePhone && phone ? { phoneNumber: phone } : {}),
+    },
   };
 }
 

@@ -23,6 +23,7 @@ function mapCurrentUser(user, { unitPath } = {}) {
     emailVerified: Boolean(user.emailVerifiedAt),
     googleDriveFolderId: user.googleDriveFolderId || null,
     registrationStatus: user.registrationStatus,
+    zaloLinked: Boolean(user.zaloUserId),
     unitPath: unitPath ?? [],
     jobTitle: user.jobTitle
       ? {

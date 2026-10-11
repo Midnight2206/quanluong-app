@@ -68,6 +68,28 @@ test("create supplier account blocks an empty selection and sends a null unit", 
   assert.equal(Object.hasOwn(other, "supplierIds"), false);
 });
 
+test("create body sends phone except for superadmin and never phoneVerifiedAt", () => {
+  const withPhone = supplierCreateBody({
+    ...filled,
+    isSupplierCreateType: false,
+    supplierIds: [],
+    phoneNumber: " 0901 ",
+    includePhone: true,
+  });
+  assert.equal(withPhone.profile.phoneNumber, "0901");
+  assert.equal(Object.hasOwn(withPhone, "phoneVerifiedAt"), false);
+  assert.equal(Object.hasOwn(withPhone.profile, "phoneVerifiedAt"), false);
+
+  const superadmin = supplierCreateBody({
+    ...filled,
+    isSupplierCreateType: false,
+    phoneNumber: "0901",
+    includePhone: false,
+  });
+  assert.equal(Object.hasOwn(superadmin.profile, "phoneNumber"), false);
+  assert.equal(Object.hasOwn(superadmin, "phoneVerifiedAt"), false);
+});
+
 test("edit supplier links prefills ids and patches the selected set", () => {
   assert.deepEqual(
     supplierIdsFromLinks({ links: [{ supplierId: 2 }, { supplierId: "x" }, {}] }),

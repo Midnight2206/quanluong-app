@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { mapCurrentUser } from "./auth.mapper.js";
@@ -107,4 +108,39 @@ test("mapCurrentUser maps rankFull, rankAbbr, department on profile", () => {
   assert.equal(mapped.profile.rankFull, "Trung tá");
   assert.equal(mapped.profile.rankAbbr, "Tr.tá");
   assert.equal(mapped.profile.department, "Phòng Tham mưu");
+});
+
+function currentUserFixture(extra) {
+  return {
+    id: 3,
+    username: "sa",
+    email: "sa@example.com",
+    isActive: true,
+    emailVerifiedAt: null,
+    googleDriveFolderId: null,
+    registrationStatus: "APPROVED",
+    jobTitle: null,
+    type: { id: 1, name: "user", description: null },
+    unit: null,
+    assignedUnit: null,
+    permissions: [],
+    profile: null,
+    ...extra,
+  };
+}
+
+test("mapCurrentUser exposes zaloLinked and omits zaloUserId", () => {
+  const linked = mapCurrentUser(currentUserFixture({ zaloUserId: "z-9" }));
+  assert.equal(linked.zaloLinked, true);
+  assert.equal(Object.hasOwn(linked, "zaloUserId"), false);
+
+  const open = mapCurrentUser(currentUserFixture({ zaloUserId: null }));
+  assert.equal(open.zaloLinked, false);
+  assert.equal(Object.hasOwn(open, "zaloUserId"), false);
+});
+
+test("updateOwnProfile drops phoneNumber when the saved type is superadmin", () => {
+  const src = readFileSync(new URL("./me-profile.service.js", import.meta.url), "utf8");
+  assert.match(src, /user\.type\?\.name === "superadmin"/);
+  assert.match(src, /delete data\.phoneNumber/);
 });

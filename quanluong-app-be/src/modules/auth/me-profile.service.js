@@ -5,7 +5,12 @@ import { ERROR_CODES } from "../../errors/error-codes.js";
 async function updateOwnProfile(userId, patch) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, username: true, profile: { select: { id: true, fullName: true } } },
+    select: {
+      id: true,
+      username: true,
+      type: { select: { name: true } },
+      profile: { select: { id: true, fullName: true } },
+    },
   });
 
   if (!user) {
@@ -17,6 +22,9 @@ async function updateOwnProfile(userId, patch) {
   }
 
   const data = { ...patch };
+  if (user.type?.name === "superadmin") {
+    delete data.phoneNumber;
+  }
 
   const fullNameForCreate = (data.fullName ?? user.profile?.fullName ?? user.username) || "User";
 

@@ -8,6 +8,7 @@ import { Check, X } from "lucide-react";
 import { qk } from "@/app/query/queryKeys";
 import { Card, CardContent } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
+import { useLttpSupplierCatalogQuery } from "@/features/lttp-supplier/api/lttpSupplierApi";
 import { useGetUsersQuery } from "@/features/users/api/usersApi";
 import {
   useApproveRegistrationMutation,
@@ -68,6 +69,17 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
   const [approve, { isLoading: approving }] = useApproveRegistrationMutation();
   const [reject, { isLoading: rejecting }] = useRejectRegistrationMutation();
   const [processingId, setProcessingId] = useState(null);
+  const [approveSupplierByUser, setApproveSupplierByUser] = useState({});
+  const pendingSupplierReview = users.some(
+    (row) =>
+      canReviewRegistrations &&
+      row.registrationStatus === "PENDING_APPROVAL" &&
+      row.type?.name === "lttp_supplier",
+  );
+  const { data: supplierCatalogData, isError: suppliersError } = useLttpSupplierCatalogQuery({
+    skip: !pendingSupplierReview,
+  });
+  const suppliers = Array.isArray(supplierCatalogData?.suppliers) ? supplierCatalogData.suppliers : [];
   const [rejectNotes, setRejectNotes] = useState({});
   const { draft: rejectDraft, setDraftPayload: persistRejectNotes, ready: rejectPersistReady } =
     useDraftPersist({ draftType: "reject-notes", scopeId: "global" });
@@ -113,10 +125,15 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
     notifyError("Không tải được danh sách người dùng. Kiểm tra quyền hoặc backend.");
   }, [isError]);
 
-  async function onApprove(userId) {
-    setProcessingId(userId);
+  async function onApprove(user) {
+    const supplierPick = user.type?.name === "lttp_supplier";
+    const lttpSupplierId = Number(approveSupplierByUser[user.id]);
+    if (supplierPick && !(Number.isInteger(lttpSupplierId) && lttpSupplierId > 0)) {
+      return;
+    }
+    setProcessingId(user.id);
     try {
-      await approve(userId).unwrap();
+      await approve(supplierPick ? { userId: user.id, lttpSupplierId } : user.id).unwrap();
       refetchListsAfterRegistrationReview();
       notifySuccess("Đã duyệt đăng ký.");
     } catch (e) {
@@ -193,13 +210,39 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
                       </div>
                       {showActions ? (
                         <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[12rem] md:items-end">
+                          {user.type?.name === "lttp_supplier" ? (
+                            <select
+                              className={cn(inputClass, "md:w-64")}
+                              aria-label="Đối tác"
+                              value={approveSupplierByUser[user.id] ?? ""}
+                              onChange={(e) =>
+                                setApproveSupplierByUser((prev) => ({
+                                  ...prev,
+                                  [user.id]: e.target.value,
+                                }))
+                              }
+                            >
+                              <option value="">— Chọn đối tác —</option>
+                              {suppliers.map((supplier) => (
+                                <option key={supplier.id} value={supplier.id}>
+                                  {supplier.level1UnitName} — {supplier.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : null}
+                          {user.type?.name === "lttp_supplier" && suppliersError ? (
+                            <p className="text-xs text-muted-foreground">Không tải được danh sách đối tác.</p>
+                          ) : null}
                           <div className="flex flex-wrap gap-1.5">
                             <IconButton
                               label="Duyệt"
                               variant="primary"
-                              disabled={processingId != null}
+                              disabled={
+                                processingId != null
+                                || (user.type?.name === "lttp_supplier" && !(approveSupplierByUser[user.id] ?? ""))
+                              }
                               loading={processingId === user.id && approving}
-                              onClick={() => onApprove(user.id)}
+                              onClick={() => onApprove(user)}
                             >
                               <Check strokeWidth={2} aria-hidden />
                             </IconButton>

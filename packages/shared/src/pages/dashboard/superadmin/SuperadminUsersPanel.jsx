@@ -52,6 +52,7 @@ export function SuperadminUsersPanel() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [typeId, setTypeId] = useState("");
   const [unitId, setUnitId] = useState("");
   const [supplierIds, setSupplierIds] = useState([]);
@@ -70,6 +71,7 @@ export function SuperadminUsersPanel() {
     [typeId, typesForCreate],
   );
   const isSupplierCreateType = selectedTypeName === "lttp_supplier";
+  const includePhone = selectedTypeName !== "superadmin";
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [patchUser, { isLoading: isPatching }] = usePatchUserMutation();
@@ -117,6 +119,9 @@ export function SuperadminUsersPanel() {
       if (typeof s.fullName === "string") {
         setFullName(s.fullName);
       }
+      if (typeof s.phoneNumber === "string") {
+        setPhoneNumber(s.phoneNumber);
+      }
       if (s.typeId !== undefined) {
         setTypeId(s.typeId);
       }
@@ -142,6 +147,7 @@ export function SuperadminUsersPanel() {
       username,
       email,
       fullName,
+      phoneNumber,
       typeId,
       unitId,
       supplierIds,
@@ -150,6 +156,7 @@ export function SuperadminUsersPanel() {
     username,
     email,
     fullName,
+    phoneNumber,
     typeId,
     unitId,
     supplierIds,
@@ -183,12 +190,15 @@ export function SuperadminUsersPanel() {
         password,
         fullName,
         typeId,
+        phoneNumber,
+        includePhone,
       })).unwrap();
       notifySuccess("Đã tạo người dùng.");
       setUsername("");
       setEmail("");
       setPassword("");
       setFullName("");
+      setPhoneNumber("");
       setTypeId("");
       setUnitId("");
       setSupplierIds([]);
@@ -317,6 +327,22 @@ export function SuperadminUsersPanel() {
               onChange={(e) => setFullName(e.target.value)}
             />
           </label>
+          {includePhone ? (
+            <label className="space-y-0.5" htmlFor="ql-sa-users-create-phone">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Số điện thoại
+              </span>
+              <input
+                id="ql-sa-users-create-phone"
+                name="phoneNumber"
+                className={inputClass}
+                autoComplete="tel"
+                maxLength={30}
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+              />
+            </label>
+          ) : null}
           <label className="space-y-0.5" htmlFor="ql-sa-users-create-typeId">
             <span className="text-[11px] font-medium text-muted-foreground">
               Vai trò (Type)

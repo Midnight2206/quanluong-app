@@ -37,7 +37,8 @@ import { changePasswordSchema, meProfileFormSchema } from "@/features/auth/schem
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { cn } from "@/utils/cn";
-import { resolveMediaUrl } from "@/utils/runtimeEnv";
+import { getApiBaseUrl, resolveMediaUrl } from "@/utils/runtimeEnv";
+import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 import {
   precheckSignatureFile,
   readImageDimensions,
@@ -109,6 +110,10 @@ export function ProfilePage() {
   const signatureUrl = user?.profile?.signatureUrl;
   const signatureDisplaySrc = signatureUrl ? resolveMediaUrl(signatureUrl) : null;
   const displayEmail = user?.email ?? "";
+  const isSuperadmin = user?.type?.name === "superadmin";
+  const showPhoneField = Boolean(user) && !isSuperadmin;
+  const showZaloLink = Boolean(user) && !isSuperadmin && user.zaloLinked !== true;
+  const [isZaloLinkBusy, setIsZaloLinkBusy] = useState(false);
 
   const [showCrop, setShowCrop] = useState(false);
   const [imageSrc, setImageSrc] = useState(null);
@@ -323,11 +328,38 @@ export function ProfilePage() {
     }
   }
 
+  async function handleLinkZalo() {
+    setIsZaloLinkBusy(true);
+    try {
+      const portal = window.location.origin === getSupplierAppOrigin() ? "supplier" : "main";
+      const params = new URLSearchParams({ portal, mode: "link", from: "/profile" });
+      const res = await fetch(`${getApiBaseUrl()}/auth/zalo/login/authorize-url?${params}`, {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notifyError(body?.message || "Không bắt đầu được liên kết Zalo.");
+        return;
+      }
+      const url = body?.data?.url;
+      if (typeof url !== "string" || !url.startsWith("https://")) {
+        notifyError("Máy chủ không trả về URL Zalo hợp lệ.");
+        return;
+      }
+      window.location.assign(url);
+    } catch {
+      notifyError("Lỗi mạng. Kiểm tra kết nối rồi thử lại.");
+    } finally {
+      setIsZaloLinkBusy(false);
+    }
+  }
+
   async function onSaveProfile(values) {
     try {
       await patchProfile({
         fullName: values.fullName,
-        phoneNumber: values.phoneNumber?.trim() || null,
+        ...(showPhoneField ? { phoneNumber: values.phoneNumber?.trim() || null } : {}),
         address: values.address?.trim() || null,
         description: values.description?.trim() || null,
         jobTitle: values.jobTitle?.trim() || null,
@@ -584,13 +616,27 @@ export function ProfilePage() {
                     <p className="text-sm text-destructive">{profileErrors.fullName.message}</p>
                   ) : null}
                 </label>
-                <label className="block space-y-2">
-                  <span className="text-sm font-medium">Số điện thoại</span>
-                  <input className={fieldClass} {...regProfile("phoneNumber")} />
-                  {profileErrors.phoneNumber ? (
-                    <p className="text-sm text-destructive">{profileErrors.phoneNumber.message}</p>
-                  ) : null}
-                </label>
+                {showPhoneField ? (
+                  <label className="block space-y-2">
+                    <span className="text-sm font-medium">Số điện thoại</span>
+                    <input className={fieldClass} {...regProfile("phoneNumber")} />
+                    {profileErrors.phoneNumber ? (
+                      <p className="text-sm text-destructive">{profileErrors.phoneNumber.message}</p>
+                    ) : null}
+                  </label>
+                ) : null}
+                {showZaloLink ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-2xl"
+                    disabled={isZaloLinkBusy}
+                    onClick={handleLinkZalo}
+                  >
+                    {isZaloLinkBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+                    <span className={cn(isZaloLinkBusy && "ml-2")}>Liên kết Zalo</span>
+                  </Button>
+                ) : null}
                 <label className="block space-y-2">
                   <span className="text-sm font-medium">Địa chỉ</span>
                   <textarea rows={2} className={cn(fieldClass, "resize-y min-h-[4.5rem]")} {...regProfile("address")} />
