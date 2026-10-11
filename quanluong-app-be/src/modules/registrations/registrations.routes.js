@@ -10,7 +10,11 @@ import {
   rejectRegistrationController,
 } from "./registrations.controller.js";
 import { REGISTRATIONS_ROUTE_DEFINITIONS } from "./registrations.route-definitions.js";
-import { rejectRegistrationBodySchema, registrationUserParamsSchema } from "./registrations.validator.js";
+import {
+  approveRegistrationBodySchema,
+  rejectRegistrationBodySchema,
+  registrationUserParamsSchema,
+} from "./registrations.validator.js";
 
 const registrationsRouter = express.Router();
 
@@ -29,7 +33,10 @@ registrationsRouter.get(
 
 registrationsRouter.post(
   "/:userId/approve",
-  validateRequest({ params: registrationUserParamsSchema }),
+  validateRequest({
+    params: registrationUserParamsSchema,
+    body: approveRegistrationBodySchema,
+  }),
   permissionMiddleware([routePermissions.approveRegistration]),
   asyncHandler(approveRegistrationController),
 );

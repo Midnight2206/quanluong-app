@@ -8,4 +8,11 @@ const rejectRegistrationBodySchema = z.object({
   note: z.string().max(500).optional(),
 });
 
-export { rejectRegistrationBodySchema, registrationUserParamsSchema };
+const approveRegistrationBodySchema = z.preprocess(
+  (value) => (value == null ? {} : value),
+  z.object({
+    lttpSupplierId: z.coerce.number().int().positive().optional(),
+  }),
+);
+
+export { approveRegistrationBodySchema, rejectRegistrationBodySchema, registrationUserParamsSchema };

@@ -18,6 +18,13 @@ const SYSTEM_TYPE_NAMES = {
   ADMIN: "admin",
 };
 
+function supplierApproveError({ typeName, lttpSupplierId }) {
+  if (typeName === "lttp_supplier" && lttpSupplierId == null) {
+    return "missing_supplier";
+  }
+  return null;
+}
+
 function assertCanApproveRegistrations(actor) {
   if (actor?.type?.name === SYSTEM_TYPE_NAMES.SUPERADMIN) {
     return;
@@ -74,23 +81,50 @@ async function getPendingTargetOrThrow(userId, scope) {
   return user;
 }
 
-async function approveRegistration({ targetUserId, reviewer, scope }) {
+async function approveRegistration({ targetUserId, reviewer, scope, lttpSupplierId = null }) {
   assertCanApproveRegistrations(reviewer);
-  await getPendingTargetOrThrow(targetUserId, scope);
+  const target = await getPendingTargetOrThrow(targetUserId, scope);
 
-  const updated = await prisma.user.update({
-    where: { id: targetUserId },
-    data: {
-      registrationStatus: "APPROVED",
-      isActive: true,
-      registrationReviewedAt: new Date(),
-      registrationReviewedById: reviewer.id,
-      registrationReviewNote: null,
-    },
-    include: REG_USER_INCLUDE,
+  if (supplierApproveError({ typeName: target.type?.name, lttpSupplierId }) === "missing_supplier") {
+    throw new AppError({
+      message: "Nhà cung cấp phải chọn đối tác",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+
+  if (lttpSupplierId != null) {
+    const supplier = await prisma.lttpSupplier.findUnique({ where: { id: lttpSupplierId } });
+    if (!supplier) {
+      throw new AppError({
+        message: "Đối tác cung cấp không tồn tại",
+        statusCode: 404,
+        code: ERROR_CODES.NOT_FOUND,
+      });
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id: targetUserId },
+      data: {
+        registrationStatus: "APPROVED",
+        isActive: true,
+        registrationReviewedAt: new Date(),
+        registrationReviewedById: reviewer.id,
+        registrationReviewNote: null,
+      },
+      include: REG_USER_INCLUDE,
+    });
+
+    if (lttpSupplierId != null) {
+      await tx.userLttpSupplier.create({
+        data: { userId: targetUserId, lttpSupplierId },
+      });
+    }
+
+    return updated;
   });
-
-  return updated;
 }
 
 async function rejectRegistration({ targetUserId, reviewer, scope, note }) {
@@ -112,4 +146,4 @@ async function rejectRegistration({ targetUserId, reviewer, scope, note }) {
   return updated;
 }
 
-export { approveRegistration, listPendingRegistrations, rejectRegistration };
+export { approveRegistration, listPendingRegistrations, rejectRegistration, supplierApproveError };

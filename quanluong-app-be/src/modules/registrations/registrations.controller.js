@@ -20,6 +20,7 @@ async function approveRegistrationController(req, res) {
     targetUserId: req.validatedParams.userId,
     reviewer: req.user,
     scope: req.unitScope,
+    lttpSupplierId: req.validatedBody?.lttpSupplierId ?? null,
   });
 
   return respondSuccess(res, {
