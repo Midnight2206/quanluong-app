@@ -748,6 +748,19 @@ function zaloAttemptFields(attempt) {
   };
 }
 
+const ZALO_ATTEMPT_ERROR_MESSAGES = {
+  no_phone: "Zalo không trả về số điện thoại.",
+  id_mismatch: "Tài khoản Zalo không khớp phiếu này.",
+  expired: "Phiếu xác minh đã hết hạn.",
+  ambiguous: "Số điện thoại trùng nhiều tài khoản.",
+  superadmin: "Không đăng nhập superadmin bằng Zalo.",
+  taken: "Mã Zalo đã thuộc tài khoản khác.",
+};
+
+function zaloAttemptErrorMessage(errorCode) {
+  return ZALO_ATTEMPT_ERROR_MESSAGES[errorCode] || "Đăng nhập Zalo thất bại.";
+}
+
 function zaloAttemptNotFound() {
   return new AppError({
     message: "Phiếu đăng nhập Zalo không còn hiệu lực.",
@@ -999,7 +1012,7 @@ async function zaloPhoneController(req, res) {
     };
     patchAttempt(ticket, next);
     return respondSuccess(res, {
-      message: "Không lấy được số điện thoại Zalo.",
+      message: zaloAttemptErrorMessage(next.errorCode),
       data: zaloAttemptFields(next),
     });
   }
@@ -1020,8 +1033,12 @@ async function zaloPhoneController(req, res) {
     ownerUserId: owner?.id ?? null,
   });
   patchAttempt(ticket, next);
+  const message =
+    next.status === "failed"
+      ? zaloAttemptErrorMessage(next.errorCode)
+      : "Đã xác minh số điện thoại Zalo.";
   return respondSuccess(res, {
-    message: "Đã xác minh số điện thoại Zalo.",
+    message,
     data: zaloAttemptFields(next),
   });
 }

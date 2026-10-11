@@ -9,10 +9,7 @@ function readTicket() {
 }
 
 function failureText(body) {
-  const data = body?.data;
-  const message = typeof body?.message === "string" ? body.message : "";
-  if (data?.status === "failed") return data.errorCode || message;
-  return message;
+  return typeof body?.message === "string" ? body.message : "";
 }
 
 function thrownText(error) {
