@@ -139,6 +139,12 @@ const env = {
     }
     return "";
   })(),
+  zaloAppId: process.env.ZALO_APP_ID || "",
+  zaloAppSecret: process.env.ZALO_APP_SECRET || "",
+  zaloLoginRedirectUri: (process.env.ZALO_LOGIN_REDIRECT_URI || "").trim().replace(/\/+$/, ""),
+  zaloMiniAppDeeplink: (process.env.ZALO_MINI_APP_DEEPLINK || "").trim(),
+  uiMainOrigin: (process.env.UI_MAIN_ORIGIN || "http://localhost:8080").replace(/\/+$/, ""),
+  uiSupplierOrigin: (process.env.UI_SUPPLIER_ORIGIN || "http://localhost:8082").replace(/\/+$/, ""),
   /**
    * Refresh token của tài khoản Google chứa mẫu chứng từ quyết toán (thường trùng superadmin hoặc GMAIL_SENDER).
    * OAuth cần có quyền đọc/ghi vùng mẫu (vd. `drive` hoặc `drive.metadata.readonly` + khả năng tạo file) và `spreadsheets.readonly`.

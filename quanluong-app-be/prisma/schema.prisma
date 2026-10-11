@@ -111,8 +111,10 @@ model UnitEntityFork {
 model User {
   id             Int           @id @default(autoincrement())
   username       String        @unique
-  email          String        @unique
-  password       String
+  email          String?       @unique
+  password       String?
+  zaloUserId     String?       @unique @db.VarChar(64)
+  phoneVerifiedAt DateTime?
   typeId         Int
   unitId         Int?
   assignedUnitId Int?

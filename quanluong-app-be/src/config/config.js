@@ -47,6 +47,14 @@ const config = {
     chungTuSystemDriveRefreshToken: env.chungTuSystemDriveRefreshToken,
     chungTuSystemTemplateFolderId: env.chungTuSystemTemplateFolderId,
   },
+  zalo: {
+    appId: env.zaloAppId,
+    appSecret: env.zaloAppSecret,
+    loginRedirectUri: env.zaloLoginRedirectUri,
+    miniAppDeeplink: env.zaloMiniAppDeeplink,
+    mainOrigin: env.uiMainOrigin,
+    supplierOrigin: env.uiSupplierOrigin,
+  },
   security: {
     corsOrigins: env.corsOrigins,
     /** Tối đa request / IP / 15 phút cho lớp rate-limit chung `app.js` (trừ đã skip). */
