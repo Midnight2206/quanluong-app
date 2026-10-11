@@ -51,3 +51,17 @@ test("sau số: hai tài khoản thì lỗi, một pending thì chờ duyệt", 
     "pending",
   );
 });
+
+test("sau số: chỉ superadmin thì lỗi superadmin", () => {
+  assert.deepEqual(decideZaloPhone({ portal: "main", matches: [{ ...base, typeName: "superadmin" }] }), {
+    kind: "error",
+    code: "superadmin",
+  });
+});
+
+test("sau số: superadmin cùng tài khoản khác thì lỗi ambiguous", () => {
+  assert.equal(
+    decideZaloPhone({ portal: "main", matches: [base, { ...base, id: 2, typeName: "superadmin" }] }).code,
+    "ambiguous",
+  );
+});

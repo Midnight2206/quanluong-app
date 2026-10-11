@@ -15,7 +15,14 @@ function decideZaloOauth(user) {
 }
 
 function decideZaloPhone({ matches }) {
-  const rows = (matches ?? []).filter((row) => !row.deletedAt && row.typeName !== "superadmin");
+  const rows = (matches ?? []).filter((row) => !row.deletedAt);
+  const hasSuperadmin = rows.some((row) => row.typeName === "superadmin");
+  if (hasSuperadmin) {
+    if (rows.length === 1) {
+      return { kind: "error", code: "superadmin" };
+    }
+    return { kind: "error", code: "ambiguous" };
+  }
   if (rows.length > 1) {
     return { kind: "error", code: "ambiguous" };
   }
