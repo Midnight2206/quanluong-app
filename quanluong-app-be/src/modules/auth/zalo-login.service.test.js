@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   applyPhone,
   buildZaloAuthorizeUrl,
+  completeZaloRegister,
   exchangeZaloCode,
   exchangeZaloPhone,
   fetchZaloProfile,
@@ -115,4 +116,64 @@ test("applyPhone lệch id Mini App thì failed", () => {
   });
   assert.equal(next.status, "failed");
   assert.equal(next.errorCode, "id_mismatch");
+});
+
+function readyRegisterAttempt(portal) {
+  return {
+    branch: "register",
+    status: "ready",
+    portal,
+    zaloUserId: "z1",
+    displayName: "An",
+    phone: "84987654321",
+  };
+}
+
+test("completeZaloRegister cổng chính chờ duyệt không cấp phiên", async () => {
+  let draft;
+  const result = await completeZaloRegister({
+    attempt: readyRegisterAttempt("main"),
+    username: "an",
+    unitId: 4,
+    registrationRequiresApproval: true,
+    createUser: async (next) => {
+      draft = next;
+      return { id: 1 };
+    },
+  });
+  assert.equal(result.issueSession, false);
+  assert.equal(draft.typeName, "user");
+  assert.equal(draft.unitId, 4);
+});
+
+test("completeZaloRegister nhà cung cấp chờ duyệt không cấp phiên", async () => {
+  let draft;
+  const result = await completeZaloRegister({
+    attempt: readyRegisterAttempt("supplier"),
+    username: "ncc",
+    unitId: 9,
+    createUser: async (next) => {
+      draft = next;
+      return { id: 2 };
+    },
+  });
+  assert.equal(draft.typeName, "lttp_supplier");
+  assert.equal(draft.unitId, null);
+  assert.equal(draft.registrationStatus, "PENDING_APPROVAL");
+  assert.equal(result.issueSession, false);
+});
+
+test("completeZaloRegister cổng chính thiếu đơn vị thì unit_required", async () => {
+  let called = false;
+  const result = await completeZaloRegister({
+    attempt: readyRegisterAttempt("main"),
+    username: "an",
+    unitId: null,
+    createUser: async () => {
+      called = true;
+      return { id: 1 };
+    },
+  });
+  assert.equal(result.errorCode, "unit_required");
+  assert.equal(called, false);
 });

@@ -85,7 +85,9 @@ async function approveRegistration({ targetUserId, reviewer, scope, lttpSupplier
   assertCanApproveRegistrations(reviewer);
   const target = await getPendingTargetOrThrow(targetUserId, scope);
 
-  if (supplierApproveError({ typeName: target.type?.name, lttpSupplierId }) === "missing_supplier") {
+  const partnerId = target.type?.name === "lttp_supplier" ? lttpSupplierId : null;
+
+  if (supplierApproveError({ typeName: target.type?.name, lttpSupplierId: partnerId }) === "missing_supplier") {
     throw new AppError({
       message: "Nhà cung cấp phải chọn đối tác",
       statusCode: 400,
@@ -93,8 +95,8 @@ async function approveRegistration({ targetUserId, reviewer, scope, lttpSupplier
     });
   }
 
-  if (lttpSupplierId != null) {
-    const supplier = await prisma.lttpSupplier.findUnique({ where: { id: lttpSupplierId } });
+  if (partnerId != null) {
+    const supplier = await prisma.lttpSupplier.findUnique({ where: { id: partnerId } });
     if (!supplier) {
       throw new AppError({
         message: "Đối tác cung cấp không tồn tại",
@@ -117,9 +119,9 @@ async function approveRegistration({ targetUserId, reviewer, scope, lttpSupplier
       include: REG_USER_INCLUDE,
     });
 
-    if (lttpSupplierId != null) {
+    if (partnerId != null) {
       await tx.userLttpSupplier.create({
-        data: { userId: targetUserId, lttpSupplierId },
+        data: { userId: targetUserId, lttpSupplierId: partnerId },
       });
     }
 

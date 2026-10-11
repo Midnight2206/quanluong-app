@@ -107,7 +107,10 @@ const env = {
       process.env.NODE_ENV === "production"
         ? fromEnv
         : [...new Set([...fromEnv, ...devDefaults])];
-    return expandLocalhostOriginPairs(base);
+    const origins = expandLocalhostOriginPairs(base);
+    const miniAppOrigin = normalizeCorsOrigin(process.env.ZALO_MINI_APP_ORIGIN || "");
+    if (!miniAppOrigin) return origins;
+    return [...new Set([...origins, miniAppOrigin])];
   })(),
   smtp: {
     host: process.env.SMTP_HOST || "",

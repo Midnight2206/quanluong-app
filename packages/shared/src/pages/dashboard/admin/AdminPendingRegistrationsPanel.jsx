@@ -7,6 +7,7 @@ import { Check, X } from "lucide-react";
 import { qk } from "@/app/query/queryKeys";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
+import { useLttpSupplierCatalogQuery } from "@/features/lttp-supplier/api/lttpSupplierApi";
 import {
   useApproveRegistrationMutation,
   useGetPendingRegistrationsQuery,
@@ -14,6 +15,7 @@ import {
 } from "@/features/registrations/api/registrationsApi";
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { cn } from "@/utils/cn";
 
 const P_READ = "registrations.read";
 const P_REVIEW = "registrations.review";
@@ -31,6 +33,13 @@ export function AdminPendingRegistrationsPanel() {
   );
   const [approve, { isLoading: approving }] = useApproveRegistrationMutation();
   const [reject, { isLoading: rejecting }] = useRejectRegistrationMutation();
+  const [approveSupplierByUser, setApproveSupplierByUser] = useState({});
+  const pendingSupplierReview =
+    canReview && pending.some((row) => row.type?.name === "lttp_supplier");
+  const { data: supplierCatalogData, isError: suppliersError } = useLttpSupplierCatalogQuery({
+    skip: !pendingSupplierReview,
+  });
+  const suppliers = Array.isArray(supplierCatalogData?.suppliers) ? supplierCatalogData.suppliers : [];
   const [rejectNotes, setRejectNotes] = useState({});
   const { draft: rejectDraft, setDraftPayload: persistRejectNotes, ready: rejectPersistReady } =
     useDraftPersist({ draftType: "reject-notes", scopeId: "global", enabled: canRead });
@@ -74,10 +83,15 @@ export function AdminPendingRegistrationsPanel() {
     queryClient.invalidateQueries({ queryKey: qk.jobTitles.list() });
   }
 
-  async function onApprove(userId) {
-    setProcessingId(userId);
+  async function onApprove(user) {
+    const supplierPick = user.type?.name === "lttp_supplier";
+    const lttpSupplierId = Number(approveSupplierByUser[user.id]);
+    if (supplierPick && !(Number.isInteger(lttpSupplierId) && lttpSupplierId > 0)) {
+      return;
+    }
+    setProcessingId(user.id);
     try {
-      await approve(userId).unwrap();
+      await approve(supplierPick ? { userId: user.id, lttpSupplierId } : user.id).unwrap();
       refetchListsForJobTitlesTab();
       notifySuccess("Đã duyệt đăng ký. Người dùng có thể đăng nhập.");
     } catch (e) {
@@ -148,13 +162,40 @@ export function AdminPendingRegistrationsPanel() {
                 </div>
                 {canReview ? (
                   <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                    {u.type?.name === "lttp_supplier" ? (
+                      <select
+                        className={cn(inputClass, "sm:w-64")}
+                        aria-label="Đối tác"
+                        value={approveSupplierByUser[u.id] ?? ""}
+                        onChange={(e) =>
+                          setApproveSupplierByUser((prev) => ({
+                            ...prev,
+                            [u.id]: e.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">— Chọn đối tác —</option>
+                        {suppliers.map((supplier) => (
+                          <option key={supplier.id} value={supplier.id}>
+                            {supplier.level1UnitName} — {supplier.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                    {u.type?.name === "lttp_supplier" && suppliersError ? (
+                      <p className="text-xs text-muted-foreground">Không tải được danh sách đối tác.</p>
+                    ) : null}
                     <div className="flex flex-wrap gap-1.5">
                       <IconButton
                         label="Duyệt"
                         variant="primary"
-                        disabled={processingId != null || isFetching}
+                        disabled={
+                          processingId != null
+                          || isFetching
+                          || (u.type?.name === "lttp_supplier" && !(approveSupplierByUser[u.id] ?? ""))
+                        }
                         loading={processingId === u.id && approving}
-                        onClick={() => onApprove(u.id)}
+                        onClick={() => onApprove(u)}
                       >
                         <Check strokeWidth={2} aria-hidden />
                       </IconButton>

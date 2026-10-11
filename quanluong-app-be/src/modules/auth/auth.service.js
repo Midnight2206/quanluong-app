@@ -20,6 +20,7 @@ import { isTransactionalMailConfigured } from "../../infra/mail/mail-capabilitie
 import { dispatchVerificationEmail } from "../../infra/mail/verification-email.dispatcher.js";
 import { logger } from "../../shared/utils/logger.js";
 import { grantedPermissionRecords } from "./auth-granted-permissions.js";
+import { assertStoredPassword } from "./stored-password.js";
 
 /** Đổi mã quyền cũ `lrtp.*` thành `lttp.*` tại chỗ để giữ `permissionId` và TypePermission. */
 const LEGACY_LRTP_TO_LTTP_PERMISSION_CODE = {
@@ -285,9 +286,7 @@ async function login({ req, identifier, password, ipAddress, userAgent }) {
     throw createAuthError();
   }
 
-  if (!raw.password) {
-    throw createAuthError();
-  }
+  assertStoredPassword(raw.password);
 
   const isPasswordValid = await bcrypt.compare(password, raw.password);
 
