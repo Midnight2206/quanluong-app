@@ -1,10 +1,14 @@
+import bcrypt from "bcryptjs";
 import { AUTH_COOKIE_NAMES } from "./auth.constants.js";
 import { clearAuthCookies, setAuthCookies } from "./auth.cookies.js";
 import { logger } from "../../shared/utils/logger.js";
 import { mapCurrentUser } from "./auth.mapper.js";
+import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import {
   getCurrentUser,
   getRegisterUnits,
+  getUserById,
+  issueZaloSession,
   login,
   loginWithGoogleAccount,
   logout,
@@ -12,6 +16,20 @@ import {
   register,
   verifyEmailWithToken,
 } from "./auth.service.js";
+import { getAttempt, patchAttempt } from "./zalo-attempt.store.js";
+import { normalizeVnPhone } from "./zalo-phone.js";
+import {
+  applyOauthProfile,
+  applyPhone,
+  assertZaloConfigured,
+  buildZaloAuthorizeUrl,
+  completeZaloPassword,
+  completeZaloRegister,
+  createPkcePair,
+  exchangeZaloCode,
+  exchangeZaloPhone,
+  fetchZaloProfile,
+} from "./zalo-login.service.js";
 import path from "node:path";
 import fs from "node:fs/promises";
 import {
@@ -675,6 +693,548 @@ async function patchMeProfileController(req, res) {
   });
 }
 
+function ensureZaloConfigured() {
+  try {
+    assertZaloConfigured(config.zalo);
+  } catch (error) {
+    if (error?.statusCode === 503) {
+      throw new AppError({
+        message: "Đăng nhập Zalo chưa được cấu hình.",
+        statusCode: 503,
+        code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+      });
+    }
+    throw error;
+  }
+}
+
+function zaloPortalOrigin(portal) {
+  const raw = portal === "supplier" ? config.zalo.supplierOrigin : config.zalo.mainOrigin;
+  return String(raw || "").replace(/\/+$/, "");
+}
+
+function zaloLoginErrorRedirect(origin, reason) {
+  const q = new URLSearchParams({ zalo: "error", reason: String(reason || "unknown") });
+  return `${origin}/login?${q.toString()}`;
+}
+
+function zaloContinueRedirect(origin, { ticket, branch } = {}) {
+  const q = new URLSearchParams();
+  if (ticket) q.set("ticket", ticket);
+  if (branch) q.set("branch", branch);
+  const qs = q.toString();
+  return `${origin}/login/zalo${qs ? `?${qs}` : ""}`;
+}
+
+function zaloMiniAppUrl(ticket) {
+  const deeplink = String(config.zalo.miniAppDeeplink || "");
+  try {
+    const url = new URL(deeplink);
+    url.searchParams.set("ticket", ticket);
+    return url.toString();
+  } catch {
+    const join = deeplink.includes("?") ? "&" : "?";
+    return `${deeplink}${join}ticket=${encodeURIComponent(ticket)}`;
+  }
+}
+
+function zaloAttemptFields(attempt) {
+  return {
+    status: attempt?.status ?? null,
+    branch: attempt?.branch ?? null,
+    errorCode: attempt?.errorCode ?? null,
+    displayName: attempt?.displayName ?? null,
+    phone: attempt?.phone ?? null,
+  };
+}
+
+function zaloAttemptNotFound() {
+  return new AppError({
+    message: "Phiếu đăng nhập Zalo không còn hiệu lực.",
+    statusCode: 404,
+    code: ERROR_CODES.NOT_FOUND,
+  });
+}
+
+function zaloPasswordError() {
+  return new AppError({
+    message: "Tên đăng nhập hoặc mật khẩu không đúng",
+    statusCode: 401,
+    code: ERROR_CODES.UNAUTHORIZED,
+  });
+}
+
+function zaloCallbackReason(error) {
+  if (error?.code === "token" || error?.code === "profile") return error.code;
+  if (error?.statusCode === 503) return "config";
+  if (error?.statusCode === 403) return "forbidden";
+  if (error?.statusCode === 401) return "inactive";
+  return "unknown";
+}
+
+function loadZaloAttempt(ticket) {
+  const attempt = getAttempt(ticket);
+  if (!attempt) throw zaloAttemptNotFound();
+  return attempt;
+}
+
+async function zaloLoginAuthorizeUrlController(req, res) {
+  ensureZaloConfigured();
+  const { portal, mode, from } = req.validatedQuery;
+  if (mode === "link" && req.user?.type?.name === "superadmin") {
+    throw new AppError({
+      message: "Superadmin không gắn Zalo.",
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+  }
+  if (mode === "link" && req.user?.zaloUserId) {
+    throw new AppError({
+      message: "Tài khoản đã gắn Zalo.",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  }
+  const { codeVerifier, codeChallenge } = createPkcePair();
+  const state = crypto.randomBytes(24).toString("hex");
+  req.session.zaloOAuthLogin = {
+    state,
+    codeVerifier,
+    portal,
+    mode,
+    from: sanitizeLoginFromPath(from),
+    linkUserId: mode === "link" ? req.user.id : null,
+  };
+  await saveSessionAsync(req);
+  const url = buildZaloAuthorizeUrl({
+    state,
+    codeChallenge,
+    appId: config.zalo.appId,
+    redirectUri: config.zalo.loginRedirectUri,
+  });
+  return respondSuccess(res, {
+    message: "Sẵn sàng chuyển tới Zalo để đăng nhập.",
+    data: { url },
+  });
+}
+
+async function zaloLoginCallbackController(req, res) {
+  const sessPreview = req.session?.zaloOAuthLogin;
+  const origin = zaloPortalOrigin(sessPreview?.portal === "supplier" ? "supplier" : "main");
+  try {
+    ensureZaloConfigured();
+  } catch {
+    return res.redirect(302, zaloLoginErrorRedirect(origin, "config"));
+  }
+
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError) {
+    return res.redirect(302, zaloLoginErrorRedirect(origin, "denied"));
+  }
+  if (!code || !state || typeof code !== "string" || typeof state !== "string") {
+    return res.redirect(302, zaloLoginErrorRedirect(origin, "missing"));
+  }
+  const sess = req.session?.zaloOAuthLogin;
+  if (!sess || sess.state !== state || !sess.codeVerifier) {
+    return res.redirect(302, zaloLoginErrorRedirect(origin, "state"));
+  }
+
+  const portal = sess.portal === "supplier" ? "supplier" : "main";
+  const portalOrigin = zaloPortalOrigin(portal);
+  const mode = sess.mode === "link" ? "link" : "login";
+  const from = sanitizeLoginFromPath(sess.from);
+  const linkUserId = sess.linkUserId ?? null;
+  const codeVerifier = sess.codeVerifier;
+  delete req.session.zaloOAuthLogin;
+  await saveSessionAsync(req);
+
+  try {
+    const accessToken = await exchangeZaloCode({
+      code,
+      codeVerifier,
+      appId: config.zalo.appId,
+      appSecret: config.zalo.appSecret,
+      fetchImpl: fetch,
+    });
+    const profile = await fetchZaloProfile({
+      accessToken,
+      appSecret: config.zalo.appSecret,
+      fetchImpl: fetch,
+    });
+    const raw = await prisma.user.findFirst({
+      where: { zaloUserId: profile.id },
+      include: { type: { select: { name: true } } },
+    });
+    const existingUser = raw
+      ? {
+          id: raw.id,
+          typeName: raw.type?.name ?? null,
+          registrationStatus: raw.registrationStatus,
+          isActive: raw.isActive,
+          deletedAt: raw.deletedAt,
+          zaloUserId: raw.zaloUserId,
+        }
+      : null;
+    const attemptDraft = {
+      ticket: crypto.randomBytes(24).toString("hex"),
+      portal,
+      mode,
+      from,
+      linkUserId,
+      zaloUserId: profile.id,
+      displayName: profile.name,
+    };
+    const result = applyOauthProfile({
+      attemptDraft,
+      existingUser: mode === "link" ? null : existingUser,
+    });
+    if (result.kind === "session") {
+      const user = await getUserById(result.userId);
+      const session = await issueZaloSession({
+        req,
+        user,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent"),
+      });
+      setAuthCookies(res, session);
+      return res.redirect(302, `${portalOrigin}${from}`);
+    }
+    if (result.kind === "pending") {
+      return res.redirect(302, zaloContinueRedirect(portalOrigin, { branch: "pending" }));
+    }
+    if (result.kind === "await_phone") {
+      return res.redirect(302, zaloContinueRedirect(portalOrigin, { ticket: result.attempt.ticket }));
+    }
+    return res.redirect(302, zaloLoginErrorRedirect(portalOrigin, result.code || "unknown"));
+  } catch (error) {
+    const reason = zaloCallbackReason(error);
+    logger.warn(
+      {
+        reason,
+        portal,
+        err: error instanceof AppError ? { statusCode: error.statusCode, code: error.code } : { message: error?.message },
+      },
+      "Zalo login callback failed",
+    );
+    if (mode === "login") clearAuthCookies(res);
+    return res.redirect(302, zaloLoginErrorRedirect(portalOrigin, reason));
+  }
+}
+
+async function zaloAttemptController(req, res) {
+  ensureZaloConfigured();
+  const attempt = loadZaloAttempt(req.validatedParams.ticket);
+  return respondSuccess(res, {
+    message: "Đã lấy phiếu đăng nhập Zalo.",
+    data: {
+      ...zaloAttemptFields(attempt),
+      portal: attempt.portal ?? null,
+      miniAppUrl: zaloMiniAppUrl(attempt.ticket),
+    },
+  });
+}
+
+async function findZaloPhoneMatches(rawPhone) {
+  const phone = normalizeVnPhone(rawPhone);
+  if (!phone) return [];
+  // ponytail: scans every live profile phone; store a normalized column if this table grows.
+  const rows = await prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      profile: { is: { phoneNumber: { not: null } } },
+    },
+    select: {
+      id: true,
+      registrationStatus: true,
+      isActive: true,
+      deletedAt: true,
+      zaloUserId: true,
+      type: { select: { name: true } },
+      profile: { select: { phoneNumber: true } },
+    },
+  });
+  return rows
+    .filter((row) => normalizeVnPhone(row.profile?.phoneNumber) === phone)
+    .map((row) => ({
+      id: row.id,
+      typeName: row.type?.name ?? null,
+      registrationStatus: row.registrationStatus,
+      isActive: row.isActive,
+      deletedAt: row.deletedAt,
+      zaloUserId: row.zaloUserId,
+    }));
+}
+
+async function zaloPhoneController(req, res) {
+  ensureZaloConfigured();
+  const ticket = req.validatedParams.ticket;
+  const attempt = loadZaloAttempt(ticket);
+  if (attempt.status !== "await_phone") {
+    return respondSuccess(res, {
+      message: "Phiếu đã được xử lý.",
+      data: zaloAttemptFields(attempt),
+    });
+  }
+
+  const { accessToken, phoneToken } = req.validatedBody;
+  let profile;
+  let rawPhone;
+  try {
+    profile = await fetchZaloProfile({
+      accessToken,
+      appSecret: config.zalo.appSecret,
+      fetchImpl: fetch,
+    });
+    rawPhone = await exchangeZaloPhone({
+      accessToken,
+      phoneToken,
+      appSecret: config.zalo.appSecret,
+      fetchImpl: fetch,
+    });
+  } catch (error) {
+    const next = {
+      ...attempt,
+      status: "failed",
+      errorCode: error?.code === "profile" ? "profile" : "no_phone",
+    };
+    patchAttempt(ticket, next);
+    return respondSuccess(res, {
+      message: "Không lấy được số điện thoại Zalo.",
+      data: zaloAttemptFields(next),
+    });
+  }
+
+  const owner =
+    attempt.mode === "link"
+      ? await prisma.user.findFirst({
+          where: { zaloUserId: profile.id },
+          select: { id: true },
+        })
+      : null;
+  const next = applyPhone({
+    ticket,
+    attempt,
+    miniAppUserId: profile.id,
+    rawPhone,
+    matches: attempt.mode === "link" ? [] : await findZaloPhoneMatches(rawPhone),
+    ownerUserId: owner?.id ?? null,
+  });
+  patchAttempt(ticket, next);
+  return respondSuccess(res, {
+    message: "Đã xác minh số điện thoại Zalo.",
+    data: zaloAttemptFields(next),
+  });
+}
+
+async function writeZaloUserUpdate(userUpdate, fullNameFallback) {
+  const phoneNumber = userUpdate.profile?.phoneNumber ?? null;
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userUpdate.id },
+        data: {
+          zaloUserId: userUpdate.zaloUserId,
+          phoneVerifiedAt: userUpdate.phoneVerifiedAt,
+        },
+      });
+      await tx.profile.upsert({
+        where: { userId: userUpdate.id },
+        create: {
+          userId: userUpdate.id,
+          fullName: fullNameFallback || "User",
+          phoneNumber,
+        },
+        update: { phoneNumber },
+      });
+    });
+  } catch (error) {
+    if (error?.code === "P2002") {
+      throw new AppError({
+        message: "Mã Zalo đã thuộc tài khoản khác.",
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
+      });
+    }
+    throw error;
+  }
+}
+
+async function respondZaloSession(req, res, userId, { created = false } = {}) {
+  const user = await getUserById(userId);
+  const session = await issueZaloSession({
+    req,
+    user,
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent"),
+  });
+  setAuthCookies(res, session);
+  return respondSuccess(res, {
+    statusCode: created ? 201 : 200,
+    message: created ? "Đã tạo tài khoản và đăng nhập." : "Đăng nhập bằng Zalo thành công.",
+    data: await mapAuthUserResponse(session.user),
+  });
+}
+
+async function zaloLinkController(req, res) {
+  const ticket = req.validatedParams.ticket;
+  const attempt = loadZaloAttempt(ticket);
+  if (attempt.status !== "ready" || (attempt.branch !== "password" && attempt.branch !== "link")) {
+    throw new AppError({
+      message: "Phiếu không ở bước xác nhận mật khẩu.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: attempt.targetUserId, deletedAt: null },
+    select: {
+      id: true,
+      password: true,
+      username: true,
+      profile: { select: { fullName: true } },
+    },
+  });
+  if (!user?.password) throw zaloPasswordError();
+  const passwordOk = await bcrypt.compare(req.validatedBody.password, user.password);
+  if (!passwordOk) throw zaloPasswordError();
+
+  const fullName = user.profile?.fullName || user.username;
+  if (attempt.branch === "password") {
+    const done = completeZaloPassword({ ticket, attempt, passwordOk: true });
+    if (!done.ok || !done.userUpdate) {
+      throw new AppError({
+        message: "Phiếu không ở bước xác nhận mật khẩu.",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+    await writeZaloUserUpdate(done.userUpdate, fullName);
+    patchAttempt(ticket, done.attempt);
+  } else {
+    await writeZaloUserUpdate(
+      {
+        id: attempt.targetUserId,
+        zaloUserId: attempt.zaloUserId,
+        phoneVerifiedAt: new Date(),
+        profile: { phoneNumber: attempt.phone },
+      },
+      fullName,
+    );
+    patchAttempt(ticket, { ...attempt, status: "consumed" });
+  }
+
+  if (attempt.mode === "login") {
+    return respondZaloSession(req, res, attempt.targetUserId);
+  }
+  const linked = await getUserById(attempt.targetUserId);
+  return respondSuccess(res, {
+    message: "Đã gắn Zalo vào tài khoản.",
+    data: await mapAuthUserResponse(linked),
+  });
+}
+
+async function createZaloUser(draft) {
+  const type = await prisma.type.findUnique({ where: { name: draft.typeName } });
+  if (!type) {
+    throw new AppError({
+      message: "Registration is temporarily unavailable",
+      statusCode: 503,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+  if (draft.unitId != null) {
+    const unit = await prisma.unit.findFirst({
+      where: { id: draft.unitId, isActive: true },
+      select: { id: true },
+    });
+    if (!unit) {
+      throw new AppError({
+        message: "Selected unit is not available",
+        statusCode: 400,
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+  }
+  const usernameTaken = await prisma.user.findFirst({
+    where: { username: draft.username },
+    select: { id: true },
+  });
+  if (usernameTaken) {
+    throw new AppError({
+      message: "Username or email already exists",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  }
+  try {
+    const created = await prisma.user.create({
+      data: {
+        username: draft.username,
+        email: null,
+        password: null,
+        zaloUserId: draft.zaloUserId,
+        phoneVerifiedAt: draft.phoneVerifiedAt,
+        typeId: type.id,
+        unitId: draft.unitId,
+        isActive: draft.isActive,
+        registrationStatus: draft.registrationStatus,
+        profile: {
+          create: {
+            fullName: draft.profile?.fullName || draft.username,
+            phoneNumber: draft.profile?.phoneNumber ?? null,
+          },
+        },
+      },
+      select: { id: true },
+    });
+    return getUserById(created.id);
+  } catch (error) {
+    if (error?.code === "P2002") {
+      const target = JSON.stringify(error.meta?.target ?? "").toLowerCase();
+      throw new AppError({
+        message: target.includes("zalo")
+          ? "Mã Zalo đã thuộc tài khoản khác."
+          : "Username or email already exists",
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
+      });
+    }
+    throw error;
+  }
+}
+
+async function zaloRegisterController(req, res) {
+  const ticket = req.validatedParams.ticket;
+  const attempt = loadZaloAttempt(ticket);
+  const result = await completeZaloRegister({
+    ticket,
+    attempt,
+    username: req.validatedBody.username,
+    unitId: req.validatedBody.unitId,
+    createUser: createZaloUser,
+  });
+  if (result.attempt) patchAttempt(ticket, result.attempt);
+  if (!result.ok) {
+    throw new AppError({
+      message: result.errorCode === "unit_required" ? "Cần chọn đơn vị." : "Phiếu không ở bước đăng ký.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  if (result.issueSession) {
+    return respondZaloSession(req, res, result.user.id, { created: true });
+  }
+  return respondSuccess(res, {
+    statusCode: 202,
+    message: "Đã gửi đăng ký. Vui lòng chờ duyệt.",
+    data: {
+      pending: true,
+      user: await mapAuthUserResponse(result.user),
+    },
+  });
+}
+
 export {
   changePasswordController,
   currentUserController,
@@ -702,4 +1262,10 @@ export {
   uploadAvatarController,
   uploadSignatureController,
   verifyEmailController,
+  zaloAttemptController,
+  zaloLinkController,
+  zaloLoginAuthorizeUrlController,
+  zaloLoginCallbackController,
+  zaloPhoneController,
+  zaloRegisterController,
 };

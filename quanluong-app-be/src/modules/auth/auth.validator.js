@@ -72,6 +72,34 @@ const avatarJobParamsSchema = z.object({
   jobId: z.string().min(1).max(80),
 });
 
+const zaloLoginFromSchema = z.string().refine((value) => value.startsWith("/") && !value.startsWith("//"), {
+  message: "from phải là path bắt đầu bằng /",
+});
+
+const zaloAuthorizeQuerySchema = z.object({
+  portal: z.enum(["main", "supplier"]),
+  mode: z.enum(["login", "link"]),
+  from: zaloLoginFromSchema.optional().default("/"),
+});
+
+const zaloTicketParamsSchema = z.object({
+  ticket: z.string().min(1).max(128),
+});
+
+const zaloPhoneBodySchema = z.object({
+  accessToken: z.string().trim().min(1),
+  phoneToken: z.string().trim().min(1),
+});
+
+const zaloLinkBodySchema = z.object({
+  password: z.string().min(1),
+});
+
+const zaloRegisterBodySchema = z.object({
+  username: z.string().trim().min(3).max(50),
+  unitId: z.coerce.number().int().positive().optional(),
+});
+
 export {
   avatarJobParamsSchema,
   avatarPixelCropSchema,
@@ -82,4 +110,9 @@ export {
   registerBodySchema,
   requestVerificationEmailPublicBodySchema,
   resetPasswordBodySchema,
+  zaloAuthorizeQuerySchema,
+  zaloLinkBodySchema,
+  zaloPhoneBodySchema,
+  zaloRegisterBodySchema,
+  zaloTicketParamsSchema,
 };

@@ -19,6 +19,12 @@ import {
   googleLoginCallbackController,
   googleLoginStartController,
   loginController,
+  zaloAttemptController,
+  zaloLinkController,
+  zaloLoginAuthorizeUrlController,
+  zaloLoginCallbackController,
+  zaloPhoneController,
+  zaloRegisterController,
   logoutController,
   patchMeProfileController,
   registerController,
@@ -43,7 +49,19 @@ import {
   registerBodySchema,
   requestVerificationEmailPublicBodySchema,
   resetPasswordBodySchema,
+  zaloAuthorizeQuerySchema,
+  zaloLinkBodySchema,
+  zaloPhoneBodySchema,
+  zaloRegisterBodySchema,
+  zaloTicketParamsSchema,
 } from "./auth.validator.js";
+
+function requireAuthWhenZaloLink(req, res, next) {
+  if (req.validatedQuery?.mode === "link") {
+    return authMiddleware(req, res, next);
+  }
+  return next();
+}
 
 const authRouter = express.Router();
 
@@ -59,6 +77,36 @@ authRouter.get("/google/drive/callback", asyncHandler(googleDriveCallbackControl
 authRouter.get("/google/login/start", asyncHandler(googleLoginStartController));
 authRouter.get("/google/login/authorize-url", asyncHandler(googleLoginAuthorizeUrlController));
 authRouter.get("/google/login/callback", asyncHandler(googleLoginCallbackController));
+authRouter.get(
+  "/zalo/login/authorize-url",
+  validateRequest({ query: zaloAuthorizeQuerySchema }),
+  requireAuthWhenZaloLink,
+  asyncHandler(zaloLoginAuthorizeUrlController),
+);
+authRouter.get("/zalo/login/callback", asyncHandler(zaloLoginCallbackController));
+authRouter.get(
+  "/zalo/attempts/:ticket",
+  validateRequest({ params: zaloTicketParamsSchema }),
+  asyncHandler(zaloAttemptController),
+);
+authRouter.post(
+  "/zalo/attempts/:ticket/phone",
+  sensitiveAuthEndpointRateLimit,
+  validateRequest({ params: zaloTicketParamsSchema, body: zaloPhoneBodySchema }),
+  asyncHandler(zaloPhoneController),
+);
+authRouter.post(
+  "/zalo/attempts/:ticket/link",
+  sensitiveAuthEndpointRateLimit,
+  validateRequest({ params: zaloTicketParamsSchema, body: zaloLinkBodySchema }),
+  asyncHandler(zaloLinkController),
+);
+authRouter.post(
+  "/zalo/attempts/:ticket/register",
+  sensitiveAuthEndpointRateLimit,
+  validateRequest({ params: zaloTicketParamsSchema, body: zaloRegisterBodySchema }),
+  asyncHandler(zaloRegisterController),
+);
 authRouter.get("/google/drive/status", authMiddleware, asyncHandler(googleDriveStatusController));
 authRouter.delete("/google/drive", authMiddleware, asyncHandler(googleDriveUnlinkController));
 authRouter.post(
