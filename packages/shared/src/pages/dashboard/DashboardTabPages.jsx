@@ -44,7 +44,7 @@ const LTTP_SUB_ORDER = [
 function dashboardPrimaryRedirectTarget(raw) {
   const isValid = raw && /^[a-z0-9-]+$/.test(raw) && raw.length <= 64;
   // Vào `/dashboard` gốc: không khôi phục thẳng tab «Bảng giá LTTP» (lttp) — tránh nhầm với màn Nhập xuất LTTP trên menu.
-  return isValid && raw !== "lttp" ? raw : "units";
+  return isValid && raw !== "lttp" && raw !== "users" ? raw : "units";
 }
 
 /** Khôi phục tab dashboard cấp 1 đã lưu (mặc định «units»). */

@@ -61,6 +61,9 @@ export function generateMetadata() {
       title: defaultOgTitle,
       description: defaultDescription,
     },
+    other: {
+      "zalo-platform-site-verification": "S--FSAx38YOhnv47qFGs2o-BvJB3_JvkDpas",
+    },
   };
 }
 

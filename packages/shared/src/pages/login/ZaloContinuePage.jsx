@@ -76,6 +76,50 @@ function failedSentence(attempt, loadError) {
   return ZALO_ATTEMPT_ERRORS[attempt?.errorCode] || loadError || "Đăng nhập Zalo thất bại.";
 }
 
+function ZaloPhoneOpen({ url }) {
+  return (
+    <a
+      href={url}
+      className="inline-flex w-full items-center justify-center rounded-lg border border-primary/20 bg-primary px-4 py-3 text-sm font-medium text-primary-foreground"
+    >
+      Mở app Zalo
+    </a>
+  );
+}
+
+function ZaloPhoneQr({ url }) {
+  const [dataUrl, setDataUrl] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    import("qrcode")
+      .then((mod) => mod.toDataURL(url, { margin: 1, width: 220, errorCorrectionLevel: "M" }))
+      .then((value) => {
+        if (!cancelled) setDataUrl(value);
+      })
+      .catch(() => {
+        if (!cancelled) setDataUrl("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  if (!dataUrl) {
+    return <p className="text-sm text-muted-foreground">Đang tạo mã QR…</p>;
+  }
+
+  return (
+    <img
+      src={dataUrl}
+      alt="Mã QR mở Zalo để chia sẻ số điện thoại"
+      width={220}
+      height={220}
+      className="mx-auto rounded-2xl bg-white p-3"
+    />
+  );
+}
+
 function PendingBlock() {
   return (
     <div className="space-y-3">
@@ -162,6 +206,25 @@ export function ZaloContinuePage() {
         setLoadError("");
         if (data.status === "consumed" || payloadUser(data)) {
           finishRef.current(payloadUser(data));
+          return;
+        }
+        if (data.status === "ready" && data.branch === "session") {
+          const resumeRes = await fetch(attemptUrl(ticket, "/resume"), {
+            method: "POST",
+            credentials: "include",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            body: "{}",
+          });
+          const resumeBody = await resumeRes.json().catch(() => ({}));
+          if (cancelled) {
+            return;
+          }
+          if (!resumeRes.ok) {
+            setAttempt({ status: "failed", errorCode: null });
+            setLoadError(resumeBody?.message || "Không vào được tài khoản.");
+            return;
+          }
+          finishRef.current(payloadUser(resumeBody?.data));
           return;
         }
         setAttempt(data);
@@ -256,22 +319,32 @@ export function ZaloContinuePage() {
       <div className="space-y-4">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold">Xác minh số điện thoại</h1>
-          <p className="text-sm text-muted-foreground">
-            Mở Zalo để chia sẻ số điện thoại, rồi quay lại trang này.
+          <p className="text-sm text-muted-foreground lg:hidden">
+            Bấm nút bên dưới để mở app Zalo và chia sẻ số điện thoại. Giữ trang này mở, rồi quay lại sau khi xác minh xong.
+          </p>
+          <p className="hidden text-sm text-muted-foreground lg:block">
+            Mở app Zalo trên điện thoại, bấm quét QR và quét mã này để chia sẻ số điện thoại.
+            Trang này tự tiếp tục sau khi Zalo xác minh xong.
           </p>
         </div>
         {attempt.miniAppUrl ? (
-          <a
-            className="inline-flex font-medium text-primary underline"
-            href={attempt.miniAppUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Mở Zalo để chia sẻ số điện thoại
-          </a>
+          <>
+            <div className="lg:hidden">
+              <ZaloPhoneOpen url={attempt.miniAppUrl} />
+            </div>
+            <div className="hidden lg:block">
+              <ZaloPhoneQr url={attempt.miniAppUrl} />
+            </div>
+          </>
         ) : (
           <p className="text-sm text-destructive">Chưa có liên kết Mini App.</p>
         )}
+        {ticket ? (
+          <p className="text-sm text-muted-foreground">
+            Mã QR mở bản Testing. Nếu ô phiếu trống, dán phiếu này:
+            <span className="mt-2 block break-all font-mono text-foreground">{ticket}</span>
+          </p>
+        ) : null}
         <p className="text-sm text-muted-foreground">Đang chờ xác minh…</p>
         {loadError ? (
           <p role="alert" className="text-sm text-destructive">

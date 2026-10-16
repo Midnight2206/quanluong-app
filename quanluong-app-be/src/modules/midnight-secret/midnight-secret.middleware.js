@@ -29,20 +29,27 @@ function midnightSecretMiddleware(req, res, next) {
 
 function midnightUserUnitMiddleware(req, _res, next) {
   const fromUser = Number(req.user?.unitId ?? req.user?.unit?.id);
-  const unitId = Number.isInteger(fromUser) && fromUser > 0
-    ? fromUser
-    : Number(req.get("x-midnight-user-unit-id"));
-  if (!Number.isInteger(unitId) || unitId <= 0) {
-    return next(
-      new AppError({
-        message: "Không xác định được đơn vị của user đang truy cập",
-        statusCode: 401,
-        code: ERROR_CODES.UNAUTHORIZED,
-      }),
-    );
+  const fromHeader = Number(req.get("x-midnight-user-unit-id"));
+  if (Number.isInteger(fromUser) && fromUser > 0) {
+    req.midnightUserUnitId = fromUser;
+    return next();
   }
-  req.midnightUserUnitId = unitId;
-  next();
+  if (Number.isInteger(fromHeader) && fromHeader > 0) {
+    req.midnightUserUnitId = fromHeader;
+    return next();
+  }
+  // Superadmin không gắn đơn vị: cho qua để GET /units liệt kê; API còn lại tự kiểm tra.
+  if (req.user?.type?.name === "superadmin") {
+    req.midnightUserUnitId = null;
+    return next();
+  }
+  return next(
+    new AppError({
+      message: "Không xác định được đơn vị của user đang truy cập",
+      statusCode: 401,
+      code: ERROR_CODES.UNAUTHORIZED,
+    }),
+  );
 }
 
 export { midnightSecretMiddleware, midnightUserUnitMiddleware };

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
-import { Loader2, Power, UserPlus } from "lucide-react";
+import { Loader2, Power, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -15,9 +15,14 @@ import { useGetTypesQuery } from "@/features/types/api/typesApi";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import {
   useCreateUserMutation,
+  useDeleteUserMutation,
   useGetUsersQuery,
   usePatchUserMutation,
 } from "@/features/users/api/usersApi";
+import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
+import { PERMISSIONS } from "@/features/permissions/constants/permissions";
+import { notifyNoDeletePermission } from "@/features/permissions/permissionUi";
+import { useConfirm } from "@/contexts/ConfirmProvider";
 import { cn } from "@/utils/cn";
 import { notifyError, notifySuccess } from "@/services/notify";
 import {
@@ -41,8 +46,28 @@ function toggleSupplierId(list, supplierId) {
     : [...list, supplierId];
 }
 
-export function SuperadminUsersPanel() {
+const USER_TABLE_COLS = [
+  ["4.5rem", "Mã"],
+  ["9.5rem", "Họ tên"],
+  ["8rem", "Tên đăng nhập"],
+  ["11rem", "Email"],
+  ["7.5rem", "Điện thoại"],
+  ["6.5rem", "Vai trò"],
+  ["8rem", "Đơn vị"],
+  ["7.5rem", "Chức danh"],
+  ["3.5rem", "HT"],
+  ["8.5rem", "Thao tác"],
+];
+
+const userCellClass = "overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1.5 align-middle";
+
+export function SuperadminUsersPanel({ section = "all" } = {}) {
+  const showCreate = section !== "list";
+  const showList = section !== "create";
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const currentUser = useCurrentUser();
+  const canDelete = useHasPermission(PERMISSIONS.USERS_DELETE);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
   const { data: users = [], isLoading, isError } = useGetUsersQuery();
   const { data: types = [] } = useGetTypesQuery();
@@ -75,6 +100,8 @@ export function SuperadminUsersPanel() {
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [patchUser, { isLoading: isPatching }] = usePatchUserMutation();
+  const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
+  const [deletingUserId, setDeletingUserId] = useState(null);
   const [togglingUserId, setTogglingUserId] = useState(null);
   const [editingSupplierUser, setEditingSupplierUser] = useState(null);
   const [editingSupplierIds, setEditingSupplierIds] = useState([]);
@@ -208,6 +235,33 @@ export function SuperadminUsersPanel() {
     }
   }
 
+  async function onDeleteUser(user) {
+    if (!canDelete) {
+      notifyNoDeletePermission();
+      return;
+    }
+    if (currentUser?.id != null && Number(currentUser.id) === Number(user.id)) {
+      notifyError("Không xóa tài khoản đang đăng nhập.");
+      return;
+    }
+    const ok = await confirm({
+      title: "Xóa người dùng?",
+      message: `${user.profile?.fullName || user.username} (#${user.id}) sẽ bị xóa mềm và không đăng nhập được nữa.`,
+      confirmLabel: "Xóa",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setDeletingUserId(user.id);
+    try {
+      await deleteUser(user.id).unwrap();
+      notifySuccess("Đã xóa người dùng.");
+    } catch (err) {
+      notifyError(err?.data?.message || "Không xóa được người dùng.");
+    } finally {
+      setDeletingUserId(null);
+    }
+  }
+
   async function toggleActive(u) {
     setTogglingUserId(u.id);
     try {
@@ -269,6 +323,7 @@ export function SuperadminUsersPanel() {
   return (
     <Card className="shadow-soft min-w-0">
       <CardContent className="min-w-0 space-y-3 !p-3 sm:!p-4">
+        {showCreate ? (
         <form
           data-local-commit-form="true"
           onSubmit={onCreateUser}
@@ -447,30 +502,45 @@ export function SuperadminUsersPanel() {
             </Button>
           </div>
         </form>
+        ) : null}
 
-        {isLoading ? (
+        {showList && isLoading ? (
           <p className="shrink-0 text-xs text-muted-foreground">Đang tải…</p>
         ) : null}
-        {isError ? (
+        {showList && isError ? (
           <p className="shrink-0 text-xs text-destructive">
             Không tải được danh sách (users.read).
           </p>
         ) : null}
 
-        {!isLoading && !isError ? (
+        {showList && !isLoading && !isError ? (
           isDesktop ? (
             <div className="min-w-0">
               <StickyResponsiveTable stickyLevel={1} className="border-border/70">
-                <table className="w-full min-w-[560px] border-collapse text-left text-xs sm:text-sm">
+                <table
+                  className="table-fixed border-collapse text-left text-xs sm:text-sm"
+                  style={{ width: "74.5rem" }}
+                >
+                  <colgroup>
+                    {USER_TABLE_COLS.map(([width, label]) => (
+                      <col key={label} style={{ width }} />
+                    ))}
+                  </colgroup>
                   <thead>
                     <tr className="border-b border-border bg-secondary/40 text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <th className="px-2 py-1.5 font-medium">Người dùng</th>
-                      <th className="px-2 py-1.5 font-medium">Vai trò</th>
-                      <th className="px-2 py-1.5 font-medium">Đơn vị</th>
-                      <th className="px-2 py-1.5 font-medium">HT</th>
-                      <th className="px-2 py-1.5 font-medium text-right">
-                        Thao tác
-                      </th>
+                      {USER_TABLE_COLS.map(([width, label]) => (
+                        <th
+                          key={label}
+                          className={cn(
+                            userCellClass,
+                            "font-medium",
+                            label === "Thao tác" && "text-right",
+                          )}
+                          style={{ width }}
+                        >
+                          {label}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -479,22 +549,28 @@ export function SuperadminUsersPanel() {
                         key={u.id}
                         className="border-b border-border/60 hover:bg-secondary/20"
                       >
-                        <td className="px-2 py-1.5">
-                          <div className="font-medium">
-                            {u.profile?.fullName || u.username}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {u.email}
-                          </div>
+                        <td className={cn(userCellClass, "tabular-nums")}>{u.id}</td>
+                        <td className={cn(userCellClass, "font-medium")} title={u.profile?.fullName || u.username}>
+                          {u.profile?.fullName || u.username}
                         </td>
-                        <td className="px-2 py-1.5 capitalize text-muted-foreground">
+                        <td className={userCellClass} title={u.username}>
+                          {u.username || "—"}
+                        </td>
+                        <td className={userCellClass} title={u.email}>
+                          {u.email || "—"}
+                        </td>
+                        <td className={userCellClass}>{u.profile?.phoneNumber || "—"}</td>
+                        <td className={cn(userCellClass, "capitalize text-muted-foreground")}>
                           {u.type?.name ?? "—"}
                         </td>
-                        <td className="max-w-[10rem] truncate px-2 py-1.5 text-muted-foreground">
+                        <td className={cn(userCellClass, "text-muted-foreground")} title={u.unit?.name ?? ""}>
                           {u.unit?.name ?? "—"}
                         </td>
-                        <td className="px-2 py-1.5">{u.isActive ? "✓" : "—"}</td>
-                        <td className="px-2 py-1.5 text-right">
+                        <td className={cn(userCellClass, "text-muted-foreground")} title={u.jobTitle?.name ?? ""}>
+                          {u.jobTitle?.name ?? "—"}
+                        </td>
+                        <td className={userCellClass}>{u.isActive ? "✓" : "—"}</td>
+                        <td className={cn(userCellClass, "overflow-visible text-right")}>
                           <div className="flex justify-end gap-2">
                             {u.type?.name === "lttp_supplier" ? (
                               <Button
@@ -510,11 +586,20 @@ export function SuperadminUsersPanel() {
                             <IconButton
                               label={u.isActive ? "Vô hiệu" : "Kích hoạt"}
                               variant={u.isActive ? "danger" : "primary"}
-                              disabled={isPatching || togglingUserId != null || loadingSupplierUserId != null}
+                              disabled={isPatching || togglingUserId != null || loadingSupplierUserId != null || deletingUserId != null}
                               loading={togglingUserId === u.id}
                               onClick={() => toggleActive(u)}
                             >
                               <Power aria-hidden />
+                            </IconButton>
+                            <IconButton
+                              label="Xóa"
+                              variant="danger"
+                              disabled={isDeleting || deletingUserId != null || togglingUserId != null}
+                              loading={deletingUserId === u.id}
+                              onClick={() => onDeleteUser(u)}
+                            >
+                              <Trash2 aria-hidden />
                             </IconButton>
                           </div>
                         </td>
@@ -536,7 +621,11 @@ export function SuperadminUsersPanel() {
                       <p className="text-sm font-semibold text-foreground">
                         {u.profile?.fullName || u.username}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        #{u.id}
+                        {u.username ? ` · @${u.username}` : ""}
+                        {u.email ? ` · ${u.email}` : ""}
+                      </p>
                     </div>
                     <span
                       className="shrink-0 rounded-md bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground"
@@ -559,6 +648,18 @@ export function SuperadminUsersPanel() {
                         {u.unit?.name ?? "—"}
                       </dd>
                     </div>
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-muted-foreground">Điện thoại</dt>
+                      <dd className="min-w-0 flex-1 truncate text-right text-foreground">
+                        {u.profile?.phoneNumber || "—"}
+                      </dd>
+                    </div>
+                    <div className="flex gap-2">
+                      <dt className="shrink-0 text-muted-foreground">Chức danh</dt>
+                      <dd className="min-w-0 flex-1 truncate text-right text-foreground">
+                        {u.jobTitle?.name ?? "—"}
+                      </dd>
+                    </div>
                   </dl>
 
                   <div className="mt-3 flex justify-end gap-2 border-t border-border/60 pt-3">
@@ -576,11 +677,20 @@ export function SuperadminUsersPanel() {
                     <IconButton
                       label={u.isActive ? "Vô hiệu" : "Kích hoạt"}
                       variant={u.isActive ? "danger" : "primary"}
-                      disabled={isPatching || togglingUserId != null || loadingSupplierUserId != null}
+                      disabled={isPatching || togglingUserId != null || loadingSupplierUserId != null || deletingUserId != null}
                       loading={togglingUserId === u.id}
                       onClick={() => toggleActive(u)}
                     >
                       <Power aria-hidden />
+                    </IconButton>
+                    <IconButton
+                      label="Xóa"
+                      variant="danger"
+                      disabled={isDeleting || deletingUserId != null || togglingUserId != null}
+                      loading={deletingUserId === u.id}
+                      onClick={() => onDeleteUser(u)}
+                    >
+                      <Trash2 aria-hidden />
                     </IconButton>
                   </div>
                 </article>

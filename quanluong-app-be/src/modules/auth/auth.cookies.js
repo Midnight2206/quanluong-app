@@ -3,6 +3,7 @@ import {
   AUTH_COOKIE_NAMES,
   REFRESH_TOKEN_COOKIE_OPTIONS,
 } from "./auth.constants.js";
+import { config } from "../../config/config.js";
 
 /** Options tối thiểu để clearCookie khớp cookie đã set (Express cần path/domain/sameSite/secure). */
 function clearOpts(extra = {}) {
@@ -19,7 +20,12 @@ function clearOpts(extra = {}) {
  * Xóa cả host-only (cookie cũ trước khi bật COOKIE_DOMAIN) và bản Domain=.parent.
  */
 function clearAuthCookies(res) {
-  const names = [AUTH_COOKIE_NAMES.ACCESS_TOKEN, AUTH_COOKIE_NAMES.REFRESH_TOKEN];
+  const names = [
+    AUTH_COOKIE_NAMES.ACCESS_TOKEN,
+    AUTH_COOKIE_NAMES.REFRESH_TOKEN,
+    config.auth.sessionCookieName,
+    "ql_zalo_login",
+  ];
   for (const name of names) {
     res.clearCookie(name, clearOpts());
     if (ACCESS_TOKEN_COOKIE_OPTIONS.domain) {

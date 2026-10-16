@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, cloneElement, isValidElement, useRef } from "react";
+import { Children, cloneElement, isValidElement, useLayoutEffect, useRef } from "react";
 import { UnifiedStickyRegion } from "@/hocs/withUnifiedPageScroll";
 import { cn } from "@/utils/cn";
 
@@ -53,6 +53,31 @@ export function StickyHorizontalTable({
   );
 }
 
+function alignStickyHeader(headerTrack, bodyScroll) {
+  const headerTable = headerTrack?.querySelector("table");
+  const bodyTable = bodyScroll?.querySelector("table");
+  if (!headerTable || !bodyTable) return;
+  const headerCells = [
+    ...headerTable.querySelectorAll("thead > tr:first-child > th, thead > tr:first-child > td"),
+  ];
+  if (!headerCells.length) return;
+  const bodyRow = [...bodyTable.querySelectorAll("tbody > tr")].find((row) => {
+    const cells = [...row.querySelectorAll(":scope > td, :scope > th")];
+    return cells.length === headerCells.length && cells.every((cell) => cell.colSpan === 1);
+  });
+  if (!bodyRow) return;
+  const bodyCells = [...bodyRow.children];
+  let total = 0;
+  headerCells.forEach((cell, index) => {
+    const width = bodyCells[index].getBoundingClientRect().width;
+    total += width;
+    cell.style.boxSizing = "border-box";
+    cell.style.width = `${width}px`;
+  });
+  headerTable.style.tableLayout = "fixed";
+  headerTable.style.width = `${total}px`;
+}
+
 export function StickyResponsiveTable({
   ariaLabel = "Bảng dữ liệu",
   children,
@@ -70,6 +95,20 @@ export function StickyResponsiveTable({
     (child) => child?.type !== "colgroup" && child?.type !== "thead",
   );
   const headerTrackRef = useRef(null);
+  const bodyScrollRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const headerTrack = headerTrackRef.current;
+    const bodyScroll = bodyScrollRef.current;
+    if (!headerTrack || !bodyScroll) return undefined;
+    const sync = () => alignStickyHeader(headerTrack, bodyScroll);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(bodyScroll);
+    const bodyTable = bodyScroll.querySelector("table");
+    if (bodyTable) observer.observe(bodyTable);
+    return () => observer.disconnect();
+  });
 
   if (!isValidElement(table) || table.type !== "table" || !header) {
     return (
@@ -95,6 +134,7 @@ export function StickyResponsiveTable({
         </div>
       </UnifiedStickyRegion>
       <div
+        ref={bodyScrollRef}
         aria-label={`${ariaLabel} — cuộn ngang`}
         className="min-w-0 overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         role="region"

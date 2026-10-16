@@ -25,6 +25,7 @@ import {
   zaloLoginCallbackController,
   zaloPhoneController,
   zaloRegisterController,
+  zaloResumeController,
   logoutController,
   patchMeProfileController,
   registerController,
@@ -100,6 +101,12 @@ authRouter.post(
   sensitiveAuthEndpointRateLimit,
   validateRequest({ params: zaloTicketParamsSchema, body: zaloLinkBodySchema }),
   asyncHandler(zaloLinkController),
+);
+authRouter.post(
+  "/zalo/attempts/:ticket/resume",
+  sensitiveAuthEndpointRateLimit,
+  validateRequest({ params: zaloTicketParamsSchema }),
+  asyncHandler(zaloResumeController),
 );
 authRouter.post(
   "/zalo/attempts/:ticket/register",

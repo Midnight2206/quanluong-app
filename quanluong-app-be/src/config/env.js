@@ -146,6 +146,8 @@ const env = {
   zaloAppSecret: process.env.ZALO_APP_SECRET || "",
   zaloLoginRedirectUri: (process.env.ZALO_LOGIN_REDIRECT_URI || "").trim().replace(/\/+$/, ""),
   zaloMiniAppDeeplink: (process.env.ZALO_MINI_APP_DEEPLINK || "").trim(),
+  /** Số phiên bản Testing trên Zalo. Có giá trị thì mã QR mở bản đó để nhập phiếu. */
+  zaloMiniAppTestingVersion: (process.env.ZALO_MINI_APP_TESTING_VERSION || "").trim(),
   uiMainOrigin: (process.env.UI_MAIN_ORIGIN || "http://localhost:8080").replace(/\/+$/, ""),
   uiSupplierOrigin: (process.env.UI_SUPPLIER_ORIGIN || "http://localhost:8082").replace(/\/+$/, ""),
   /**

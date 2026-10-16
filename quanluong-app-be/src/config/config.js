@@ -52,6 +52,7 @@ const config = {
     appSecret: env.zaloAppSecret,
     loginRedirectUri: env.zaloLoginRedirectUri,
     miniAppDeeplink: env.zaloMiniAppDeeplink,
+    miniAppTestingVersion: env.zaloMiniAppTestingVersion,
     mainOrigin: env.uiMainOrigin,
     supplierOrigin: env.uiSupplierOrigin,
   },

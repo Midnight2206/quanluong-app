@@ -25,6 +25,17 @@ function getCurrentUserUnitId(req) {
 }
 
 async function listActiveUnitsForMidnight(req, res) {
+  if (req.user?.type?.name === "superadmin") {
+    const rows = await prisma.unit.findMany({
+      where: { isActive: true },
+      orderBy: [{ path: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, path: true, depth: true },
+    });
+    return respondSuccess(res, {
+      message: "Đơn vị đang hoạt động",
+      data: rows,
+    });
+  }
   const unitId = getCurrentUserUnitId(req);
   const rows = await prisma.unit.findMany({
     where: { id: unitId, isActive: true },

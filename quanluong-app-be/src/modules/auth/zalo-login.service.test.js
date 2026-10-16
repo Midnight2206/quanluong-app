@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -42,10 +43,30 @@ test("exchangeZaloPhone đọc data.number và không nhận số từ client", 
       assert.equal(init.headers.access_token, "tok");
       assert.equal(init.headers.code, "code1");
       assert.equal(init.headers.secret_key, "sec");
+      assert.equal(
+        init.headers.appsecret_proof,
+        crypto.createHmac("sha256", "sec").update("tok").digest("hex"),
+      );
       return { ok: true, json: async () => ({ error: 0, data: { number: "84987654321" } }) };
     },
   });
   assert.equal(number, "84987654321");
+});
+
+test("exchangeZaloPhone giữ mã lỗi Zalo khi không có số", async () => {
+  await assert.rejects(
+    () =>
+      exchangeZaloPhone({
+        accessToken: "tok",
+        phoneToken: "code1",
+        appSecret: "sec",
+        fetchImpl: async () => ({
+          ok: true,
+          json: async () => ({ error: 118, message: "code is invalid" }),
+        }),
+      }),
+    (error) => error.zaloCode === 118,
+  );
 });
 
 test("exchangeZaloCode đọc access_token từ JSON giả", async () => {
@@ -87,6 +108,31 @@ test("applyPhone một user đã duyệt thì phiếu sẵn sàng nhập mật k
   assert.equal(next.branch, "password");
   assert.equal(next.targetUserId, 7);
   assert.equal(next.phone, "84987654321");
+});
+
+test("applyPhone đúng mã Zalo đã gắn thì phiếu vào phiên", () => {
+  const next = applyPhone({
+    attempt: {
+      zaloUserId: "z1",
+      status: "await_phone",
+      expiresAt: Date.now() + 60_000,
+      portal: "main",
+      mode: "login",
+    },
+    miniAppUserId: "z1",
+    rawPhone: "0987654321",
+    matches: [{
+      id: 4,
+      typeName: "user",
+      registrationStatus: "APPROVED",
+      isActive: true,
+      deletedAt: null,
+      zaloUserId: "z1",
+    }],
+  });
+  assert.equal(next.branch, "session");
+  assert.equal(next.targetUserId, 4);
+  assert.equal(next.status, "ready");
 });
 
 test("applyPhone mode link từ chối khi mã Zalo đã thuộc người khác", () => {

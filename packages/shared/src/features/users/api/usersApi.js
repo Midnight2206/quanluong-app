@@ -23,6 +23,14 @@ export function useCreateUserMutation() {
   });
 }
 
+export function useDeleteUserMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (id) => apiRequest({ url: `/users/${id}`, method: "delete" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.users.root }),
+  });
+}
+
 export function usePatchUserMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({

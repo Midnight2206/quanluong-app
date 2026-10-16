@@ -11,10 +11,9 @@ const base = {
   zaloUserId: null,
 };
 
-test("oauth cấp phiên khi mã Zalo đã gắn tài khoản hoạt động", () => {
+test("oauth tài khoản đã gắn vẫn chờ xác minh số, không cấp phiên ngay", () => {
   assert.deepEqual(decideZaloOauth({ ...base, zaloUserId: "z1" }), {
-    kind: "session",
-    userId: 1,
+    kind: "await_phone",
   });
 });
 
@@ -28,6 +27,16 @@ test("oauth về chờ duyệt khi hồ sơ pending đã có mã Zalo", () => {
 test("oauth từ chối superadmin và khi chưa gắn thì chờ số", () => {
   assert.equal(decideZaloOauth({ ...base, typeName: "superadmin", zaloUserId: "z1" }).kind, "error");
   assert.deepEqual(decideZaloOauth(null), { kind: "await_phone" });
+});
+
+test("sau số: đúng mã Zalo đã gắn thì vào phiên", () => {
+  assert.deepEqual(
+    decideZaloPhone({
+      matches: [{ ...base, zaloUserId: "z1" }],
+      zaloUserId: "z1",
+    }),
+    { kind: "session", userId: 1 },
+  );
 });
 
 test("sau số: một tài khoản đã duyệt chưa gắn thì nhập mật khẩu", () => {

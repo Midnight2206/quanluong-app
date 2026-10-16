@@ -23,7 +23,10 @@ export default async function MidnightSecretPage() {
   const cookieStore = await cookies();
   const cookieHeader = buildCookieHeaderFromStore(cookieStore);
   const actor = await getMidnightActor(cookieHeader);
-  if (actor.error || !userHasAnyPermission(actor.user, MIDNIGHT_TAB_READ_CODES)) {
+  if (actor.error || !actor.user) {
+    redirect("/login?from=/midnight-secret");
+  }
+  if (!userHasAnyPermission(actor.user, MIDNIGHT_TAB_READ_CODES)) {
     redirect("/");
   }
 

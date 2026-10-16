@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { IconButton } from "@/components/ui/IconButton";
 import { useLttpSupplierCatalogQuery } from "@/features/lttp-supplier/api/lttpSupplierApi";
 import { useGetUsersQuery } from "@/features/users/api/usersApi";
+import { SuperadminUsersPanel } from "@/pages/dashboard/superadmin/SuperadminUsersPanel";
 import {
   useApproveRegistrationMutation,
   useRejectRegistrationMutation,
@@ -19,6 +20,12 @@ import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 
 const P_REVIEW = "registrations.review";
+
+const USER_TABS = [
+  { id: "list", label: "Danh sách" },
+  { id: "create", label: "Tạo người dùng" },
+  { id: "review", label: "Duyệt đăng ký" },
+];
 
 const inputClass =
   "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
@@ -68,6 +75,7 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
   const errorToastSent = useRef(false);
   const [approve, { isLoading: approving }] = useApproveRegistrationMutation();
   const [reject, { isLoading: rejecting }] = useRejectRegistrationMutation();
+  const [tab, setTab] = useState("list");
   const [processingId, setProcessingId] = useState(null);
   const [approveSupplierByUser, setApproveSupplierByUser] = useState({});
   const pendingSupplierReview = users.some(
@@ -168,9 +176,33 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
         <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
           Người dùng
         </p>
-        <h2 className="text-2xl font-semibold">Danh sách người dùng</h2>
+        <h2 className="text-2xl font-semibold">Người dùng trong đơn vị</h2>
       </div>
 
+      <div role="tablist" aria-label="Nghiệp vụ người dùng" className="flex flex-wrap gap-1 border-b border-border">
+        {USER_TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            className={cn(
+              "border-b-2 px-3 py-2 text-sm",
+              tab === item.id
+                ? "border-primary font-medium text-foreground"
+                : "border-transparent text-muted-foreground",
+            )}
+            onClick={() => setTab(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "list" ? <SuperadminUsersPanel section="list" /> : null}
+      {tab === "create" ? <SuperadminUsersPanel section="create" /> : null}
+
+      {tab === "review" ? (
       <Card>
         <CardContent className="space-y-3" data-local-commit-form="true">
           {isLoading ? <p className="text-sm text-muted-foreground">Đang tải người dùng...</p> : null}
@@ -190,7 +222,16 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
                         <h3 className="text-base font-semibold">
                           {user.profile?.fullName || user.username}
                         </h3>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                        <p className="text-sm text-muted-foreground">
+                          #{user.id}
+                          {user.username ? ` · @${user.username}` : ""}
+                          {user.email ? ` · ${user.email}` : ""}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {[user.unit?.name, user.jobTitle?.name, user.profile?.phoneNumber]
+                            .filter(Boolean)
+                            .join(" · ") || "—"}
+                        </p>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className="text-sm text-muted-foreground">
                             {user.type?.name || "unknown"}
@@ -275,6 +316,7 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
           ) : null}
         </CardContent>
       </Card>
+      ) : null}
     </section>
   );
 }

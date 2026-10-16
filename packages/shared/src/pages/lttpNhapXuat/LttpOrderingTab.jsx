@@ -2,6 +2,7 @@
 
 import { useMemo, useCallback, useState, useEffect, useLayoutEffect, useRef, memo } from "react";
 import { ClipboardCopy, ImageIcon, X } from "lucide-react";
+import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { useGetLttpDailyOrderSummaryQuery } from "@/features/lttp/api/lttpApi";
@@ -173,7 +174,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   const [tablePreviewBlob, setTablePreviewBlob] = useState(null);
   const [tablePreviewLoading, setTablePreviewLoading] = useState(false);
   const [tablePreviewSharing, setTablePreviewSharing] = useState(false);
-  const [forceShowTableForCapture, setForceShowTableForCapture] = useState(false);
 
   const {
     draft: orderingDraft,
@@ -263,7 +263,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
     const el = orderCaptureRef.current;
     if (!el || pngExporting || isLoading || isFetching || !matrix?.rows?.length) return;
     setPngExporting(true);
-    setForceShowTableForCapture(true);
     try {
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       await new Promise((resolve) => setTimeout(resolve, 120));
@@ -285,7 +284,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
       const msg = typeof e?.message === "string" ? e.message : null;
       notifyError(msg || "Không tạo được ảnh. Thử đóng bớt cửa sổ và thử lại.");
     } finally {
-      setForceShowTableForCapture(false);
       setPngExporting(false);
     }
   }, [pngExporting, isLoading, isFetching, matrix?.rows?.length, orderDate]);
@@ -294,7 +292,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
     const el = orderCaptureRef.current || tableCardRef.current;
     if (!el || tablePreviewLoading || isLoading || isFetching || !matrix?.rows?.length) return;
     setTablePreviewLoading(true);
-    setForceShowTableForCapture(true);
     try {
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       await new Promise((resolve) => setTimeout(resolve, 120));
@@ -310,7 +307,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
       const msg = typeof e?.message === "string" ? e.message : null;
       notifyError(msg || "Không tạo được ảnh xem trước bảng.");
     } finally {
-      setForceShowTableForCapture(false);
       setTablePreviewLoading(false);
     }
   }, [isLoading, isFetching, matrix?.rows?.length, tablePreviewLoading]);
@@ -370,13 +366,11 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
   return (
     <div className="min-w-0 space-y-4 pb-2 print:pb-4" aria-busy={showLoader}>
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Mỗi <span className="font-medium text-foreground">phiếu xuất</span> trong ngày là một cột — cùng đơn vị nhận nhưng nhiều phiếu sẽ có nhiều cột. Dòng hai tiêu đề cột là{" "}
-        <span className="font-medium text-foreground">chú thích phiếu</span> (nhập khi viết phiếu). Chỉ tính các dòng khớp{" "}
-        <span className="font-medium text-foreground">đối tác cung cấp</span> khi bạn chọn lọc.
+        Mỗi <span className="font-medium text-foreground">phiếu xuất</span> là một cột. Cuộn trang để xem hết mặt hàng — thanh tab và tiêu đề bảng neo phía trên. Vuốt ngang trong bảng để xem thêm phiếu; cột STT, tên và ĐVT giữ bên trái.
       </p>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card/50 p-3 shadow-sm lg:flex-row lg:flex-wrap lg:items-end print:hidden">
-        <label className="min-w-[180px] flex-1 space-y-1" htmlFor="lttp-ordering-date">
+      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card/50 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-end print:hidden">
+        <label className="min-w-[160px] flex-1 space-y-1" htmlFor="lttp-ordering-date">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">Ngày đặt</span>
           <input
             id="lttp-ordering-date"
@@ -386,8 +380,8 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             onChange={(e) => setOrderDate(e.target.value || todayIsoDate())}
           />
         </label>
-        <label className="min-w-[220px] flex-1 space-y-1" htmlFor="lttp-ordering-supplier">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">Đối tác cung cấp (dòng phiếu)</span>
+        <label className="min-w-[200px] flex-[1.4] space-y-1" htmlFor="lttp-ordering-supplier">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">Đối tác cung cấp</span>
           <select
             id="lttp-ordering-supplier"
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium outline-none focus:border-primary"
@@ -407,13 +401,13 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
               ))}
           </select>
         </label>
-        <div className="flex w-full shrink-0 flex-row flex-wrap items-center gap-2 lg:ml-auto lg:w-auto lg:justify-end">
+        <div className="flex w-full shrink-0 flex-row flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
           <Button
             type="button"
             variant="ghost"
             className="hidden h-9 shrink-0 gap-2 text-xs lg:inline-flex"
             disabled={!canExportPng || pngExporting}
-            title="Trên điện thoại / máy tính bảng dùng «Xem bảng» để chụp ảnh sau khi xem trước."
+            title="Chụp toàn bảng thành ảnh PNG để gửi Zalo hoặc ứng dụng khác."
             onClick={handleExportPngForZalo}
           >
             <ImageIcon className="size-3.5 shrink-0" />
@@ -424,11 +418,11 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             variant="outline"
             className="h-9 shrink-0 gap-2 text-xs"
             disabled={!canCopyText}
-            title="Định dạng: mỗi phiếu là một khối riêng, có dòng trống ngăn cách để dễ đọc khi dán vào Zalo."
+            title="Mỗi phiếu một khối, có dòng trống ngăn cách để dán vào Zalo."
             onClick={() => void handleCopyOrderText()}
           >
             <ClipboardCopy className="size-3.5 shrink-0" />
-            Copy text đặt hàng
+            Copy text
           </Button>
           <Button
             type="button"
@@ -438,7 +432,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             onClick={() => void handleOpenTablePreview()}
           >
             <ImageIcon className="size-3.5 shrink-0" />
-            {tablePreviewLoading ? "Đang tạo ảnh bảng…" : "Xem bảng"}
+            {tablePreviewLoading ? "Đang tạo ảnh…" : "Chụp bảng"}
           </Button>
         </div>
       </div>
@@ -485,33 +479,27 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
         {showLoader ? <p className="text-center text-sm text-muted-foreground">Đang tải dữ liệu…</p> : null}
 
         {!showLoader && matrix && matrix.columns.length > 0 && matrix.rows.length > 0 ? (
-          <Card
+          <div
             ref={tableCardRef}
             data-lttp-ordering-card
-            className={cn(
-              /* overflow-visible: overflow-hidden trên Card cắt position:sticky của thead (không neo theo viewport). */
-              "-mx-3 w-[calc(100%+1.5rem)] overflow-visible border-border/80 shadow-md sm:-mx-4 sm:w-[calc(100%+2rem)] print:mx-0 print:w-full print:break-inside-avoid",
-              !forceShowTableForCapture ? "hidden lg:block print:block" : "block",
-            )}
+            className="-mx-3 w-[calc(100%+1.5rem)] overflow-visible sm:-mx-4 sm:w-[calc(100%+2rem)] print:mx-0 print:w-full print:break-inside-avoid"
           >
-            <div className="border-b border-border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-3 py-2.5 sm:px-4">
-              <h2 className="text-balance text-xs font-semibold uppercase tracking-wide text-foreground">Bảng đặt hàng theo phiếu</h2>
-              <p className="mt-0.5 text-balance text-[11px] leading-snug text-muted-foreground sm:text-[10px]">
-                Trên điện thoại / máy tính bảng: vuốt ngang để xem thêm cột — STT, tên mặt hàng và ĐVT giữ cố định bên trái; không thu nhỏ chữ để vừa màn hình.
+            <div className="mb-2 rounded-lg border border-border/70 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-3 py-2.5 sm:px-4">
+              <h2 className="text-balance text-xs font-semibold uppercase tracking-wide text-foreground">
+                Bảng đặt hàng theo phiếu
+              </h2>
+              <p className="mt-0.5 text-balance text-[11px] leading-snug text-muted-foreground">
+                Một thanh cuộn trang. Vuốt ngang trong bảng để xem thêm phiếu — STT, tên và ĐVT giữ bên trái.
               </p>
             </div>
-            <CardContent className="!p-0">
-              <div
-                data-lttp-ordering-table-scroll
-                data-local-scroll="true"
-                style={{ maxHeight: "70vh" }}
-                className="min-w-0 overflow-auto overscroll-x-contain pr-3 [-webkit-overflow-scrolling:touch]"
+            {/* Capture PNG mở rộng khối này; không dùng max-height / overflow-y để tránh hai thanh cuộn. */}
+            <div data-lttp-ordering-table-scroll>
+              <StickyResponsiveTable
+                ariaLabel="Bảng đặt hàng theo phiếu"
+                stickyLevel={2}
+                className="border-border/80 shadow-md"
               >
-                {/* table-fixed + colgroup width cố định giúp sticky-left ổn định và không lệch cột khi cuộn. */}
-                <table className="w-max min-w-full border-separate border-spacing-0 text-center text-sm table-fixed">
-                  {/*
-                    Cố định 3 cột trái (STT + tên + ĐVT) khớp sticky left — tránh cột tên giãn (sm:max-w-none) làm lệch ĐVT và các cột phiếu.
-                  */}
+                <table className="mb-px w-max min-w-full table-fixed border-separate border-spacing-0 text-center text-sm">
                   <colgroup>
                     <col style={ORDER_COL_STYLE.index} />
                     <col style={ORDER_COL_STYLE.name} />
@@ -521,35 +509,26 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                     ))}
                     <col style={ORDER_COL_STYLE.total} />
                   </colgroup>
-                  <thead className="border-b border-border print:table-header-group">
-                    <tr className="border-b border-border">
+                  <thead className="bg-muted print:table-header-group">
+                    <tr>
                       <th
                         scope="col"
-                        className={cn(
-                          "sticky top-0 z-40 border-b border-r border-border !bg-muted px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
-                          "print:relative print:top-auto print:shadow-none",
-                        )}
-                        style={{ ...ORDER_COL_STYLE.index, left: ORDER_STICKY_LEFT_PX.index }}
+                        className="border-b border-r border-border bg-muted px-1.5 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground sm:text-[10px]"
+                        style={ORDER_COL_STYLE.index}
                       >
                         STT
                       </th>
                       <th
                         scope="col"
-                        className={cn(
-                          "sticky top-0 z-40 border-b border-r border-border !bg-muted px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
-                          "print:relative print:top-auto print:shadow-none",
-                        )}
-                        style={{ ...ORDER_COL_STYLE.name, left: ORDER_STICKY_LEFT_PX.name }}
+                        className="border-b border-r border-border bg-muted px-2 py-2.5 text-[11px] font-semibold uppercase text-muted-foreground sm:text-[10px]"
+                        style={ORDER_COL_STYLE.name}
                       >
                         <span className="block break-words leading-snug">Tên mặt hàng</span>
                       </th>
                       <th
                         scope="col"
-                        className={cn(
-                          "sticky top-0 z-40 border-b border-r border-border !bg-muted px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground shadow-sm sm:text-[10px]",
-                          "print:relative print:top-auto print:shadow-none",
-                        )}
-                        style={{ ...ORDER_COL_STYLE.unit, left: ORDER_STICKY_LEFT_PX.unit }}
+                        className="border-b border-r border-border bg-muted px-1 py-2.5 text-center text-[11px] font-semibold uppercase text-muted-foreground sm:text-[10px]"
+                        style={ORDER_COL_STYLE.unit}
                       >
                         ĐVT
                       </th>
@@ -560,9 +539,8 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                             key={col.key}
                             scope="col"
                             className={cn(
-                              "sticky top-0 z-40 border-b border-l border-border/60 !bg-muted px-1.5 py-2 align-top shadow-sm",
+                              "border-b border-l border-border/60 bg-muted px-1.5 py-2 align-top",
                               tint.cell,
-                              "print:relative print:top-auto print:shadow-none",
                             )}
                             style={ORDER_COL_STYLE.slip}
                           >
@@ -581,10 +559,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                       })}
                       <th
                         scope="col"
-                        className={cn(
-                          "sticky top-0 z-40 border-b border-l-2 border-primary/40 !bg-muted px-1.5 py-2.5 text-center text-[11px] font-bold uppercase text-primary shadow-sm sm:text-[10px]",
-                          "print:relative print:top-auto print:shadow-none",
-                        )}
+                        className="border-b border-l-2 border-primary/40 bg-muted px-1.5 py-2.5 text-center text-[11px] font-bold uppercase text-primary sm:text-[10px]"
                         style={ORDER_COL_STYLE.total}
                       >
                         Tổng
@@ -605,9 +580,9 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </CardContent>
-          </Card>
+              </StickyResponsiveTable>
+            </div>
+          </div>
         ) : null}
 
         {!showLoader && summary && matrix && matrix.columns.length === 0 && summary.slipCount > 0 ? (

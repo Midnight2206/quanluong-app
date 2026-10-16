@@ -91,7 +91,12 @@ export function MidnightMainPanel({ grants }) {
           <PermissionSectionDenied />
         )
       ) : grants?.debtsRead ? (
-        <MidnightTabPartnerDebts canWrite={Boolean(grants?.debtsWrite)} />
+        <MidnightTabPartnerDebts
+          units={units}
+          unitId={unitId}
+          onUnitId={setUnitId}
+          canWrite={Boolean(grants?.debtsWrite)}
+        />
       ) : (
         <PermissionSectionDenied />
       )}

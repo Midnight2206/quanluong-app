@@ -46,7 +46,7 @@ function Modal({ title, children, onClose }) {
   );
 }
 
-export function MidnightTabPartnerDebts({ canWrite = false }) {
+export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, canWrite = false }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,10 +62,16 @@ export function MidnightTabPartnerDebts({ canWrite = false }) {
   const [paying, setPaying] = useState(false);
 
   const load = useCallback(async () => {
+    if (!unitId) {
+      setErr("Chọn đơn vị kho.");
+      setData(null);
+      return;
+    }
     setErr("");
     setLoading(true);
     try {
-      const r = await fetch("/api/midnight-secret/partner-debts", { credentials: "include" });
+      const q = new URLSearchParams({ unitId });
+      const r = await fetch(`/api/midnight-secret/partner-debts?${q}`, { credentials: "include" });
       const j = await r.json();
       if (!r.ok) {
         throw new Error(j?.error?.message || j?.message || "Không tải được công nợ");
@@ -76,7 +82,7 @@ export function MidnightTabPartnerDebts({ canWrite = false }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [unitId]);
 
   useEffect(() => {
     void load();
@@ -96,8 +102,9 @@ export function MidnightTabPartnerDebts({ canWrite = false }) {
     setHistoryErr("");
     setHistoryLoading(true);
     try {
+      const q = unitId ? `?unitId=${encodeURIComponent(unitId)}` : "";
       const r = await fetch(
-        `/api/midnight-secret/partner-debts/${partner.lttpSupplierId}/payments`,
+        `/api/midnight-secret/partner-debts/${partner.lttpSupplierId}/payments${q}`,
         { credentials: "include" },
       );
       const j = await r.json();
@@ -142,7 +149,12 @@ export function MidnightTabPartnerDebts({ canWrite = false }) {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentDate, amount: Number(amount), note }),
+          body: JSON.stringify({
+            paymentDate,
+            amount: Number(amount),
+            note,
+            unitId: unitId ? Number(unitId) : undefined,
+          }),
         },
       );
       const j = await r.json();
@@ -169,11 +181,26 @@ export function MidnightTabPartnerDebts({ canWrite = false }) {
       </p>
 
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          Đơn vị kho
+          <select
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+            value={unitId}
+            onChange={(e) => onUnitId?.(e.target.value)}
+          >
+            <option value="">Chọn đơn vị</option>
+            {(units || []).map((u) => (
+              <option key={u.id} value={String(u.id)}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           onClick={() => void load()}
           className="rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-100"
-          disabled={loading}
+          disabled={loading || !unitId}
         >
           {loading ? "Đang tải..." : "Tải lại công nợ"}
         </button>

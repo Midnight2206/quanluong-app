@@ -17,7 +17,6 @@ export const DASHBOARD_LTTP_SUB_PATHS = [
  */
 export const DASHBOARD_TAB_META = [
   { path: "units", label: "Đơn vị", routeAccessKey: "dashboard-units" },
-  { path: "users", label: "Người dùng", routeAccessKey: "dashboard-users" },
   {
     path: "pending-registrations",
     label: "Đăng ký chờ duyệt",

@@ -12,7 +12,7 @@ import {
   LTTP_SUPPLIER_TYPE_NAME,
   syncLttpSupplierAssignment,
 } from "../lttp-supplier/lttp-supplier.links.js";
-import { superadminTypeAssignError } from "./user-type-assign.js";
+import { softDeleteActorError, superadminTypeAssignError } from "./user-type-assign.js";
 
 const USER_INCLUDE = {
   type: true,
@@ -619,8 +619,21 @@ async function replaceUser(userId, payload, scope, effectiveUnitIds) {
   return updated;
 }
 
-async function softDeleteUser(userId, scope, effectiveUnitIds) {
-  await getUserById(userId, scope, effectiveUnitIds);
+async function softDeleteUser(userId, scope, effectiveUnitIds, actorId) {
+  const existing = await getUserById(userId, scope, effectiveUnitIds);
+  const blocked = softDeleteActorError({
+    actorId,
+    targetId: existing.id,
+    targetTypeName: existing.type?.name,
+    scopeMode: scope?.mode,
+  });
+  if (blocked) {
+    throw new AppError({
+      message: blocked,
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+  }
 
   return prisma.user.update({
     where: {

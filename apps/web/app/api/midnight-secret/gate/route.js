@@ -1,12 +1,12 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import {
-  getCurrentUserUnitIdForMidnight,
+  getMidnightActor,
   getMidnightGateCookieValue,
-  midnightPermissionDenial,
   MIDNIGHT_GATE_COOKIE,
   MIDNIGHT_GATE_MAX_AGE_SECONDS,
   MIDNIGHT_TAB_READ_CODES,
+  userHasAnyPermission,
 } from "../../../../lib/midnightSecretServer.js";
 
 export async function POST(request) {
@@ -23,9 +23,18 @@ export async function POST(request) {
     return NextResponse.json({ success: false, error: { message: "Body không hợp lệ" } }, { status: 400 });
   }
   const cookie = request.headers.get("cookie") || "";
-  const denied = await midnightPermissionDenial(cookie, MIDNIGHT_TAB_READ_CODES);
-  if (denied) {
-    return NextResponse.json(denied.body, { status: denied.status });
+  const actor = await getMidnightActor(cookie);
+  if (actor.error || !actor.user) {
+    return NextResponse.json(
+      { success: false, error: { message: "Bạn cần đăng nhập trước khi mở trang nội bộ" } },
+      { status: actor.status || 401 },
+    );
+  }
+  if (!userHasAnyPermission(actor.user, MIDNIGHT_TAB_READ_CODES)) {
+    return NextResponse.json(
+      { success: false, error: { message: "Không có quyền truy cập." } },
+      { status: 403 },
+    );
   }
   const pwd = String(body?.password ?? "");
   const exp = process.env.MIDNIGHT_SECRET_PASSWORD;
@@ -33,13 +42,6 @@ export async function POST(request) {
   const b = Buffer.from(exp, "utf8");
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     return NextResponse.json({ success: false, error: { message: "Mật khẩu không đúng" } }, { status: 401 });
-  }
-  const current = await getCurrentUserUnitIdForMidnight(cookie);
-  if (current.error) {
-    return NextResponse.json(
-      { success: false, error: { message: "Bạn cần đăng nhập trước khi mở trang nội bộ" } },
-      { status: current.status || 401 },
-    );
   }
   const token = getMidnightGateCookieValue(cookie);
   if (!token) {

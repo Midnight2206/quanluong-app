@@ -730,6 +730,11 @@ function zaloMiniAppUrl(ticket) {
   const deeplink = String(config.zalo.miniAppDeeplink || "");
   try {
     const url = new URL(deeplink);
+    const version = String(config.zalo.miniAppTestingVersion || "").trim();
+    if (version) {
+      url.searchParams.set("env", "TESTING");
+      url.searchParams.set("version", version);
+    }
     url.searchParams.set("ticket", ticket);
     return url.toString();
   } catch {
@@ -748,8 +753,18 @@ function zaloAttemptFields(attempt) {
   };
 }
 
+const ZALO_PHONE_EXCHANGE_MESSAGES = {
+  114: "Zalo không nhận được mã số điện thoại.",
+  115: "Mã số điện thoại Zalo không hợp lệ.",
+  116: "Máy chủ thiếu khóa bí mật Zalo.",
+  117: "Khóa bí mật Zalo không đúng.",
+  118: "Mã số điện thoại thuộc ứng dụng Zalo khác.",
+  119: "Mã số điện thoại đã được dùng. Bấm chia sẻ lại.",
+};
+
 const ZALO_ATTEMPT_ERROR_MESSAGES = {
   no_phone: "Zalo không trả về số điện thoại.",
+  phone_format: "Số điện thoại Zalo không đúng định dạng.",
   id_mismatch: "Tài khoản Zalo không khớp phiếu này.",
   expired: "Phiếu xác minh đã hết hạn.",
   ambiguous: "Số điện thoại trùng nhiều tài khoản.",
@@ -1005,15 +1020,16 @@ async function zaloPhoneController(req, res) {
       fetchImpl: fetch,
     });
   } catch (error) {
-    const next = {
-      ...attempt,
-      status: "failed",
-      errorCode: error?.code === "profile" ? "profile" : "no_phone",
-    };
-    patchAttempt(ticket, next);
+    const exchangeMessage = ZALO_PHONE_EXCHANGE_MESSAGES[error?.zaloCode];
     return respondSuccess(res, {
-      message: zaloAttemptErrorMessage(next.errorCode),
-      data: zaloAttemptFields(next),
+      message:
+        error?.code === "profile"
+          ? "Không đọc được tài khoản Zalo."
+          : exchangeMessage ||
+            (error?.zaloCode
+              ? `Zalo không trả về số điện thoại (mã ${error.zaloCode}).`
+              : zaloAttemptErrorMessage("no_phone")),
+      data: { ...zaloAttemptFields(attempt), status: "failed", errorCode: "no_phone" },
     });
   }
 
@@ -1090,6 +1106,20 @@ async function respondZaloSession(req, res, userId, { created = false } = {}) {
     message: created ? "Đã tạo tài khoản và đăng nhập." : "Đăng nhập bằng Zalo thành công.",
     data: await mapAuthUserResponse(session.user),
   });
+}
+
+async function zaloResumeController(req, res) {
+  const ticket = req.validatedParams.ticket;
+  const attempt = loadZaloAttempt(ticket);
+  if (attempt.status !== "ready" || attempt.branch !== "session" || !attempt.targetUserId) {
+    throw new AppError({
+      message: "Phiếu chưa sẵn sàng để vào tài khoản.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  patchAttempt(ticket, { status: "consumed" });
+  return respondZaloSession(req, res, attempt.targetUserId);
 }
 
 async function zaloLinkController(req, res) {
@@ -1285,4 +1315,5 @@ export {
   zaloLoginCallbackController,
   zaloPhoneController,
   zaloRegisterController,
+  zaloResumeController,
 };

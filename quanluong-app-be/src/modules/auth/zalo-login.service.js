@@ -66,12 +66,16 @@ async function exchangeZaloPhone({ accessToken, phoneToken, appSecret, fetchImpl
       access_token: accessToken,
       code: phoneToken,
       secret_key: appSecret,
+      appsecret_proof: appsecretProof(accessToken, appSecret),
     },
   });
   const data = await res.json();
+  const zaloCode = Number(data?.error);
   const number = data?.data?.number;
-  if (!res.ok || data.error || !number) {
-    throw Object.assign(new Error("zalo_phone"), { code: "no_phone" });
+  if (!res.ok || (Number.isFinite(zaloCode) && zaloCode !== 0) || !number) {
+    const err = Object.assign(new Error("zalo_phone"), { code: "no_phone" });
+    if (Number.isFinite(zaloCode) && zaloCode !== 0) err.zaloCode = zaloCode;
+    throw err;
   }
   return String(number);
 }
@@ -120,7 +124,7 @@ function applyPhone({ ticket, attempt, miniAppUserId, rawPhone, matches, ownerUs
   }
   const phone = normalizeVnPhone(rawPhone);
   if (!phone) {
-    return { ...current, status: "failed", errorCode: "no_phone" };
+    return { ...current, status: "failed", errorCode: "phone_format" };
   }
   if (current.mode === "link") {
     if (ownerUserId != null && ownerUserId !== current.linkUserId) {
@@ -128,7 +132,7 @@ function applyPhone({ ticket, attempt, miniAppUserId, rawPhone, matches, ownerUs
     }
     return { ...current, phone, status: "ready", branch: "link", targetUserId: current.linkUserId };
   }
-  const decision = decideZaloPhone({ matches });
+  const decision = decideZaloPhone({ matches, zaloUserId: current.zaloUserId });
   if (decision.kind === "error") {
     return { ...current, phone, status: "failed", errorCode: decision.code };
   }

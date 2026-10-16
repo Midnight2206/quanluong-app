@@ -63,7 +63,12 @@ async function replaceUserController(req, res) {
 }
 
 async function deleteUserController(req, res) {
-  const user = await softDeleteUser(req.validatedParams.id, req.unitScope, req.effectiveUnitIds);
+  const user = await softDeleteUser(
+    req.validatedParams.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.user?.id ?? null,
+  );
 
   return respondSuccess(res, {
     message: "Deleted user successfully",

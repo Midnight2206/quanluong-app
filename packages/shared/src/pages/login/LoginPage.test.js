@@ -23,6 +23,14 @@ test("ZaloContinuePage polls the attempt and skips the API when OAuth is pending
   const page = readFileSync(new URL("./ZaloContinuePage.jsx", import.meta.url), "utf8");
   assert.match(page, /Xác minh số điện thoại/);
   assert.match(page, /await_phone/);
+  assert.match(page, /ZaloPhoneQr/);
+  assert.match(page, /ZaloPhoneOpen/);
+  assert.match(page, /dán phiếu này/);
+  assert.match(page, /Mở app Zalo/);
+  assert.match(page, /lg:hidden/);
+  assert.match(page, /hidden lg:block/);
+  assert.match(page, /toDataURL/);
+  assert.doesNotMatch(page, /href=\{attempt\.miniAppUrl\}/);
   assert.match(page, /2000/);
   assert.match(page, /credentials: "include"/);
   assert.match(page, /searchParams\.get\("branch"\) === "pending"/);

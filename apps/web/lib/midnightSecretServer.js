@@ -198,21 +198,38 @@ export async function midnightPermissionDenial(cookieHeader, codes) {
 }
 
 export async function getCurrentUserUnitIdForMidnight(cookieHeader) {
-  const base = getBackendBaseForMidnight();
-  const r = await fetch(`${base}/auth/current-user`, {
-    headers: { Cookie: cookieHeader || "" },
-    cache: "no-store",
-  });
-  const json = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    return { error: json, status: r.status };
+  const actor = await getMidnightActor(cookieHeader);
+  if (actor.error || !actor.user) {
+    return {
+      error: actor.error || { success: false, error: { message: "Chưa đăng nhập" } },
+      status: actor.status || 401,
+    };
   }
-  const unitId = Number(json?.data?.unit?.id);
+  if (actor.user?.type?.name === "superadmin") {
+    return { unitId: null, isSuperadmin: true, user: actor.user };
+  }
+  const unitId = Number(actor.user?.unit?.id ?? actor.user?.unitId);
   if (!Number.isInteger(unitId) || unitId <= 0) {
     return {
       error: { success: false, error: { message: "Tài khoản hiện tại chưa gắn đơn vị" } },
       status: 403,
     };
   }
-  return { unitId };
+  return { unitId, user: actor.user };
+}
+
+/** Đơn vị kho để gọi API nội bộ: user thường = đơn vị của mình; superadmin = unitId chọn trên UI. */
+export async function resolveMidnightProxyUnitId(cookieHeader, preferredUnitId) {
+  const current = await getCurrentUserUnitIdForMidnight(cookieHeader);
+  if (current.error) {
+    return current;
+  }
+  if (current.isSuperadmin) {
+    const preferred = Number(preferredUnitId);
+    if (Number.isInteger(preferred) && preferred > 0) {
+      return { unitId: preferred, isSuperadmin: true, user: current.user };
+    }
+    return { unitId: null, isSuperadmin: true, user: current.user };
+  }
+  return current;
 }
