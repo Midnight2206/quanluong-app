@@ -61,9 +61,6 @@ export function VerifyEmailPage() {
           </div>
           <div className="space-y-2">
             <h1 className="text-xl font-semibold">Xác minh email</h1>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Chỉ bấm một lần. Trong lúc hệ thống xử lý, nút sẽ khóa để tránh gửi trùng yêu cầu.
-            </p>
           </div>
           <Button type="button" className="w-full max-w-xs" onClick={runVerify} title="Gửi yêu cầu xác minh">
             Xác minh email

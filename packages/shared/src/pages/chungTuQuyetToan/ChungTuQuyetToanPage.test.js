@@ -67,8 +67,6 @@ test("PXK signature workspace saves xuatTaiKho + diaDiem and locks thu_kho + ngu
   assert.match(signatureSettingsSource, /key:\s*"nguoi_nhan"/);
   assert.match(signatureSettingsSource, /register\("extraFields\.xuatTaiKho"\)/);
   assert.match(signatureSettingsSource, /register\("extraFields\.diaDiem"\)/);
-  assert.match(signatureSettingsSource, /FIELD_xuat_tai_kho/);
-  assert.match(signatureSettingsSource, /FIELD_dia_diem/);
   assert.match(signatureSettingsSource, /xuatTaiKho/);
   assert.match(signatureSettingsSource, /diaDiem/);
   assert.match(signatureSettingsSource, /ensurePxkSignatureBlock/);
@@ -88,10 +86,8 @@ test("PNK signature workspace saves lyDoNhapKho + nhapTaiKho and locks nguoi_gia
   assert.match(signatureSettingsSource, /categoryKey === "phieu-nhap-kho"/);
   assert.match(signatureSettingsSource, /Lý do nhập kho/);
   assert.match(signatureSettingsSource, /register\("extraFields\.lyDoNhapKho"\)/);
-  assert.match(signatureSettingsSource, /FIELD_ly_do_nhap_kho/);
   assert.match(signatureSettingsSource, /Nhập tại kho/);
   assert.match(signatureSettingsSource, /register\("extraFields\.nhapTaiKho"\)/);
-  assert.match(signatureSettingsSource, /FIELD_nhap_tai_kho/);
   assert.match(signatureSettingsSource, /key:\s*"nguoi_giao"/);
   assert.match(signatureSettingsSource, /label:\s*"NGƯỜI GIAO"/);
   assert.match(signatureSettingsSource, /locked:\s*true/);

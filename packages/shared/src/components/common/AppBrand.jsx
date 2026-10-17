@@ -8,9 +8,6 @@ export function AppBrand() {
         <p className="text-xs uppercase tracking-[0.28em] text-muted-foreground">
           Quân lương
         </p>
-        <p className="mt-1 text-sm font-semibold">
-          Quản lý quân lương hiệu quả
-        </p>
       </div>
     </div>
   );

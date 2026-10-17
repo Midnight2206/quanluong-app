@@ -2021,14 +2021,8 @@ export function LttpPhieuXuatTab({
                     ) : null}
                     Lưu cấu hình mẫu in
                   </Button>
-                  <p className="text-[9px] text-muted-foreground">
-                    Ghi lại mẫu số, kho, chữ ký cho lần sau.
-                  </p>
                 </div>
               </div>
-              <p className="text-[9px] text-muted-foreground">
-                Bản in dùng mẫu Excel đã publish (document-service).
-              </p>
             </div>
           </div>
         </div>

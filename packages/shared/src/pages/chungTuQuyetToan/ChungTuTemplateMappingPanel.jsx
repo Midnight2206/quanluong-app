@@ -279,10 +279,6 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
           ghi <strong>ô thành tiền</strong>. Khi có nhiều dòng LTTP, app chèn thêm dòng dữ liệu
           phía trên dòng tổng mẫu.
         </p>
-        <p className="mt-1">
-          Chọn logic fill cho từng cột (A, B, C, …). Với mẫu có tiêu đề bị merge, app vẫn hiển
-          thị đủ các cột cố định theo loại chứng từ.
-        </p>
       </div>
 
       <div className="space-y-2 rounded-lg border border-border/80 bg-muted/20 p-2.5">

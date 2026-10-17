@@ -997,10 +997,6 @@ export function AdminLttpPanel({
             <div className="pr-1">
               {sub === "food-groups" && canManageLttpGroups ? (
                 <div className="space-y-3">
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    Nhóm dùng chung toàn hệ thống. Mã nhóm là khóa kỹ thuật (vd. <span className="font-mono">gao</span>) — admin
-                    chọn khi khai báo mặt hàng. Nhóm <span className="font-medium">Khác</span> không cần tỷ lệ quy đổi.
-                  </p>
                   <form data-local-commit-form="true"
                     onSubmit={onAddFoodGroup}
                     className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card/50 p-2"
@@ -1217,10 +1213,6 @@ export function AdminLttpPanel({
 
               {sub === "suppliers" && canCRead ? (
                 <div className="space-y-3">
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    Danh sách đối tác cung cấp theo <span className="font-medium text-foreground">đơn vị đang chọn</span> — mỗi
-                    đơn vị quản lý riêng.
-                  </p>
                   {canCWrite ? (
                     <form data-local-commit-form="true"
                       onSubmit={onAddSupplier}

@@ -83,9 +83,6 @@ export function SuperadminInfraPanel() {
       <CardContent className="space-y-3 !p-3 sm:!p-4">
         <div>
           <p className="text-sm font-medium">Hạ tầng</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            Đĩa máy chủ, backup đêm lúc 02:15, và container đang chạy. Trang tự tải lại mỗi 30 giây.
-          </p>
         </div>
         {isLoading ? (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">

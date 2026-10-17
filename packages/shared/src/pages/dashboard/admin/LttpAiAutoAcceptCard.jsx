@@ -61,10 +61,6 @@ export function LttpAiAutoAcceptCard({ unitId, unitLabel }) {
       <p className="text-xs font-medium text-foreground">
         AI tự chốt mã {unitLabel ? `«${unitLabel}»` : ""}
       </p>
-      <p className="text-[11px] leading-snug text-muted-foreground">
-        Dòng có điểm cao hơn mức này thì AI giữ mã, không bắt chọn SKU. Mức 100% không tự chốt dòng nào.
-        Khoảng gợi ý theo số mẫu tên và số lượng danh mục kho đã học, không theo từng phiếu đặt trước.
-      </p>
       <p className="text-[11px] leading-snug text-muted-foreground">{suggestionText(data?.suggestion)}</p>
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-xs text-muted-foreground">

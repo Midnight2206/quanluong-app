@@ -7,7 +7,6 @@ import { cn } from "@/utils/cn";
  */
 export function WorkspacePanelCard({
   title,
-  description,
   children,
   className,
   bodyClassName,
@@ -28,11 +27,6 @@ export function WorkspacePanelCard({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground">
             {title}
           </h3>
-          {description ? (
-            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-              {description}
-            </p>
-          ) : null}
         </header>
       ) : null}
       <div

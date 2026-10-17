@@ -72,9 +72,6 @@ export function ResendVerificationEmailPage() {
           <Mail className="size-7" aria-hidden />
         </div>
         <h1 className="text-xl font-semibold">Gửi lại email xác minh</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Hệ thống gửi thư qua hàng đợi (worker). Trong email có nút dẫn tới trang xác minh kèm mã token.
-        </p>
       </div>
 
       {isAuthenticated ? (

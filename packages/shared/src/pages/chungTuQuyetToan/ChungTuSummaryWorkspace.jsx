@@ -160,11 +160,6 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
         {canPickUnits && unitsForDropdown.length > 0 && effectiveUnitId != null ? (
           <ChungTuExportWizardCard
             title="Bộ lọc"
-            description={
-              isFolderSummaryCategory
-                ? `Chọn kho LTTP để xem các folder PDF ${folderSummaryLabel} đã xuất.`
-                : "Chọn kho LTTP để xem các tháng BKMH đã xuất."
-            }
             expanded={expandedLayout}
           >
             <label className="block min-w-0 space-y-1" htmlFor={`ct-summary-unit-${categoryKey}`}>
@@ -215,7 +210,6 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
           ) : (
           <ChungTuExportWizardCard
             title={`Tổng hợp BKMH (${monthlyRows.length})`}
-            description="Mỗi dòng là một tháng đã xuất cho kho LTTP đang chọn."
             expanded={expandedLayout}
             bodyClassName="space-y-3"
           >
@@ -292,7 +286,6 @@ export function ChungTuSummaryWorkspace({ categoryKey }) {
           ) : (
             <ChungTuExportWizardCard
               title={`Tổng hợp folder ${folderSummaryLabel} (${pdfExportBatches.length})`}
-              description={`Mỗi dòng là một folder PDF ${folderSummaryLabel}; mở để xem danh sách file đã xuất.`}
               expanded={expandedLayout}
               bodyClassName="space-y-3"
             >

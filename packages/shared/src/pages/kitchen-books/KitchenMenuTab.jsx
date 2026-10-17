@@ -526,7 +526,6 @@ export function KitchenMenuTab({
       <section className="space-y-2 border-t border-border pt-4">
         <div>
           <h2 className="font-semibold">Mẫu đã lưu</h2>
-          <p className="text-sm text-muted-foreground">Các mẫu cho buổi và mức tiền ăn đang chọn.</p>
         </div>
         {!rateId ? (
           <p className="text-sm text-muted-foreground">Chọn mức tiền ăn để xem mẫu.</p>

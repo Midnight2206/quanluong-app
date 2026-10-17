@@ -463,7 +463,6 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
       {isBkmhCategory ? (
         <ChungTuExportWizardCard
           title="Header BKMH"
-          description="Thông tin người mua trên header bảng kê mua hàng."
         >
           <p className="text-sm text-muted-foreground">
             Họ tên và bộ phận người mua sẽ được lấy tự động từ cài đặt người mua của đơn vị khi xuất PDF.
@@ -473,7 +472,6 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
 
       <ChungTuExportWizardCard
         title="Khối chữ ký"
-        description="Cấu hình số cột, khoảng cách và các vị trí ký dùng chung cho loại chứng từ này."
       >
         <form
           data-local-commit-form="true"
@@ -492,9 +490,6 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                   placeholder="Ví dụ: Nhập hàng bổ sung"
                   {...register("extraFields.lyDoNhapKho")}
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Giá trị này sẽ đi vào `FIELD_ly_do_nhap_kho` khi xuất PNK.
-                </p>
               </label>
 
               <label className="block space-y-1">
@@ -507,9 +502,6 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                   placeholder="Ví dụ: Kho trung tâm"
                   {...register("extraFields.nhapTaiKho")}
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Giá trị này sẽ đi vào `FIELD_nhap_tai_kho` khi xuất PNK.
-                </p>
               </label>
             </div>
           ) : null}
@@ -526,9 +518,6 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                   placeholder="Ví dụ: Kho trung tâm"
                   {...register("extraFields.xuatTaiKho")}
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Giá trị này sẽ đi vào `FIELD_xuat_tai_kho` khi xuất PXK.
-                </p>
               </label>
 
               <label className="block space-y-1">
@@ -541,9 +530,6 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
                   placeholder="Ví dụ: Doanh trại A"
                   {...register("extraFields.diaDiem")}
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Giá trị này sẽ đi vào `FIELD_dia_diem` khi xuất PXK.
-                </p>
               </label>
             </div>
           ) : null}
@@ -609,9 +595,6 @@ export function ChungTuSignatureSettingsWorkspace({ categoryKey }) {
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wide text-foreground">
                   Vị trí ký
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Key sẽ được dùng ở màn Xuất để nhập tên người ký.
                 </p>
               </div>
               {canWrite ? (

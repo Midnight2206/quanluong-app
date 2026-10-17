@@ -125,10 +125,6 @@ export function AdminPendingRegistrationsPanel() {
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3 !px-0 !py-3 sm:!p-4" data-local-commit-form="true">
         <div className="px-3 sm:px-0">
           <p className="text-xs font-medium sm:text-sm">Đăng ký chờ duyệt</p>
-          <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-            Chỉ hiển thị tài khoản người dùng đã đăng ký vào đơn vị trong phạm vi bạn quản lý. Sau khi duyệt, tài khoản
-            được kích hoạt và có thể đăng nhập.
-          </p>
         </div>
 
         {isError ? (

@@ -46,9 +46,6 @@ export function PortalChooserPage() {
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-lg font-semibold text-foreground">Chọn cổng làm việc</h1>
-        <p className="text-sm text-muted-foreground">
-          Tài khoản superadmin có thể vào ứng dụng đơn vị hoặc cổng quản trị hệ thống.
-        </p>
       </div>
       <div className="flex flex-col gap-3">
         <Button

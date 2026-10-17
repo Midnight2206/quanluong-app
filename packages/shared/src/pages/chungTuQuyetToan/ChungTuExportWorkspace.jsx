@@ -1268,18 +1268,12 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         <>
           <ChungTuExportWizardCard
             title="Tham số chứng từ"
-            description={
-              isPnkMonthly
-                ? "Chọn kho, khoảng ngày và cách gộp PNK theo dữ liệu BKMH đã xuất."
-                : "Chọn kho, kỳ dữ liệu và đơn vị nguồn LTTP."
-            }
           >
             {paramsFields}
           </ChungTuExportWizardCard>
 
           <ChungTuExportWizardCard
             title="Mẫu PDF & chữ ký"
-            description="Chọn mẫu xuất PDF, nhập người ký và tải mẫu mới nếu cần."
           >
             {templatePickerBlock}
           </ChungTuExportWizardCard>
@@ -1290,11 +1284,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
         <>
           <ChungTuExportWizardCard
             title="Tham số chứng từ"
-            description={
-              isPnkMonthly
-                ? "Chọn kho, khoảng ngày và cách gộp PNK theo dữ liệu BKMH đã xuất."
-                : "Chọn kho, kỳ dữ liệu và đơn vị nguồn LTTP."
-            }
             expanded={expandedCards}
           >
             {paramsFields}
@@ -1302,7 +1291,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
 
           <ChungTuExportWizardCard
             title="Mẫu PDF & chữ ký"
-            description="Chọn mẫu và chuẩn bị thông tin người ký trước khi xuất file."
             expanded={expandedCards}
           >
             {templatePickerBlock}
@@ -1316,16 +1304,6 @@ export function ChungTuExportWorkspace({ categoryKey, exportKind }) {
             {wizardSummary}
           </ChungTuExportWizardCard>
 
-          <ChungTuExportWizardCard
-            title="Kiểm tra trước khi xuất"
-            description="Xem trước dữ liệu LTTP rồi xuất PDF từ mẫu đã chọn."
-            expanded={expandedCards}
-            bodyClassName="space-y-4"
-          >
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Bước này giữ nguyên phần xem trước dữ liệu trước khi tải file PDF từ mẫu đã chọn.
-            </p>
-          </ChungTuExportWizardCard>
         </>
       ) : null}
 

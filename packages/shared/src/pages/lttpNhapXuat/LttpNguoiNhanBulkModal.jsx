@@ -154,10 +154,6 @@ export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
             <p id={titleId} className="text-sm font-semibold text-foreground">
               Người nhận mặc định theo đơn vị nhận
             </p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              Named range <span className="font-mono">nguoiNhanHang</span> = user mặc định;{" "}
-              <span className="font-mono">donVi</span> = tên đơn vị nhận (cột trái).
-            </p>
           </div>
           <Button
             type="button"

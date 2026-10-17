@@ -436,9 +436,6 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
         <CardContent className="space-y-3 !p-3 sm:!p-4">
           <div className="space-y-1">
             <p className="text-sm font-medium text-foreground">Tải mẫu Excel</p>
-            <p className="text-xs text-muted-foreground">
-              Upload file .xlsx đã chuẩn Named Ranges của document-service cho loại chứng từ này.
-            </p>
           </div>
 
           <label className="block space-y-1" htmlFor={`sa-ct-template-file-${categoryKey}`}>
@@ -653,10 +650,6 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                   Nhãn field cho mẫu
                 </p>
                 <p className="text-xs text-muted-foreground">{getTemplateLabel(selectedTemplate)}</p>
-                <p className="text-xs text-muted-foreground">
-                  Danh sách này lấy từ scalar field trên mẫu đang chọn. Nếu muốn tiền tố có dấu
-                  cách, hãy nhập luôn `: ` hoặc khoảng trắng cuối chuỗi.
-                </p>
                 {fieldLabelsReadOnly ? (
                   <p className="text-xs text-muted-foreground">
                     Mẫu đã ngừng dùng chỉ xem được nhãn đã lưu.

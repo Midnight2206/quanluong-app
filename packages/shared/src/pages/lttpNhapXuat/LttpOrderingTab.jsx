@@ -365,10 +365,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
 
   return (
     <div className="min-w-0 space-y-4 pb-2 print:pb-4" aria-busy={showLoader}>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">
-        Mỗi <span className="font-medium text-foreground">phiếu xuất</span> là một cột. Cuộn trang để xem hết mặt hàng — thanh tab và tiêu đề bảng neo phía trên. Vuốt ngang trong bảng để xem thêm phiếu; cột STT, tên và ĐVT giữ bên trái.
-      </p>
-
       <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card/50 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-end print:hidden">
         <label className="min-w-[160px] flex-1 space-y-1" htmlFor="lttp-ordering-date">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">Ngày đặt</span>
@@ -488,9 +484,6 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
               <h2 className="text-balance text-xs font-semibold uppercase tracking-wide text-foreground">
                 Bảng đặt hàng theo phiếu
               </h2>
-              <p className="mt-0.5 text-balance text-[11px] leading-snug text-muted-foreground">
-                Một thanh cuộn trang. Vuốt ngang trong bảng để xem thêm phiếu — STT, tên và ĐVT giữ bên trái.
-              </p>
             </div>
             {/* Capture PNG mở rộng khối này; không dùng max-height / overflow-y để tránh hai thanh cuộn. */}
             <div data-lttp-ordering-table-scroll>

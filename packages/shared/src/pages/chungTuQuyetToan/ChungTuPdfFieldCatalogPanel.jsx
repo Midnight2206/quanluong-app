@@ -58,9 +58,6 @@ export function ChungTuPdfFieldCatalogPanel() {
         <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <div className="space-y-1">
           <p className="text-sm font-medium text-foreground">Tra cứu Named Range / field key</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Tra cứu nhanh các Named Range scalar để gắn dữ liệu đơn khi thiết kế mẫu Excel.
-          </p>
         </div>
       </div>
 

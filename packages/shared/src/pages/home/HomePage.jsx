@@ -227,15 +227,6 @@ export function HomePage() {
           <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
             QUẢN LÝ QUÂN LƯƠNG HIỆU QUẢ, HIỆN ĐẠI
           </h1>
-          <p className="max-w-3xl text-base leading-relaxed text-muted-foreground md:text-lg">
-            Nền tảng hướng tới quy trình số hóa: từ nhập xuất kho đến sổ sách trên
-            Google, thực đơn có hỗ trợ AI và báo cáo tự động qua Telegram — gói
-            gọn trong một trục làm việc thống nhất.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Một số tính năng đang được mở rộng theo roadmap; bạn có thể đăng nhập
-            để truy cập các module nội bộ đã bật.
-          </p>
         </div>
 
         {!isAuthenticated ? (
@@ -253,11 +244,6 @@ export function HomePage() {
               <CardContent className="space-y-4 pt-6">
                 <p className="text-sm font-medium text-foreground">
                   Xin chào, {displayName || "bạn"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Dùng thanh bên để mở Bảng điều khiển, Người dùng, Lộ trình và các
-                  mục khác khi đã được cấp quyền. Trang chủ này luôn mô tả tổng quan sản
-                  phẩm.
                 </p>
                 <CtaLink href="/dashboard" variant="primary" title="Mở bảng điều khiển theo quyền">
                   Vào bảng điều khiển
@@ -345,9 +331,6 @@ export function HomePage() {
       <section className="space-y-5">
         <div>
           <h2 className="text-xl font-semibold">Tính năng nổi bật</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Bốn trụ cột chính mà ứng dụng hướng tới.
-          </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {features.map(({ icon: Icon, title, description }) => (

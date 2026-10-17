@@ -483,7 +483,6 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
         {canPickUnits && unitsForDropdown.length > 0 && effectiveUnitId != null ? (
           <ChungTuExportWizardCard
             title="Bộ lọc"
-            description="Chọn kho LTTP để xem chứng từ đã lưu."
             expanded={expandedLayout}
           >
             <label className="block min-w-0 space-y-1" htmlFor={`ct-history-unit-${categoryKey}`}>
@@ -545,7 +544,6 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
           ) : (
             <ChungTuExportWizardCard
               title={`Lịch sử BKMH theo tháng (${monthlyRows.length})`}
-              description="Mỗi thẻ là một tháng đã xuất; có thể in gộp, tải zip hoặc mở tổng hợp slice."
               expanded={expandedLayout}
               bodyClassName="space-y-3"
             >
@@ -710,11 +708,6 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
         ) : (
           <ChungTuExportWizardCard
             title={`Lịch sử folder PDF (${pdfExportBatches.length})`}
-            description={
-              isFolderSummaryCategory
-                ? "Mỗi thẻ là một folder đã xuất; có thể in gộp, tải zip hoặc mở tổng hợp file."
-                : "Mỗi lần xuất tạo một folder; mở từng folder để tải zip, in gộp hoặc tải file lẻ."
-            }
             expanded={expandedLayout}
             bodyClassName="space-y-3"
           >
