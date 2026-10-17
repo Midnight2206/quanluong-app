@@ -1,0 +1,84 @@
+.cursor/agents/ecc-architect.md
+.cursor/agents/ecc-build-error-resolver.md
+.cursor/agents/ecc-code-explorer.md
+.cursor/agents/ecc-code-reviewer.md
+.cursor/agents/ecc-database-reviewer.md
+.cursor/agents/ecc-doc-updater.md
+.cursor/agents/ecc-e2e-runner.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/]
+.cursor/agents/ecc-performance-optimizer.md
+.cursor/agents/ecc-planner.md
+.cursor/agents/ecc-python-reviewer.md
+.cursor/agents/ecc-react-build-resolver.md
+.cursor/agents/ecc-react-reviewer.md
+.cursor/agents/ecc-refactor-cleaner.md
+.cursor/agents/ecc-security-reviewer.md
+.cursor/agents/ecc-silent-failure-hunter.md
+.cursor/agents/ecc-tdd-guide.md
+.cursor/agents/ecc-typescript-reviewer.md
+.cursor/commands/ecc-build-fix.md
+.cursor/commands/ecc-code-review.md
+.cursor/commands/ecc-feature-dev.md
+.cursor/commands/ecc-plan.md
+.cursor/commands/ecc-python-review.md
+.cursor/commands/ecc-react-build.md
+.cursor/commands/ecc-react-review.md
+.cursor/commands/ecc-react-test.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/]
+.cursor/commands/ecc-refactor-clean.md
+.cursor/commands/ecc-test-coverage.md
+.cursor/commands/ecc-update-docs.md
+.cursor/rules/ecc-common-agents.mdc
+.cursor/rules/ecc-common-code-review.mdc
+.cursor/rules/ecc-common-coding-style.mdc
+.cursor/rules/ecc-common-development-workflow.mdc
+.cursor/rules/ecc-common-git-workflow.mdc
+.cursor/rules/ecc-common-patterns.mdc
+.cursor/rules/ecc-common-performance.mdc
+.cursor/rules/ecc-common-security.mdc
+.cursor/rules/ecc-common-testing.mdc
+.cursor/rules/ecc-python-coding-style.mdc
+.cursor/rules/ecc-python-patterns.mdc
+.cursor/rules/ecc-python-security.mdc
+.cursor/rules/ecc-python-testing.mdc
+.cursor/rules/ecc-react-coding-style.mdc
+.cursor/rules/ecc-react-hooks.mdc
+.cursor/rules/ecc-react-patterns.mdc
+.cursor/rules/ecc-react-security.mdc
+.cursor/rules/ecc-react-testing.mdc
+.cursor/rules/ecc-typescript-coding-style.mdc
+.cursor/rules/ecc-typescript-patterns.mdc
+.cursor/rules/ecc-typescript-security.mdc
+.cursor/rules/ecc-typescript-testing.mdc
+.cursor/skills/api-design/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/api-design/]
+.cursor/skills/architecture-decision-records/SKILL.md
+.cursor/skills/backend-patterns/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/backend-patterns/]
+.cursor/skills/codebase-onboarding/SKILL.md
+.cursor/skills/coding-standards/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/coding-standards/]
+.cursor/skills/database-migrations/SKILL.md
+.cursor/skills/deployment-patterns/SKILL.md
+.cursor/skills/docker-patterns/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/docker-patterns/]
+.cursor/skills/e2e-testing/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/]
+.cursor/skills/error-handling/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/error-handling/]
+.cursor/skills/frontend-patterns/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/frontend-patterns/]
+.cursor/skills/git-workflow/SKILL.md
+.cursor/skills/mysql-patterns/SKILL.md
+.cursor/skills/nextjs-turbopack/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/nextjs-turbopack/]
+.cursor/skills/prisma-patterns/SKILL.md
+.cursor/skills/python-patterns/SKILL.md
+.cursor/skills/python-testing/SKILL.md
+.cursor/skills/react-patterns/SKILL.md
+.cursor/skills/react-performance/SKILL.md
+.cursor/skills/react-testing/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/]
+.cursor/skills/redis-patterns/SKILL.md
+.cursor/skills/search-first/SKILL.md
+.cursor/skills/security-review/SKILL.md
+.cursor/skills/security-review/cloud-infrastructure-security.md
+.cursor/skills/strategic-compact/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/strategic-compact/]
+.cursor/skills/tdd-workflow/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/tdd-workflow/]
+.cursor/skills/verification-loop/SKILL.md  [ARCHIVED 2026-10-17 -> .cursor/_archived-skills/ecc/verification-loop/]
+
+# 2026-10-17 dedupe: 10 ECC skills moved to .cursor/_archived-skills/ecc/ (lines marked ARCHIVED).
+# Skill references in 8 ECC rule/agent/command files were repointed to kept skills;
+# originals saved under .cursor/_archived-skills/ecc/_original-refs/. Restore = move dirs back + copy originals back.
+
+# 2026-10-17 decisions: archived react-testing, e2e-testing skills, command ecc-react-test, agent ecc-e2e-runner;
+# ecc-common-agents.mdc set alwaysApply:false; refs edited (originals in _archived-skills/ecc/_original-refs/).
