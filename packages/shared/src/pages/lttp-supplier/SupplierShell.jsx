@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, MoonStar, Settings, Sun, UserRound, X } from "lucide-react";
+import { LogOut, Menu, Settings, UserRound, X } from "lucide-react";
 import { useLogoutWithDraftGuard } from "@/features/auth/hooks/useLogoutWithDraftGuard";
 import { useLocalUnsavedFieldMarks } from "@/hooks/useLocalUnsavedFieldMarks";
 import { usePrivateDomUiPersist } from "@/hooks/usePrivateDomUiPersist";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { cn } from "@/utils/cn";
-import { getStoredTheme, initializeTheme, toggleTheme } from "@/utils/theme";
+import { ThemePicker } from "@/components/common/ThemeToggle";
 
 const NAV_ITEMS = [
   { href: "/", label: "Trang chủ" },
@@ -31,14 +31,12 @@ export function SupplierShell({ children }) {
   const [navOpen, setNavOpen] = useState(false);
   const [navMounted, setNavMounted] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [theme, setTheme] = useState("light");
   const accountRef = useRef(null);
 
   usePrivateDomUiPersist();
   useLocalUnsavedFieldMarks();
 
   useEffect(() => {
-    setTheme(initializeTheme());
     setNavMounted(true);
   }, []);
 
@@ -114,19 +112,7 @@ export function SupplierShell({ children }) {
           </nav>
 
           <div className="relative ml-auto flex items-center gap-2" ref={accountRef}>
-            <button
-              type="button"
-              className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition hover:bg-secondary"
-              title={theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
-              onClick={() => setTheme(toggleTheme())}
-            >
-              {theme === "dark" ? (
-                <Sun className="size-4 text-amber-600 dark:text-amber-300" aria-hidden />
-              ) : (
-                <MoonStar className="size-4" aria-hidden />
-              )}
-              <span className="sr-only">{theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}</span>
-            </button>
+            <ThemePicker variant="popover" />
 
             <button
               type="button"

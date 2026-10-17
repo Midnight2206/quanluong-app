@@ -7,8 +7,6 @@ import {
   LogIn,
   LogOut,
   MessageCircle,
-  MoonStar,
-  Sun,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,7 +18,7 @@ import { useLogoutWithDraftGuard } from "@/features/auth/hooks/useLogoutWithDraf
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { cn } from "@/utils/cn";
 import { resolveMediaUrl } from "@/utils/runtimeEnv";
-import { getStoredTheme, toggleTheme } from "@/utils/theme";
+import { ThemePicker } from "@/components/common/ThemeToggle";
 import { useChatDockOptional } from "@/contexts/ChatDockContext";
 import { useNetworkStatus } from "@/offline/hooks/useNetworkStatus.js";
 
@@ -31,7 +29,6 @@ export function AppHeader() {
   const { online } = useNetworkStatus();
   const { logoutWithDraftGuard, isLoggingOut } = useLogoutWithDraftGuard();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [theme, setTheme] = useState(() => getStoredTheme());
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -47,10 +44,6 @@ export function AppHeader() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  const handleToggleTheme = () => {
-    setTheme(toggleTheme());
-  };
 
   const displayName = user?.profile?.fullName || user?.username || "Khách";
   const avatarUrl = user?.profile?.avatarUrl ? resolveMediaUrl(user.profile.avatarUrl) : null;
@@ -195,18 +188,7 @@ export function AppHeader() {
               <UserRound className="w-4 h-4 text-muted-foreground" />
               Trang cá nhân
             </button>
-            <button
-              type="button"
-              className="flex items-center w-full gap-3 px-3 py-3 text-sm text-left transition rounded-2xl hover:bg-secondary"
-              onClick={handleToggleTheme}
-            >
-              {theme === "dark" ? (
-                <Sun className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <MoonStar className="w-4 h-4 text-muted-foreground" />
-              )}
-              {theme === "dark" ? "Chế độ sáng" : "Chế độ tối"}
-            </button>
+            <ThemePicker className="px-3 py-2" />
           </div>
 
           <div className="pt-3 mt-3 border-t">

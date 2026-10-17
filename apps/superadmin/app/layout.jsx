@@ -2,6 +2,7 @@ import "./globals.css";
 import { AppProviders } from "@/app/providers/AppProviders";
 import { LttpSupplierRedirect } from "@/hocs/LttpSupplierRedirect";
 import { QUANLUONG_SITE_NAME } from "@/lib/quanLuongPageMeta";
+import { THEME_INIT_SCRIPT } from "@/utils/theme";
 
 /** @param {string} url */
 function iconMimeForUrl(url) {
@@ -65,8 +66,9 @@ export function generateMetadata() {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <AppProviders>
           <LttpSupplierRedirect />
           {children}

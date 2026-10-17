@@ -16,7 +16,7 @@
     --muted-foreground: 215 14% 42%;
     --accent: 28 85% 92%;
     --accent-foreground: 20 70% 24%;
-    --destructive: 0 78% 58%;
+    --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 100%;
     --border: 42 20% 85%;
     --input: 42 20% 85%;
@@ -50,6 +50,111 @@
     --shadow-lg: 0 28px 60px -28px rgb(2 6 23 / 0.7);
   }
 
+
+  /* Accent palettes: html[data-accent]. Default (no attribute / teal) = :root values above. */
+  html[data-accent="blue"] {
+    --primary: 217 85% 42%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 217 85% 42%;
+    --accent: 217 60% 92%;
+    --accent-foreground: 217 60% 22%;
+  }
+
+  html.dark[data-accent="blue"] {
+    --primary: 213 94% 72%;
+    --primary-foreground: 222 70% 12%;
+    --ring: 213 94% 72%;
+    --accent: 213 35% 22%;
+    --accent-foreground: 213 80% 88%;
+  }
+
+  html[data-accent="green"] {
+    --primary: 145 63% 27%;
+    --primary-foreground: 140 40% 98%;
+    --ring: 145 63% 27%;
+    --accent: 145 60% 92%;
+    --accent-foreground: 145 60% 22%;
+  }
+
+  html.dark[data-accent="green"] {
+    --primary: 142 60% 62%;
+    --primary-foreground: 145 70% 9%;
+    --ring: 142 60% 62%;
+    --accent: 142 35% 22%;
+    --accent-foreground: 142 80% 88%;
+  }
+
+  html[data-accent="olive"] {
+    --primary: 78 38% 27%;
+    --primary-foreground: 60 30% 97%;
+    --ring: 78 38% 27%;
+    --accent: 78 60% 92%;
+    --accent-foreground: 78 60% 22%;
+  }
+
+  html.dark[data-accent="olive"] {
+    --primary: 74 45% 60%;
+    --primary-foreground: 80 60% 9%;
+    --ring: 74 45% 60%;
+    --accent: 74 35% 22%;
+    --accent-foreground: 74 80% 88%;
+  }
+
+  html[data-accent="rose"] {
+    --primary: 346 72% 42%;
+    --primary-foreground: 350 40% 98%;
+    --ring: 346 72% 42%;
+    --accent: 346 60% 92%;
+    --accent-foreground: 346 60% 22%;
+  }
+
+  html.dark[data-accent="rose"] {
+    --primary: 347 85% 76%;
+    --primary-foreground: 345 70% 12%;
+    --ring: 347 85% 76%;
+    --accent: 347 35% 22%;
+    --accent-foreground: 347 80% 88%;
+  }
+
+  html[data-accent="amber"] {
+    --primary: 28 92% 30%;
+    --primary-foreground: 40 60% 98%;
+    --ring: 28 92% 30%;
+    --accent: 28 60% 92%;
+    --accent-foreground: 28 60% 22%;
+  }
+
+  html.dark[data-accent="amber"] {
+    --primary: 38 92% 58%;
+    --primary-foreground: 28 80% 9%;
+    --ring: 38 92% 58%;
+    --accent: 38 35% 22%;
+    --accent-foreground: 38 80% 88%;
+  }
+
+  /* High contrast: html[data-contrast="high"], works with any accent, light & dark. */
+  html[data-contrast="high"] {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --secondary-foreground: 0 0% 0%;
+    --muted-foreground: 0 0% 25%;
+    --border: 0 0% 35%;
+    --input: 0 0% 35%;
+  }
+
+  html.dark[data-contrast="high"] {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 100%;
+    --secondary-foreground: 0 0% 100%;
+    --muted-foreground: 0 0% 82%;
+    --border: 0 0% 65%;
+    --input: 0 0% 65%;
+  }
+
   html {
     color-scheme: light;
   }
@@ -65,16 +170,20 @@
   body {
     @apply bg-background text-foreground antialiased;
     background-image:
-      radial-gradient(circle at top left, rgb(20 184 166 / 0.12), transparent 24rem),
-      radial-gradient(circle at top right, rgb(245 158 11 / 0.08), transparent 18rem);
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.12), transparent 24rem),
+      radial-gradient(circle at top right, hsl(var(--accent-foreground) / 0.08), transparent 18rem);
     overflow: hidden;
   }
 
   html.dark body {
     background-image:
-      radial-gradient(circle at top left, rgb(45 212 191 / 0.16), transparent 22rem),
-      radial-gradient(circle at top right, rgb(249 115 22 / 0.1), transparent 18rem),
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.16), transparent 22rem),
+      radial-gradient(circle at top right, hsl(var(--accent-foreground) / 0.1), transparent 18rem),
       linear-gradient(180deg, rgb(15 23 42 / 0.32), transparent 12rem);
+  }
+
+  html[data-contrast="high"] body {
+    background-image: none;
   }
 
   html,
@@ -91,6 +200,10 @@
 @layer components {
   .page-shell {
     @apply min-h-0 max-h-dvh h-dvh bg-app-grid bg-[size:28px_28px];
+  }
+
+  html[data-contrast="high"] .page-shell {
+    background-image: none;
   }
 
   [data-sticky-level] {

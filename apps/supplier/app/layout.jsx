@@ -1,6 +1,7 @@
 import "./globals.css";
 import { AppProviders } from "@/app/providers/AppProviders";
 import { QUANLUONG_SITE_NAME } from "@/lib/quanLuongPageMeta";
+import { THEME_INIT_SCRIPT } from "@/utils/theme";
 
 /** @param {string} url */
 function iconMimeForUrl(url) {
@@ -66,12 +67,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="vi" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              '(function(){try{if(localStorage.getItem("quanluong-ui:theme")==="dark"){document.documentElement.classList.add("dark")}}catch(e){}})()',
-          }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
