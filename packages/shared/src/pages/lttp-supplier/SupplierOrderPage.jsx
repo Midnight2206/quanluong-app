@@ -231,7 +231,7 @@ export function SupplierOrderPage() {
       </div>
 
       <Card>
-        <CardContent className="space-y-4 !p-3 sm:!p-4">
+        <CardContent className="space-y-4">
           <div className="grid items-end gap-3 sm:grid-cols-2">
             <label className="grid gap-1.5" htmlFor="supplier-order-date">
               <span className={fieldLabelClass}>Ngày</span>
@@ -367,7 +367,7 @@ export function SupplierOrderPage() {
                 </div>
               <div ref={tableRef} className="space-y-3 bg-background">
                 <div className="space-y-1 px-1 md:pr-56">
-                  <h2 className="text-lg font-semibold text-foreground">Bảng đặt hàng</h2>
+                  <h2 className="text-sm font-semibold text-foreground">Bảng đặt hàng</h2>
                   <p className="text-sm text-muted-foreground">{orderDate}</p>
                 </div>
 
@@ -460,7 +460,7 @@ export function SupplierOrderPage() {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="supplier-order-text-title"
-                className="relative flex h-dvh w-full flex-col overflow-hidden bg-card sm:h-[min(90dvh,40rem)] sm:max-w-3xl sm:rounded-2xl sm:border sm:border-border sm:shadow-lg"
+                className="relative flex h-dvh w-full flex-col overflow-hidden bg-card sm:h-[min(90dvh,40rem)] sm:max-w-3xl sm:rounded-xl sm:border sm:border-border sm:shadow-lg"
               >
                 <div className="flex items-center justify-between gap-3 border-b border-border px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
                   <h2 id="supplier-order-text-title" className="min-w-0 text-lg font-semibold text-foreground">

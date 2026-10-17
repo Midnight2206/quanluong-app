@@ -61,7 +61,7 @@ export function DashboardLayout({ children }) {
         <header className="flex flex-wrap items-end justify-between gap-2 border-b border-border/60 pb-2">
           <div className="space-y-1">
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Bảng điều khiển</p>
-            <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight sm:text-xl">
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
               <LayoutDashboard className="h-5 w-5 text-primary" aria-hidden />
               Theo quyền được cấp
             </h1>

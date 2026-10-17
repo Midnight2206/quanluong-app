@@ -54,7 +54,7 @@ function ChatIncomingToastBody({ toastId, name, subtitle, preview, avatarUrl, is
     >
       <button
         type="button"
-        className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
         aria-label="Đóng thông báo"
         onClick={() => toast.dismiss(toastId)}
       >
@@ -67,7 +67,7 @@ function ChatIncomingToastBody({ toastId, name, subtitle, preview, avatarUrl, is
         {isGroup && sub ? (
           <p className="truncate text-[10px] text-muted-foreground">Từ {sub}</p>
         ) : null}
-        <div className="mt-1 rounded-md border border-border/70 bg-muted/40 px-2 py-1.5">
+        <div className="mt-1 rounded-lg border border-border/70 bg-muted/40 px-2 py-1.5">
           <p className="line-clamp-3 break-words text-[11px] leading-snug text-foreground/95">{safePreview}</p>
         </div>
       </div>

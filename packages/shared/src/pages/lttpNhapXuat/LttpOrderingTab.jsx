@@ -45,10 +45,10 @@ function formatViDate(ymd) {
  */
 
 const SLIP_COLUMN_STYLES = [
-  { bar: "bg-sky-500", cell: "bg-sky-500/[0.09] dark:bg-sky-500/15 border-sky-500/25" },
+  { bar: "bg-sky-500", cell: "bg-sky-500/[0.09] border-info/25" },
   { bar: "bg-violet-500", cell: "bg-violet-500/[0.09] dark:bg-violet-500/15 border-violet-500/25" },
-  { bar: "bg-emerald-500", cell: "bg-emerald-500/[0.09] dark:bg-emerald-500/15 border-emerald-500/25" },
-  { bar: "bg-amber-500", cell: "bg-amber-500/[0.09] dark:bg-amber-500/15 border-amber-500/25" },
+  { bar: "bg-emerald-500", cell: "bg-emerald-500/[0.09] border-success/25" },
+  { bar: "bg-amber-500", cell: "bg-amber-500/[0.09] border-warning/25" },
   { bar: "bg-rose-500", cell: "bg-rose-500/[0.09] dark:bg-rose-500/15 border-rose-500/25" },
   { bar: "bg-cyan-500", cell: "bg-cyan-500/[0.09] dark:bg-cyan-500/15 border-cyan-500/25" },
   { bar: "bg-orange-500", cell: "bg-orange-500/[0.09] dark:bg-orange-500/15 border-orange-500/25" },
@@ -445,7 +445,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
         ref={orderCaptureRef}
         id="lttp-daily-order-print"
         className={cn(
-          "space-y-6 rounded-2xl border border-border/60 bg-gradient-to-b from-card/80 to-card/40 px-3 py-4 shadow-sm sm:px-4 sm:py-6",
+          "space-y-6 rounded-xl border border-border/60 bg-gradient-to-b from-card/80 to-card/40 px-3 py-4 shadow-sm sm:px-4 sm:py-6",
           "print:border-0 print:bg-white print:p-0 print:shadow-none",
         )}
       >
@@ -460,7 +460,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
           </p>
           {summary != null ? (
             <>
-            <p className="mt-1 break-words rounded-md bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 break-words rounded-lg bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground">
               Đang lọc đối tác: <span className="font-semibold text-foreground">{supplierFilterLabel}</span>
             </p>
             <p className="mt-1 text-balance text-xs text-muted-foreground">
@@ -579,8 +579,8 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
         ) : null}
 
         {!showLoader && summary && matrix && matrix.columns.length === 0 && summary.slipCount > 0 ? (
-          <Card className="border-amber-500/25 bg-amber-500/[0.06]">
-            <CardContent className="py-6 text-center text-sm text-muted-foreground">
+          <Card className="border-warning/25 bg-amber-500/[0.06]">
+            <CardContent className="!py-6 text-center text-sm text-muted-foreground">
               Có phiếu nhưng không có cột phiếu sau lọc — kiểm tra đối tác trên từng dòng và dữ liệu phiếu.
             </CardContent>
           </Card>
@@ -588,7 +588,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
 
         {!showLoader && summary && summary.slipCount === 0 ? (
           <Card className="border-dashed">
-            <CardContent className="py-10 text-center">
+            <CardContent className="!py-10 text-center">
               <p className="text-sm text-muted-foreground">Không có phiếu xuất cho ngày đã chọn.</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 Lập phiếu ở tab <span className="font-medium text-foreground">Phiếu xuất</span> (mục Nhập xuất LTTP). Đặt <span className="font-medium text-foreground">chú thích phiếu</span> trong form để hiển thị dưới tên đơn vị ở tab Đặt hàng.
@@ -606,15 +606,15 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             </div>
             <div
               data-local-scroll="true"
-              className="min-h-0 flex-1 overflow-auto rounded-md bg-black/40 p-1 pb-16"
+              className="min-h-0 flex-1 overflow-auto rounded-lg bg-black/40 p-1 pb-16"
             >
               {tablePreviewImageUrl ? (
-                <img src={tablePreviewImageUrl} alt="Ảnh chụp bảng đặt hàng" className="mx-auto h-auto max-w-none rounded-md" />
+                <img src={tablePreviewImageUrl} alt="Ảnh chụp bảng đặt hàng" className="mx-auto h-auto max-w-none rounded-lg" />
               ) : (
                 <p className="px-3 py-4 text-center text-sm text-white/80">Không có ảnh xem trước.</p>
               )}
             </div>
-            <div className="sticky bottom-0 mt-2 flex items-center justify-end gap-2 rounded-md bg-black/55 p-2 backdrop-blur-sm">
+            <div className="sticky bottom-0 mt-2 flex items-center justify-end gap-2 rounded-lg bg-black/55 p-2 backdrop-blur-sm">
               <Button
                 type="button"
                 variant="secondary"

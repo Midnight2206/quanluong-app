@@ -57,7 +57,7 @@ export function ReauthOverlay({ onSuccess }) {
             <input
               type="text"
               autoComplete="username"
-              className="w-full px-4 py-3 text-sm transition border outline-none rounded-2xl bg-background ring-0 focus:border-primary aria-invalid:border-destructive"
+              className="w-full px-4 py-3 text-sm transition border outline-none rounded-xl bg-background ring-0 focus:border-primary aria-invalid:border-destructive"
               placeholder="username hoặc email đã đăng ký"
               {...register("identifier")}
               id="ql-reauth-identifier"
@@ -77,7 +77,7 @@ export function ReauthOverlay({ onSuccess }) {
               <input
                 type={isPasswordVisible ? "text" : "password"}
                 autoComplete="current-password"
-                className="w-full px-4 py-3 pr-12 text-sm transition border outline-none rounded-2xl bg-background ring-0 focus:border-primary aria-invalid:border-destructive"
+                className="w-full px-4 py-3 pr-12 text-sm transition border outline-none rounded-xl bg-background ring-0 focus:border-primary aria-invalid:border-destructive"
                 placeholder="Nhập mật khẩu"
                 {...register("password")}
                 id="ql-reauth-password"

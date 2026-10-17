@@ -413,7 +413,7 @@ export function ChungTuTemplateMappingPanel({ categoryKey, driveFileId, canWrite
 
       {saveError ? <p className="text-xs text-destructive">{saveError}</p> : null}
       {saveOk ? (
-        <p className="text-xs text-emerald-700 dark:text-emerald-300">
+        <p className="text-xs text-success">
           Đã lưu map — tạo/đồng bộ chứng từ sẽ dùng cấu hình này.
         </p>
       ) : null}

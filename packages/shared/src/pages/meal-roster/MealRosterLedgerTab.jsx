@@ -35,9 +35,7 @@ import {
   periodAmountsForCalendarDay,
   presetValueForPeriods,
 } from "./mealRosterUiUtils";
-
-const inputClass =
-  "w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 /** Tham chiếu ổn định — `?? []` trong render tạo mảng mới mỗi lần → useMemo/useEffect phụ thuộc mảng bị lặp vô hạn. */
 const EMPTY_ARRAY = [];
@@ -353,7 +351,7 @@ function MealRatePickerItem({ rate, checked, pickerAmounts, togglePickerId, patc
   const sumOk = sum === M;
   const checkId = `meal-rate-picker-${rate.id}-enabled`;
   return (
-    <li className="rounded-md border border-border/60 bg-background/40 px-2 py-2">
+    <li className="rounded-lg border border-border/60 bg-background/40 px-2 py-2">
       <label className="flex cursor-pointer items-start gap-2" htmlFor={checkId}>
         <input
           id={checkId}
@@ -390,7 +388,7 @@ function MealRatePickerItem({ rate, checked, pickerAmounts, togglePickerId, patc
             <p
               className={cn(
                 "text-[10px] tabular-nums",
-                sumOk ? "text-muted-foreground" : "font-medium text-amber-700 dark:text-amber-300",
+                sumOk ? "text-muted-foreground" : "font-medium text-warning",
               )}
             >
               Tổng S+T+C: {formatMealAmountOnly(sum)} đ — cần {formatMealAmountOnly(M)} đ/ngày
@@ -1030,12 +1028,12 @@ export function MealRosterLedgerTab({
       </div>
 
       {!selectedUnitId ? (
-        <p className="text-sm text-amber-700 dark:text-amber-200">
+        <p className="text-sm text-warning">
           Chưa chọn đơn vị — không thể mở sổ chấm.
         </p>
       ) : null}
       {selectedUnitId && canAccess && needsMealRateSelection ? (
-        <p className="text-sm text-amber-700 dark:text-amber-200">
+        <p className="text-sm text-warning">
           Bấm «Chọn mức tiền ăn cho đơn vị» để bật các mức dùng trong sổ (ăn tiêu chuẩn và/hoặc ăn thêm).
         </p>
       ) : null}
@@ -1064,11 +1062,11 @@ export function MealRosterLedgerTab({
             badge:
               extraWithoutStandardCount > 0 ? (
                 <span
-                  className="inline-flex max-w-[14rem] items-center gap-1 whitespace-nowrap rounded-md border border-amber-500/45 bg-amber-500/10 px-1.5 py-px text-[10px] font-normal normal-case leading-tight text-amber-950 dark:text-amber-50 sm:max-w-[18rem] sm:text-[11px]"
+                  className="inline-flex max-w-[14rem] items-center gap-1 whitespace-nowrap rounded-lg border border-warning/45 bg-warning/10 px-1.5 py-px text-[10px] font-normal normal-case leading-tight text-warning sm:max-w-[18rem] sm:text-[11px]"
                   title={`Có ${extraWithoutStandardCount} buổi (thuộc cách chia ăn thêm trong ngày) đang bật «ăn thêm» nhưng chưa chấm «ăn tiêu chuẩn» buổi đó. Khi lưu sẽ hỏi xác nhận.`}
                 >
                   <AlertTriangle
-                    className="size-3 shrink-0 text-amber-600 dark:text-amber-300"
+                    className="size-3 shrink-0 text-warning"
                     aria-hidden
                   />
                   <span className="tabular-nums font-semibold">{extraWithoutStandardCount}</span>
@@ -1147,7 +1145,7 @@ export function MealRosterLedgerTab({
                       panel: (
                         <ul className="space-y-3">
                           {catalogRatesStandard.length === 0 ? (
-                            <li className="rounded-md border border-dashed border-border/60 py-6 text-center text-xs text-muted-foreground">
+                            <li className="rounded-lg border border-dashed border-border/60 py-6 text-center text-xs text-muted-foreground">
                               Không có mức «ăn tiêu chuẩn» trong danh mục hệ thống.
                             </li>
                           ) : (
@@ -1171,7 +1169,7 @@ export function MealRosterLedgerTab({
                       panel: (
                         <ul className="space-y-3">
                           {catalogRatesExtra.length === 0 ? (
-                            <li className="rounded-md border border-dashed border-border/60 py-6 text-center text-xs text-muted-foreground">
+                            <li className="rounded-lg border border-dashed border-border/60 py-6 text-center text-xs text-muted-foreground">
                               Không có mức «ăn thêm» trong danh mục hệ thống.
                             </li>
                           ) : (

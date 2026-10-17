@@ -57,7 +57,7 @@ export function ApplyToDescendantUnitModal({
       />
       <div
         className={cn(
-          "relative z-10 flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-border bg-background shadow-lg sm:rounded-2xl",
+          "relative z-10 flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-border bg-background shadow-lg sm:rounded-xl",
         )}
       >
         <header className="flex items-start justify-between gap-2 border-b border-border px-3 py-2 sm:px-4">

@@ -16,9 +16,7 @@ import { notifyError } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { conversionNote } from "./applyIssueSlipAiPreview.js";
 import { clearUserAsk, userAskQuestions, withUserAsk } from "./lttpIssueSlipAskQueue.js";
-
-const inputClass =
-  "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 function normalizePreview(data) {
   if (!data) {
@@ -35,11 +33,11 @@ function normalizePreview(data) {
 function confidenceClass(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "text-muted-foreground";
-  if (n >= 0.9) return "text-emerald-700 dark:text-emerald-300";
+  if (n >= 0.9) return "text-success";
   if (n >= 0.75) return "text-lime-700 dark:text-lime-300";
-  if (n >= 0.55) return "text-amber-700 dark:text-amber-300";
+  if (n >= 0.55) return "text-warning";
   if (n >= 0.35) return "text-orange-700 dark:text-orange-300";
-  return "text-red-700 dark:text-red-300";
+  return "text-destructive";
 }
 
 function qtyRuleLabel(rule) {
@@ -804,15 +802,15 @@ export function LttpIssueSlipAiSuggestDialog({
                   key={`${turn.role}-${i}`}
                   className={
                     turn.role === "user"
-                      ? "ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-sm text-primary-foreground"
-                      : "mr-10 max-w-[85%] rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm"
+                      ? "ml-auto max-w-[85%] rounded-xl rounded-tr-sm bg-primary px-3 py-2 text-sm text-primary-foreground"
+                      : "mr-10 max-w-[85%] rounded-xl rounded-tl-sm bg-muted px-3 py-2 text-sm"
                   }
                 >
                   {turn.text}
                 </div>
               ))}
               {plan ? (
-                <div className="mr-8 rounded-2xl rounded-tl-sm bg-muted px-3 py-2 text-sm">
+                <div className="mr-8 rounded-xl rounded-tl-sm bg-muted px-3 py-2 text-sm">
                   <ul className="space-y-1">
                     {plan.steps.map((step, i) => {
                       const done = i < plan.cursor;
@@ -869,7 +867,7 @@ export function LttpIssueSlipAiSuggestDialog({
           <section ref={workRef} className="min-h-0 flex-1 overflow-y-auto" data-local-scroll="true">
           {preview ? (
             <>
-              <section className="m-3 rounded-md border border-border">
+              <section className="m-3 rounded-lg border border-border">
                 <header className="border-b border-border bg-muted/30 px-3 py-1.5 text-sm font-semibold">
                   Dòng hàng
                 </header>
@@ -914,14 +912,14 @@ export function LttpIssueSlipAiSuggestDialog({
                               activeLine === i
                                 ? "border-t border-primary/50 bg-primary/10"
                                 : needs
-                                  ? "border-t border-amber-500/40 bg-amber-500/10"
+                                  ? "border-t border-warning/40 bg-warning/10"
                                   : "border-t border-border/50"
                             }
                           >
                             <td className="px-3 py-1 align-top">
                               <div>{line.commodityName || line.rawName || "—"}</div>
                               <div className="text-[11px] text-muted-foreground">
-                                <span className={needs ? "font-medium text-amber-800 dark:text-amber-200" : ""}>
+                                <span className={needs ? "font-medium text-warning" : ""}>
                                   {lineStatusLabel(line)}
                                 </span>
                                 {Number.isFinite(pct) ? (
@@ -1004,7 +1002,7 @@ export function LttpIssueSlipAiSuggestDialog({
                                 <div className="text-[11px] text-muted-foreground">{conversionNote(line)}</div>
                               ) : null}
                               {line.commodityId && needs && line.writtenUom ? (
-                                <div className="text-[11px] text-amber-800 dark:text-amber-200">
+                                <div className="text-[11px] text-warning">
                                   Chat quy tắc cho «{line.writtenUom}»
                                 </div>
                               ) : null}

@@ -20,9 +20,7 @@ import {
 import { notifyError, notifySuccess } from "@/services/notify";
 import { formatVnd } from "@/utils/formatVnd";
 import { cn } from "@/utils/cn";
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 const TYPE_OPTIONS = [
   { value: "an_tieu_chuan", label: "Ăn tiêu chuẩn" },
@@ -221,7 +219,7 @@ export function SuperadminMealAllowanceRatesPanel() {
 
   return (
     <Card className="shadow-soft w-full min-w-0">
-      <CardContent className="flex flex-col gap-3 !p-3 sm:!p-4">
+      <CardContent className="flex flex-col gap-3">
         <div className="shrink-0">
           <p className="text-xs font-medium sm:text-sm">Danh mục mức tiền ăn</p>
         </div>
@@ -238,7 +236,7 @@ export function SuperadminMealAllowanceRatesPanel() {
                 type="button"
                 onClick={() => setFilterType(t.id)}
                 className={cn(
-                  "min-h-9 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition sm:text-xs",
+                  "min-h-9 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition sm:text-xs",
                   filterType === t.id
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-muted/80",
@@ -346,7 +344,7 @@ export function SuperadminMealAllowanceRatesPanel() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="meal-rate-add-title"
-            className="relative flex max-h-[min(92dvh,32rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+            className="relative flex max-h-[min(92dvh,32rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl"
           >
             <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-4 pb-3 pt-4 sm:px-5">
               <p
@@ -357,7 +355,7 @@ export function SuperadminMealAllowanceRatesPanel() {
               </p>
               <button
                 type="button"
-                className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 aria-label="Đóng"
                 onClick={closeAddModal}
               >
@@ -434,7 +432,7 @@ export function SuperadminMealAllowanceRatesPanel() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="meal-rate-edit-title"
-            className="relative flex max-h-[min(92dvh,32rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+            className="relative flex max-h-[min(92dvh,32rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl"
           >
             <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-4 pb-3 pt-4 sm:px-5">
               <p
@@ -445,7 +443,7 @@ export function SuperadminMealAllowanceRatesPanel() {
               </p>
               <button
                 type="button"
-                className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                className="rounded-lg p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 aria-label="Đóng"
                 onClick={cancelEdit}
               >

@@ -17,7 +17,7 @@ export function NotFoundPage() {
           <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
             404
           </p>
-          <h1 className="text-3xl font-semibold">Không tìm thấy trang</h1>
+          <h1 className="text-xl font-semibold">Không tìm thấy trang</h1>
           <p className="text-sm text-muted-foreground">
             Đường dẫn này chưa được khai báo hoặc đã được chuyển đi.
           </p>

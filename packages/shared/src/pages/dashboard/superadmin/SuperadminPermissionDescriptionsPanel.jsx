@@ -108,7 +108,7 @@ export function SuperadminPermissionDescriptionsPanel() {
   return (
     <Card className="shadow-soft">
       <CardContent
-        className="flex min-h-0 flex-1 flex-col gap-3 !p-3 sm:!p-4"
+        className="flex min-h-0 flex-1 flex-col gap-3"
         data-local-commit-form="true"
       >
         <div>

@@ -14,7 +14,7 @@ export function AuthRouteLoading() {
         <div className="h-11 w-full animate-pulse rounded-xl bg-muted/55" />
       </div>
       <div className="h-11 w-full animate-pulse rounded-xl bg-primary/25" />
-      <div className="h-4 w-2/3 animate-pulse rounded-md bg-muted/50" />
+      <div className="h-4 w-2/3 animate-pulse rounded-lg bg-muted/50" />
     </div>
   );
 }

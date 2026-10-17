@@ -45,7 +45,7 @@ export function PortalChooserPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-foreground">Chọn cổng làm việc</h1>
+        <h1 className="text-xl font-semibold text-foreground">Chọn cổng làm việc</h1>
       </div>
       <div className="flex flex-col gap-3">
         <Button

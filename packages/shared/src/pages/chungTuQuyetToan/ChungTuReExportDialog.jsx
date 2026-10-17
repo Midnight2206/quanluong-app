@@ -5,9 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
-
-const fieldClass =
-  "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
+import { fieldClass } from "@/utils/fieldClass";
 
 function getTemplateLabel(template) {
   if (!template) return "";
@@ -83,7 +81,7 @@ export function ChungTuReExportDialog({
         disabled={submitting}
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-t-2xl border border-border bg-background shadow-lg sm:rounded-2xl">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-t-2xl border border-border bg-background shadow-lg sm:rounded-xl">
         <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0 space-y-1">
             <h2 id="chung-tu-reexport-title" className="text-sm font-semibold text-foreground">

@@ -77,7 +77,7 @@ export function JobTitleRenameModal({ open, jobTitle, unitLabel, onClose, onSave
         aria-modal="true"
         aria-labelledby="job-title-rename-title"
         className={cn(
-          "relative w-full max-w-md rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl",
+          "relative w-full max-w-md rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl",
         )}
       >
         <form onSubmit={handleSubmit}>

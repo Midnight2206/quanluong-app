@@ -32,9 +32,7 @@ import {
   supplierEditPatch,
   supplierIdsFromLinks,
 } from "./supplierUserForm.js";
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 function sortUnitsByPath(units) {
   return [...units].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
@@ -322,7 +320,7 @@ export function SuperadminUsersPanel({ section = "all" } = {}) {
 
   return (
     <Card className="shadow-soft min-w-0">
-      <CardContent className="min-w-0 space-y-3 !p-3 sm:!p-4">
+      <CardContent className="min-w-0 space-y-3">
         {showCreate ? (
         <form
           data-local-commit-form="true"
@@ -437,7 +435,7 @@ export function SuperadminUsersPanel({ section = "all" } = {}) {
                     return (
                       <label
                         key={supplier.id}
-                        className="flex items-start gap-2 rounded-md border border-border/60 px-2 py-1.5 text-xs"
+                        className="flex items-start gap-2 rounded-lg border border-border/60 px-2 py-1.5 text-xs"
                       >
                         <input
                           type="checkbox"
@@ -628,7 +626,7 @@ export function SuperadminUsersPanel({ section = "all" } = {}) {
                       </p>
                     </div>
                     <span
-                      className="shrink-0 rounded-md bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground"
+                      className="shrink-0 rounded-lg bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground"
                       aria-label={u.isActive ? "Đang hoạt động" : "Đã vô hiệu"}
                     >
                       {u.isActive ? "HT" : "—"}
@@ -716,7 +714,7 @@ export function SuperadminUsersPanel({ section = "all" } = {}) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="supplier-editor-title"
-            className="relative w-full max-w-lg rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+            className="relative w-full max-w-lg rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl"
           >
             <div className="space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">
               <p

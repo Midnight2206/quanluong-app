@@ -70,7 +70,7 @@ export function KitchenCommodityPicker({ commodities, commodityId, onPick, disab
     open && anchor && typeof document !== "undefined"
       ? createPortal(
           <ul
-            className="fixed z-[200] max-h-56 overflow-auto overscroll-contain rounded-md border border-border bg-popover py-1 text-sm shadow-lg"
+            className="fixed z-[200] max-h-56 overflow-auto overscroll-contain rounded-lg border border-border bg-popover py-1 text-sm shadow-lg"
             data-local-scroll="true"
             style={{
               top: anchor.bottom + 4,
@@ -110,7 +110,7 @@ export function KitchenCommodityPicker({ commodities, commodityId, onPick, disab
     <>
       <div ref={wrapRef} className={cn("relative", className)}>
         <input
-          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+          className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
           placeholder="Tìm mặt hàng LTTP…"
           value={query}
           disabled={disabled}

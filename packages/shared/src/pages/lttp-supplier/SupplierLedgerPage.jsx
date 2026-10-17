@@ -170,7 +170,7 @@ export function SupplierLedgerPage() {
       </div>
 
       <Card>
-        <CardContent className="space-y-4 !p-3 sm:!p-4">
+        <CardContent className="space-y-4">
           <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="grid gap-1.5" htmlFor="ledger-from">
               <span className={fieldLabelClass}>Từ ngày</span>

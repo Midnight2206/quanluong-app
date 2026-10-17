@@ -16,12 +16,10 @@ import {
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 const P_READ = "registrations.read";
 const P_REVIEW = "registrations.review";
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
 
 export function AdminPendingRegistrationsPanel() {
   const queryClient = useQueryClient();
@@ -69,7 +67,7 @@ export function AdminPendingRegistrationsPanel() {
   if (!canRead) {
     return (
       <Card className="shadow-soft">
-        <CardContent className="!p-3 sm:!p-4">
+        <CardContent>
           <p className="text-xs text-muted-foreground">
             Tài khoản của bạn không có quyền xem đăng ký chờ duyệt.
           </p>

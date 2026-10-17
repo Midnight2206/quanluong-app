@@ -33,7 +33,7 @@ export function ForgotPasswordPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold">Quên mật khẩu</h1>
+        <h1 className="text-xl font-semibold">Quên mật khẩu</h1>
         <p className="text-sm text-muted-foreground">
           Nhập email đã đăng ký. Nếu tài khoản tồn tại, bạn sẽ nhận liên kết đặt lại mật khẩu (hiệu lực 1
           giờ).
@@ -51,7 +51,7 @@ export function ForgotPasswordPage() {
             <input
               type="email"
               autoComplete="email"
-              className="w-full rounded-2xl border bg-background py-3 pl-10 pr-4 text-sm outline-none ring-0 transition focus:border-primary"
+              className="w-full rounded-xl border bg-background py-3 pl-10 pr-4 text-sm outline-none ring-0 transition focus:border-primary"
               placeholder="you@example.com"
               {...register("email")}
               id="ql-forgot-email"

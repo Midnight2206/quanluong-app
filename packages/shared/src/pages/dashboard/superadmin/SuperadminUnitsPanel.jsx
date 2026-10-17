@@ -26,9 +26,7 @@ import {
 import { cn } from "@/utils/cn";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { notifyError, notifySuccess, notifySuccessWithUndo } from "@/services/notify";
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 function sortUnitsByPath(units) {
   return [...units].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
@@ -316,7 +314,7 @@ export function SuperadminUnitsPanel() {
 
   return (
     <Card className="shadow-soft">
-      <CardContent className="flex min-h-0 flex-1 flex-col space-y-3 !p-3 sm:!p-4">
+      <CardContent className="flex min-h-0 flex-1 flex-col space-y-3">
         <form
           data-local-commit-form="true"
           onSubmit={onCreate}
@@ -442,7 +440,7 @@ export function SuperadminUnitsPanel() {
                                 type="button"
                                 onClick={() => toggleBranch(u.id)}
                                 className={cn(
-                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground",
+                                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground",
                                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 )}
                                 aria-expanded={isOpen}

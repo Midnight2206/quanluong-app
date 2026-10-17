@@ -12,9 +12,7 @@ import {
 import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary";
+import { fieldClass as inputClass } from "@/utils/fieldClass";
 
 const lockedInputClass =
   "w-full cursor-not-allowed rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground";
@@ -347,7 +345,7 @@ export function LttpSignatureSettingsTab({
       </p>
 
       {!canEditApprover ? (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-950 dark:text-amber-100">
+        <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] text-warning">
           Bạn không phải admin đơn vị — phần người duyệt / chữ ký số ô duyệt ở chế độ chỉ xem.
         </p>
       ) : null}

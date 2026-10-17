@@ -88,7 +88,7 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
         <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
           Đăng ký
         </p>
-        <h1 className="text-3xl font-semibold">Tạo tài khoản mới</h1>
+        <h1 className="text-xl font-semibold">Tạo tài khoản mới</h1>
         <p className="text-sm text-muted-foreground">
           Chọn đúng đơn vị trực thuộc. Sau khi gửi form, tài khoản chờ quản trị đơn vị
           đủ cấp trong nhánh tổ chức duyệt mới đăng nhập được.
@@ -101,7 +101,7 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
           <input
             type="text"
             autoComplete="username"
-            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
+            className="w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
             placeholder="nguyenvana"
             {...register("username")}
             id="ql-register-username"
@@ -120,7 +120,7 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
           <input
             type="email"
             autoComplete="email"
-            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
+            className="w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
             placeholder="ban@domain.com"
             {...register("email")}
             id="ql-register-email"
@@ -140,7 +140,7 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
             <input
               type={isPasswordVisible ? "text" : "password"}
               autoComplete="new-password"
-              className="w-full rounded-2xl border bg-background px-4 py-3 pr-12 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
+              className="w-full rounded-xl border bg-background px-4 py-3 pr-12 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
               placeholder="Nhập mật khẩu"
               {...register("password")}
               id="ql-register-password"
@@ -166,7 +166,7 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
         <label className="block space-y-2" htmlFor="ql-register-unitId">
           <span className="text-sm font-medium">Đơn vị</span>
           <select
-            className="w-full rounded-2xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
+            className="w-full rounded-xl border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary aria-invalid:border-destructive"
             disabled={isLoadingUnits || !units.length}
             {...register("unitId")}
             id="ql-register-unitId"

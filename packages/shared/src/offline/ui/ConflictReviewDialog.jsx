@@ -113,7 +113,7 @@ export function ConflictReviewDialog({
         aria-modal="true"
         aria-labelledby="conflict-review-title"
         className={cn(
-          "relative flex max-h-[min(90vh,640px)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl",
+          "relative flex max-h-[min(90vh,640px)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl",
         )}
       >
         <div className="border-b border-border p-4 sm:p-5">
@@ -130,7 +130,7 @@ export function ConflictReviewDialog({
                   <button
                     type="button"
                     className={cn(
-                      "w-full rounded-md px-2 py-1 text-left",
+                      "w-full rounded-lg px-2 py-1 text-left",
                       item.id === active.id
                         ? "bg-violet-500/15 font-medium text-violet-950 dark:text-violet-100"
                         : "text-muted-foreground hover:bg-muted/80",

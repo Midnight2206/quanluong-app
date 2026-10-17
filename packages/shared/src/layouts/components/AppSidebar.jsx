@@ -73,7 +73,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
             const classNameBuilder = ({ isActive }) => {
               const active = navItemPathMatches(item, pathname) || isActive;
               return cn(
-                "flex flex-col items-center gap-2 rounded-2xl px-2 py-3 text-[11px] font-medium transition",
+                "flex flex-col items-center gap-2 rounded-xl px-2 py-3 text-[11px] font-medium transition",
                 active
                   ? "bg-secondary text-foreground"
                   : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground",

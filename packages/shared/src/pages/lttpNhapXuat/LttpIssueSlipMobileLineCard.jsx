@@ -53,14 +53,14 @@ export function LttpIssueSlipMobileLineCard({
       className={cn(
         "rounded-xl border border-border/70 bg-card/40 p-3 shadow-sm",
         dupRow &&
-          "border-l-[3px] border-l-red-600 border-red-500/40 bg-red-500/8 dark:border-l-red-400 dark:bg-red-950/25",
+          "border-l-[3px] border-l-red-600 border-destructive/40 bg-destructive/8 dark:border-l-red-400",
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <p
           className={cn(
             "text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
-            dupRow && "text-red-900 dark:text-red-100",
+            dupRow && "text-destructive",
           )}
         >
           Dòng {index + 1}
@@ -89,7 +89,7 @@ export function LttpIssueSlipMobileLineCard({
           <select
             className={cn(
               mobileInputClass,
-              dupRow && "border-red-500/90 dark:border-red-400/80",
+              dupRow && "border-destructive/90",
             )}
             value={
               row.lttpSupplierId === "" || row.lttpSupplierId == null
@@ -115,7 +115,7 @@ export function LttpIssueSlipMobileLineCard({
             className={cn(
               mobileInputClass,
               "font-mono",
-              dupRow && "border-red-500/90 dark:border-red-400/80",
+              dupRow && "border-destructive/90",
             )}
             value={row.codeDraft}
             disabled={!canWrite}
@@ -160,7 +160,7 @@ export function LttpIssueSlipMobileLineCard({
               className={cn(
                 mobileInputClass,
                 "text-center tabular-nums",
-                dupRow && "border-red-500/90 dark:border-red-400/80",
+                dupRow && "border-destructive/90",
               )}
               value={quantityDisplay}
               onChange={onQuantityChange}

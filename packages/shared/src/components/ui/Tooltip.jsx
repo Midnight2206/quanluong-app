@@ -83,7 +83,7 @@ export function Tooltip({
                     "whitespace-pre-wrap",
                   )
                 : cn(
-                    "max-w-[min(14rem,calc(100vw-1.25rem))] rounded-md bg-foreground px-2 py-1 text-center text-[10px] font-medium leading-tight text-background ring-black/10 dark:ring-white/15",
+                    "max-w-[min(14rem,calc(100vw-1.25rem))] rounded-lg bg-foreground px-2 py-1 text-center text-[10px] font-medium leading-tight text-background ring-black/10 dark:ring-white/15",
                     "line-clamp-2",
                   ),
             )}

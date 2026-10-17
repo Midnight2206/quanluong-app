@@ -241,7 +241,7 @@ export function HomePage() {
         ) : (
           <div className="space-y-4">
             <Card className="border-primary/20 bg-primary/5 shadow-none">
-              <CardContent className="space-y-4 pt-6">
+              <CardContent className="space-y-4">
                 <p className="text-sm font-medium text-foreground">
                   Xin chào, {displayName || "bạn"}
                 </p>
@@ -253,9 +253,9 @@ export function HomePage() {
 
             {canLinkDrive ? (
               <Card className="shadow-soft">
-                <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-start sm:justify-between">
+                <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 flex-1 gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-secondary text-primary">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
                       <Cloud className="size-5" aria-hidden />
                     </div>
                     <div className="min-w-0 space-y-2">
@@ -276,7 +276,7 @@ export function HomePage() {
                           <span className="break-all font-mono">{user.googleDriveFolderId}</span>
                         </p>
                       ) : !mayUseDriveLink ? (
-                        <p className="text-[11px] text-amber-700 dark:text-amber-200">
+                        <p className="text-[11px] text-warning">
                           Hoàn tất xác minh email trước khi liên kết Drive (trừ tài khoản quản trị hệ thống).
                         </p>
                       ) : null}
@@ -335,8 +335,8 @@ export function HomePage() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {features.map(({ icon: Icon, title, description }) => (
             <Card key={title} className="h-full shadow-soft">
-              <CardContent className="flex h-full flex-col gap-3 pt-6">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-primary">
+              <CardContent className="flex h-full flex-col gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
                   <Icon className="h-5 w-5" aria-hidden />
                 </div>
                 <h3 className="text-base font-semibold leading-snug">{title}</h3>

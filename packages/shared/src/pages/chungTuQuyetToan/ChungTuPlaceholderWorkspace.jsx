@@ -23,7 +23,7 @@ export function ChungTuPlaceholderWorkspace({ label, subtitle, hint }) {
               <p className={cn("text-[11px] leading-relaxed text-muted-foreground/90 sm:text-xs")}>{hint}</p>
             ) : null}
           </div>
-          <p className="rounded-md bg-muted/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+          <p className="rounded-lg bg-muted/80 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             Tab đặt chỗ · sắp bổ sung
           </p>
         </CardContent>

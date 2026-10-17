@@ -24,15 +24,13 @@ import {
   periodAmountsForRate,
   prevYearMonthLabel,
 } from "./mealRosterUiUtils";
-
-const inputClass =
-  "w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 const rankInputClass =
-  "w-full min-w-0 max-w-full rounded-md border border-border bg-background px-1 py-1 text-[11px] outline-none focus:border-primary sm:text-xs";
+  "w-full min-w-0 max-w-full rounded-lg border border-border bg-background px-1 py-1 text-[11px] outline-none focus:border-primary sm:text-xs";
 
 const mealSelectClass =
-  "w-full min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm font-semibold tabular-nums outline-none focus:border-primary sm:text-base";
+  "w-full min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm font-semibold tabular-nums outline-none focus:border-primary sm:text-base";
 
 /** Stable empty list so `rows` is not a new [] each render when query has no data (fixes useEffect + setDrafts loop). */
 const EMPTY_MEAL_ROSTER_ROWS = [];
@@ -489,24 +487,24 @@ export function MealRosterGuarantyTab({
       </div>
 
       {!selectedUnitId ? (
-        <p className="text-sm text-amber-700 dark:text-amber-200">
+        <p className="text-sm text-warning">
           Tài khoản chưa gắn đơn vị hoặc chưa có quyền xem danh sách đơn vị — không thể tải danh sách.
         </p>
       ) : null}
       {selectedUnitId && canAccess && needsMealRateSelection ? (
-        <p className="text-sm text-amber-700 dark:text-amber-200">
+        <p className="text-sm text-warning">
           Chưa chọn mức tiền ăn áp dụng cho đơn vị — chuyển sang tab «Sổ chấm cơm» và bấm «Chọn mức tiền ăn cho đơn vị», sau đó
           quay lại tab này.
         </p>
       ) : null}
       {selectedUnitId && canAccess && needsStandardRatesForGuaranty ? (
-        <p className="text-sm text-amber-700 dark:text-amber-200">
+        <p className="text-sm text-warning">
           Trong tập đã chọn chưa có mức «ăn tiêu chuẩn» (chỉ có «ăn thêm») — tab này và file Excel cần ít nhất một mức
           tiêu chuẩn trong «Chọn mức tiền ăn cho đơn vị».
         </p>
       ) : null}
       {selectedUnitId && canAccess && metaUnitOptions.length === 0 ? (
-        <p className="text-sm text-amber-700 dark:text-amber-200">
+        <p className="text-sm text-warning">
           Đơn vị này chưa có danh sách đơn vị trực thuộc (AssignedUnit) — hãy cấu hình hoặc dùng tên đơn vị mặc định.
         </p>
       ) : null}
@@ -607,7 +605,7 @@ export function MealRosterGuarantyTab({
                           <button
                             type="button"
                             className={cn(
-                              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/90 bg-card text-muted-foreground shadow-sm transition hover:border-primary/30 hover:bg-muted hover:text-foreground",
+                              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border/90 bg-card text-muted-foreground shadow-sm transition hover:border-primary/30 hover:bg-muted hover:text-foreground",
                               selectedRate && "border-primary/25 text-primary",
                             )}
                             aria-label="Xem chi tiết mức tiền ăn"

@@ -47,7 +47,7 @@ export function KitchenPickCatalogDialog({ open, onClose, unitId, menuDate, meal
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
-              className="w-full rounded-md border border-border bg-background py-2 pl-8 pr-2 text-sm"
+              className="w-full rounded-lg border border-border bg-background py-2 pl-8 pr-2 text-sm"
               placeholder="Tìm món…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -72,7 +72,7 @@ export function KitchenPickCatalogDialog({ open, onClose, unitId, menuDate, meal
                 <li key={item.id}>
                   <button
                     type="button"
-                    className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
                     disabled={importing}
                     onClick={() => handlePick(item)}
                   >

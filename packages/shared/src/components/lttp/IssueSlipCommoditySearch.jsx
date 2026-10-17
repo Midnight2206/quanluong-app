@@ -95,7 +95,7 @@ export function IssueSlipCommoditySearch({
     createPortal(
       <ul
         data-local-scroll="true"
-        className="fixed z-[120] max-h-52 overflow-y-auto rounded-md border border-border bg-card py-1 text-left text-xs text-card-foreground shadow-float"
+        className="fixed z-[120] max-h-52 overflow-y-auto rounded-lg border border-border bg-card py-1 text-left text-xs text-card-foreground shadow-float"
         style={{
           top: anchor.bottom + 6,
           left: anchor.left,
@@ -145,7 +145,7 @@ export function IssueSlipCommoditySearch({
         className={cn(
           inputClass,
           "truncate",
-          dupRow && "border-red-500/90 dark:border-red-400/80",
+          dupRow && "border-destructive/90",
         )}
         title={(query || selectedLabel || "").trim() || undefined}
         value={query}

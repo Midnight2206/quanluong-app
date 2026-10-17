@@ -74,14 +74,14 @@ export function chungTuStatusBadge(status) {
     return {
       label: "Đã đồng bộ",
       className:
-        "rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300",
+        "rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-medium text-success",
     };
   }
   if (status === "stale") {
     return {
       label: "Cần đồng bộ lại",
       className:
-        "rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-200",
+        "rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning",
     };
   }
   if (status === "locked") {

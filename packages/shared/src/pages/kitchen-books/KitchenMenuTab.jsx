@@ -82,7 +82,7 @@ function CatalogPicker({ open, onClose, onPick, unitId }) {
                 <li key={item.id}>
                   <button
                     type="button"
-                    className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
                     onClick={() => onPick(item)}
                   >
                     <span className="font-medium">{item.name}</span>
@@ -336,7 +336,7 @@ export function KitchenMenuTab({
           user={user}
         />
         <div className="flex flex-wrap items-end gap-2">
-          <div className="flex gap-1 rounded-md bg-muted p-1">
+          <div className="flex gap-1 rounded-lg bg-muted p-1">
             {PERIODS.map((period) => (
               <button
                 key={period}
@@ -375,13 +375,13 @@ export function KitchenMenuTab({
       </div>
 
       {needsMealRateSelection || mealRateUnavailable ? (
-        <p className="text-sm text-amber-700 dark:text-amber-200">
+        <p className="text-sm text-warning">
           Đơn vị cần chọn mức tiền ăn trong Sổ chấm cơm trước khi lập thực đơn mẫu.
           {mealMetaForbidden ? " Bạn có thể cần quyền mealRoster.access." : ""}
         </p>
       ) : null}
       {dirty ? (
-        <p role="status" className="rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+        <p role="status" className="rounded-lg border border-warning/35 bg-warning/10 px-3 py-2 text-sm text-warning">
           Bạn có thay đổi chưa lưu.
         </p>
       ) : null}
@@ -436,7 +436,7 @@ export function KitchenMenuTab({
                   <div
                     key={lineIndex}
                     className={cn(
-                      "grid gap-2 rounded-md bg-muted/20 p-2 sm:grid-cols-[1fr_auto_auto]",
+                      "grid gap-2 rounded-lg bg-muted/20 p-2 sm:grid-cols-[1fr_auto_auto]",
                       !line.commodityId && "ring-1 ring-amber-500/50",
                     )}
                   >
@@ -525,7 +525,7 @@ export function KitchenMenuTab({
 
       <section className="space-y-2 border-t border-border pt-4">
         <div>
-          <h2 className="font-semibold">Mẫu đã lưu</h2>
+          <h2 className="text-sm font-semibold">Mẫu đã lưu</h2>
         </div>
         {!rateId ? (
           <p className="text-sm text-muted-foreground">Chọn mức tiền ăn để xem mẫu.</p>

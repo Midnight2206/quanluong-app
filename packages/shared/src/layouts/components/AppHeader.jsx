@@ -59,22 +59,7 @@ export function AppHeader() {
   return (
     <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b bg-card/95 px-4 backdrop-blur print:hidden sm:px-5 lg:px-6">
       <div className="flex items-center min-w-0 gap-3">
-        <div className="lg:hidden">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#f26f21] text-xs font-bold text-white shadow-soft">
-              QL
-            </div>
-            <div className="hidden sm:block">
-              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                Quân lương
-              </p>
-              <p className="text-xs font-semibold">Workspace</p>
-            </div>
-          </div>
-        </div>
-        <div className="hidden lg:block">
-          <AppBrand />
-        </div>
+        <AppBrand compact />
       </div>
 
       <div className="flex items-center gap-2 ml-auto sm:gap-3" ref={menuRef}>
@@ -178,7 +163,7 @@ export function AppHeader() {
           <div className="mt-3 space-y-1">
             <button
               type="button"
-              className="flex items-center w-full gap-3 px-3 py-3 text-sm text-left transition rounded-2xl hover:bg-secondary"
+              className="flex items-center w-full gap-3 px-3 py-3 text-sm text-left transition rounded-xl hover:bg-secondary"
               onClick={() => {
                 setIsMenuOpen(false);
                 startNavigationIntent();
@@ -194,7 +179,7 @@ export function AppHeader() {
           <div className="pt-3 mt-3 border-t">
             <Button
               variant="ghost"
-              className="flex w-full items-center justify-start gap-3 rounded-2xl px-3 py-3 text-left text-sm"
+              className="flex w-full items-center justify-start gap-3 rounded-xl px-3 py-3 text-left text-sm"
               title="Đăng xuất"
               onClick={handleLogout}
               disabled={isLoggingOut}

@@ -80,7 +80,7 @@ export function ConfirmProvider({ children }) {
             aria-modal="true"
             aria-labelledby="app-confirm-title"
             className={cn(
-              "relative w-full max-w-md rounded-t-2xl border border-border bg-card p-4 shadow-lg sm:rounded-2xl sm:p-5",
+              "relative w-full max-w-md rounded-t-2xl border border-border bg-card p-4 shadow-lg sm:rounded-xl sm:p-5",
             )}
           >
             <p

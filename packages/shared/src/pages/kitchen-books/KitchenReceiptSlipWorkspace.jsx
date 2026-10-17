@@ -59,6 +59,7 @@ import {
   readStoredKitchenReceiptDate,
   writeStoredKitchenReceiptDate,
 } from "./kitchenBooksSessionPersist.js";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 function normalizeStoredReceiptDraftRows(raw) {
   if (!Array.isArray(raw) || raw.length === 0) {
@@ -91,14 +92,11 @@ function normalizeStoredReceiptDraftRows(raw) {
   }));
 }
 
-const inputClass =
-  "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
-
 const tableInputClass =
-  "w-full min-w-0 rounded-md border border-border bg-background px-1 py-1 text-[11px] outline-none focus:border-primary";
+  "w-full min-w-0 rounded-lg border border-border bg-background px-1 py-1 text-[11px] outline-none focus:border-primary";
 
 const tableQtyDisplayClass =
-  "flex h-7 w-full min-w-0 items-center justify-center rounded-md border border-border bg-muted/35 px-0.5 text-center text-[10px] tabular-nums text-muted-foreground";
+  "flex h-7 w-full min-w-0 items-center justify-center rounded-lg border border-border bg-muted/35 px-0.5 text-center text-[10px] tabular-nums text-muted-foreground";
 
 const RECEIPT_SUB_TAB_IDS = ["mua-tt", "tgsx", "tong-hop"];
 
@@ -666,7 +664,7 @@ export function KitchenReceiptSlipWorkspace({
                     key={r.key}
                     className={cn(
                       "align-top",
-                      dupRow && "bg-red-500/8 dark:bg-red-950/20",
+                      dupRow && "bg-destructive/8",
                     )}
                   >
                     <td className="border-b border-border/50 px-1 py-1 text-center tabular-nums text-muted-foreground">
@@ -694,7 +692,7 @@ export function KitchenReceiptSlipWorkspace({
                         className={cn(
                           tableInputClass,
                           "font-mono",
-                          dupRow && "border-red-500/90",
+                          dupRow && "border-destructive/90",
                         )}
                         value={r.codeDraft}
                         disabled={!canWrite}
@@ -728,7 +726,7 @@ export function KitchenReceiptSlipWorkspace({
                         className={cn(
                           tableInputClass,
                           "text-center tabular-nums",
-                          dupRow && "border-red-500/90",
+                          dupRow && "border-destructive/90",
                         )}
                         value={quantityInputDisplay(r.quantity)}
                         onChange={(e) => {
@@ -940,7 +938,7 @@ export function KitchenReceiptSlipWorkspace({
       {hasLineIssues ? (
         <div
           role="alert"
-          className="rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1.5 text-[11px] font-medium leading-snug text-destructive"
+          className="rounded-lg border border-destructive/50 bg-destructive/10 px-2 py-1.5 text-[11px] font-medium leading-snug text-destructive"
         >
           {LTTP_ISSUE_SLIP_LINE_ISSUES_BANNER}
         </div>

@@ -21,6 +21,7 @@ import { notifyError, notifySuccess, notifySuccessWithUndo } from "@/services/no
 import { JobTitlePermissionsModal } from "@/pages/dashboard/admin/JobTitlePermissionsModal";
 import { JobTitleRenameModal } from "@/pages/dashboard/admin/JobTitleRenameModal";
 import { Ban, Pencil, Plus, RotateCcw, Save, ShieldCheck } from "lucide-react";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 const JT_UI_STORAGE = "admin-job-titles.v1";
 
@@ -35,9 +36,6 @@ function readLegacyJtUiSession() {
     return null;
   }
 }
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
 
 const P = {
   JT_READ: "jobTitles.read",
@@ -512,7 +510,7 @@ export function AdminJobTitlesPanel() {
   return (
     <div className="flex flex-col gap-4 pb-2">
       <Card className="shadow-soft">
-        <CardContent className="flex flex-col gap-3 !p-3 sm:!p-4">
+        <CardContent className="flex flex-col gap-3">
           <div className="shrink-0">
             <p className="text-xs font-medium sm:text-sm">Chức danh &amp; phân quyền</p>
           </div>
@@ -694,7 +692,7 @@ export function AdminJobTitlesPanel() {
 
       {canUsRead && canUsPatch ? (
         <Card className="shadow-soft">
-          <CardContent className="flex flex-col gap-2 !p-3 sm:!p-4" data-local-commit-form="true">
+          <CardContent className="flex flex-col gap-2" data-local-commit-form="true">
             <p className="shrink-0 text-xs font-medium sm:text-sm">Gán chức danh cho nhân sự (nhận gói phân quyền)</p>
             
             <StickyResponsiveTable stickyLevel={1} className="border-border/60">
@@ -764,11 +762,11 @@ export function AdminJobTitlesPanel() {
                                 Không thể tự gán chức danh cho chính mình.
                               </span>
                             ) : !u.unit?.id ? (
-                              <span className="mt-0.5 block text-[10px] text-amber-600">
+                              <span className="mt-0.5 block text-[10px] text-warning">
                                 User chưa có đơn vị
                               </span>
                             ) : options.length === 0 ? (
-                              <span className="mt-0.5 block text-[10px] text-amber-700">
+                              <span className="mt-0.5 block text-[10px] text-warning">
                                 {hasLocalAdmin
                                   ? "Chưa có chức danh cho đơn vị này — tạo ở bảng trên."
                                   : "Chưa có chức danh phù hợp — tạo ở đơn vị này hoặc đơn vị cấp trên trên cùng nhánh."}

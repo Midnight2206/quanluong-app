@@ -9,9 +9,7 @@ import {
   usePutLttpReceivingDefaultRecipientMutation,
 } from "@/features/lttp/api/lttpApi";
 import { notifyError, notifySuccess } from "@/services/notify";
-
-const inputClass =
-  "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 /**
  * Một dòng: **đơn vị nhận** + chọn user mặc định (lưu vào bảng theo recipientUnitId).
@@ -146,7 +144,7 @@ export function LttpNguoiNhanBulkModal({ open, onClose, units, canWrite }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative flex max-h-dvh w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[44rem] sm:rounded-2xl"
+        className="relative flex max-h-dvh w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[44rem] sm:rounded-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border bg-card px-4 py-3 sm:px-5">

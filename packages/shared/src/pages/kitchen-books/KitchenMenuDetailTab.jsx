@@ -104,7 +104,7 @@ export function KitchenMenuDetailTab({
           </Button>
           <input
             type="date"
-            className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+            className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
             value={menuDate}
             onChange={(e) => setMenuDate(e.target.value)}
           />
@@ -120,7 +120,7 @@ export function KitchenMenuDetailTab({
           <span className="text-muted-foreground">Tổng ngày</span>
           <span className="font-semibold tabular-nums">{formatVnd(data?.dayAmount ?? 0)}</span>
           {data?.missingPriceCount > 0 ? (
-            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-900 dark:text-amber-100">
+            <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">
               Thiếu giá: {data.missingPriceCount} dòng
             </span>
           ) : null}

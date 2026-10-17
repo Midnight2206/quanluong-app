@@ -56,7 +56,7 @@ export function VerifyEmailPage() {
     <div className="mx-auto flex max-w-md flex-col items-center gap-6 px-4 py-16 text-center">
       {phase === "idle" && token ? (
         <>
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Mail className="size-7" aria-hidden />
           </div>
           <div className="space-y-2">
@@ -87,7 +87,7 @@ export function VerifyEmailPage() {
 
       {phase === "ok" ? (
         <>
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <MailCheck className="size-7" aria-hidden />
           </div>
           <div className="space-y-2">
@@ -102,7 +102,7 @@ export function VerifyEmailPage() {
 
       {phase === "error" ? (
         <>
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
             <MailX className="size-7" aria-hidden />
           </div>
           <div className="space-y-2">

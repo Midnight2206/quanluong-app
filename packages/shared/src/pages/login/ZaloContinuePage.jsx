@@ -27,7 +27,7 @@ const ZALO_ATTEMPT_ERRORS = {
 };
 
 const fieldClass =
-  "w-full px-4 py-3 text-sm transition border outline-none rounded-2xl bg-background ring-0 focus:border-primary aria-invalid:border-destructive read-only:bg-muted/40";
+  "w-full px-4 py-3 text-sm transition border outline-none rounded-xl bg-background ring-0 focus:border-primary aria-invalid:border-destructive read-only:bg-muted/40";
 
 function attemptUrl(ticket, suffix = "") {
   return `${getApiBaseUrl()}/auth/zalo/attempts/${encodeURIComponent(ticket)}${suffix}`;
@@ -115,7 +115,7 @@ function ZaloPhoneQr({ url }) {
       alt="Mã QR mở Zalo để chia sẻ số điện thoại"
       width={220}
       height={220}
-      className="mx-auto rounded-2xl bg-white p-3"
+      className="mx-auto rounded-xl bg-white p-3"
     />
   );
 }
@@ -123,7 +123,7 @@ function ZaloPhoneQr({ url }) {
 function PendingBlock() {
   return (
     <div className="space-y-3">
-      <h1 className="text-3xl font-semibold">Chờ duyệt</h1>
+      <h1 className="text-xl font-semibold">Chờ duyệt</h1>
       <p className="text-sm text-muted-foreground">{PENDING_MESSAGE}</p>
     </div>
   );
@@ -295,7 +295,7 @@ export function ZaloContinuePage() {
     }
     return (
       <div className="space-y-3">
-        <h1 className="text-3xl font-semibold">Phiếu không còn hiệu lực</h1>
+        <h1 className="text-xl font-semibold">Phiếu không còn hiệu lực</h1>
         <p className="text-sm text-muted-foreground">Không thấy phiếu đăng nhập Zalo.</p>
         <AgainLink />
       </div>
@@ -318,7 +318,7 @@ export function ZaloContinuePage() {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold">Xác minh số điện thoại</h1>
+          <h1 className="text-xl font-semibold">Xác minh số điện thoại</h1>
           <p className="text-sm text-muted-foreground lg:hidden">
             Bấm nút bên dưới để mở app Zalo và chia sẻ số điện thoại. Giữ trang này mở, rồi quay lại sau khi xác minh xong.
           </p>
@@ -358,7 +358,7 @@ export function ZaloContinuePage() {
   if (screen === "failed") {
     return (
       <div className="space-y-3">
-        <h1 className="text-3xl font-semibold">Không đăng nhập được</h1>
+        <h1 className="text-xl font-semibold">Không đăng nhập được</h1>
         <p role="alert" className="text-sm text-destructive">
           {failedSentence(attempt, loadError)}
         </p>
@@ -382,7 +382,7 @@ export function ZaloContinuePage() {
         }}
       >
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold">Xác nhận mật khẩu</h1>
+          <h1 className="text-xl font-semibold">Xác nhận mật khẩu</h1>
           <p className="text-sm text-muted-foreground">
             Số này đã có tài khoản. Nhập mật khẩu để gắn Zalo.
           </p>
@@ -448,7 +448,7 @@ export function ZaloContinuePage() {
         }}
       >
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold">Tạo tài khoản</h1>
+          <h1 className="text-xl font-semibold">Tạo tài khoản</h1>
           <p className="text-sm text-muted-foreground">
             Tên và số lấy từ Zalo. Chọn tên đăng nhập
             {supplier ? "." : " và đơn vị."}

@@ -117,7 +117,7 @@ export function ChungTuTemplateTreePicker({
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/80"
                 onClick={() => openFolder(folder)}
               >
-                <Folder className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <Folder className="h-4 w-4 shrink-0 text-warning" />
                 <span className="min-w-0 flex-1 truncate font-medium">{folder.name}</span>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </button>
@@ -140,7 +140,7 @@ export function ChungTuTemplateTreePicker({
                     checked={selected}
                     onChange={() => onSelect(template)}
                   />
-                  <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <FileSpreadsheet className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">
                       {template.displayName || template.driveFileName}

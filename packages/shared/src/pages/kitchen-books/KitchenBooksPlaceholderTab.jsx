@@ -16,7 +16,7 @@ export function KitchenBooksPlaceholderTab({ title }) {
             <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
           </div>
           <h2 className="text-sm font-semibold text-foreground sm:text-base">{title}</h2>
-          <p className="rounded-md bg-muted/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+          <p className="rounded-lg bg-muted/80 px-2.5 py-1 text-xs font-medium text-muted-foreground">
             Đang phát triển
           </p>
         </CardContent>

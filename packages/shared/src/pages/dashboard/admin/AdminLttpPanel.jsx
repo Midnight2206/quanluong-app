@@ -51,9 +51,7 @@ import { cn } from "@/utils/cn";
 import { formatVnd } from "@/utils/formatVnd";
 import { LttpAiAutoAcceptCard } from "./LttpAiAutoAcceptCard";
 import { LttpWarehouseBuyerCard } from "./LttpWarehouseBuyerCard";
-
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 /** Ẩn nút tăng/giảm của `type="number"` (Chrome / Edge / Safari). */
 const noSpinnerNumClass =
@@ -927,7 +925,7 @@ export function AdminLttpPanel({
 
   return (
     <Card className="shadow-soft w-full min-w-0">
-      <CardContent className="flex flex-col gap-3 !p-3 sm:!p-4">
+      <CardContent className="flex flex-col gap-3">
         {!groupsOnly ? (
           <p className="text-xs text-muted-foreground">
             Đơn vị LTTP:{" "}
@@ -1586,7 +1584,7 @@ export function AdminLttpPanel({
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="lttp-edit-commodity-title"
-                    className="relative flex max-h-[min(92dvh,36rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+                    className="relative flex max-h-[min(92dvh,36rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl"
                   >
                     <div className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">
                       <p
@@ -1675,7 +1673,7 @@ export function AdminLttpPanel({
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="lttp-edit-supplier-title"
-                    className="relative flex max-h-[min(92dvh,40rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl"
+                    className="relative flex max-h-[min(92dvh,40rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl"
                   >
                     <div className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">
                       <p

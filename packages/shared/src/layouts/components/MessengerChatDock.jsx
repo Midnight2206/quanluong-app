@@ -90,7 +90,7 @@ function ChatUserPicker({ open, onClose, onPick }) {
       role="presentation"
     >
       <div
-        className="max-h-[min(70dvh,32rem)] w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-float"
+        className="max-h-[min(70dvh,32rem)] w-full max-w-md overflow-hidden rounded-xl border border-border bg-card shadow-float"
         role="dialog"
         onClick={(e) => e.stopPropagation()}
         aria-modal="true"
@@ -228,7 +228,7 @@ function GroupCreateModal({ open, onClose, onCreate }) {
       role="presentation"
     >
       <div
-        className="flex max-h-[min(75dvh,36rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-float"
+        className="flex max-h-[min(75dvh,36rem)] w-full max-w-md flex-col overflow-hidden rounded-xl border border-border bg-card shadow-float"
         role="dialog"
         onClick={(e) => e.stopPropagation()}
         aria-modal="true"
@@ -370,7 +370,7 @@ function ChatHubPanel({
       role="presentation"
     >
       <div
-        className="absolute right-3 top-[4.25rem] flex max-h-[calc(100dvh-5.5rem)] w-[min(calc(100vw-1.5rem),22rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-float sm:right-5 sm:top-[4.5rem] sm:w-[22rem]"
+        className="absolute right-3 top-[4.25rem] flex max-h-[calc(100dvh-5.5rem)] w-[min(calc(100vw-1.5rem),22rem)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-float sm:right-5 sm:top-[4.5rem] sm:w-[22rem]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -634,7 +634,7 @@ function ChatWindowFrame({
               ) : null}
               <div
                 className={cn(
-                  "max-w-[85%] rounded-2xl px-3 py-1.5 text-sm",
+                  "max-w-[85%] rounded-xl px-3 py-1.5 text-sm",
                   mine ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
                 )}
               >

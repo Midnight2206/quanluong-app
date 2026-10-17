@@ -24,9 +24,7 @@ import {
 import { isNlFieldNamedRange, resolveNlFieldKey } from "@/pages/chungTuQuyetToan/chungTuNlField";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
-
-const fieldClass =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary";
+import { fieldClass } from "@/utils/fieldClass";
 
 function getTemplateLabel(template) {
   if (!template) return "";
@@ -46,12 +44,12 @@ function getTemplateStatusMeta(status) {
     case "draft":
       return {
         label: "Nháp",
-        className: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+        className: "bg-warning/15 text-warning",
       };
     case "published":
       return {
         label: "Đã duyệt",
-        className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+        className: "bg-success/15 text-success",
       };
     case "retired":
       return {
@@ -433,7 +431,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
   return (
     <div className="space-y-4" data-local-commit-form="true">
       <Card className="shadow-soft">
-        <CardContent className="space-y-3 !p-3 sm:!p-4">
+        <CardContent className="space-y-3">
           <div className="space-y-1">
             <p className="text-sm font-medium text-foreground">Tải mẫu Excel</p>
           </div>
@@ -503,7 +501,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
       </Card>
 
       <Card className="shadow-soft">
-        <CardContent className="space-y-3 !p-3 sm:!p-4">
+        <CardContent className="space-y-3">
           <p className="text-sm font-medium text-foreground">Danh sách mẫu</p>
           {templatesLoading ? (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -533,7 +531,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
 
       {selectedTemplate ? (
         <Card className="shadow-soft">
-          <CardContent className="space-y-3 !p-3 sm:!p-4">
+          <CardContent className="space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">Named Range trên mẫu</p>
@@ -569,7 +567,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                       templateSchema.scalarFields.map((field) => (
                         <div
                           key={field.field_name ?? field.key}
-                          className="rounded-md bg-background px-2.5 py-2"
+                          className="rounded-lg bg-background px-2.5 py-2"
                         >
                           <p className="font-mono text-[11px] text-foreground">
                             {field.field_name ?? field.key}
@@ -593,7 +591,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                       templateSchema.columns.map((column) => (
                         <div
                           key={column.key}
-                          className="rounded-md bg-background px-2.5 py-2"
+                          className="rounded-lg bg-background px-2.5 py-2"
                         >
                           <p className="font-medium text-foreground">{column.title ?? column.key}</p>
                           <p className="mt-0.5 text-muted-foreground">key: {column.key}</p>
@@ -613,7 +611,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                   {templateSchema.signatureBlock.slots.map((slot) => (
                     <span
                       key={slot.key}
-                      className="rounded-md bg-background px-2 py-1 text-muted-foreground"
+                      className="rounded-lg bg-background px-2 py-1 text-muted-foreground"
                     >
                       {slot.key}
                       {slot.label ? `: ${String(slot.label).replace(/\\n/g, " ")}` : ""}
@@ -641,7 +639,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={fieldLabelsTitleId}
-            className="relative flex max-h-dvh w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[44rem] sm:rounded-2xl"
+            className="relative flex max-h-dvh w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[44rem] sm:rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border bg-card px-4 py-3 sm:px-5">
@@ -688,7 +686,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
                     return (
                       <label
                         key={field.fieldKey}
-                        className="grid gap-2 rounded-md bg-background px-3 py-2 text-xs lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
+                        className="grid gap-2 rounded-lg bg-background px-3 py-2 text-xs lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"
                       >
                         <div className="space-y-1">
                           <p className="font-mono text-[11px] text-foreground">{namedRange}</p>

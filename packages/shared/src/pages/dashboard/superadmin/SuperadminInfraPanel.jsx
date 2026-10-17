@@ -12,8 +12,8 @@ import {
 import { notifyError, notifySuccess } from "@/services/notify";
 
 const STATUS_CLASS = {
-  ok: "text-emerald-700 dark:text-emerald-300",
-  warn: "text-amber-700 dark:text-amber-300",
+  ok: "text-success",
+  warn: "text-warning",
   down: "text-destructive",
   unknown: "text-muted-foreground",
 };
@@ -80,7 +80,7 @@ export function SuperadminInfraPanel() {
 
   return (
     <Card className="shadow-soft">
-      <CardContent className="space-y-3 !p-3 sm:!p-4">
+      <CardContent className="space-y-3">
         <div>
           <p className="text-sm font-medium">Hạ tầng</p>
         </div>

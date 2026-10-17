@@ -18,6 +18,7 @@ import {
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 const P_REVIEW = "registrations.review";
 
@@ -27,13 +28,10 @@ const USER_TABS = [
   { id: "review", label: "Duyệt đăng ký" },
 ];
 
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
-
 function registrationBadgeClass(status) {
   switch (status) {
     case "PENDING_APPROVAL":
-      return "bg-amber-500/15 text-amber-800 dark:text-amber-200";
+      return "bg-warning/15 text-warning";
     case "REJECTED":
       return "bg-destructive/15 text-destructive";
     case "APPROVED":
@@ -176,7 +174,7 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
         <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
           Người dùng
         </p>
-        <h2 className="text-2xl font-semibold">Người dùng trong đơn vị</h2>
+        <h2 className="text-xl font-semibold">Người dùng trong đơn vị</h2>
       </div>
 
       <div role="tablist" aria-label="Nghiệp vụ người dùng" className="flex flex-wrap gap-1 border-b border-border">
@@ -215,7 +213,7 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
                 return (
                   <div
                     key={user.id}
-                    className="rounded-2xl border bg-background px-4 py-4 shadow-soft"
+                    className="rounded-xl border bg-background px-4 py-4 shadow-soft"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="min-w-0">

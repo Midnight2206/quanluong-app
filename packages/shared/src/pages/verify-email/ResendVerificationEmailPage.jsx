@@ -68,14 +68,14 @@ export function ResendVerificationEmailPage() {
   return (
     <div className="mx-auto flex max-w-md flex-col gap-6 px-4 py-12">
       <div className="flex flex-col items-center gap-3 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Mail className="size-7" aria-hidden />
         </div>
         <h1 className="text-xl font-semibold">Gửi lại email xác minh</h1>
       </div>
 
       {isAuthenticated ? (
-        <div className="space-y-4 rounded-2xl border border-border/80 bg-card/50 p-5 shadow-sm">
+        <div className="space-y-4 rounded-xl border border-border/80 bg-card/50 p-5 shadow-sm">
           <p className="text-sm text-muted-foreground">
             Gửi lại thư tới <span className="font-medium text-foreground">{user?.email}</span>
           </p>
@@ -93,7 +93,7 @@ export function ResendVerificationEmailPage() {
           </Button>
         </div>
       ) : (
-        <form className="space-y-4 rounded-2xl border border-border/80 bg-card/50 p-5 shadow-sm" onSubmit={sendAsGuest} noValidate>
+        <form className="space-y-4 rounded-xl border border-border/80 bg-card/50 p-5 shadow-sm" onSubmit={sendAsGuest} noValidate>
           <label className="block space-y-2" htmlFor="ql-resend-verification-email">
             <span className="text-sm font-medium">Email đã đăng ký</span>
             <input
@@ -101,7 +101,7 @@ export function ResendVerificationEmailPage() {
               name="email"
               type="email"
               autoComplete="email"
-              className="w-full px-4 py-3 text-sm transition border outline-none rounded-2xl bg-background ring-0 focus:border-primary"
+              className="w-full px-4 py-3 text-sm transition border outline-none rounded-xl bg-background ring-0 focus:border-primary"
               placeholder="ban@example.com"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}

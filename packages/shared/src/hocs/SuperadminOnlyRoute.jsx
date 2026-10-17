@@ -28,7 +28,7 @@ export function SuperadminOnlyRoute({ children }) {
   if (user?.type?.name !== "superadmin") {
     return (
       <div className="mx-auto flex max-w-md flex-col gap-4 p-6 text-center">
-        <h1 className="text-lg font-semibold text-foreground">Cổng quản trị hệ thống</h1>
+        <h1 className="text-xl font-semibold text-foreground">Cổng quản trị hệ thống</h1>
         <p className="text-sm text-muted-foreground">
           Chỉ tài khoản superadmin đăng nhập tại địa chỉ này. Bạn có thể quay lại ứng dụng chính.
         </p>

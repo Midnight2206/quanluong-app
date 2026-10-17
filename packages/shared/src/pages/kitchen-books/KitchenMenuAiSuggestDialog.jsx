@@ -105,7 +105,7 @@ export function KitchenMenuAiSuggestDialog({
         </div>
         <div className="flex-1 space-y-3 overflow-y-auto overscroll-contain p-4" data-local-scroll="true">
           {(warnings || []).length > 0 ? (
-            <ul className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+            <ul className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
               {warnings.map((w, i) => (
                 <li key={i}>{w}</li>
               ))}
@@ -117,7 +117,7 @@ export function KitchenMenuAiSuggestDialog({
               return null;
             }
             return (
-              <section key={p} className="rounded-md border border-border">
+              <section key={p} className="rounded-lg border border-border">
                 <header className="border-b border-border bg-muted/30 px-3 py-1.5 text-sm font-semibold">
                   {MEAL_PERIOD_LABELS[p]}
                 </header>
@@ -144,9 +144,9 @@ export function KitchenMenuAiSuggestDialog({
                             </td>
                             <td className="px-3 py-1 align-top">
                               {line?.mapped ? (
-                                <span className="text-xs text-emerald-700 dark:text-emerald-300">OK</span>
+                                <span className="text-xs text-success">OK</span>
                               ) : (
-                                <span className="text-xs text-amber-700 dark:text-amber-300">Chưa</span>
+                                <span className="text-xs text-warning">Chưa</span>
                               )}
                             </td>
                           </tr>

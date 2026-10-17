@@ -80,7 +80,7 @@ export function ResetPasswordPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold">Đặt lại mật khẩu</h1>
+        <h1 className="text-xl font-semibold">Đặt lại mật khẩu</h1>
         <p className="text-sm text-muted-foreground">Nhập mật khẩu mới (tối thiểu 8 ký tự).</p>
       </div>
 
@@ -91,7 +91,7 @@ export function ResetPasswordPage() {
             <input
               type={showPw ? "text" : "password"}
               autoComplete="new-password"
-              className="w-full rounded-2xl border bg-background py-3 pl-4 pr-12 text-sm outline-none ring-0 transition focus:border-primary"
+              className="w-full rounded-xl border bg-background py-3 pl-4 pr-12 text-sm outline-none ring-0 transition focus:border-primary"
               {...register("newPassword")}
               id="ql-reset-new-password"
             />
@@ -115,7 +115,7 @@ export function ResetPasswordPage() {
             <input
               type={showPw2 ? "text" : "password"}
               autoComplete="new-password"
-              className="w-full rounded-2xl border bg-background py-3 pl-4 pr-12 text-sm outline-none ring-0 transition focus:border-primary"
+              className="w-full rounded-xl border bg-background py-3 pl-4 pr-12 text-sm outline-none ring-0 transition focus:border-primary"
               {...register("confirmNewPassword")}
               id="ql-reset-confirm-password"
             />

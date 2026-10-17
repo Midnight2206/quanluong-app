@@ -19,9 +19,7 @@ import {
   openLttpIssueSlipPdfInTab,
   openLttpIssueSlipsMergedPdfInTab,
 } from "./lttpIssueSlipPdfOpen";
-
-const inputClass =
-  "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 function localYmd(d = new Date()) {
   const y = d.getFullYear();

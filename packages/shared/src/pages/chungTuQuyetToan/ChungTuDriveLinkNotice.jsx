@@ -18,14 +18,14 @@ export function ChungTuDriveLinkNotice({ className }) {
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2.5",
+        "flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/35 bg-warning/10 px-3 py-2.5",
         className,
       )}
       role="status"
     >
       <div className="flex min-w-0 items-center gap-2">
-        <HardDrive className="size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
-        <p className="text-xs font-medium text-amber-950 dark:text-amber-50">
+        <HardDrive className="size-4 shrink-0 text-warning" aria-hidden />
+        <p className="text-xs font-medium text-warning">
           Cần liên kết Google Drive để chọn mẫu chứng từ.
         </p>
       </div>

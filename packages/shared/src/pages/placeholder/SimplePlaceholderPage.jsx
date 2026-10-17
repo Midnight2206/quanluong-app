@@ -5,13 +5,13 @@ export function SimplePlaceholderPage({ title, description }) {
     <section className="space-y-6">
       <div data-sticky-level="0" className="unified-sticky-surface py-1">
         <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">{title}</p>
-        <h2 className="text-2xl font-semibold">{title}</h2>
+        <h2 className="text-xl font-semibold">{title}</h2>
         {description ? (
           <p className="mt-2 text-sm text-muted-foreground">{description}</p>
         ) : null}
       </div>
       <Card>
-        <CardContent className="pt-6">
+        <CardContent>
           <p className="text-sm text-muted-foreground">
             Trang đang được xây dựng. Quay lại sau để sử dụng đầy đủ tính năng.
           </p>

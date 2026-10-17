@@ -5,7 +5,7 @@ export function SupplierHomePage() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-3 py-6 sm:px-4">
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">LTTP</p>
-        <h1 className="text-2xl font-semibold text-foreground">Cổng nhà cung cấp</h1>
+        <h1 className="text-xl font-semibold text-foreground">Cổng nhà cung cấp</h1>
       </div>
 
       <div className="flex flex-wrap gap-2">

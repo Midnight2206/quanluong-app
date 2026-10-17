@@ -1,3 +1,4 @@
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -67,17 +68,19 @@ import {
 } from "./LttpIssueSlipWizard";
 import { LttpIssueSlipMobileLineCard } from "./LttpIssueSlipMobileLineCard";
 import { applyIssueSlipAiPreview } from "./applyIssueSlipAiPreview.js";
-import { LttpIssueSlipAiSuggestDialog } from "./LttpIssueSlipAiSuggestDialog.jsx";
+import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
-const inputClass =
-  "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary sm:text-sm";
+// Code-split rarely opened dialogs/panels out of the route bundle.
+const LttpIssueSlipAiSuggestDialog = dynamic(() =>
+  import("./LttpIssueSlipAiSuggestDialog.jsx").then((m) => m.LttpIssueSlipAiSuggestDialog),
+);
 
 /** Ô nhập trong bảng phiếu xuất — gọn để không kéo cao / rộng dòng. */
 const tableInputClass =
-  "w-full min-w-0 rounded-md border border-border bg-background px-1 py-1 text-[11px] outline-none focus:border-primary";
+  "w-full min-w-0 rounded-lg border border-border bg-background px-1 py-1 text-[11px] outline-none focus:border-primary";
 
 const tableQtyDisplayClass =
-  "flex h-7 items-center justify-center rounded-md border border-border bg-muted/35 px-0.5 text-center text-[10px] tabular-nums text-muted-foreground";
+  "flex h-7 items-center justify-center rounded-lg border border-border bg-muted/35 px-0.5 text-center text-[10px] tabular-nums text-muted-foreground";
 
 function emptyHeaderTouched() {
   return {
@@ -365,7 +368,7 @@ function IssueSlipCommoditySearch({
     createPortal(
       <ul
         data-local-scroll="true"
-        className="fixed z-[120] max-h-52 overflow-y-auto rounded-md border border-border bg-card py-1 text-left text-xs text-card-foreground shadow-float"
+        className="fixed z-[120] max-h-52 overflow-y-auto rounded-lg border border-border bg-card py-1 text-left text-xs text-card-foreground shadow-float"
         style={{
           top: anchor.bottom + 6,
           left: anchor.left,
@@ -415,7 +418,7 @@ function IssueSlipCommoditySearch({
         className={cn(
           inputClass,
           "truncate",
-          dupRow && "border-red-500/90 dark:border-red-400/80",
+          dupRow && "border-destructive/90",
         )}
         title={(query || selectedLabel || "").trim() || undefined}
         value={query}
@@ -1731,7 +1734,7 @@ export function LttpPhieuXuatTab({
     <div className="space-y-4 text-xs">
       <div className="print:hidden space-y-3">
         {isEditMode ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-amber-300/70 bg-amber-50/70 p-3 text-[11px] text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100">
+          <div className="flex flex-col gap-2 rounded-lg border border-warning/70 bg-warning/10 p-3 text-[11px] text-warning sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 space-y-0.5">
               <p className="font-medium">
                 Đang sửa phiếu — Quyển{" "}
@@ -1836,7 +1839,7 @@ export function LttpPhieuXuatTab({
             role="dialog"
             aria-modal="true"
             aria-labelledby="lttp-px-settings-title"
-            className="relative flex max-h-dvh w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[42rem] sm:rounded-2xl"
+            className="relative flex max-h-dvh w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[42rem] sm:rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border bg-card px-4 pb-3 pt-4 sm:px-5">
@@ -2175,7 +2178,7 @@ export function LttpPhieuXuatTab({
           thủ công).
         </p>
         {hasDuplicateCommodityInForm ? (
-          <p className="rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1.5 text-[11px] font-medium leading-snug text-destructive dark:bg-destructive/20">
+          <p className="rounded-lg border border-destructive/50 bg-destructive/10 px-2 py-1.5 text-[11px] font-medium leading-snug text-destructive dark:bg-destructive/20">
             {LTTP_ISSUE_SLIP_LINE_ISSUES_BANNER}
           </p>
         ) : null}
@@ -2360,7 +2363,7 @@ export function LttpPhieuXuatTab({
                     className={cn(
                       "border-b border-border/50 transition-colors",
                       dupRow &&
-                        "border-l-[3px] border-l-red-600 bg-red-500/12 dark:border-l-red-400 dark:bg-red-950/35",
+                        "border-l-[3px] border-l-red-600 bg-destructive/12 dark:border-l-red-400",
                     )}
                     title={
                       dupRow
@@ -2371,7 +2374,7 @@ export function LttpPhieuXuatTab({
                     <td
                       className={cn(
                         "px-1 py-1 text-[10px] text-muted-foreground",
-                        dupRow && "text-red-900 dark:text-red-100/95",
+                        dupRow && "text-destructive",
                       )}
                     >
                       {i + 1}
@@ -2393,7 +2396,7 @@ export function LttpPhieuXuatTab({
                         className={cn(
                           tableInputClass,
                           "max-w-full truncate",
-                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                          dupRow && "border-destructive/90",
                         )}
                         title={supplierForRow?.name ?? undefined}
                         value={
@@ -2425,7 +2428,7 @@ export function LttpPhieuXuatTab({
                           className={cn(
                             tableInputClass,
                             "min-w-0 flex-1 font-mono text-[10px]",
-                            dupRow && "border-red-500/90 dark:border-red-400/80",
+                            dupRow && "border-destructive/90",
                           )}
                           value={r.codeDraft}
                           onChange={(e) =>
@@ -2449,7 +2452,7 @@ export function LttpPhieuXuatTab({
                         <span
                           className={cn(
                             "w-7 shrink-0 truncate text-center text-[9px] text-muted-foreground",
-                            dupRow && "text-red-900/90 dark:text-red-100/90",
+                            dupRow && "text-destructive/90",
                           )}
                           title={c?.measureUnit ?? undefined}
                         >
@@ -2461,7 +2464,7 @@ export function LttpPhieuXuatTab({
                       <div
                         className={cn(
                           tableQtyDisplayClass,
-                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                          dupRow && "border-destructive/90",
                         )}
                         aria-readonly
                       >
@@ -2476,7 +2479,7 @@ export function LttpPhieuXuatTab({
                       <div
                         className={cn(
                           tableQtyDisplayClass,
-                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                          dupRow && "border-destructive/90",
                         )}
                         aria-readonly
                       >
@@ -2497,7 +2500,7 @@ export function LttpPhieuXuatTab({
                         const tgsxDisabled = rowDisabled || r.tgsxPrice == null;
                         const boxClass = cn(
                           "size-2.5 shrink-0 rounded border-border accent-primary",
-                          dupRow && "border-red-500/90",
+                          dupRow && "border-destructive/90",
                         );
                         const labelClass = cn(
                           "inline-flex shrink-0 cursor-pointer select-none items-center gap-px leading-none",
@@ -2516,7 +2519,7 @@ export function LttpPhieuXuatTab({
                                 tableInputClass,
                                 "min-w-[2rem] max-w-[3.25rem] shrink-0 text-center tabular-nums",
                                 dupRow &&
-                                  "border-red-500/90 dark:border-red-400/80",
+                                  "border-destructive/90",
                               )}
                               value={quantityInputDisplay(r.quantity)}
                               onChange={(e) => {
@@ -2597,7 +2600,7 @@ export function LttpPhieuXuatTab({
                     <td
                       className={cn(
                         "max-w-0 truncate px-1 py-1 text-right tabular-nums text-[10px]",
-                        dupRow && "text-red-950 dark:text-red-50/95",
+                        dupRow && "text-destructive",
                       )}
                       title={
                         r.unitPrice != null || r.tgsxPrice != null
@@ -2613,7 +2616,7 @@ export function LttpPhieuXuatTab({
                     <td
                       className={cn(
                         "max-w-0 truncate px-1 py-1 text-right tabular-nums text-[10px]",
-                        dupRow && "text-red-950 dark:text-red-50/95",
+                        dupRow && "text-destructive",
                       )}
                       title={formatVnd(lineTotal(r))}
                     >
@@ -2624,7 +2627,7 @@ export function LttpPhieuXuatTab({
                         className={cn(
                           tableInputClass,
                           "text-[10px]",
-                          dupRow && "border-red-500/90 dark:border-red-400/80",
+                          dupRow && "border-destructive/90",
                         )}
                         value={r.lineNote ?? ""}
                         onChange={(e) =>

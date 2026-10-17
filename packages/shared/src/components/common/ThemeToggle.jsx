@@ -38,7 +38,7 @@ function ThemePanel() {
             role="radio"
             aria-checked={theme === id}
             className={cn(
-              "inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition",
+              "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition",
               theme === id ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted",
             )}
             onClick={() => {

@@ -29,7 +29,7 @@ function isUnitRowVisible(unit, byId, expandedIds) {
 }
 
 const treeRowBtn =
-  "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const EMPTY_DEPTHS = [];
 const EMPTY_PERMISSIONS = [];
@@ -333,7 +333,7 @@ export function SuperadminPermissionMatrixPanel() {
                       <li key={u.id}>
                         <div
                           className={cn(
-                            "flex min-w-0 items-center gap-0.5 rounded-md pr-1 transition",
+                            "flex min-w-0 items-center gap-0.5 rounded-lg pr-1 transition",
                             isSelected ? "bg-primary/10 ring-1 ring-primary/25" : "hover:bg-background/70",
                           )}
                           style={{ paddingLeft: indentPx }}
@@ -444,7 +444,7 @@ export function SuperadminPermissionMatrixPanel() {
               {moduleKeys.map((mod) => {
                 const isModuleOpen = expandedModules.has(mod);
                 return (
-                  <div key={mod} className="rounded-md border border-border/40 bg-background/50">
+                  <div key={mod} className="rounded-lg border border-border/40 bg-background/50">
                     <div className="flex flex-wrap items-center gap-2 border-b border-border/40 px-2 py-1.5">
                       <button
                         type="button"
@@ -483,7 +483,7 @@ export function SuperadminPermissionMatrixPanel() {
                         {(byModule.get(mod) || []).map((p) => (
                           <li key={p.id}>
                             <label
-                              className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-0.5 hover:bg-muted/40"
+                              className="flex cursor-pointer items-start gap-2 rounded-lg px-1 py-0.5 hover:bg-muted/40"
                               htmlFor={`ql-perm-matrix-${p.id}`}
                             >
                               <input

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Users } from "lucide-react";
@@ -15,7 +16,11 @@ import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpOrderingTab } from "./LttpOrderingTab";
 import { LttpSignatureSettingsTab } from "./LttpSignatureSettingsTab";
-import { LttpNguoiNhanBulkModal } from "./LttpNguoiNhanBulkModal";
+
+// Code-split rarely opened dialogs/panels out of the route bundle.
+const LttpNguoiNhanBulkModal = dynamic(() =>
+  import("./LttpNguoiNhanBulkModal").then((m) => m.LttpNguoiNhanBulkModal),
+);
 
 const LTTP_TAB_PERSIST_ID = "lttp-nhap-xuat";
 /** Khớp thư mục `app/.../lttp-nhap-xuat/ordering-lttp/` */
@@ -240,7 +245,7 @@ export function LttpNhapXuatPage() {
       ) : null}
 
       <Card className="shadow-soft">
-        <CardContent className="!p-3 sm:!p-4">
+        <CardContent>
           {effectiveUnitId == null ? (
             <p className="text-xs text-destructive">Chưa có đơn vị làm việc — gán đơn vị cho tài khoản.</p>
           ) : (

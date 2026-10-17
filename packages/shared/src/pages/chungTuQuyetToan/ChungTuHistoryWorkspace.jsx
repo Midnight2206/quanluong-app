@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Archive, Download, Eye, FolderOpen, Loader2, Printer, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
@@ -30,13 +31,19 @@ import { useConfirm } from "@/contexts/ConfirmProvider";
 import { formatPeriodLabel, formatPeriodMonth } from "@/pages/chungTuQuyetToan/chungTuFormat";
 import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScope";
 import { ChungTuExportWizardCard } from "./ChungTuExportWizard";
-import { ChungTuBkmhSliceSummaryPanel } from "./ChungTuBkmhSliceSummaryPanel.jsx";
-import { ChungTuPnkBatchSummaryPanel } from "./ChungTuPnkBatchSummaryPanel.jsx";
-import { ChungTuReExportDialog } from "./ChungTuReExportDialog.jsx";
 import { formatVnd } from "@/utils/formatVnd";
+import { fieldClass } from "@/utils/fieldClass";
 
-const fieldClass =
-  "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
+// Code-split rarely opened dialogs/panels out of the route bundle.
+const ChungTuBkmhSliceSummaryPanel = dynamic(() =>
+  import("./ChungTuBkmhSliceSummaryPanel.jsx").then((m) => m.ChungTuBkmhSliceSummaryPanel),
+);
+const ChungTuPnkBatchSummaryPanel = dynamic(() =>
+  import("./ChungTuPnkBatchSummaryPanel.jsx").then((m) => m.ChungTuPnkBatchSummaryPanel),
+);
+const ChungTuReExportDialog = dynamic(() =>
+  import("./ChungTuReExportDialog.jsx").then((m) => m.ChungTuReExportDialog),
+);
 
 const PDF_FILES_MISSING_MESSAGE =
   "File PDF không còn trên máy chủ. Bấm Xuất lại để tạo lại từ dữ liệu lần xuất trước.";
@@ -44,7 +51,7 @@ const PDF_FILES_MISSING_MESSAGE =
 function PdfFilesMissingNotice({ show }) {
   if (!show) return null;
   return (
-    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-foreground">
+    <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs leading-snug text-foreground">
       {PDF_FILES_MISSING_MESSAGE}
     </p>
   );

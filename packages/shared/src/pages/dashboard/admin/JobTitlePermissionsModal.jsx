@@ -58,7 +58,7 @@ export function JobTitlePermissionsModal({
         aria-modal="true"
         aria-labelledby="job-title-perm-modal-title"
         className={cn(
-          "relative flex max-h-[min(92dvh,48rem)] w-full max-w-3xl flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-2xl",
+          "relative flex max-h-[min(92dvh,48rem)] w-full max-w-3xl flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl",
         )}
       >
         <div className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">

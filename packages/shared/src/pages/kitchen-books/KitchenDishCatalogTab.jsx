@@ -19,7 +19,7 @@ import { KitchenCommodityPicker } from "./KitchenCommodityPicker.jsx";
 import { KitchenBooksUnitPicker } from "./KitchenBooksUnitPicker.jsx";
 
 const inputClass =
-  "w-full min-w-0 rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary";
+  "w-full min-w-0 rounded-lg border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary";
 
 const MEAL_PERIOD_LABELS = { sang: "Sáng", trua: "Trưa", chieu: "Chiều" };
 
@@ -151,7 +151,7 @@ function CatalogEditor({ unitId, item, commodities, onClose, onSaved }) {
       </div>
       <div className="space-y-3">
         {lines.map((line, idx) => (
-          <div key={idx} className="rounded-md border border-border/80 p-3">
+          <div key={idx} className="rounded-lg border border-border/80 p-3">
             <div className="mb-2 flex items-start justify-between gap-2">
               <span className="text-xs font-medium text-muted-foreground">Nguyên liệu #{idx + 1}</span>
               <button

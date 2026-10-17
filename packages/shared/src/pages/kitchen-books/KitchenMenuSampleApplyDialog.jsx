@@ -80,7 +80,7 @@ export function KitchenMenuSampleApplyDialog({ open, onClose, sample, unitId }) 
         </div>
         <label className="grid gap-1 p-4 text-sm">
           <span>Ngày áp dụng</span>
-          <input type="date" className="rounded-md border border-border bg-background px-3 py-2" value={date} onChange={(event) => setDate(event.target.value)} required autoFocus />
+          <input type="date" className="rounded-lg border border-border bg-background px-3 py-2" value={date} onChange={(event) => setDate(event.target.value)} required autoFocus />
         </label>
         <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
           <Button type="button" variant="outline" onClick={onClose} disabled={applying}>

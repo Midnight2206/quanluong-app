@@ -22,7 +22,7 @@ export function DashboardUserRowCard({
           <p className="truncate text-xs text-muted-foreground">{user.email}</p>
         </div>
         <span
-          className="shrink-0 rounded-md bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground"
+          className="shrink-0 rounded-lg bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground"
           aria-label={user.isActive ? "Đang hoạt động" : "Đã vô hiệu"}
         >
           {user.isActive ? "HT" : "—"}

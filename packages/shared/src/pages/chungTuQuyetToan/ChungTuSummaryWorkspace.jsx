@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
@@ -13,11 +14,15 @@ import { cn } from "@/utils/cn";
 import { formatPeriodMonth } from "@/pages/chungTuQuyetToan/chungTuFormat";
 import { useChungTuUnitScope } from "@/pages/chungTuQuyetToan/useChungTuUnitScope";
 import { ChungTuExportWizardCard } from "./ChungTuExportWizard";
-import { ChungTuBkmhSliceSummaryPanel } from "./ChungTuBkmhSliceSummaryPanel.jsx";
-import { ChungTuPnkBatchSummaryPanel } from "./ChungTuPnkBatchSummaryPanel.jsx";
+import { fieldClass } from "@/utils/fieldClass";
 
-const fieldClass =
-  "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary";
+// Code-split rarely opened dialogs/panels out of the route bundle.
+const ChungTuBkmhSliceSummaryPanel = dynamic(() =>
+  import("./ChungTuBkmhSliceSummaryPanel.jsx").then((m) => m.ChungTuBkmhSliceSummaryPanel),
+);
+const ChungTuPnkBatchSummaryPanel = dynamic(() =>
+  import("./ChungTuPnkBatchSummaryPanel.jsx").then((m) => m.ChungTuPnkBatchSummaryPanel),
+);
 
 const exportTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   dateStyle: "short",

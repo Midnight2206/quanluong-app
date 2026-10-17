@@ -120,7 +120,7 @@ export function SuperadminBackupPanel() {
 
   return (
     <Card className="shadow-soft">
-      <CardContent className="space-y-3 !p-3 sm:!p-4">
+      <CardContent className="space-y-3">
         <div>
           <p className="text-sm font-medium">Backup dữ liệu</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">

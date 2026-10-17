@@ -130,7 +130,7 @@ export function SupplierShell({ children }) {
             <div
               role="menu"
               className={cn(
-                "absolute right-0 top-full z-50 mt-2 w-64 origin-top-right rounded-2xl border border-border bg-card p-2 shadow-lg transition duration-200 ease-out",
+                "absolute right-0 top-full z-50 mt-2 w-64 origin-top-right rounded-xl border border-border bg-card p-2 shadow-lg transition duration-200 ease-out",
                 accountOpen
                   ? "pointer-events-auto translate-y-0 opacity-100"
                   : "pointer-events-none -translate-y-1 opacity-0",
