@@ -81,7 +81,7 @@ export function ChungTuReExportDialog({
         disabled={submitting}
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-t-2xl border border-border bg-background shadow-lg sm:rounded-xl">
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-t-xl border border-border bg-background shadow-lg sm:rounded-xl">
         <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0 space-y-1">
             <h2 id="chung-tu-reexport-title" className="text-sm font-semibold text-foreground">

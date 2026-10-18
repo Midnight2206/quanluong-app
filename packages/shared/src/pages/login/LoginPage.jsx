@@ -217,10 +217,6 @@ export function LoginPage() {
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-xl font-semibold">Đăng nhập vào hệ thống</h1>
-        <p className="text-sm text-muted-foreground">
-          Sử dụng tên đăng nhập hoặc email cùng với mật khẩu, hoặc đăng nhập
-          bằng Google nếu email đã đăng ký trong hệ thống.
-        </p>
       </div>
 
       <Button

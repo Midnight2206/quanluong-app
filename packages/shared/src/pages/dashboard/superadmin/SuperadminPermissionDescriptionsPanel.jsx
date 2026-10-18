@@ -131,7 +131,7 @@ export function SuperadminPermissionDescriptionsPanel() {
                   <div
                     key={row.id}
                     className={cn(
-                      "rounded-xl border border-border/70 bg-card/80 px-3 py-3 sm:px-4",
+                      "rounded-xl border border-border/70 bg-card px-3 py-3 sm:px-4",
                     )}
                   >
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:gap-4">

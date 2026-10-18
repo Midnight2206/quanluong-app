@@ -80,7 +80,7 @@ export function SupplierShell({ children }) {
         <div className="flex h-14 items-center gap-2 px-3 sm:gap-3 sm:px-4">
           <button
             type="button"
-            className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-background text-foreground transition hover:bg-secondary md:hidden"
+            className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-background text-foreground transition-colors duration-150 hover:bg-secondary md:hidden"
             aria-expanded={navOpen}
             aria-controls="supplier-nav"
             onClick={() => setNavOpen((open) => !open)}
@@ -116,7 +116,7 @@ export function SupplierShell({ children }) {
 
             <button
               type="button"
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-2 text-sm shadow-sm transition hover:border-primary/40"
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-background px-2 text-sm transition-colors duration-150 hover:border-primary/40"
               aria-expanded={accountOpen}
               aria-haspopup="menu"
               onClick={() => setAccountOpen((open) => !open)}
@@ -140,7 +140,7 @@ export function SupplierShell({ children }) {
               <button
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-secondary"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm hover:bg-secondary"
                 onClick={() => {
                   setAccountOpen(false);
                   router.push("/settings");
@@ -152,7 +152,7 @@ export function SupplierShell({ children }) {
               <button
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-secondary"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm hover:bg-secondary"
                 onClick={() => {
                   setAccountOpen(false);
                   router.push("/profile");
@@ -164,7 +164,7 @@ export function SupplierShell({ children }) {
               <button
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-destructive hover:bg-secondary"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm text-destructive hover:bg-secondary"
                 onClick={handleLogout}
                 disabled={isLoggingOut}
               >

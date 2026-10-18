@@ -113,7 +113,7 @@ export function ConflictReviewDialog({
         aria-modal="true"
         aria-labelledby="conflict-review-title"
         className={cn(
-          "relative flex max-h-[min(90vh,640px)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl",
+          "relative flex max-h-[min(90vh,640px)] w-full max-w-lg flex-col rounded-t-xl border border-border bg-card shadow-lg sm:rounded-xl",
         )}
       >
         <div className="border-b border-border p-4 sm:p-5">

@@ -639,7 +639,7 @@ export function SuperadminChungTuPdfCategoryTemplates({ categoryKey }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={fieldLabelsTitleId}
-            className="relative flex max-h-dvh w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[44rem] sm:rounded-xl"
+            className="relative flex max-h-dvh w-full max-w-4xl flex-col overflow-hidden rounded-t-xl border border-border bg-card shadow-lg sm:max-h-[44rem] sm:rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border bg-card px-4 py-3 sm:px-5">

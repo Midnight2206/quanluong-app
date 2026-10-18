@@ -557,7 +557,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
               {monthlyRows.map((item) => {
                 const creatorLabel = formatCreatorLabel(item, currentUser);
                 return (
-                  <div key={item.id} className="space-y-3 rounded-xl border border-border/70 bg-card/30 p-3 sm:p-4">
+                  <div key={item.id} className="space-y-3 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1 space-y-1">
                         <p className="flex items-center gap-2 text-sm font-semibold leading-snug text-foreground">
@@ -769,7 +769,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
 
               if (isFolderSummaryCategory) {
                 return (
-                  <div key={item.batchKey} className="space-y-3 rounded-xl border border-border/70 bg-card/30 p-3 sm:p-4">
+                  <div key={item.batchKey} className="space-y-3 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
                     {batchHeader}
                     <PdfFilesMissingNotice show={item.pdfFilesPresent === false} />
                     <div className="flex flex-wrap gap-2">
@@ -861,7 +861,7 @@ export function ChungTuHistoryWorkspace({ categoryKey, exportKind }) {
               return (
                 <details
                   key={item.batchKey}
-                  className="rounded-xl border border-border/70 bg-card/30"
+                  className="rounded-xl border border-border/70 bg-card"
                 >
                   <summary className="cursor-pointer list-none space-y-3 px-3 py-3 sm:px-4">
                     {batchHeader}

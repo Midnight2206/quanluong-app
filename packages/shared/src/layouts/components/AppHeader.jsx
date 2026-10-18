@@ -57,7 +57,7 @@ export function AppHeader() {
   };
 
   return (
-    <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b bg-card/95 px-4 backdrop-blur print:hidden sm:px-5 lg:px-6">
+    <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b bg-card px-4 print:hidden sm:px-5 lg:px-6">
       <div className="flex items-center min-w-0 gap-3">
         <AppBrand compact />
       </div>
@@ -65,19 +65,20 @@ export function AppHeader() {
       <div className="flex items-center gap-2 ml-auto sm:gap-3" ref={menuRef}>
         <button
           type="button"
-          className="inline-flex items-center justify-center w-10 h-10 transition rounded-full text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+          aria-label="Thông báo"
+          className="inline-flex items-center justify-center w-10 h-10 transition-colors duration-150 rounded-full text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
         >
-          <Bell className="w-5 h-5" />
+          <Bell className="w-5 h-5" aria-hidden />
         </button>
         {user && chatDock ? (
           <button
             type="button"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-secondary-foreground"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-secondary-foreground"
             title="Tin nhắn"
             aria-label="Mở tin nhắn"
             onClick={() => chatDock.setHubOpen(true)}
           >
-            <MessageCircle className="h-5 w-5" />
+            <MessageCircle className="h-5 w-5" aria-hidden />
             {chatDock.unreadChatTotal > 0 ? (
               <span className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground">
                 {chatDock.unreadChatTotal > 99 ? "99+" : chatDock.unreadChatTotal}
@@ -88,7 +89,9 @@ export function AppHeader() {
         {user ? (
           <button
             type="button"
-            className="flex items-center gap-2 px-1 py-1 pr-3 transition border rounded-full bg-background shadow-soft hover:border-primary/30"
+            aria-label="Tài khoản"
+            aria-haspopup="menu"
+            className="flex items-center gap-2 px-1 py-1 pr-3 transition-colors duration-150 border rounded-full bg-background hover:border-primary/40"
             onClick={() => setIsMenuOpen((value) => !value)}
           >
             <div className="relative shrink-0">
@@ -113,14 +116,14 @@ export function AppHeader() {
           <div className="flex items-center gap-2">
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition border rounded-full bg-background shadow-soft hover:border-primary/30"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors duration-150 border rounded-lg bg-background hover:border-primary/40"
             >
               <LogIn className="w-4 h-4" />
               Đăng nhập
             </Link>
             <Link
               href="/register"
-              className="hidden px-4 py-2 text-sm font-medium transition rounded-full bg-primary text-primary-foreground shadow-soft hover:opacity-90 sm:inline-flex"
+              className="hidden px-4 py-2 text-sm font-medium transition-colors duration-150 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 sm:inline-flex"
             >
               Đăng ký
             </Link>
@@ -129,7 +132,7 @@ export function AppHeader() {
 
         <div
           className={cn(
-            "absolute right-0 top-[calc(100%+0.75rem)] z-30 w-[min(22rem,calc(100vw-2rem))] rounded-3xl border bg-card p-4 shadow-float transition",
+            "absolute right-0 top-[calc(100%+0.75rem)] z-30 w-[min(22rem,calc(100vw-2rem))] rounded-xl border bg-card p-3 shadow-float transition duration-150",
             isMenuOpen && user
               ? "pointer-events-auto translate-y-0 opacity-100"
               : "pointer-events-none -translate-y-2 opacity-0",
@@ -163,7 +166,7 @@ export function AppHeader() {
           <div className="mt-3 space-y-1">
             <button
               type="button"
-              className="flex items-center w-full gap-3 px-3 py-3 text-sm text-left transition rounded-xl hover:bg-secondary"
+              className="flex items-center w-full gap-3 px-3 py-2.5 text-sm text-left transition-colors duration-150 rounded-md hover:bg-secondary"
               onClick={() => {
                 setIsMenuOpen(false);
                 startNavigationIntent();
@@ -179,7 +182,7 @@ export function AppHeader() {
           <div className="pt-3 mt-3 border-t">
             <Button
               variant="ghost"
-              className="flex w-full items-center justify-start gap-3 rounded-xl px-3 py-3 text-left text-sm"
+              className="flex w-full items-center justify-start gap-3 rounded-md px-3 py-2.5 text-left text-sm"
               title="Đăng xuất"
               onClick={handleLogout}
               disabled={isLoggingOut}

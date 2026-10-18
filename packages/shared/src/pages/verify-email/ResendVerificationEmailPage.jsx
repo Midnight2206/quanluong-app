@@ -75,7 +75,7 @@ export function ResendVerificationEmailPage() {
       </div>
 
       {isAuthenticated ? (
-        <div className="space-y-4 rounded-xl border border-border/80 bg-card/50 p-5 shadow-sm">
+        <div className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-sm">
           <p className="text-sm text-muted-foreground">
             Gửi lại thư tới <span className="font-medium text-foreground">{user?.email}</span>
           </p>
@@ -93,7 +93,7 @@ export function ResendVerificationEmailPage() {
           </Button>
         </div>
       ) : (
-        <form className="space-y-4 rounded-xl border border-border/80 bg-card/50 p-5 shadow-sm" onSubmit={sendAsGuest} noValidate>
+        <form className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-sm" onSubmit={sendAsGuest} noValidate>
           <label className="block space-y-2" htmlFor="ql-resend-verification-email">
             <span className="text-sm font-medium">Email đã đăng ký</span>
             <input

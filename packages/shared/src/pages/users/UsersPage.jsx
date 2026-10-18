@@ -171,7 +171,7 @@ export function UsersPage({ initialUsers, initialUsersError = false } = {}) {
   return (
     <section className="space-y-6">
       <div>
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Người dùng
         </p>
         <h2 className="text-xl font-semibold">Người dùng trong đơn vị</h2>

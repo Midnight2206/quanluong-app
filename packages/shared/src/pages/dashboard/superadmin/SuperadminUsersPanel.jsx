@@ -325,7 +325,7 @@ export function SuperadminUsersPanel({ section = "all" } = {}) {
         <form
           data-local-commit-form="true"
           onSubmit={onCreateUser}
-          className="grid shrink-0 gap-2 rounded-lg border border-border/70 bg-card/40 p-2 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid shrink-0 gap-2 rounded-lg border border-border/70 bg-card p-2 sm:grid-cols-2 lg:grid-cols-3"
         >
           <label className="space-y-0.5" htmlFor="ql-sa-users-create-username">
             <span className="text-[11px] font-medium text-muted-foreground">
@@ -612,7 +612,7 @@ export function SuperadminUsersPanel({ section = "all" } = {}) {
               {users.map((u) => (
                 <article
                   key={u.id}
-                  className="-mx-3 rounded-none border-x-0 border-y border-border/70 bg-card/40 p-3 shadow-sm first:border-t sm:mx-0 sm:rounded-xl sm:border sm:border-border/70"
+                  className="-mx-3 rounded-none border-x-0 border-y border-border/70 bg-card p-3 shadow-sm first:border-t sm:mx-0 sm:rounded-xl sm:border sm:border-border/70"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -714,7 +714,7 @@ export function SuperadminUsersPanel({ section = "all" } = {}) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="supplier-editor-title"
-            className="relative w-full max-w-lg rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl"
+            className="relative w-full max-w-lg rounded-t-xl border border-border bg-card shadow-lg sm:rounded-xl"
           >
             <div className="space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">
               <p

@@ -899,7 +899,7 @@ export function KitchenReceiptSlipWorkspace({
       className="flex min-h-0 flex-col gap-3"
       onSubmit={(e) => void onSubmit(e)}
     >
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/70 bg-card/40 p-3">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border/70 bg-card p-3">
         <label className="space-y-0.5 text-xs">
           <span className="text-muted-foreground">Ngày phiếu</span>
           <input

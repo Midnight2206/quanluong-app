@@ -6,7 +6,7 @@ export function AppBrand({ compact = false }) {
     <div className={cn("flex items-center", compact ? "gap-2 lg:gap-3" : "gap-3")}>
       <div
         className={cn(
-          "flex items-center justify-center rounded-xl bg-[#f26f21] font-bold text-white shadow-soft",
+          "flex items-center justify-center rounded-lg bg-[#f26f21] font-bold text-white",
           compact ? "h-9 w-9 text-xs lg:h-11 lg:w-11 lg:text-sm" : "h-11 w-11 text-sm",
         )}
       >
@@ -14,7 +14,7 @@ export function AppBrand({ compact = false }) {
       </div>
       <p
         className={cn(
-          "text-xs uppercase tracking-[0.28em] text-muted-foreground",
+          "text-xs font-semibold uppercase tracking-[0.18em] text-foreground",
           compact && "hidden sm:block",
         )}
       >

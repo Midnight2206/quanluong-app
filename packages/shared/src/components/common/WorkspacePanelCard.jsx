@@ -15,10 +15,10 @@ export function WorkspacePanelCard({
   return (
     <section
       className={cn(
-        "min-w-0 border border-border/80 bg-card/50 shadow-sm",
+        "min-w-0 border border-border bg-card shadow-panel",
         expanded
-          ? "-mx-4 rounded-none border-x-0 sm:mx-0 sm:rounded-xl sm:border-x"
-          : "rounded-xl",
+          ? "-mx-4 rounded-none border-x-0 sm:mx-0 sm:rounded-lg sm:border-x"
+          : "rounded-lg",
         className,
       )}
     >

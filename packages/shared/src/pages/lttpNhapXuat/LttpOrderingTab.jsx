@@ -635,7 +635,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
 
   return (
     <div className="min-w-0 space-y-4 pb-2 print:pb-4" aria-busy={showLoader}>
-      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card/50 p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-end print:hidden">
+      <div className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-end print:hidden">
         <label className="min-w-[160px] flex-1 space-y-1" htmlFor="lttp-ordering-date">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground">Ngày đặt</span>
           <input
@@ -715,7 +715,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
         ref={orderCaptureRef}
         id="lttp-daily-order-print"
         className={cn(
-          "space-y-6 rounded-xl border border-border/60 bg-gradient-to-b from-card/80 to-card/40 px-3 py-4 shadow-sm sm:px-4 sm:py-6",
+          "space-y-6 rounded-lg border border-border bg-card px-3 py-4 shadow-panel sm:px-4 sm:py-6",
           "print:border-0 print:bg-white print:p-0 print:shadow-none",
         )}
       >
@@ -750,7 +750,7 @@ export function LttpOrderingTab({ effectiveUnitId, storageUnitName }) {
             data-lttp-ordering-card
             className="-mx-3 w-[calc(100%+1.5rem)] overflow-visible sm:-mx-4 sm:w-[calc(100%+2rem)] print:mx-0 print:w-full print:break-inside-avoid"
           >
-            <div className="mb-2 rounded-lg border border-border/70 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-3 py-2.5 sm:px-4">
+            <div className="mb-2 rounded-lg border border-border border-l-4 border-l-primary bg-muted/50 px-3 py-2.5 sm:px-4">
               <h2 className="text-balance text-xs font-semibold uppercase tracking-wide text-foreground">
                 Bảng đặt hàng theo phiếu
               </h2>

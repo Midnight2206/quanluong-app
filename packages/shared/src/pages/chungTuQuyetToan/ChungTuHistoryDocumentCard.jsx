@@ -38,8 +38,8 @@ export function ChungTuHistoryDocumentCard({
     <article
       className={cn(
         inset
-          ? "bg-card/30 px-3 py-3 sm:px-4"
-          : "rounded-xl border border-border/70 bg-card/40 p-3 shadow-sm",
+          ? "bg-card px-3 py-3 sm:px-4"
+          : "rounded-xl border border-border/70 bg-card p-3 shadow-sm",
       )}
     >
       <div className="flex items-start justify-between gap-3">

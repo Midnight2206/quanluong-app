@@ -63,7 +63,7 @@ export function ResetPasswordPage() {
         <Link
           href="/forgot-password"
           className={cn(
-            "inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-border/90 bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/90",
+            "inline-flex w-full items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/90",
           )}
         >
           Yêu cầu liên kết mới

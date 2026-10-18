@@ -68,7 +68,7 @@ export function LttpWarehouseBuyerCard({ unitId, unitLabel }) {
   }
 
   return (
-    <div className="space-y-2 rounded-lg border border-border/70 bg-card/50 p-3">
+    <div className="space-y-2 rounded-lg border border-border/70 bg-card p-3">
       <p className="text-xs font-medium text-foreground">
         Người mua kho {unitLabel ? `«${unitLabel}»` : ""}
       </p>

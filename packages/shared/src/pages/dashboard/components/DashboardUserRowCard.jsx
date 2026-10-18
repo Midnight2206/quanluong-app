@@ -15,7 +15,7 @@ export function DashboardUserRowCard({
   const displayName = user.profile?.fullName || user.username;
 
   return (
-    <article className="-mx-3 rounded-none border-x-0 border-y border-border/70 bg-card/40 p-3 shadow-sm first:border-t sm:mx-0 sm:rounded-xl sm:border sm:border-border/70">
+    <article className="-mx-3 rounded-none border-x-0 border-y border-border/70 bg-card p-3 shadow-sm first:border-t sm:mx-0 sm:rounded-xl sm:border sm:border-border/70">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground">{displayName}</p>

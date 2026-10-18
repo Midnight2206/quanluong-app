@@ -258,7 +258,7 @@ export function ChungTuPnkBatchSummaryPanel({ batch, open, onOpenChange }) {
 
       <div
         className={cn(
-          "relative z-10 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-t-2xl border border-border bg-background shadow-lg sm:rounded-xl",
+          "relative z-10 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-t-xl border border-border bg-background shadow-lg sm:rounded-xl",
         )}
       >
         <header className="flex items-start justify-between gap-3 border-b border-border px-3 py-3 sm:px-4">

@@ -15,7 +15,7 @@ export function DashboardMealRateCard({
   onDelete,
 }) {
   return (
-    <article className="-mx-3 rounded-none border-x-0 border-y border-border/70 bg-card/40 p-3 shadow-sm first:border-t sm:mx-0 sm:rounded-xl sm:border sm:border-border/70">
+    <article className="-mx-3 rounded-none border-x-0 border-y border-border/70 bg-card p-3 shadow-sm first:border-t sm:mx-0 sm:rounded-xl sm:border sm:border-border/70">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           {typeLabel(row.type)}

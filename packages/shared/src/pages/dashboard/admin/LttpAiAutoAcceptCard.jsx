@@ -57,7 +57,7 @@ export function LttpAiAutoAcceptCard({ unitId, unitLabel }) {
   const suggested = data?.suggestion?.ready ? data.suggestion.from : null;
 
   return (
-    <div className="space-y-2 rounded-lg border border-border/70 bg-card/50 p-3">
+    <div className="space-y-2 rounded-lg border border-border/70 bg-card p-3">
       <p className="text-xs font-medium text-foreground">
         AI tự chốt mã {unitLabel ? `«${unitLabel}»` : ""}
       </p>

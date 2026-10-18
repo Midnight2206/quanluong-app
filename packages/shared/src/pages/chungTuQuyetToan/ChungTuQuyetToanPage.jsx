@@ -62,7 +62,7 @@ export function ChungTuQuyetToanPage() {
       <Link
         href="/"
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-lg border-2 border-border/90 bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition print:hidden hover:bg-muted/90 hover:border-primary/35",
+          "inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition print:hidden hover:bg-muted/90 hover:border-primary/35",
         )}
       >
         Về trang chủ

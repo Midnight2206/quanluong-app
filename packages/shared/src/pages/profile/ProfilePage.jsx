@@ -90,7 +90,7 @@ async function waitForAvatarJob(queryClient, jobId) {
 }
 
 const fieldClass =
-  "w-full rounded-2xl border border-border bg-background py-3 px-4 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20";
+  "w-full rounded-lg border border-input bg-background py-2.5 px-3 text-sm outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-primary/20";
 
 function formatLockoutRemaining(totalSec) {
   const s = Math.max(0, Math.floor(totalSec));
@@ -471,9 +471,6 @@ export function ProfilePage() {
         className="unified-sticky-surface mb-6 border-b border-border/80 pb-5"
       >
         <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Trang cá nhân</h1>
-        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Cập nhật ảnh đại diện, ảnh chữ ký (ký số trên PDF), thông tin liên hệ và mật khẩu. Ảnh đại diện được xử lý qua hàng đợi khi có Redis và worker-media.
-        </p>
         {displayEmail ? (
           <p className="mt-2 text-xs text-muted-foreground">
             Đăng nhập: <span className="font-medium text-foreground">{displayEmail}</span>
@@ -487,7 +484,7 @@ export function ProfilePage() {
             <CardContent className={cn(cardBody, "pt-5")}>
               <SectionHeader icon={UserRound} title="Ảnh đại diện" />
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start lg:flex-col lg:items-center">
-                <div className="relative flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted">
+                <div className="relative flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
                   {avatarDisplaySrc ? (
                     <img src={avatarDisplaySrc} alt="" className="h-full w-full object-cover" />
                   ) : (
@@ -510,7 +507,7 @@ export function ProfilePage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="rounded-2xl"
+                      className="rounded-lg"
                       disabled={busyMedia}
                       onClick={() => filePickRef.current?.click()}
                     >
@@ -522,7 +519,7 @@ export function ProfilePage() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="rounded-2xl text-destructive hover:text-destructive"
+                        className="rounded-lg text-destructive hover:text-destructive"
                         disabled={busyMedia}
                         onClick={onDeleteAvatar}
                       >
@@ -540,7 +537,7 @@ export function ProfilePage() {
             <CardContent className={cn(cardBody, "pt-5")}>
               <SectionHeader icon={PenLine} title="Ảnh chữ ký (ký số)" />
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start lg:flex-col lg:items-center">
-                <div className="relative flex h-28 w-full max-w-[14rem] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-border bg-muted/60 px-3">
+                <div className="relative flex h-28 w-full max-w-[14rem] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/60 px-3">
                   {signatureDisplaySrc ? (
                     <img
                       src={signatureDisplaySrc}
@@ -571,7 +568,7 @@ export function ProfilePage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="rounded-2xl"
+                      className="rounded-lg"
                       disabled={busySignature}
                       onClick={() => signatureFileRef.current?.click()}
                     >
@@ -585,7 +582,7 @@ export function ProfilePage() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="rounded-2xl text-destructive hover:text-destructive"
+                        className="rounded-lg text-destructive hover:text-destructive"
                         disabled={busySignature}
                         onClick={onDeleteSignature}
                       >
@@ -630,7 +627,7 @@ export function ProfilePage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-2xl"
+                    className="rounded-lg"
                     disabled={isZaloLinkBusy}
                     onClick={handleLinkZalo}
                   >
@@ -691,7 +688,7 @@ export function ProfilePage() {
                   <span className="text-sm font-medium">Ngày sinh</span>
                   <input type="date" className={fieldClass} {...regProfile("birthday")} />
                 </label>
-                <Button type="submit" className="rounded-2xl" disabled={savingProfile}>
+                <Button type="submit" className="rounded-lg" disabled={savingProfile}>
                   {savingProfile ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
                   <span className={cn(savingProfile && "ml-2")}>Lưu hồ sơ</span>
                 </Button>
@@ -709,7 +706,7 @@ export function ProfilePage() {
               </p>
               {pwdLocked ? (
                 <div
-                  className="mb-4 flex gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-100"
+                  className="mb-4 flex gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-100"
                   role="status"
                 >
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -798,7 +795,7 @@ export function ProfilePage() {
                     <p className="text-sm text-destructive">{pwdErrors.confirmNewPassword.message}</p>
                   ) : null}
                 </label>
-                <Button type="submit" className="gap-2 rounded-2xl" disabled={busyPassword || pwdLocked}>
+                <Button type="submit" className="gap-2 rounded-lg" disabled={busyPassword || pwdLocked}>
                   {busyPassword ? (
                     <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
                   ) : (
@@ -827,11 +824,11 @@ export function ProfilePage() {
           aria-modal="true"
           aria-labelledby="crop-title"
         >
-          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-4 shadow-float">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-4 shadow-float">
             <h3 id="crop-title" className="mb-3 text-base font-semibold">
               Crop ảnh đại diện
             </h3>
-            <div className="relative h-64 w-full overflow-hidden rounded-2xl bg-muted">
+            <div className="relative h-64 w-full overflow-hidden rounded-lg bg-muted">
               <Cropper
                 image={imageSrc}
                 crop={crop}
@@ -855,10 +852,10 @@ export function ProfilePage() {
               />
             </label>
             <div className="mt-4 flex justify-end gap-2">
-              <Button type="button" variant="ghost" className="rounded-2xl" onClick={closeCropModal}>
+              <Button type="button" variant="ghost" className="rounded-lg" onClick={closeCropModal}>
                 Hủy
               </Button>
-              <Button type="button" className="rounded-2xl" onClick={confirmCropAndUpload} disabled={uploading}>
+              <Button type="button" className="rounded-lg" onClick={confirmCropAndUpload} disabled={uploading}>
                 {uploading ? <Loader2 className="size-4 animate-spin" /> : null}
                 <span className={cn(uploading && "ml-2")}>Tải lên</span>
               </Button>

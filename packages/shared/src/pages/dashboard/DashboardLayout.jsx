@@ -60,7 +60,7 @@ export function DashboardLayout({ children }) {
       <div data-sticky-level="0" className="unified-sticky-surface space-y-2">
         <header className="flex flex-wrap items-end justify-between gap-2 border-b border-border/60 pb-2">
           <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Bảng điều khiển</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bảng điều khiển</p>
             <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
               <LayoutDashboard className="h-5 w-5 text-primary" aria-hidden />
               Theo quyền được cấp
@@ -71,7 +71,7 @@ export function DashboardLayout({ children }) {
         <ScrollableHorizontalStrip
           role="tablist"
           aria-label="Mục bảng điều khiển"
-          className="border-b border-border bg-background/80 pb-px backdrop-blur-sm"
+          className="border-b border-border bg-background pb-px"
           innerClassName="flex flex-nowrap gap-0.5"
         >
           {visibleTabs.map((tab) => {

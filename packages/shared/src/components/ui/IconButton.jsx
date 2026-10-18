@@ -5,13 +5,13 @@ import { Tooltip } from "@/components/ui/Tooltip";
 const variantStyles = {
   /** Nổi trên nền muted/card — mặc định cho thao tác trong bảng */
   surface:
-    "border-2 border-border/90 bg-card text-foreground shadow-sm hover:bg-muted/90 hover:border-primary/35",
+    "border border-input bg-card text-foreground shadow-soft hover:bg-muted hover:border-primary/40",
   primary:
-    "border border-primary/25 bg-primary text-primary-foreground shadow-md shadow-primary/15 hover:brightness-[1.06] active:brightness-95",
+    "border border-primary bg-primary text-primary-foreground shadow-soft hover:bg-primary/90 active:bg-primary/85",
   ghost:
-    "border border-border/60 bg-background/85 text-foreground shadow-sm hover:bg-muted/90 hover:border-primary/28",
+    "border border-border bg-transparent text-foreground hover:bg-secondary hover:text-secondary-foreground",
   danger:
-    "border-2 border-destructive/40 bg-destructive/12 text-destructive shadow-sm hover:bg-destructive/22 hover:border-destructive/55",
+    "border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15 hover:border-destructive/60",
 };
 
 /**
@@ -37,7 +37,7 @@ export function IconButton({
       aria-busy={loading || undefined}
       disabled={disabled || loading}
       className={cn(
-        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-55",
+        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-55",
         "[&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:stroke-[1.75]",
         v,
         className,

@@ -236,7 +236,7 @@ export function LttpLichSuXuatTab({
         Kho cấp: <span className="font-medium text-foreground">{storageUnitName || `#${storageUnitId}`}</span>
       </p>
 
-      <div className="grid gap-2 rounded-lg border border-border/70 bg-card/30 p-3 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto] lg:items-end">
+      <div className="grid gap-2 rounded-lg border border-border/70 bg-card p-3 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto] lg:items-end">
         <label className="min-w-0 space-y-0.5 text-[10px] text-muted-foreground">
           Từ ngày
           <input

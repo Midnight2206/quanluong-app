@@ -10,7 +10,7 @@ export function PageRouteLoading() {
       aria-label="Đang tải trang"
     >
       <div className="h-9 w-48 max-w-[60%] animate-pulse rounded-xl bg-muted/80" />
-      <div className="space-y-3 rounded-xl border border-border/50 bg-card/50 p-5 shadow-soft">
+      <div className="space-y-3 rounded-xl border border-border/50 bg-card p-5 shadow-soft">
         <div className="h-4 max-w-xl animate-pulse rounded-lg bg-muted/70" />
         <div className="h-4 max-w-lg animate-pulse rounded-lg bg-muted/60" />
         <div className="h-36 w-full animate-pulse rounded-xl bg-muted/50" />

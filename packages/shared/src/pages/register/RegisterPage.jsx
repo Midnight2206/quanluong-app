@@ -85,7 +85,7 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Đăng ký
         </p>
         <h1 className="text-xl font-semibold">Tạo tài khoản mới</h1>

@@ -41,37 +41,29 @@ const features = [
   {
     icon: Package,
     title: "Nhập xuất thực phẩm thông minh",
-    description:
-      "Theo dõi và quản lý luồng nhập xuất lượng thực phẩm rõ ràng, gọn gàng và phù hợp quy trình kiểm soát tại đơn vị.",
   },
   {
     icon: FileSpreadsheet,
     title: "Google Workspace cho sổ sách",
-    description:
-      "Kết hợp Google Apps Script, Google Docs và Google Sheets để tự động hóa ghi chép, đối soát và lưu trữ sổ sách hàng ngày.",
   },
   {
     icon: UtensilsCrossed,
     title: "AI gợi ý thực đơn",
-    description:
-      "Tích hợp AI hỗ trợ xây dựng thực đơn hợp lý, đa dạng và bám sát nguyên liệu — giảm thời gian lên kế hoạch bếp.",
   },
   {
     icon: Bot,
     title: "Báo cáo tự động qua Telegram",
-    description:
-      "Dùng AI cùng Telegram bot để gửi báo cáo định kỳ hoặc cảnh báo, giúp lãnh đạo nắm nhanh tình hình mà không cần vào bảng biểu thủ công.",
   },
 ];
 
 function CtaLink({ href, variant = "primary", title, children }) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+    "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
   const variants = {
     primary:
-      "border border-primary/20 bg-primary text-primary-foreground shadow-md shadow-primary/15 hover:brightness-[1.06] active:brightness-95",
+      "border border-primary bg-primary text-primary-foreground shadow-soft hover:bg-primary/90 active:bg-primary/85",
     secondary:
-      "border-2 border-border/90 bg-card text-foreground shadow-sm hover:bg-muted/90 hover:border-primary/35",
+      "border border-input bg-card text-foreground shadow-soft hover:bg-muted hover:border-primary/40",
   };
   return (
     <Link href={href} title={title} className={cn(base, variants[variant])}>
@@ -221,10 +213,10 @@ export function HomePage() {
   }
 
   return (
-    <div className="space-y-12 pb-2">
-      <section className="space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-8 pb-2">
+      <section className="space-y-4">
         <div className="space-y-4">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             QUẢN LÝ QUÂN LƯƠNG HIỆU QUẢ, HIỆN ĐẠI
           </h1>
         </div>
@@ -240,7 +232,7 @@ export function HomePage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <Card className="border-primary/20 bg-primary/5 shadow-none">
+            <Card className="border-l-4 border-l-primary">
               <CardContent className="space-y-4">
                 <p className="text-sm font-medium text-foreground">
                   Xin chào, {displayName || "bạn"}
@@ -252,24 +244,14 @@ export function HomePage() {
             </Card>
 
             {canLinkDrive ? (
-              <Card className="shadow-soft">
+              <Card>
                 <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex min-w-0 flex-1 gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
                       <Cloud className="size-5" aria-hidden />
                     </div>
-                    <div className="min-w-0 space-y-2">
+                    <div className="min-w-0 space-y-1">
                       <p className="text-sm font-medium text-foreground">Google Drive — sổ sách</p>
-                      <p className="text-xs leading-relaxed text-muted-foreground">
-                        Liên kết một lần để tạo thư mục{" "}
-                        <span className="font-mono text-[11px]">midnight-app</span> trên Drive của bạn, kèm{" "}
-                        <span className="font-mono text-[11px]">chung-tu-quyet-toan-template</span> (mẫu) và{" "}
-                        <span className="font-mono text-[11px]">chung-tu-quyet-toan-generated</span> (chứng từ đã tạo).
-                        Đặt Google Sheets/Docs mẫu vào các thư mục con theo loại chứng từ (vd.{" "}
-                        <span className="font-mono text-[11px]">bang-ke-mua-hang</span>). Luồng OAuth: bấm liên kết →
-                        đăng nhập Google → chấp nhận quyền → trình duyệt quay về trang chủ. Dùng cùng địa chỉ trang (vd.
-                        luôn localhost:8080, không trộn với 127.0.0.1).
-                      </p>
                       {user?.googleDriveFolderId ? (
                         <p className="text-[11px] leading-relaxed text-muted-foreground">
                           <span className="font-medium text-foreground">Đã liên kết.</span> Folder ID:{" "}
@@ -290,7 +272,7 @@ export function HomePage() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className={cn(
-                            "inline-flex items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground shadow-md transition hover:brightness-[1.06]",
+                            "inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground shadow-soft transition-colors duration-150 hover:bg-primary/90",
                           )}
                         >
                           <ExternalLink className="size-4 shrink-0" aria-hidden />
@@ -314,7 +296,7 @@ export function HomePage() {
                         disabled={driveLinkBusy}
                         onClick={() => void startGoogleDriveLink()}
                         className={cn(
-                          "inline-flex items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground shadow-md transition hover:brightness-[1.06] disabled:pointer-events-none disabled:opacity-50",
+                          "inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground shadow-soft transition-colors duration-150 hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50",
                         )}
                       >
                         {driveLinkBusy ? "Đang mở Google…" : "Liên kết Google Drive"}
@@ -328,21 +310,16 @@ export function HomePage() {
         )}
       </section>
 
-      <section className="space-y-5">
-        <div>
-          <h2 className="text-xl font-semibold">Tính năng nổi bật</h2>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {features.map(({ icon: Icon, title, description }) => (
-            <Card key={title} className="h-full shadow-soft">
-              <CardContent className="flex h-full flex-col gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary">
-                  <Icon className="h-5 w-5" aria-hidden />
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">Tính năng nổi bật</h2>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {features.map(({ icon: Icon, title }) => (
+            <Card key={title} className="h-full">
+              <CardContent className="flex h-full items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
+                  <Icon className="size-[18px]" aria-hidden />
                 </div>
-                <h3 className="text-base font-semibold leading-snug">{title}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {description}
-                </p>
+                <h3 className="text-sm font-semibold leading-snug">{title}</h3>
               </CardContent>
             </Card>
           ))}

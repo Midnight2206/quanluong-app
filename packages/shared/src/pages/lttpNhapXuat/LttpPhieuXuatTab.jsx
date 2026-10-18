@@ -1803,7 +1803,7 @@ export function LttpPhieuXuatTab({
           ) : null}
         </p>
 
-        <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-card/30 p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-card p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
           <div className="min-w-0 space-y-1">
             <p className="text-[10px] font-medium uppercase text-muted-foreground">
               Cài đặt mẫu in
@@ -1839,7 +1839,7 @@ export function LttpPhieuXuatTab({
             role="dialog"
             aria-modal="true"
             aria-labelledby="lttp-px-settings-title"
-            className="relative flex max-h-dvh w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-lg sm:max-h-[42rem] sm:rounded-xl"
+            className="relative flex max-h-dvh w-full max-w-3xl flex-col overflow-hidden rounded-t-xl border border-border bg-card shadow-lg sm:max-h-[42rem] sm:rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border bg-card px-4 pb-3 pt-4 sm:px-5">
@@ -2685,7 +2685,7 @@ export function LttpPhieuXuatTab({
 
         {wizardShowReview ? (
           <div className="space-y-3">
-            <div className="rounded-xl border border-border/70 bg-card/40 p-3 text-xs shadow-sm">
+            <div className="rounded-xl border border-border/70 bg-card p-3 text-xs shadow-sm">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Thông tin phiếu
               </p>
@@ -2721,7 +2721,7 @@ export function LttpPhieuXuatTab({
               </dl>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-card/40 p-3 text-xs shadow-sm">
+            <div className="rounded-xl border border-border/70 bg-card p-3 text-xs shadow-sm">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Mặt hàng ({dataRows.length} dòng)
               </p>

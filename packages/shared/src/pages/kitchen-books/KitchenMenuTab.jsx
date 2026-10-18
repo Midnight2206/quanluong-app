@@ -54,7 +54,7 @@ function CatalogPicker({ open, onClose, onPick, unitId }) {
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-lg border border-border bg-card shadow-xl">
+      <div className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-lg border border-border bg-card shadow-float">
         <div className="border-b border-border px-4 py-3">
           <h3 className="font-semibold">Chọn từ danh mục</h3>
           <p className="text-xs text-muted-foreground">Món được thêm vào bản nháp thực đơn mẫu.</p>

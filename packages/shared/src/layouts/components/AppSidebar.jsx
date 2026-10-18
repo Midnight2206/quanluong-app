@@ -73,16 +73,16 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
             const classNameBuilder = ({ isActive }) => {
               const active = navItemPathMatches(item, pathname) || isActive;
               return cn(
-                "flex flex-col items-center gap-2 rounded-xl px-2 py-3 text-[11px] font-medium transition",
+                "flex flex-col items-center gap-1.5 rounded-lg px-2 py-2.5 text-[11px] font-medium transition-colors duration-150",
                 active
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground",
+                  ? "bg-primary/10 text-primary font-semibold"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
               );
             };
             return (
               <div key={item.to} className="flex flex-col gap-1">
                 {showSection ? (
-                  <p className="px-1 pt-2 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="px-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {item.section}
                   </p>
                 ) : null}
@@ -114,7 +114,7 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
       </aside>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 flex overflow-x-auto items-stretch gap-0.5 border-t border-border bg-card/95 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-md print:hidden supports-[backdrop-filter]:bg-card/85 lg:hidden"
+        className="fixed bottom-0 left-0 right-0 z-30 flex overflow-x-auto items-stretch gap-0.5 border-t border-border bg-card px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1 print:hidden lg:hidden"
         aria-label="Điều hướng chính"
       >
         {visibleItems.map((item) => {
@@ -122,10 +122,10 @@ export function AppSidebar({ items = mainNavItems, onMobileNavActivate }) {
           const classNameBuilder = ({ isActive }) => {
             const active = navItemPathMatches(item, pathname) || isActive;
             return cn(
-              "flex min-h-[3.25rem] flex-1 min-w-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-medium leading-tight transition touch-manipulation sm:min-w-[4rem] sm:gap-1 sm:text-[11px]",
+              "flex min-h-[3.25rem] flex-1 min-w-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[11px] font-medium leading-tight transition-colors duration-150 touch-manipulation sm:min-w-[4rem] sm:gap-1",
               active
-                ? "bg-secondary text-foreground"
-                : "text-muted-foreground active:bg-secondary/90 active:text-foreground",
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground active:bg-secondary",
             );
           };
           if (item.external) {

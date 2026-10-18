@@ -137,7 +137,7 @@ export function TabPanel({
             scrollableTabList ? "flex-nowrap items-stretch" : equalWidthTabs ? "w-full flex-nowrap sm:flex-wrap" : "flex-wrap items-center",
             !scrollableTabList && equalWidthTabs ? "items-stretch" : null,
             !stickyTabList && fullBleedInCard ? "rounded-t-xl px-4 pt-4 sm:px-5 sm:pt-5" : null,
-            !stickyTabList && !fullBleedInCard ? "bg-background/80 backdrop-blur-sm" : null,
+            !stickyTabList && !fullBleedInCard ? "bg-background" : null,
             stickyTabList && fullBleedInCard ? "rounded-t-xl px-4 pt-3 sm:px-5 sm:pt-4" : null,
             stickyTabList && !fullBleedInCard ? "px-0 pt-0" : null,
           )}

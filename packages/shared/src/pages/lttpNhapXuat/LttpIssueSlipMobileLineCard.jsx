@@ -51,7 +51,7 @@ export function LttpIssueSlipMobileLineCard({
   return (
     <article
       className={cn(
-        "rounded-xl border border-border/70 bg-card/40 p-3 shadow-sm",
+        "rounded-xl border border-border/70 bg-card p-3 shadow-sm",
         dupRow &&
           "border-l-[3px] border-l-red-600 border-destructive/40 bg-destructive/8 dark:border-l-red-400",
       )}

@@ -36,7 +36,7 @@ export function LttpLichSuXuatSlipCard({
       : null;
 
   return (
-    <article className="rounded-xl border border-border/70 bg-card/40 p-3 shadow-sm">
+    <article className="rounded-xl border border-border/70 bg-card p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 space-y-0.5">
           <p className="font-mono text-sm font-semibold tabular-nums text-foreground">

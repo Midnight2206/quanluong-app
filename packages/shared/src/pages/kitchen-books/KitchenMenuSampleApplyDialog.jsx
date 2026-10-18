@@ -69,7 +69,7 @@ export function KitchenMenuSampleApplyDialog({ open, onClose, sample, unitId }) 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 p-4">
       <form
-        className="flex w-full max-w-md flex-col rounded-lg border border-border bg-card shadow-xl"
+        className="flex w-full max-w-md flex-col rounded-lg border border-border bg-card shadow-float"
         onSubmit={handleSubmit}
       >
         <div className="border-b border-border px-4 py-3">

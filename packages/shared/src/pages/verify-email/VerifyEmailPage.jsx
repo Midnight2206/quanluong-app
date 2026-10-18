@@ -9,9 +9,9 @@ import httpClient from "@/services/httpClient";
 import { cn } from "@/utils/cn";
 
 const primaryLinkClass =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md shadow-primary/15 transition hover:brightness-[1.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft transition hover:brightness-[1.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 const outlineLinkClass =
-  "inline-flex items-center justify-center gap-2 rounded-lg border-2 border-border/90 bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/90";
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted/90";
 
 export function VerifyEmailPage() {
   const searchParams = useSearchParams();

@@ -997,7 +997,7 @@ export function AdminLttpPanel({
                 <div className="space-y-3">
                   <form data-local-commit-form="true"
                     onSubmit={onAddFoodGroup}
-                    className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card/50 p-2"
+                    className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card p-2"
                   >
                     <label className="w-28" htmlFor="ql-lttp-fg-code">
                       <span className="text-[10px] text-muted-foreground">Mã nhóm</span>
@@ -1083,7 +1083,7 @@ export function AdminLttpPanel({
                   {canCWrite ? (
                     <form data-local-commit-form="true"
                       onSubmit={onAddCommodity}
-                      className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card/50 p-2"
+                      className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card p-2"
                     >
                       <label className="min-w-[8ch]">
                         <span className="text-[10px] text-muted-foreground">Mã</span>
@@ -1214,7 +1214,7 @@ export function AdminLttpPanel({
                   {canCWrite ? (
                     <form data-local-commit-form="true"
                       onSubmit={onAddSupplier}
-                      className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card/50 p-2"
+                      className="flex flex-wrap items-end gap-2 rounded-lg border border-border/70 bg-card p-2"
                     >
                       <label className="min-w-[9rem] flex-1">
                         <span className="text-[10px] text-muted-foreground">Tên đối tác *</span>
@@ -1584,7 +1584,7 @@ export function AdminLttpPanel({
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="lttp-edit-commodity-title"
-                    className="relative flex max-h-[min(92dvh,36rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl"
+                    className="relative flex max-h-[min(92dvh,36rem)] w-full max-w-lg flex-col rounded-t-xl border border-border bg-card shadow-lg sm:rounded-xl"
                   >
                     <div className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">
                       <p
@@ -1673,7 +1673,7 @@ export function AdminLttpPanel({
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="lttp-edit-supplier-title"
-                    className="relative flex max-h-[min(92dvh,40rem)] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-lg sm:rounded-xl"
+                    className="relative flex max-h-[min(92dvh,40rem)] w-full max-w-lg flex-col rounded-t-xl border border-border bg-card shadow-lg sm:rounded-xl"
                   >
                     <div className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-4 sm:px-5">
                       <p

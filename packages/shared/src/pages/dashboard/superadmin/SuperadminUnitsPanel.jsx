@@ -318,7 +318,7 @@ export function SuperadminUnitsPanel() {
         <form
           data-local-commit-form="true"
           onSubmit={onCreate}
-          className="flex flex-col gap-2 p-2 border rounded-lg border-border/70 bg-card/40 sm:flex-row sm:flex-wrap sm:items-end"
+          className="flex flex-col gap-2 p-2 border rounded-lg border-border/70 bg-card sm:flex-row sm:flex-wrap sm:items-end"
         >
           <label className="min-w-[8rem] flex-1 space-y-0.5" htmlFor="ql-sa-units-create-name">
             <span className="text-[11px] font-medium text-muted-foreground">

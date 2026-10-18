@@ -244,7 +244,7 @@ export function DocumentDevTestPage() {
   return (
     <section className="space-y-6">
       <div className="space-y-2">
-        <p className="text-sm uppercase tracking-[0.28em] text-muted-foreground">Dev only</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Dev only</p>
         <h2 className="text-2xl font-semibold">Document service — render từ DB</h2>
         <p className="text-xs text-muted-foreground">
           Document service:{" "}
