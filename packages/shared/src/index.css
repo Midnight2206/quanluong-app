@@ -2,140 +2,144 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design system (ui-ux-pro-max: "Data-Dense Dashboard", see docs/design-system/quan-luong/MASTER.md)
+ * Cool slate neutrals, one restrained accent, 8px radius, hairline borders, low shadows.
+ * Accent palettes keep the same keys (teal default, blue, green, olive, rose, amber) + light/dark + high contrast.
+ */
 @layer base {
   :root {
-    --background: 42 32% 97%;
-    --foreground: 222 40% 12%;
+    --background: 210 25% 97.5%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222 40% 12%;
-    --primary: 171 73% 28%;
-    --primary-foreground: 48 33% 98%;
-    --secondary: 40 36% 92%;
-    --secondary-foreground: 222 35% 18%;
-    --muted: 40 18% 92%;
-    --muted-foreground: 215 14% 42%;
-    --accent: 28 85% 92%;
-    --accent-foreground: 20 70% 24%;
-    --destructive: 0 72% 48%;
+    --card-foreground: 222 47% 11%;
+    --primary: 175 80% 24%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 28% 94%;
+    --secondary-foreground: 222 40% 16%;
+    --muted: 214 28% 95%;
+    --muted-foreground: 215 19% 35%;
+    --accent: 172 38% 92%;
+    --accent-foreground: 175 75% 18%;
+    --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
-    --warning: 32 95% 28%;
-    --success: 152 76% 24%;
-    --info: 200 90% 30%;
-    --border: 42 20% 85%;
-    --input: 42 20% 85%;
-    --ring: 171 73% 28%;
-    --radius: 1rem;
-    --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.08);
-    --shadow-md: 0 12px 28px -16px rgb(15 23 42 / 0.18);
-    --shadow-lg: 0 24px 50px -24px rgb(15 23 42 / 0.26);
+    --warning: 30 92% 28%;
+    --success: 152 72% 23%;
+    --info: 204 88% 30%;
+    --border: 214 24% 87%;
+    --input: 215 18% 76%;
+    --ring: 175 80% 24%;
+    --radius: 0.5rem;
+    --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+    --shadow-md: 0 1px 3px 0 rgb(15 23 42 / 0.07), 0 1px 2px -1px rgb(15 23 42 / 0.05);
+    --shadow-lg: 0 12px 28px -10px rgb(15 23 42 / 0.2), 0 2px 6px -2px rgb(15 23 42 / 0.08);
   }
 
   html.dark {
-    --background: 214 34% 7%;
-    --foreground: 42 24% 96%;
-    --card: 214 28% 13%;
-    --card-foreground: 42 24% 96%;
-    --primary: 164 72% 66%;
-    --primary-foreground: 171 81% 10%;
-    --secondary: 214 22% 20%;
-    --secondary-foreground: 42 24% 96%;
-    --muted: 214 18% 16%;
-    --muted-foreground: 214 14% 74%;
-    --accent: 27 58% 24%;
-    --accent-foreground: 33 92% 88%;
-    --destructive: 0 68% 48%;
-    --destructive-foreground: 0 0% 100%;
-    --warning: 43 96% 64%;
-    --success: 152 60% 58%;
-    --info: 199 90% 70%;
-    --border: 214 19% 24%;
-    --input: 214 19% 24%;
-    --ring: 164 72% 66%;
-    --shadow-sm: 0 1px 2px 0 rgb(2 6 23 / 0.5);
-    --shadow-md: 0 14px 32px -16px rgb(2 6 23 / 0.58);
-    --shadow-lg: 0 28px 60px -28px rgb(2 6 23 / 0.7);
+    --background: 222 44% 7%;
+    --foreground: 210 33% 95%;
+    --card: 222 36% 10.5%;
+    --card-foreground: 210 33% 95%;
+    --primary: 170 62% 52%;
+    --primary-foreground: 175 80% 8%;
+    --secondary: 218 28% 17%;
+    --secondary-foreground: 210 33% 95%;
+    --muted: 218 28% 14.5%;
+    --muted-foreground: 215 20% 71%;
+    --accent: 174 34% 18%;
+    --accent-foreground: 168 70% 84%;
+    --destructive: 0 84% 66%;
+    --destructive-foreground: 0 70% 8%;
+    --warning: 40 92% 62%;
+    --success: 150 55% 56%;
+    --info: 200 85% 68%;
+    --border: 218 24% 21%;
+    --input: 217 20% 30%;
+    --ring: 170 62% 52%;
+    --shadow-sm: 0 1px 2px 0 rgb(2 6 23 / 0.45);
+    --shadow-md: 0 1px 3px 0 rgb(2 6 23 / 0.5), 0 1px 2px -1px rgb(2 6 23 / 0.4);
+    --shadow-lg: 0 16px 36px -12px rgb(2 6 23 / 0.7), 0 2px 6px -2px rgb(2 6 23 / 0.5);
   }
-
 
   /* Accent palettes: html[data-accent]. Default (no attribute / teal) = :root values above. */
   html[data-accent="blue"] {
-    --primary: 217 85% 42%;
-    --primary-foreground: 210 40% 98%;
-    --ring: 217 85% 42%;
-    --accent: 217 60% 92%;
-    --accent-foreground: 217 60% 22%;
+    --primary: 224 70% 42%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 224 70% 42%;
+    --accent: 220 55% 94%;
+    --accent-foreground: 224 64% 26%;
   }
 
   html.dark[data-accent="blue"] {
-    --primary: 213 94% 72%;
-    --primary-foreground: 222 70% 12%;
-    --ring: 213 94% 72%;
-    --accent: 213 35% 22%;
-    --accent-foreground: 213 80% 88%;
+    --primary: 214 90% 70%;
+    --primary-foreground: 224 70% 10%;
+    --ring: 214 90% 70%;
+    --accent: 220 34% 20%;
+    --accent-foreground: 214 85% 86%;
   }
 
   html[data-accent="green"] {
-    --primary: 145 63% 27%;
-    --primary-foreground: 140 40% 98%;
-    --ring: 145 63% 27%;
-    --accent: 145 60% 92%;
-    --accent-foreground: 145 60% 22%;
+    --primary: 152 64% 25%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 152 64% 25%;
+    --accent: 148 38% 92%;
+    --accent-foreground: 152 64% 18%;
   }
 
   html.dark[data-accent="green"] {
-    --primary: 142 60% 62%;
-    --primary-foreground: 145 70% 9%;
-    --ring: 142 60% 62%;
-    --accent: 142 35% 22%;
-    --accent-foreground: 142 80% 88%;
+    --primary: 146 52% 56%;
+    --primary-foreground: 150 70% 8%;
+    --ring: 146 52% 56%;
+    --accent: 148 30% 18%;
+    --accent-foreground: 142 60% 84%;
   }
 
   html[data-accent="olive"] {
-    --primary: 78 38% 27%;
-    --primary-foreground: 60 30% 97%;
-    --ring: 78 38% 27%;
-    --accent: 78 60% 92%;
-    --accent-foreground: 78 60% 22%;
+    --primary: 80 34% 27%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 80 34% 27%;
+    --accent: 76 30% 91%;
+    --accent-foreground: 80 40% 18%;
   }
 
   html.dark[data-accent="olive"] {
-    --primary: 74 45% 60%;
-    --primary-foreground: 80 60% 9%;
-    --ring: 74 45% 60%;
-    --accent: 74 35% 22%;
-    --accent-foreground: 74 80% 88%;
+    --primary: 74 40% 58%;
+    --primary-foreground: 80 60% 8%;
+    --ring: 74 40% 58%;
+    --accent: 76 24% 18%;
+    --accent-foreground: 72 50% 84%;
   }
 
   html[data-accent="rose"] {
-    --primary: 346 72% 42%;
-    --primary-foreground: 350 40% 98%;
-    --ring: 346 72% 42%;
-    --accent: 346 60% 92%;
-    --accent-foreground: 346 60% 22%;
+    --primary: 346 66% 40%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 346 66% 40%;
+    --accent: 346 50% 94%;
+    --accent-foreground: 346 60% 26%;
   }
 
   html.dark[data-accent="rose"] {
-    --primary: 347 85% 76%;
-    --primary-foreground: 345 70% 12%;
-    --ring: 347 85% 76%;
-    --accent: 347 35% 22%;
-    --accent-foreground: 347 80% 88%;
+    --primary: 348 80% 74%;
+    --primary-foreground: 345 70% 10%;
+    --ring: 348 80% 74%;
+    --accent: 346 30% 20%;
+    --accent-foreground: 348 80% 87%;
   }
 
   html[data-accent="amber"] {
-    --primary: 28 92% 30%;
-    --primary-foreground: 40 60% 98%;
-    --ring: 28 92% 30%;
-    --accent: 28 60% 92%;
-    --accent-foreground: 28 60% 22%;
+    --primary: 28 88% 30%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 28 88% 30%;
+    --accent: 36 60% 92%;
+    --accent-foreground: 28 80% 22%;
   }
 
   html.dark[data-accent="amber"] {
-    --primary: 38 92% 58%;
-    --primary-foreground: 28 80% 9%;
-    --ring: 38 92% 58%;
-    --accent: 38 35% 22%;
-    --accent-foreground: 38 80% 88%;
+    --primary: 38 90% 58%;
+    --primary-foreground: 28 80% 8%;
+    --ring: 38 90% 58%;
+    --accent: 36 34% 18%;
+    --accent-foreground: 40 85% 84%;
   }
 
   /* High contrast: html[data-contrast="high"], works with any accent, light & dark. */
@@ -163,6 +167,8 @@
 
   html {
     color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
   }
 
   html.dark {
@@ -174,22 +180,60 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
-    background-image:
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.12), transparent 24rem),
-      radial-gradient(circle at top right, hsl(var(--accent-foreground) / 0.08), transparent 18rem);
+    @apply bg-background font-sans text-foreground antialiased;
     overflow: hidden;
   }
 
-  html.dark body {
-    background-image:
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.16), transparent 22rem),
-      radial-gradient(circle at top right, hsl(var(--accent-foreground) / 0.1), transparent 18rem),
-      linear-gradient(180deg, rgb(15 23 42 / 0.32), transparent 12rem);
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.011em;
   }
 
-  html[data-contrast="high"] body {
-    background-image: none;
+  /* Numbers line up in data tables and numeric inputs. */
+  table,
+  input[type="number"],
+  output,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Pointer affordance for every clickable control. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  a[href],
+  summary,
+  label[for],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled,
+  input:disabled {
+    cursor: not-allowed;
+  }
+
+  /* Visible keyboard focus everywhere (components may refine with ring utilities). */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline-offset: 0;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.2);
   }
 
   html,
@@ -203,13 +247,20 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer components {
   .page-shell {
-    @apply min-h-0 max-h-dvh h-dvh bg-app-grid bg-[size:28px_28px];
-  }
-
-  html[data-contrast="high"] .page-shell {
-    background-image: none;
+    @apply min-h-0 max-h-dvh h-dvh bg-background;
   }
 
   [data-sticky-level] {
@@ -234,7 +285,7 @@
   }
 
   .unified-sticky-surface {
-    @apply bg-background/95 shadow-[0_1px_0_0_hsl(var(--border))] backdrop-blur-sm;
+    @apply bg-background shadow-[0_1px_0_0_hsl(var(--border))];
   }
 
   [data-local-scroll="true"] {

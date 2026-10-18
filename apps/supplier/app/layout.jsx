@@ -2,6 +2,7 @@ import "./globals.css";
 import { AppProviders } from "@/app/providers/AppProviders";
 import { QUANLUONG_SITE_NAME } from "@/lib/quanLuongPageMeta";
 import { THEME_INIT_SCRIPT } from "@/utils/theme";
+import { appFont } from "@/lib/appFont";
 
 /** @param {string} url */
 function iconMimeForUrl(url) {
@@ -65,7 +66,7 @@ export function generateMetadata() {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" className={appFont.variable} suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <AppProviders>{children}</AppProviders>

@@ -7,6 +7,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Arial", "sans-serif"],
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -39,10 +42,6 @@ module.exports = {
         soft: "var(--shadow-sm)",
         panel: "var(--shadow-md)",
         float: "var(--shadow-lg)",
-      },
-      backgroundImage: {
-        "app-grid":
-          "linear-gradient(to right, rgb(148 163 184 / 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgb(148 163 184 / 0.08) 1px, transparent 1px)",
       },
       keyframes: {
         "route-progress": {
