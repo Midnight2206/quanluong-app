@@ -100,4 +100,12 @@ export const DASHBOARD_SUPERADMIN_TAB_META = [
     icon: Activity,
     routeAccessKey: "dashboard-infra",
   },
+  {
+    path: "ba-profiles",
+    label: "Hồ sơ nghiệp vụ",
+    shortLabel: "Nghiệp vụ",
+    section: "Hệ thống",
+    icon: BookOpen,
+    routeAccessKey: "dashboard-ba-profiles",
+  },
 ];

@@ -177,6 +177,7 @@ model User {
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
   kitchenMenuSamplesCreated              KitchenMenuSample[] @relation("KitchenMenuSampleCreatedBy")
   lttpSupplierLinks UserLttpSupplier[]
+  baApiTokensCreated BaApiToken[] @relation("BaApiTokenCreatedBy")
 
   @@index([typeId])
   @@index([unitId])
@@ -685,6 +686,8 @@ model Unit {
   kitchenReceiptSlips       KitchenReceiptSlip[]
   kitchenReceiptSlipSerials KitchenReceiptSlipSerial[]
   kitchenMenuSamples        KitchenMenuSample[]
+  baUnitProfiles            BaUnitProfile[]
+  baApiTokens               BaApiToken[]
 
   @@index([parentId])
   @@index([path])
@@ -1624,4 +1627,47 @@ model RefreshToken {
   @@index([sessionId])
   @@index([expiresAt])
   @@index([revokedAt])
+}
+
+enum BaApiTokenScope {
+  UNIT_PUSH
+  GLOBAL_READ
+}
+
+/// Mã khóa API cho trợ lý business analyst (bot) đẩy / đọc hồ sơ nghiệp vụ. Chỉ lưu sha256.
+model BaApiToken {
+  id              Int             @id @default(autoincrement())
+  name            String          @db.VarChar(120)
+  tokenHash       String          @unique @db.VarChar(64)
+  prefix          String          @db.VarChar(24)
+  scope           BaApiTokenScope
+  unitId          Int?
+  createdByUserId Int?
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime        @default(now())
+  unit            Unit?           @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy       User?           @relation("BaApiTokenCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  profiles        BaUnitProfile[]
+
+  @@index([unitId])
+  @@index([createdByUserId])
+}
+
+/// Hồ sơ nghiệp vụ đơn vị (Markdown, có phiên bản) do trợ lý BA đẩy lên.
+model BaUnitProfile {
+  id              Int         @id @default(autoincrement())
+  unitId          Int
+  version         Int
+  title           String      @db.VarChar(255)
+  contentMarkdown String      @db.LongText
+  schemaVersion   String      @db.VarChar(32)
+  sourceAgentName String?     @db.VarChar(120)
+  pushedByTokenId Int?
+  createdAt       DateTime    @default(now())
+  unit            Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  pushedByToken   BaApiToken? @relation(fields: [pushedByTokenId], references: [id], onDelete: SetNull)
+
+  @@unique([unitId, version])
+  @@index([pushedByTokenId])
 }

@@ -37,6 +37,7 @@ import { changePasswordSchema, meProfileFormSchema } from "@/features/auth/schem
 import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { cn } from "@/utils/cn";
+import { BaTokenManager } from "@/features/ba-profiles/components/BaTokenManager";
 import { getApiBaseUrl, resolveMediaUrl } from "@/utils/runtimeEnv";
 import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 import {
@@ -808,6 +809,17 @@ export function ProfilePage() {
               </form>
             </CardContent>
           </Card>
+          {user?.type?.name === "admin" && (user?.unitId ?? user?.unit?.id) ? (
+            <Card className="shadow-soft">
+              <CardContent className="space-y-2 !p-3 sm:!p-4">
+                <p className="text-sm font-medium">Mã khóa trợ lý nghiệp vụ (BA)</p>
+                <p className="text-xs text-muted-foreground">
+                  Cho trợ lý BA của đơn vị đẩy hồ sơ nghiệp vụ lên app. Mỗi mã chỉ đẩy được cho đơn vị của bạn.
+                </p>
+                <BaTokenManager scope="UNIT_PUSH" />
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </div>
 

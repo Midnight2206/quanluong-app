@@ -22,6 +22,12 @@ export const qk = {
   mealAllowanceRates: { root: ["mealAllowanceRates"], list: () => ["mealAllowanceRates", "list"] },
   systemBackup: { root: ["systemBackup"], state: () => ["systemBackup", "state"] },
   systemInfra: { root: ["systemInfra"], state: () => ["systemInfra", "state"] },
+  baProfiles: {
+    root: ["baProfiles"],
+    latest: () => ["baProfiles", "latest"],
+    detail: (id) => ["baProfiles", "detail", String(id)],
+    tokens: () => ["baProfiles", "tokens"],
+  },
   lttp: {
     root: ["lttp"],
     foodGroups: () => ["lttp", "foodGroups"],
