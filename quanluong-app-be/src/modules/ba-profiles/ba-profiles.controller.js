@@ -1,11 +1,13 @@
 import { respondCreated, respondSuccess } from "../../shared/utils/responders.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
-import { BA_SCOPES, GLOBAL_SCOPES } from "./ba-profiles.utils.js";
+import { config } from "../../config/config.js";
+import { BA_SCOPES, GLOBAL_SCOPES, buildStartGuide, detectSecrets } from "./ba-profiles.utils.js";
 import { baActorLabel } from "./ba-token-auth.middleware.js";
 import {
   createProposal,
   getBaselineDoc,
+  getStartGuideData,
   getComparison,
   listBaselineVersions,
   listLatestBaseline,
@@ -128,7 +130,38 @@ async function reviewProposalController(req, res) {
   return respondSuccess(res, { message: "Đã cập nhật đề xuất.", data });
 }
 
+// ---------- Trang khởi động công khai cho trợ lý BA ----------
+
+/** Địa chỉ gốc công khai: BA_PUBLIC_BASE_URL > PUBLIC_WEB_URL (không lấy từ Host header). */
+function resolvePublicBaseUrl() {
+  return process.env.BA_PUBLIC_BASE_URL || config.publicWebUrl;
+}
+
+async function startGuideController(req, res) {
+  const { guide, docs } = await getStartGuideData();
+  const out = buildStartGuide({ guide, docs, baseUrl: resolvePublicBaseUrl() });
+  // Lưới an toàn: hướng dẫn công khai không bao giờ được chứa bí mật.
+  const leaked = detectSecrets(out.markdown);
+  const blocked = leaked.length > 0;
+  const statusCode = !guide || blocked ? 503 : 200;
+  const markdown = blocked
+    ? "# Hướng dẫn trợ lý BA\n\nHướng dẫn tạm khoá vì có nội dung giống bí mật. Báo quản trị app đăng lại bản sạch.\n"
+    : out.markdown;
+  res.set("Cache-Control", "public, max-age=60");
+  res.set("X-Robots-Tag", "noindex");
+  const wantsJson = String(req.query?.format || "").toLowerCase() === "json";
+  if (wantsJson) {
+    return res.status(statusCode).json({
+      success: statusCode === 200,
+      message: statusCode === 200 ? "Success" : "Chưa có hướng dẫn công khai.",
+      data: blocked ? null : { baseUrl: out.baseUrl, guide: out.guide, docs: out.docs, contentMarkdown: markdown },
+    });
+  }
+  return res.status(statusCode).type("text/markdown; charset=utf-8").send(markdown);
+}
+
 export {
+  startGuideController,
   comparisonController,
   createProposalController,
   getBaselineDocController,

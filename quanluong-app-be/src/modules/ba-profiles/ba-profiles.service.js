@@ -4,6 +4,7 @@ import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
   BA_DOC_KEYS,
   BA_MAX_CONTENT_BYTES,
+  BA_PUBLIC_DOC_KEY,
   BA_RULE_DOC_KEY,
   BA_SCOPES,
   GLOBAL_SCOPES,
@@ -244,6 +245,17 @@ async function listLatestBaseline(db = defaultPrisma) {
   return out;
 }
 
+/** Dữ liệu cho GET /api/ba/start: nội dung `huong-dan` mới nhất + siêu dữ liệu các docKey khác (không nội dung). */
+async function getStartGuideData(db = defaultPrisma) {
+  const guide = await getLatestBaselineDoc(BA_PUBLIC_DOC_KEY, db);
+  const docs = [];
+  for (const docKey of BA_DOC_KEYS) {
+    const row = await db.baBaselineDoc.findFirst({ where: { docKey }, orderBy: { version: "desc" }, select: baselineListSelect });
+    if (row) docs.push(row);
+  }
+  return { guide, docs };
+}
+
 async function getBaselineDoc(docKey, version, db = defaultPrisma) {
   const row = version
     ? await db.baBaselineDoc.findUnique({ where: { docKey_version: { docKey, version: Number(version) } } })
@@ -355,6 +367,7 @@ async function reviewProposal({ id, status, reviewComment, actor }, db = default
 export {
   createProposal,
   getBaselineDoc,
+  getStartGuideData,
   getComparison,
   getLatestBaselineDoc,
   listBaselineVersions,

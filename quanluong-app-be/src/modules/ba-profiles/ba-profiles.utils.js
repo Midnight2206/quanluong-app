@@ -124,7 +124,66 @@ function buildComparison(baselineRuleIds, profiles) {
   return { units, rules, riengByUnit };
 }
 
+/** Tài liệu công khai qua GET /api/ba/start (không cần token). Các docKey khác vẫn cần token. */
+const BA_PUBLIC_DOC_KEY = "huong-dan";
+const BA_BASE_URL_PLACEHOLDER = "{{BASE_URL}}";
+
+function normalizeBaseUrl(url) {
+  return String(url || "").trim().replace(/\/+$/, "").replace(/\/api$/, "");
+}
+
+/**
+ * Dựng trang khởi động cho trợ lý BA từ bản `huong-dan` mới nhất.
+ * guide: { version, title, contentMarkdown, createdAt } | null
+ * docs: [{ docKey, version, title, createdAt }] — chỉ siêu dữ liệu, không nội dung.
+ */
+function buildStartGuide({ guide, docs, baseUrl }) {
+  const base = normalizeBaseUrl(baseUrl);
+  const content = guide ? String(guide.contentMarkdown || "").split(BA_BASE_URL_PLACEHOLDER).join(base) : null;
+  const otherDocs = (docs || [])
+    .filter((d) => d.docKey !== BA_PUBLIC_DOC_KEY)
+    .map((d) => ({
+      docKey: d.docKey,
+      version: d.version,
+      title: d.title,
+      createdAt: d.createdAt,
+      url: `${base}/api/ba/baseline/${d.docKey}`,
+      auth: "Bearer UNIT_PUSH",
+    }));
+  const lines = [
+    "",
+    "---",
+    "",
+    "## Phụ lục (app tự sinh)",
+    "",
+    `- Địa chỉ gốc: \`QLBA_BASE_URL=${base}\``,
+    `- Trang này: \`${base}/api/ba/start\` (công khai). JSON: \`${base}/api/ba/start?format=json\``,
+    guide ? `- Phiên bản hướng dẫn: \`huong-dan\` v${guide.version}` : "- Chưa có hướng dẫn được đăng.",
+    "",
+    "Các tài liệu còn lại của bộ chung cần mã khóa (`Authorization: Bearer $QLBA_TOKEN`):",
+    "",
+    "| docKey | Phiên bản | Tiêu đề | Lấy bằng |",
+    "|---|---|---|---|",
+    ...otherDocs.map((d) => `| \`${d.docKey}\` | v${d.version} | ${String(d.title || "").replace(/\|/g, "/")} | \`GET ${d.url}\` |`),
+    ...(otherDocs.length ? [] : ["| — | — | chưa đăng | — |"]),
+    "",
+    `Lấy cả bộ một lần: \`curl -sS "${base}/api/ba/baseline" -H "Authorization: Bearer $QLBA_TOKEN"\``,
+    "",
+  ];
+  const markdown = `${content ?? "# Hướng dẫn trợ lý BA\n\nChưa có hướng dẫn được đăng. Báo chủ tài khoản liên hệ quản trị app rồi thử lại sau."}\n${lines.join("\n")}`;
+  return {
+    baseUrl: base,
+    guide: guide ? { docKey: BA_PUBLIC_DOC_KEY, version: guide.version, title: guide.title, createdAt: guide.createdAt } : null,
+    docs: otherDocs,
+    markdown,
+  };
+}
+
 export {
+  BA_BASE_URL_PLACEHOLDER,
+  BA_PUBLIC_DOC_KEY,
+  buildStartGuide,
+  normalizeBaseUrl,
   ALL_SCOPES,
   BA_DOC_KEYS,
   BA_EVIDENCE,

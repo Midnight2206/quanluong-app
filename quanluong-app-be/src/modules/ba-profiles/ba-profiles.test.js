@@ -143,6 +143,7 @@ test("router mount: các route BA tồn tại", async () => {
   const { baProfilesRouter } = await import("./ba-profiles.routes.js");
   const paths = baProfilesRouter.stack.filter((l) => l.route).map((l) => `${Object.keys(l.route.methods)[0]} ${l.route.path}`);
   for (const p of [
+    "get /start",
     "post /unit-profiles",
     "get /unit-profiles",
     "get /unit-profiles/:id",
@@ -326,4 +327,53 @@ test("quản lý token: GLOBAL_WRITE chỉ superadmin", () => {
 
 test("đọc hồ sơ: GLOBAL_WRITE đọc mọi đơn vị", () => {
   assert.doesNotThrow(() => svc.assertTokenCanReadUnit({ scope: "GLOBAL_WRITE", unitId: null }, 7));
+});
+
+// ---------- trang khởi động công khai ----------
+test("buildStartGuide: thay {{BASE_URL}}, liệt kê docKey khác kèm cách lấy bằng token, không lộ nội dung", () => {
+  const out = utils.buildStartGuide({
+    baseUrl: "https://example.test/",
+    guide: { version: 3, title: "HD", contentMarkdown: "# HD\nMở {{BASE_URL}}/api/ba/start rồi {{BASE_URL}}/api/ba/baseline", createdAt: "x" },
+    docs: [
+      { docKey: "huong-dan", version: 3, title: "HD" },
+      { docKey: "nghiep-vu-chung", version: 2, title: "Bộ chung | 01" },
+    ],
+  });
+  assert.equal(out.baseUrl, "https://example.test");
+  assert.ok(out.markdown.includes("Mở https://example.test/api/ba/start rồi https://example.test/api/ba/baseline"));
+  assert.ok(!out.markdown.includes("{{BASE_URL}}"));
+  assert.deepEqual(out.docs.map((d) => d.docKey), ["nghiep-vu-chung"]);
+  assert.equal(out.docs[0].url, "https://example.test/api/ba/baseline/nghiep-vu-chung");
+  assert.ok(out.markdown.includes("Bộ chung / 01"));
+  assert.equal(out.guide.version, 3);
+  assert.deepEqual(utils.detectSecrets(out.markdown), []);
+  assert.equal(utils.normalizeBaseUrl("https://a.b/api/"), "https://a.b");
+});
+
+test("buildStartGuide: chưa có hướng dẫn → nội dung mặc định, guide null", () => {
+  const out = utils.buildStartGuide({ baseUrl: "https://e.t", guide: null, docs: [] });
+  assert.equal(out.guide, null);
+  assert.match(out.markdown, /Chưa có hướng dẫn/);
+});
+
+test("getStartGuideData: hướng dẫn mới nhất + siêu dữ liệu các docKey", async () => {
+  const db = memDb({
+    baseline: [
+      { docKey: "huong-dan", version: 1, title: "v1", contentMarkdown: "a" },
+      { docKey: "huong-dan", version: 2, title: "v2", contentMarkdown: "b" },
+      { docKey: "mau-ho-so", version: 1, title: "02", contentMarkdown: "c" },
+    ],
+  });
+  const { guide, docs } = await svc.getStartGuideData(db);
+  assert.equal(guide.version, 2);
+  assert.deepEqual(docs.map((d) => `${d.docKey}@${d.version}`), ["huong-dan@2", "mau-ho-so@1"]);
+});
+
+test("route /start công khai, không gắn middleware token", async () => {
+  const { baProfilesRouter } = await import("./ba-profiles.routes.js");
+  const layer = baProfilesRouter.stack.find((l) => l.route?.path === "/start");
+  assert.ok(layer);
+  assert.equal(layer.route.stack.length, 2); // rate limit + handler
+  const base = baProfilesRouter.stack.find((l) => l.route?.path === "/baseline");
+  assert.ok(base.route.stack.length >= 3); // auth + scope + handler
 });

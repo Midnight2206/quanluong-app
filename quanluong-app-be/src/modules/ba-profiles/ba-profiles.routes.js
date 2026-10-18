@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { superadminMiddleware } from "../../middlewares/superadmin.middleware.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
@@ -12,6 +13,7 @@ import {
   listProposalsController,
   publishBaselineController,
   reviewProposalController,
+  startGuideController,
   adminGetProfileController,
   adminListProfilesController,
   createTokenController,
@@ -54,6 +56,16 @@ const baActorAuth = createBaActorAuthMiddleware({
 });
 
 const baProfilesRouter = express.Router();
+
+// Trang khởi động công khai (không token): trợ lý BA đọc hướng dẫn trước khi có mã khóa.
+const startRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Gọi quá nhiều lần, thử lại sau 15 phút." },
+});
+baProfilesRouter.get("/start", startRateLimit, asyncHandler(startGuideController));
 
 // --- Bộ nghiệp vụ chung: mọi token đọc được; GLOBAL_WRITE / superadmin đăng ---
 baProfilesRouter.get("/baseline", baActorAuth, requireBaScope(...ALL_SCOPES), asyncHandler(listBaselineController));
