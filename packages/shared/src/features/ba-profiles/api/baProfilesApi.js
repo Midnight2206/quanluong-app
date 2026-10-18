@@ -44,3 +44,53 @@ export function useRevokeBaTokenMutation() {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.baProfiles.root }),
   });
 }
+
+const ba = (url, method = "get", data) => apiRequest({ url, method, data, skipTargetUnitHeader: true });
+
+export function useBaBaselineQuery(enabled = true) {
+  return useQuery({ queryKey: qk.baProfiles.baseline(), queryFn: () => ba("/ba/baseline"), enabled });
+}
+
+export function useBaBaselineVersionsQuery(docKey) {
+  return useQuery({
+    queryKey: qk.baProfiles.baselineVersions(docKey),
+    queryFn: () => ba(`/ba/baseline/${docKey}/versions`),
+    enabled: Boolean(docKey),
+  });
+}
+
+export function useBaBaselineDocQuery(docKey, version) {
+  return useQuery({
+    queryKey: qk.baProfiles.baselineDoc(docKey, version),
+    queryFn: () => ba(`/ba/baseline/${docKey}${version ? `?version=${version}` : ""}`),
+    enabled: Boolean(docKey),
+  });
+}
+
+export function usePublishBaBaselineMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ docKey, ...body }) => ba(`/ba/baseline/${docKey}`, "post", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.baProfiles.root }),
+  });
+}
+
+export function useBaComparisonQuery(enabled = true) {
+  return useQuery({ queryKey: qk.baProfiles.comparison(), queryFn: () => ba("/ba/comparison"), enabled });
+}
+
+export function useBaProposalsQuery(status, enabled = true) {
+  return useQuery({
+    queryKey: qk.baProfiles.proposals(status),
+    queryFn: () => ba(`/ba/proposals${status ? `?status=${status}` : ""}`),
+    enabled,
+  });
+}
+
+export function useReviewBaProposalMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ id, ...body }) => ba(`/ba/proposals/${id}`, "patch", body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.baProfiles.root }),
+  });
+}

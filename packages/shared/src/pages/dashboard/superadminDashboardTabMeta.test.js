@@ -10,8 +10,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 register(pathToFileURL(join(root, "test/atAliasLoader.mjs")), import.meta.url);
 const { superadminPortalNavItems } = await import("../../features/navigation/navConfig.js");
 
-test("superadmin tab meta has section shortLabel icon for 10 paths", () => {
-  assert.equal(DASHBOARD_SUPERADMIN_TAB_META.length, 10);
+test("superadmin tab meta has section shortLabel icon for 11 paths", () => {
+  assert.equal(DASHBOARD_SUPERADMIN_TAB_META.length, 11);
   const paths = DASHBOARD_SUPERADMIN_TAB_META.map((t) => t.path);
   assert.deepEqual(paths, [
     "units",
@@ -24,6 +24,7 @@ test("superadmin tab meta has section shortLabel icon for 10 paths", () => {
     "chung-tu-pdf-templates",
     "backup",
     "infra",
+    "ba-profiles",
   ]);
   for (const t of DASHBOARD_SUPERADMIN_TAB_META) {
     assert.ok(t.section);
@@ -39,7 +40,7 @@ test("superadmin tab meta has section shortLabel icon for 10 paths", () => {
 });
 
 test("superadminPortalNavItems is dashboard-only from meta", () => {
-  assert.equal(superadminPortalNavItems.length, 10);
+  assert.equal(superadminPortalNavItems.length, 11);
   for (const item of superadminPortalNavItems) {
     assert.match(item.to, /^\/dashboard\//);
     assert.ok(item.section);

@@ -27,6 +27,11 @@ export const qk = {
     latest: () => ["baProfiles", "latest"],
     detail: (id) => ["baProfiles", "detail", String(id)],
     tokens: () => ["baProfiles", "tokens"],
+    baseline: () => ["baProfiles", "baseline"],
+    baselineVersions: (docKey) => ["baProfiles", "baseline", docKey, "versions"],
+    baselineDoc: (docKey, version) => ["baProfiles", "baseline", docKey, String(version ?? "latest")],
+    comparison: () => ["baProfiles", "comparison"],
+    proposals: (status) => ["baProfiles", "proposals", status ?? "all"],
   },
   lttp: {
     root: ["lttp"],

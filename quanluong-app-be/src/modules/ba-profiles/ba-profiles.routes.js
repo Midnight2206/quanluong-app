@@ -4,6 +4,14 @@ import { superadminMiddleware } from "../../middlewares/superadmin.middleware.js
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
 import { asyncHandler } from "../../shared/utils/async-handler.js";
 import {
+  comparisonController,
+  createProposalController,
+  getBaselineDocController,
+  listBaselineController,
+  listBaselineVersionsController,
+  listProposalsController,
+  publishBaselineController,
+  reviewProposalController,
   adminGetProfileController,
   adminListProfilesController,
   createTokenController,
@@ -14,8 +22,19 @@ import {
   revokeTokenController,
 } from "./ba-profiles.controller.js";
 import { findActiveTokenByHash, touchToken } from "./ba-profiles.service.js";
-import { createBaTokenAuthMiddleware, requireBaScope } from "./ba-token-auth.middleware.js";
 import {
+  createBaActorAuthMiddleware,
+  createBaTokenAuthMiddleware,
+  requireBaScope,
+} from "./ba-token-auth.middleware.js";
+import { ALL_SCOPES, GLOBAL_SCOPES } from "./ba-profiles.utils.js";
+import {
+  baselineQuerySchema,
+  createProposalBodySchema,
+  docKeyParamsSchema,
+  listProposalsQuerySchema,
+  publishBaselineBodySchema,
+  reviewProposalBodySchema,
   createTokenBodySchema,
   idParamsSchema,
   listProfilesQuerySchema,
@@ -27,7 +46,64 @@ const baTokenAuth = createBaTokenAuthMiddleware({
   touchToken: (id) => touchToken(id),
 });
 
+// Trợ lý (Bearer qlba_…) hoặc superadmin đăng nhập (coi như GLOBAL_WRITE)
+const baActorAuth = createBaActorAuthMiddleware({
+  tokenAuth: baTokenAuth,
+  userAuth: authMiddleware,
+  superadminOnly: superadminMiddleware,
+});
+
 const baProfilesRouter = express.Router();
+
+// --- Bộ nghiệp vụ chung: mọi token đọc được; GLOBAL_WRITE / superadmin đăng ---
+baProfilesRouter.get("/baseline", baActorAuth, requireBaScope(...ALL_SCOPES), asyncHandler(listBaselineController));
+baProfilesRouter.get(
+  "/baseline/:docKey",
+  baActorAuth,
+  requireBaScope(...ALL_SCOPES),
+  validateRequest({ params: docKeyParamsSchema, query: baselineQuerySchema }),
+  asyncHandler(getBaselineDocController),
+);
+baProfilesRouter.get(
+  "/baseline/:docKey/versions",
+  baActorAuth,
+  requireBaScope(...ALL_SCOPES),
+  validateRequest({ params: docKeyParamsSchema }),
+  asyncHandler(listBaselineVersionsController),
+);
+baProfilesRouter.post(
+  "/baseline/:docKey",
+  baActorAuth,
+  requireBaScope("GLOBAL_WRITE"),
+  validateRequest({ params: docKeyParamsSchema, body: publishBaselineBodySchema }),
+  asyncHandler(publishBaselineController),
+);
+
+// --- Bảng so sánh (chỉ GLOBAL) ---
+baProfilesRouter.get("/comparison", baActorAuth, requireBaScope(...GLOBAL_SCOPES), asyncHandler(comparisonController));
+
+// --- Đề xuất: đơn vị gửi + xem của mình; GLOBAL xem tất cả; GLOBAL_WRITE duyệt ---
+baProfilesRouter.post(
+  "/proposals",
+  baActorAuth,
+  requireBaScope("UNIT_PUSH"),
+  validateRequest({ body: createProposalBodySchema }),
+  asyncHandler(createProposalController),
+);
+baProfilesRouter.get(
+  "/proposals",
+  baActorAuth,
+  requireBaScope(...ALL_SCOPES),
+  validateRequest({ query: listProposalsQuerySchema }),
+  asyncHandler(listProposalsController),
+);
+baProfilesRouter.patch(
+  "/proposals/:id",
+  baActorAuth,
+  requireBaScope("GLOBAL_WRITE"),
+  validateRequest({ params: idParamsSchema, body: reviewProposalBodySchema }),
+  asyncHandler(reviewProposalController),
+);
 
 // --- Bot (Bearer qlba_…) ---
 baProfilesRouter.post(
@@ -40,14 +116,14 @@ baProfilesRouter.post(
 baProfilesRouter.get(
   "/unit-profiles",
   baTokenAuth,
-  requireBaScope("UNIT_PUSH", "GLOBAL_READ"),
+  requireBaScope(...ALL_SCOPES),
   validateRequest({ query: listProfilesQuerySchema }),
   asyncHandler(listProfilesByTokenController),
 );
 baProfilesRouter.get(
   "/unit-profiles/:id",
   baTokenAuth,
-  requireBaScope("UNIT_PUSH", "GLOBAL_READ"),
+  requireBaScope(...ALL_SCOPES),
   validateRequest({ params: idParamsSchema }),
   asyncHandler(getProfileByTokenController),
 );

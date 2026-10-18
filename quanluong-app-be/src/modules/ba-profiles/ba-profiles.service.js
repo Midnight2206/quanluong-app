@@ -2,8 +2,14 @@ import { prisma as defaultPrisma } from "../../infra/database/prisma/prisma.clie
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
+  BA_DOC_KEYS,
   BA_MAX_CONTENT_BYTES,
+  BA_RULE_DOC_KEY,
   BA_SCOPES,
+  GLOBAL_SCOPES,
+  buildComparison,
+  extractChungRuleIds,
+  findUnknownChungRules,
   canTokenReadUnit,
   detectSecrets,
   generateBaToken,
@@ -32,7 +38,7 @@ function forbidden(message) {
 async function findActiveTokenByHash(tokenHash, db = defaultPrisma) {
   return db.baApiToken.findFirst({
     where: { tokenHash, revokedAt: null },
-    select: { id: true, scope: true, unitId: true, revokedAt: true, name: true },
+    select: { id: true, scope: true, unitId: true, revokedAt: true, name: true, prefix: true },
   });
 }
 
@@ -66,6 +72,30 @@ async function pushUnitProfile({ token, body }, db = defaultPrisma) {
     throw forbidden("Chỉ mã khóa UNIT_PUSH được đẩy hồ sơ.");
   }
   assertCleanContent(body.contentMarkdown);
+  let rules = null;
+  let baselineVersion = null;
+  if (Array.isArray(body.rules) && body.rules.length) {
+    assertCleanContent(JSON.stringify(body.rules));
+    const baseline = await getLatestBaselineDoc(BA_RULE_DOC_KEY, db);
+    const unknown = findUnknownChungRules(body.rules, baseline?.ruleIds);
+    if (unknown.length) {
+      throw new AppError({
+        message: baseline
+          ? "Có ruleId CHUNG-xx không có trong bộ nghiệp vụ chung mới nhất."
+          : "Chưa có bộ nghiệp vụ chung để đối chiếu CHUNG-xx.",
+        statusCode: 422,
+        code: ERROR_CODES.VALIDATION_ERROR,
+        details: { unknownRuleIds: unknown, baselineVersion: baseline?.version ?? null },
+      });
+    }
+    rules = body.rules.map((r) => ({
+      ruleId: r.ruleId,
+      status: r.status,
+      note: r.note ?? null,
+      evidence: r.evidence ?? null,
+    }));
+    baselineVersion = baseline?.version ?? null;
+  }
   const unitId = Number(token.unitId);
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const agg = await db.baUnitProfile.aggregate({ where: { unitId }, _max: { version: true } });
@@ -79,9 +109,10 @@ async function pushUnitProfile({ token, body }, db = defaultPrisma) {
           contentMarkdown: body.contentMarkdown,
           schemaVersion: body.schemaVersion,
           sourceAgentName: body.sourceAgentName ?? null,
+          ...(rules ? { rules, baselineVersion } : {}),
           pushedByTokenId: token.id,
         },
-        select: { id: true, unitId: true, version: true },
+        select: { id: true, unitId: true, version: true, baselineVersion: true },
       });
       return row;
     } catch (error) {
@@ -98,6 +129,7 @@ const listSelect = {
   title: true,
   schemaVersion: true,
   sourceAgentName: true,
+  baselineVersion: true,
   createdAt: true,
   unit: { select: { name: true } },
 };
@@ -124,7 +156,7 @@ async function listUnitHistory(unitId, db = defaultPrisma) {
 async function getProfileById(id, db = defaultPrisma) {
   const row = await db.baUnitProfile.findUnique({
     where: { id: Number(id) },
-    select: { ...listSelect, contentMarkdown: true },
+    select: { ...listSelect, contentMarkdown: true, rules: true },
   });
   if (!row) {
     throw new AppError({ message: "Không tìm thấy hồ sơ.", statusCode: 404, code: ERROR_CODES.NOT_FOUND });
@@ -147,7 +179,7 @@ function userTypeName(user) {
 function assertUserCanManage(user, { scope, unitId }) {
   const t = userTypeName(user);
   if (t === SUPERADMIN) return;
-  if (scope === BA_SCOPES.GLOBAL_READ) throw forbidden("Chỉ superadmin quản lý mã khóa GLOBAL_READ.");
+  if (GLOBAL_SCOPES.includes(scope)) throw forbidden("Chỉ superadmin quản lý mã khóa GLOBAL_READ / GLOBAL_WRITE.");
   if (t !== ADMIN || !user.unitId || Number(user.unitId) !== Number(unitId)) {
     throw forbidden("Chỉ admin đơn vị quản lý mã khóa đẩy hồ sơ của đơn vị mình.");
   }
@@ -190,7 +222,146 @@ async function revokeToken({ user, id }, db = defaultPrisma) {
   });
 }
 
+// ---------- Bộ nghiệp vụ chung ----------
+
+const baselineListSelect = { id: true, docKey: true, version: true, title: true, publishedBy: true, createdAt: true };
+
+function notFound(message) {
+  return new AppError({ message, statusCode: 404, code: ERROR_CODES.NOT_FOUND });
+}
+
+async function getLatestBaselineDoc(docKey, db = defaultPrisma) {
+  return db.baBaselineDoc.findFirst({ where: { docKey }, orderBy: { version: "desc" } });
+}
+
+/** Bản mới nhất của mỗi docKey (kèm nội dung — bộ kit nhỏ). */
+async function listLatestBaseline(db = defaultPrisma) {
+  const out = [];
+  for (const docKey of BA_DOC_KEYS) {
+    const row = await getLatestBaselineDoc(docKey, db);
+    if (row) out.push(row);
+  }
+  return out;
+}
+
+async function getBaselineDoc(docKey, version, db = defaultPrisma) {
+  const row = version
+    ? await db.baBaselineDoc.findUnique({ where: { docKey_version: { docKey, version: Number(version) } } })
+    : await getLatestBaselineDoc(docKey, db);
+  if (!row) throw notFound("Chưa có tài liệu này trong bộ nghiệp vụ chung.");
+  return row;
+}
+
+async function listBaselineVersions(docKey, db = defaultPrisma) {
+  return db.baBaselineDoc.findMany({ where: { docKey }, select: baselineListSelect, orderBy: { version: "desc" } });
+}
+
+/** Đăng phiên bản mới; `actor` = "user:<id>" | "token:<prefix>". */
+async function publishBaselineDoc({ docKey, title, contentMarkdown, actor }, db = defaultPrisma) {
+  assertCleanContent(contentMarkdown);
+  const ruleIds = docKey === BA_RULE_DOC_KEY ? extractChungRuleIds(contentMarkdown) : null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const agg = await db.baBaselineDoc.aggregate({ where: { docKey }, _max: { version: true } });
+    const version = (agg?._max?.version ?? 0) + 1;
+    try {
+      return await db.baBaselineDoc.create({
+        data: { docKey, version, title, contentMarkdown, ruleIds, publishedBy: actor ?? null },
+        select: { ...baselineListSelect, ruleIds: true },
+      });
+    } catch (error) {
+      if (error?.code !== "P2002" || attempt === 2) throw error;
+    }
+  }
+  return null;
+}
+
+// ---------- Bảng so sánh ----------
+
+async function getComparison(db = defaultPrisma) {
+  const baseline = await getLatestBaselineDoc(BA_RULE_DOC_KEY, db);
+  const rows = await db.baUnitProfile.findMany({ select: { ...listSelect, rules: true } });
+  const latest = pickLatestPerUnit(rows).map(mapListRow);
+  return {
+    baselineVersion: baseline?.version ?? null,
+    ...buildComparison(Array.isArray(baseline?.ruleIds) ? baseline.ruleIds : [], latest),
+  };
+}
+
+// ---------- Đề xuất ----------
+
+const proposalSelect = {
+  id: true,
+  unitId: true,
+  title: true,
+  description: true,
+  relatedRuleIds: true,
+  proposedText: true,
+  status: true,
+  reviewComment: true,
+  reviewedBy: true,
+  reviewedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  unit: { select: { name: true } },
+};
+
+async function createProposal({ token, body }, db = defaultPrisma) {
+  if (token?.scope !== BA_SCOPES.UNIT_PUSH || !token.unitId) {
+    throw forbidden("Chỉ mã khóa UNIT_PUSH được gửi đề xuất.");
+  }
+  assertCleanContent([body.title, body.description, body.proposedText].join("\n"));
+  const row = await db.baProposal.create({
+    data: {
+      unitId: Number(token.unitId),
+      title: body.title,
+      description: body.description ?? null,
+      relatedRuleIds: body.relatedRuleIds ?? [],
+      proposedText: body.proposedText,
+      createdByTokenId: token.id ?? null,
+    },
+    select: proposalSelect,
+  });
+  return mapListRow(row);
+}
+
+/** UNIT_PUSH: chỉ đề xuất của đơn vị mình; GLOBAL: tất cả. */
+async function listProposals({ token, status }, db = defaultPrisma) {
+  const where = {};
+  if (status) where.status = status;
+  if (!GLOBAL_SCOPES.includes(token?.scope)) {
+    if (token?.scope !== BA_SCOPES.UNIT_PUSH || !token.unitId) throw forbidden("Mã khóa không đọc được đề xuất.");
+    where.unitId = Number(token.unitId);
+  }
+  const rows = await db.baProposal.findMany({ where, select: proposalSelect, orderBy: { createdAt: "desc" } });
+  return rows.map(mapListRow);
+}
+
+async function reviewProposal({ id, status, reviewComment, actor }, db = defaultPrisma) {
+  const found = await db.baProposal.findUnique({ where: { id: Number(id) }, select: { id: true } });
+  if (!found) throw notFound("Không tìm thấy đề xuất.");
+  const row = await db.baProposal.update({
+    where: { id: found.id },
+    data: {
+      status,
+      reviewComment: reviewComment ?? null,
+      reviewedBy: actor ?? null,
+      reviewedAt: status === "OPEN" ? null : new Date(),
+    },
+    select: proposalSelect,
+  });
+  return mapListRow(row);
+}
+
 export {
+  createProposal,
+  getBaselineDoc,
+  getComparison,
+  getLatestBaselineDoc,
+  listBaselineVersions,
+  listLatestBaseline,
+  listProposals,
+  publishBaselineDoc,
+  reviewProposal,
   assertCleanContent,
   assertTokenCanReadUnit,
   assertUserCanManage,

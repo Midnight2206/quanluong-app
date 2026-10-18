@@ -1,8 +1,17 @@
 import { respondCreated, respondSuccess } from "../../shared/utils/responders.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
-import { BA_SCOPES } from "./ba-profiles.utils.js";
+import { BA_SCOPES, GLOBAL_SCOPES } from "./ba-profiles.utils.js";
+import { baActorLabel } from "./ba-token-auth.middleware.js";
 import {
+  createProposal,
+  getBaselineDoc,
+  getComparison,
+  listBaselineVersions,
+  listLatestBaseline,
+  listProposals,
+  publishBaselineDoc,
+  reviewProposal,
   assertTokenCanReadUnit,
   createToken,
   getProfileById,
@@ -25,7 +34,7 @@ async function listProfilesByTokenController(req, res) {
     assertTokenCanReadUnit(token, unitId);
     return respondSuccess(res, { data: await listUnitHistory(unitId) });
   }
-  if (latest && token.scope === BA_SCOPES.GLOBAL_READ) {
+  if (latest && GLOBAL_SCOPES.includes(token.scope)) {
     return respondSuccess(res, { data: await listLatestProfiles() });
   }
   if (token.scope === BA_SCOPES.UNIT_PUSH) {
@@ -72,7 +81,62 @@ async function revokeTokenController(req, res) {
   return respondSuccess(res, { message: "Đã thu hồi mã khóa.", data });
 }
 
+// ---------- Bộ nghiệp vụ chung / so sánh / đề xuất (token hoặc superadmin) ----------
+
+async function listBaselineController(_req, res) {
+  return respondSuccess(res, { data: await listLatestBaseline() });
+}
+
+async function getBaselineDocController(req, res) {
+  const { docKey } = req.validatedParams;
+  return respondSuccess(res, { data: await getBaselineDoc(docKey, req.validatedQuery?.version) });
+}
+
+async function listBaselineVersionsController(req, res) {
+  return respondSuccess(res, { data: await listBaselineVersions(req.validatedParams.docKey) });
+}
+
+async function publishBaselineController(req, res) {
+  const data = await publishBaselineDoc({
+    docKey: req.validatedParams.docKey,
+    ...req.validatedBody,
+    actor: baActorLabel(req.baToken),
+  });
+  return respondCreated(res, { message: "Đã đăng phiên bản mới.", data });
+}
+
+async function comparisonController(_req, res) {
+  return respondSuccess(res, { data: await getComparison() });
+}
+
+async function createProposalController(req, res) {
+  const data = await createProposal({ token: req.baToken, body: req.validatedBody });
+  return respondCreated(res, { message: "Đã gửi đề xuất.", data });
+}
+
+async function listProposalsController(req, res) {
+  const data = await listProposals({ token: req.baToken, status: req.validatedQuery?.status });
+  return respondSuccess(res, { data });
+}
+
+async function reviewProposalController(req, res) {
+  const data = await reviewProposal({
+    id: req.validatedParams.id,
+    ...req.validatedBody,
+    actor: baActorLabel(req.baToken),
+  });
+  return respondSuccess(res, { message: "Đã cập nhật đề xuất.", data });
+}
+
 export {
+  comparisonController,
+  createProposalController,
+  getBaselineDocController,
+  listBaselineController,
+  listBaselineVersionsController,
+  listProposalsController,
+  publishBaselineController,
+  reviewProposalController,
   adminGetProfileController,
   adminListProfilesController,
   createTokenController,
