@@ -28,6 +28,16 @@ Superadmin đăng nhập trên giao diện được coi như `GLOBAL_WRITE` vớ
 
 Gửi kèm mỗi request: `Authorization: Bearer $QLBA_TOKEN`.
 
+## Trang khởi động công khai (không token)
+
+`GET /api/ba/start` → `text/markdown`: bản `huong-dan` mới nhất (00) đã thay `{{BASE_URL}}` bằng địa chỉ gốc, kèm phụ lục liệt kê các docKey còn lại (phiên bản, tiêu đề, cách lấy bằng token). `?format=json` → `{success, data:{baseUrl, guide:{version,title}, docs:[{docKey,version,title,url,auth}], contentMarkdown}}`.
+
+- Chỉ `huong-dan` công khai. `nghiep-vu-chung`, `mau-ho-so`, `bo-cau-hoi` vẫn cần token (`GET /api/ba/baseline`).
+- Hướng dẫn **không được** chứa bí mật: server chạy bộ dò bí mật trước khi trả; có dấu hiệu thì trả `503`. Chưa đăng `huong-dan` cũng trả `503`.
+- Địa chỉ gốc lấy từ env `BA_PUBLIC_BASE_URL`, nếu không có thì `PUBLIC_WEB_URL` (không lấy từ header Host).
+- Giới hạn 60 lần / 15 phút / IP (`429`), `Cache-Control: public, max-age=60`.
+- Chủ đơn vị chỉ cần gửi trợ lý BA link này. Đăng lại hướng dẫn: sửa kit 00 rồi chạy `scripts/ba-seed-baseline.js`.
+
 ## Bộ nghiệp vụ chung (mọi token)
 
 `docKey`: `huong-dan` (00), `nghiep-vu-chung` (01), `mau-ho-so` (02), `bo-cau-hoi` (03).
