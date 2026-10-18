@@ -24,6 +24,7 @@ services:
       - ./quanluong-app-be/prisma:/app/prisma
       - ./quanluong-app-be/scripts:/app/scripts
       - ./quanluong-app-be/prisma.config.ts:/app/prisma.config.ts
+      - ./docs/ba-kit:/app/ba-kit:ro
       - media_data:/data/media
     command: ["sh", "-c", "npx prisma generate && npm run dev"]
 

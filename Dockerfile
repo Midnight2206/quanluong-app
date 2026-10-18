@@ -19,6 +19,8 @@ ENV DATABASE_URL=${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
 COPY quanluong-app-be/package*.json ./
 RUN npm ci
 COPY quanluong-app-be/ ./
+# Bộ kit BA (docs/ba-kit) cho scripts/ba-seed-baseline.js — mặc định đọc /app/ba-kit
+COPY docs/ba-kit ./ba-kit
 RUN npx prisma generate
 
 # Gỡ devDependencies khỏi tree đã `npm ci` đầy đủ — image runtime copy `node_modules` này,
@@ -49,6 +51,7 @@ COPY --from=backend-builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=backend-builder /app/src ./src
 COPY --from=backend-builder /app/scripts ./scripts
 COPY --from=backend-builder /app/assets ./assets
+COPY --from=backend-builder /app/ba-kit ./ba-kit
 RUN chmod +x scripts/prisma-migrate-deploy-recover.sh
 RUN npx prisma generate
 EXPOSE 3000

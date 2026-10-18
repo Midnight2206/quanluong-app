@@ -6,5 +6,7 @@
 **/dist
 **/.vite
 **/*.md
+# Bộ kit BA: seed script nạp vào BaBaselineDoc (image backend: /app/ba-kit)
+!docs/ba-kit/*.md
 THÔNG TƯ*.pdf
 **/.cursor

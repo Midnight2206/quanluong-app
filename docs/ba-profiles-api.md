@@ -36,7 +36,7 @@ Gửi kèm mỗi request: `Authorization: Bearer $QLBA_TOKEN`.
 - Hướng dẫn **không được** chứa bí mật: server chạy bộ dò bí mật trước khi trả; có dấu hiệu thì trả `503`. Chưa đăng `huong-dan` cũng trả `503`.
 - Địa chỉ gốc lấy từ env `BA_PUBLIC_BASE_URL`, nếu không có thì `PUBLIC_WEB_URL` (không lấy từ header Host).
 - Giới hạn 60 lần / 15 phút / IP (`429`), `Cache-Control: public, max-age=60`.
-- Chủ đơn vị chỉ cần gửi trợ lý BA link này. Đăng lại hướng dẫn: sửa kit 00 rồi chạy `scripts/ba-seed-baseline.js`.
+- Chủ đơn vị chỉ cần gửi trợ lý BA link này. Đăng lại hướng dẫn: sửa `docs/ba-kit/00-huong-dan-tro-ly-ba.md` rồi nạp lại (mục «Nạp bộ kit» dưới).
 
 ## Bộ nghiệp vụ chung (mọi token)
 
@@ -49,7 +49,19 @@ Gửi kèm mỗi request: `Authorization: Bearer $QLBA_TOKEN`.
 | `GET /api/ba/baseline/:docKey/versions` | bất kỳ | Danh sách phiên bản (không kèm nội dung) |
 | `POST /api/ba/baseline/:docKey` `{title, contentMarkdown}` | GLOBAL_WRITE / superadmin | Đăng phiên bản mới (version +1). Với `nghiep-vu-chung`, server trích các `CHUNG-xx` trong nội dung thành `ruleIds` |
 
-Nạp kit ban đầu: `node scripts/ba-seed-baseline.js <thư-mục-kit>` (chỉ đăng khi nội dung đổi).
+### Nạp bộ kit
+
+Nguồn bộ kit nằm trong repo: `docs/ba-kit/` (`00-huong-dan-tro-ly-ba.md`, `01-nghiep-vu-chung.md`, `02-mau-ho-so-don-vi.md`, `03-bo-cau-hoi.md`). Bản 00 dùng chỗ giữ `{{BASE_URL}}`, `/api/ba/start` thay bằng địa chỉ gốc khi trả.
+
+- Image backend chép `docs/ba-kit` vào `/app/ba-kit` (Dockerfile + ngoại lệ `!docs/ba-kit/*.md` trong `.dockerignore`). Dev (`docker-compose.dev.yml`) gắn `./docs/ba-kit:/app/ba-kit:ro`.
+- Production, sau `git pull` + build lại Docker:
+
+```bash
+docker exec -w /app quanluong-app-be node scripts/ba-seed-baseline.js
+```
+
+- Script chỉ đăng phiên bản mới cho tài liệu có nội dung đổi, chạy lại an toàn.
+- Thư mục mặc định: tham số dòng lệnh > env `BA_KIT_DIR` > `/app/ba-kit` (trong container) > `<repo>/docs/ba-kit` (chạy từ `quanluong-app-be/` trên máy).
 
 ```bash
 curl -sS "https://<domain>/api/ba/baseline" -H "Authorization: Bearer $QLBA_TOKEN"
