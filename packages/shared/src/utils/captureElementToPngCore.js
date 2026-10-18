@@ -50,27 +50,21 @@ export async function captureElementToPngBlobWithDeps(root, opts = {}, deps) {
 
   try {
     if (scrollEl) {
-      // StickyResponsiveTable: body cuộn ngang + header clip — lấy width từ vùng body.
-      const bodyScroll =
-        scrollEl.querySelector('[role="region"][aria-label*="cuộn ngang"]') || scrollEl;
-      const fullW = Math.max(bodyScroll.scrollWidth, scrollEl.scrollWidth);
+      // Bản phẳng full bảng (một <table>) — lấy scrollWidth của table nếu có.
+      const tableEl = scrollEl.querySelector("table");
+      const fullW = Math.max(
+        tableEl?.scrollWidth ?? 0,
+        tableEl?.offsetWidth ?? 0,
+        scrollEl.scrollWidth,
+      );
       push(scrollEl, "overflow", "visible");
       // Remove viewport clipping so PNG captures the full table, not just current scrolled region.
       push(scrollEl, "max-height", "none");
       push(scrollEl, "height", "auto");
       push(scrollEl, "width", `${fullW}px`);
-      for (const el of scrollEl.querySelectorAll('[role="region"], [data-sticky-level]')) {
-        push(el, "overflow", "visible");
-        push(el, "max-width", "none");
-        push(el, "width", `${fullW}px`);
-      }
-      const headerTrack = scrollEl.querySelector(".will-change-transform");
-      if (headerTrack) {
-        const prevTransform = headerTrack.style.transform;
-        headerTrack.style.transform = "none";
-        restores.push(() => {
-          headerTrack.style.transform = prevTransform;
-        });
+      if (tableEl) {
+        push(tableEl, "width", `${fullW}px`);
+        push(tableEl, "min-width", `${fullW}px`);
       }
     }
     if (card) {
@@ -80,9 +74,7 @@ export async function captureElementToPngBlobWithDeps(root, opts = {}, deps) {
     push(root, "max-width", "none");
 
     const tableW =
-      scrollEl?.querySelector('[role="region"][aria-label*="cuộn ngang"]')?.scrollWidth ??
-      scrollEl?.scrollWidth ??
-      0;
+      scrollEl?.querySelector("table")?.scrollWidth ?? scrollEl?.scrollWidth ?? 0;
     const minRootW = tableW + 8;
     if (minRootW > root.offsetWidth) {
       push(root, "width", `${minRootW}px`);
