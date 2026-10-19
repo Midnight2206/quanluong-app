@@ -5,6 +5,7 @@ const EXPORT_CAP = 10000;
 
 const AUTH_TYPE = { LOGIN_SUCCESS: "Đăng nhập", LOGIN_FAILED: "Thất bại", LOGOUT: "Đăng xuất" };
 const ACTION = { CREATE: "Thêm", UPDATE: "Sửa", DELETE: "Xóa" };
+const SOURCE = { web: "Web", supplier: "Nhà cung cấp" };
 const vnTime = (d) => (d ? new Date(new Date(d).getTime() + 7 * 3600000).toISOString().replace("T", " ").slice(0, 19) : "");
 const who = (r) => (r.user ? r.user.fullName || r.user.username : "");
 const clip = (s) => (s && s.length > 32000 ? `${s.slice(0, 32000)}…` : s);
@@ -46,6 +47,7 @@ const SHEETS = {
     columns: [
       ["Ngày", 12, (r) => r.day],
       ["Người dùng", 24, who],
+      ["Ứng dụng", 12, (r) => SOURCE[r.source] ?? r.source ?? ""],
       ["Thời gian hoạt động (phút)", 14, (r) => Math.round((r.activeSec || 0) / 60)],
       ["Số trang xem", 12, (r) => r.pageViews],
       ["Lần đầu (giờ VN)", 20, (r) => vnTime(r.firstSeenAt)],

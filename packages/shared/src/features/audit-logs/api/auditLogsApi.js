@@ -49,10 +49,10 @@ export async function downloadAuditLogExcel(tab, filters) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function useAuditUsagePagesQuery(userId, day) {
+export function useAuditUsagePagesQuery(userId, day, source) {
   return useQuery({
-    queryKey: ["auditLogs", "usagePages", String(userId), day],
-    queryFn: () => apiRequest({ url: "/audit-logs/usage/pages", method: "get", params: { userId, day }, skipTargetUnitHeader: true }),
+    queryKey: ["auditLogs", "usagePages", String(userId), day, source ?? ""],
+    queryFn: () => apiRequest({ url: "/audit-logs/usage/pages", method: "get", params: clean({ userId, day, source }), skipTargetUnitHeader: true }),
     enabled: Boolean(userId && day),
   });
 }

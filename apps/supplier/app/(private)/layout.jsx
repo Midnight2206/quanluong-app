@@ -5,6 +5,7 @@ import { SupplierOnlyRoute } from "@/hocs/SupplierOnlyRoute";
 import { ClientPersistenceProvider } from "@/lib/clientPersist/ClientPersistenceProvider.jsx";
 import { OfflineProvider } from "@/offline/OfflineProvider.jsx";
 import { SupplierShell } from "@/pages/lttp-supplier/SupplierShell";
+import { UsageTracker } from "@/features/audit-logs/UsageTracker";
 
 export default function PrivateGroupLayout({ children }) {
   return (
@@ -12,6 +13,7 @@ export default function PrivateGroupLayout({ children }) {
       <SupplierOnlyRoute>
         <ClientPersistenceProvider>
           <OfflineProvider>
+            <UsageTracker />
             <SupplierShell>{children}</SupplierShell>
           </OfflineProvider>
         </ClientPersistenceProvider>

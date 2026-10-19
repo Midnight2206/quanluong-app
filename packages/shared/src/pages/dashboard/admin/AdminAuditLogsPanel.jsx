@@ -39,6 +39,7 @@ const failReasonLabel = (code) => {
   if (code?.startsWith("ZALO_")) return `Zalo: ${ZALO_REASONS[code.slice(5)] ?? code.slice(5).toLowerCase()}`;
   return FAIL_REASONS[code] ?? code;
 };
+const USAGE_SOURCES = { web: "Web", supplier: "Nhà cung cấp" };
 const CHANGE_ACTIONS = {
   CREATE: ["Thêm", "bg-success/15 text-success"],
   UPDATE: ["Sửa", "bg-info/15 text-info"],
@@ -109,9 +110,13 @@ const TABS = [
     id: "usage",
     label: "Sử dụng",
     rowClick: true,
+    typeLabel: "Ứng dụng",
+    typeOptions: [["", "Tất cả"], ...Object.entries(USAGE_SOURCES)],
+    typeParam: "source",
     columns: [
       ["Ngày", (r) => <span className="tabular-nums">{r.day}</span>],
       ["Người dùng", (r) => (r.user ? r.user.fullName || r.user.username : "—")],
+      ["Ứng dụng", (r) => USAGE_SOURCES[r.source] ?? r.source],
       ["Thời gian hoạt động", (r) => <span className="tabular-nums">{fmtDur(r.activeSec)}</span>],
       ["Số trang xem", (r) => <span className="tabular-nums">{r.pageViews}</span>],
       ["Lần cuối", (r) => <span className="tabular-nums">{fmtTime(r.lastSeenAt)}</span>],
@@ -121,7 +126,7 @@ const TABS = [
 ];
 
 function UsagePages({ row, onClose }) {
-  const { data, isLoading, isError } = useAuditUsagePagesQuery(row.userId, row.day);
+  const { data, isLoading, isError } = useAuditUsagePagesQuery(row.userId, row.day, row.source);
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
@@ -238,7 +243,7 @@ function LogTab({ tab }) {
         </label>
         {tab.typeOptions ? (
           <label className="grid gap-1 text-xs text-muted-foreground">
-            Loại
+            {tab.typeLabel ?? "Loại"}
             <select className={cn(fieldClassSm, "w-40")} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })}>
               {tab.typeOptions.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>

@@ -32,8 +32,9 @@ async function persistAuditBatch(batch, client = basePrisma) {
 async function applyUsageDaily(heartbeats, client) {
   const byKey = new Map();
   for (const h of heartbeats) {
-    const k = `${h.userId}|${h.day}`;
-    const cur = byKey.get(k) ?? { userId: h.userId, unitId: h.unitId ?? null, day: h.day, activeSec: 0, pageViews: 0, first: h.at, last: h.at };
+    const source = h.source || "web";
+    const k = `${h.userId}|${h.day}|${source}`;
+    const cur = byKey.get(k) ?? { userId: h.userId, unitId: h.unitId ?? null, day: h.day, source, activeSec: 0, pageViews: 0, first: h.at, last: h.at };
     cur.activeSec += h.activeSec || 0;
     cur.pageViews += h.pageViews || 0;
     if (h.at < cur.first) cur.first = h.at;
@@ -43,10 +44,11 @@ async function applyUsageDaily(heartbeats, client) {
   for (const r of byKey.values()) {
     const day = new Date(`${r.day}T00:00:00.000Z`);
     await client.usageSessionDaily.upsert({
-      where: { userId_day: { userId: r.userId, day } },
+      where: { userId_day_source: { userId: r.userId, day, source: r.source } },
       create: {
         userId: r.userId,
         day,
+        source: r.source,
         unitId: r.unitId,
         activeSec: r.activeSec,
         pageViews: r.pageViews,

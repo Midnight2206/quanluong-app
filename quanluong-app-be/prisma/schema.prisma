@@ -1777,6 +1777,8 @@ model UsageEvent {
   unitId     Int?
   sessionId  String?  @db.VarChar(64)
   kind       String   @db.VarChar(16)
+  /// Ứng dụng gửi sự kiện: web | supplier (máy chủ xác định theo Origin)
+  source     String   @default("web") @db.VarChar(16)
   path       String   @db.VarChar(255)
   label      String?  @db.VarChar(128)
 
@@ -1789,13 +1791,14 @@ model UsageEvent {
 model UsageSessionDaily {
   userId      Int
   day         DateTime @db.Date
+  source      String   @default("web") @db.VarChar(16)
   unitId      Int?
   activeSec   Int      @default(0)
   pageViews   Int      @default(0)
   firstSeenAt DateTime @db.DateTime(3)
   lastSeenAt  DateTime @db.DateTime(3)
 
-  @@id([userId, day])
+  @@id([userId, day, source])
   @@index([unitId, day])
   @@index([day])
 }

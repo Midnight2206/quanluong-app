@@ -104,12 +104,12 @@ async function listUsageDaily(scope, q, { cap } = {}) {
   const take = cap ?? q.limit;
   const skip = cap ? 0 : Number(q.cursor || 0);
   const rows = await prisma.usageSessionDaily.findMany({
-    where: { ...scopeWhere(scope), day: dayRange(q), ...(q.userId ? { userId: q.userId } : {}) },
+    where: { ...scopeWhere(scope), day: dayRange(q), ...(q.userId ? { userId: q.userId } : {}), ...(q.source ? { source: q.source } : {}) },
     orderBy: [{ day: "desc" }, { activeSec: "desc" }],
     skip,
     take,
   });
-  const items = (await decorate(rows.map((r) => ({ ...r, id: `${r.userId}-${r.day.toISOString().slice(0, 10)}`, occurredAt: r.lastSeenAt }))))
+  const items = (await decorate(rows.map((r) => ({ ...r, id: `${r.userId}-${r.day.toISOString().slice(0, 10)}-${r.source}`, occurredAt: r.lastSeenAt }))))
     .map((r) => ({ ...r, day: r.day.toISOString().slice(0, 10) }));
   return { items, nextCursor: !cap && rows.length === take ? String(skip + take) : null };
 }
@@ -118,7 +118,7 @@ async function listUsagePages(scope, q) {
   const start = new Date(`${q.day}T00:00:00.000+07:00`);
   const end = new Date(start.getTime() + 86400000);
   const rows = await prisma.usageEvent.findMany({
-    where: { ...scopeWhere(scope), userId: q.userId, occurredAt: { gte: start, lt: end }, ...(q.kind ? { kind: q.kind } : {}) },
+    where: { ...scopeWhere(scope), userId: q.userId, occurredAt: { gte: start, lt: end }, ...(q.kind ? { kind: q.kind } : {}), ...(q.source ? { source: q.source } : {}) },
     orderBy: { id: "asc" },
     take: 1000,
     omit: { sessionId: true },
@@ -128,7 +128,7 @@ async function listUsagePages(scope, q) {
 
 async function listUsageEvents(scope, q, { cap }) {
   const rows = await prisma.usageEvent.findMany({
-    where: { ...scopeWhere(scope), occurredAt: range(q), ...(q.userId ? { userId: q.userId } : {}) },
+    where: { ...scopeWhere(scope), occurredAt: range(q), ...(q.userId ? { userId: q.userId } : {}), ...(q.source ? { source: q.source } : {}) },
     orderBy: { id: "desc" },
     take: cap,
     omit: { sessionId: true },

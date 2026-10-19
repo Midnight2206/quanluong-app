@@ -23,12 +23,13 @@ const changesQuerySchema = z.object({
   recordId: z.string().max(191).optional(),
 });
 
-const usageQuerySchema = z.object({ ...baseQuery, cursor: z.string().regex(/^\d+$/).optional() });
+const usageQuerySchema = z.object({ ...baseQuery, cursor: z.string().regex(/^\d+$/).optional(), source: z.enum(["web", "supplier"]).optional() });
 
 const usagePagesQuerySchema = z.object({
   userId: z.coerce.number().int().positive(),
   day: dateStr,
   kind: z.enum(["PAGE_VIEW", "ACTION"]).optional(),
+  source: z.enum(["web", "supplier"]).optional(),
 });
 
 const usageBatchBodySchema = z.object({

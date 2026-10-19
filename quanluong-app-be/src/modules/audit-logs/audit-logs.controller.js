@@ -3,7 +3,7 @@ import { authQuerySchema, changesQuerySchema, usageQuerySchema } from "./audit-l
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { respondSuccess } from "../../shared/utils/responders.js";
-import { recordUsageBatch } from "../../infra/audit/usage-audit.js";
+import { recordUsageBatch, resolveUsageUnitId, usageSourceOf } from "../../infra/audit/usage-audit.js";
 import { listUsageDaily, listUsagePages, getDataChange, listAuthEvents, listDataChanges, listScopeUsers } from "./audit-logs.service.js";
 
 async function listAuthController(req, res) {
@@ -37,7 +37,13 @@ async function listUsagePagesController(req, res) {
 }
 
 async function usageBatchController(req, res) {
-  const data = recordUsageBatch({ user: req.user, sessionId: req.session?.auth?.sessionId, events: req.validatedBody.events });
+  const data = recordUsageBatch({
+    user: req.user,
+    sessionId: req.session?.auth?.sessionId,
+    events: req.validatedBody.events,
+    source: usageSourceOf(req),
+    unitId: await resolveUsageUnitId(req.user),
+  });
   return respondSuccess(res, { message: "Accepted", data });
 }
 
