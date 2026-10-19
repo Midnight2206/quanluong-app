@@ -129,6 +129,25 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  worker-audit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+      args:
+        DATABASE_URL: ${DATABASE_URL:-mysql://root:change-me@db:3306/quanluong}
+    image: quanluong-backend:latest
+    container_name: quanluong-app-be-worker-audit
+    restart: unless-stopped
+    env_file:
+      - quanluong-app-be/.env.docker
+    command: ["npm", "run", "worker:audit-log"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   redis:
     image: redis:7-alpine
     container_name: quanluong-app-redis

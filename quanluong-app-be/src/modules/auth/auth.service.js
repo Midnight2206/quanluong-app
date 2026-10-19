@@ -21,6 +21,7 @@ import { dispatchVerificationEmail } from "../../infra/mail/verification-email.d
 import { logger } from "../../shared/utils/logger.js";
 import { grantedPermissionRecords } from "./auth-granted-permissions.js";
 import { assertStoredPassword } from "./stored-password.js";
+import { recordAuthEvent } from "../../infra/audit/auth-audit.js";
 
 /** Đổi mã quyền cũ `lrtp.*` thành `lttp.*` tại chỗ để giữ `permissionId` và TypePermission. */
 const LEGACY_LRTP_TO_LTTP_PERMISSION_CODE = {
@@ -226,7 +227,7 @@ async function getCurrentUser(authUser) {
   return user;
 }
 
-async function issueSessionForUser({ req, user, ipAddress, userAgent }) {
+async function issueSessionForUser({ req, user, ipAddress, userAgent, method = "password" }) {
   const sessionId = crypto.randomUUID();
   const refreshTokenValue = createRefreshTokenValue();
   const refreshToken = await prisma.refreshToken.create({
@@ -253,6 +254,8 @@ async function issueSessionForUser({ req, user, ipAddress, userAgent }) {
     refreshTokenId: refreshToken.id,
   });
 
+  recordAuthEvent({ type: "LOGIN_SUCCESS", method, user, sessionId, ip: ipAddress, userAgent });
+
   return {
     accessToken: createAccessToken(user),
     refreshToken: refreshTokenValue,
@@ -270,10 +273,11 @@ async function issueZaloSession({ req, user, ipAddress, userAgent }) {
     user,
     ipAddress,
     userAgent,
+    method: "zalo",
   });
 }
 
-async function login({ req, identifier, password, ipAddress, userAgent }) {
+async function loginCore({ req, identifier, password, ipAddress, userAgent }, fail) {
   const raw = await prisma.user.findFirst({
     where: {
       deletedAt: null,
@@ -283,20 +287,26 @@ async function login({ req, identifier, password, ipAddress, userAgent }) {
   });
 
   if (!raw) {
+    fail.reason = "NOT_FOUND";
     throw createAuthError();
   }
 
+  fail.user = raw;
+  fail.reason = "NO_PASSWORD";
   assertStoredPassword(raw.password);
 
   const isPasswordValid = await bcrypt.compare(password, raw.password);
 
   if (!isPasswordValid) {
+    fail.reason = "BAD_PASSWORD";
     throw createAuthError();
   }
 
   const user = await normalizeUser(raw);
 
+  fail.user = user;
   if (user.registrationStatus === "PENDING_APPROVAL") {
+    fail.reason = "PENDING";
     throw new AppError({
       message:
         "Tài khoản đang chờ quản trị đơn vị duyệt (chỉ quản trị từ cấp chỉ định trở lên trong cùng nhánh đơn vị).",
@@ -306,6 +316,7 @@ async function login({ req, identifier, password, ipAddress, userAgent }) {
   }
 
   if (user.registrationStatus === "REJECTED") {
+    fail.reason = "REJECTED";
     throw new AppError({
       message: "Đăng ký của bạn đã bị từ chối. Liên hệ quản trị đơn vị.",
       statusCode: 403,
@@ -313,8 +324,11 @@ async function login({ req, identifier, password, ipAddress, userAgent }) {
     });
   }
 
+  fail.reason = "INACTIVE";
   assertActiveUser(user);
+  fail.reason = "UNVERIFIED";
   assertEmailVerifiedForLogin(user);
+  fail.reason = "ERROR";
 
   return issueSessionForUser({
     req,
@@ -324,10 +338,29 @@ async function login({ req, identifier, password, ipAddress, userAgent }) {
   });
 }
 
-async function loginWithGoogleAccount({ req, email, ipAddress, userAgent }) {
+async function login(args) {
+  const fail = { reason: "ERROR", user: null };
+  try {
+    return await loginCore(args, fail);
+  } catch (error) {
+    recordAuthEvent({
+      type: "LOGIN_FAILED",
+      method: "password",
+      user: fail.user,
+      identifier: args.identifier,
+      failReason: fail.reason,
+      ip: args.ipAddress,
+      userAgent: args.userAgent,
+    });
+    throw error;
+  }
+}
+
+async function loginWithGoogleAccountCore({ req, email, ipAddress, userAgent }, fail) {
   const user = await findAuthUserByEmailNormalized(email);
 
   if (!user) {
+    fail.reason = "NOT_FOUND";
     throw new AppError({
       message: "Không tìm thấy tài khoản với email Google này. Vui lòng đăng ký trước.",
       statusCode: 404,
@@ -335,7 +368,9 @@ async function loginWithGoogleAccount({ req, email, ipAddress, userAgent }) {
     });
   }
 
+  fail.user = user;
   if (user.registrationStatus === "PENDING_APPROVAL") {
+    fail.reason = "PENDING";
     throw new AppError({
       message:
         "Tài khoản đang chờ quản trị đơn vị duyệt (chỉ quản trị từ cấp chỉ định trở lên trong cùng nhánh đơn vị).",
@@ -345,6 +380,7 @@ async function loginWithGoogleAccount({ req, email, ipAddress, userAgent }) {
   }
 
   if (user.registrationStatus === "REJECTED") {
+    fail.reason = "REJECTED";
     throw new AppError({
       message: "Đăng ký của bạn đã bị từ chối. Liên hệ quản trị đơn vị.",
       statusCode: 403,
@@ -352,7 +388,9 @@ async function loginWithGoogleAccount({ req, email, ipAddress, userAgent }) {
     });
   }
 
+  fail.reason = "INACTIVE";
   assertActiveUser(user);
+  fail.reason = "ERROR";
 
   let activeUser = user;
   if (!user.emailVerifiedAt) {
@@ -363,14 +401,35 @@ async function loginWithGoogleAccount({ req, email, ipAddress, userAgent }) {
     activeUser = await getUserById(user.id);
   }
 
+  fail.reason = "UNVERIFIED";
   assertEmailVerifiedForLogin(activeUser);
+  fail.reason = "ERROR";
 
   return issueSessionForUser({
     req,
     user: activeUser,
     ipAddress,
     userAgent,
+    method: "google",
   });
+}
+
+async function loginWithGoogleAccount(args) {
+  const fail = { reason: "ERROR", user: null };
+  try {
+    return await loginWithGoogleAccountCore(args, fail);
+  } catch (error) {
+    recordAuthEvent({
+      type: "LOGIN_FAILED",
+      method: "google",
+      user: fail.user,
+      identifier: args.email,
+      failReason: fail.reason,
+      ip: args.ipAddress,
+      userAgent: args.userAgent,
+    });
+    throw error;
+  }
 }
 
 function assertEmailVerifiedForLogin(user) {
@@ -522,6 +581,7 @@ async function register({ req, username, email, password, unitId, ipAddress, use
     user,
     ipAddress,
     userAgent,
+    method: "register",
   });
 }
 
@@ -635,6 +695,7 @@ async function refreshSession({ req, refreshToken, ipAddress, userAgent }) {
 
 async function logout({ req, refreshToken }) {
   const sessionRefreshTokenId = req.session?.auth?.refreshTokenId;
+  const logoutAuth = req.session?.auth ?? null;
   const tokenHash = refreshToken ? hashToken(refreshToken) : null;
   const revokeTargets = [
     ...(sessionRefreshTokenId ? [{ id: sessionRefreshTokenId }] : []),
@@ -654,6 +715,23 @@ async function logout({ req, refreshToken }) {
   }
 
   await destroySession(req);
+
+  let logoutUser = null;
+  if (logoutAuth?.userId) {
+    logoutUser = await prisma.user
+      .findUnique({ where: { id: logoutAuth.userId }, select: { id: true, unitId: true } })
+      .catch(() => null);
+  }
+  if (logoutUser) {
+    recordAuthEvent({
+      type: "LOGOUT",
+      method: "session",
+      user: logoutUser,
+      sessionId: logoutAuth.sessionId ?? null,
+      ip: req.ip,
+      userAgent: req.get?.("user-agent") ?? null,
+    });
+  }
 }
 
 async function authenticateAccessToken({ accessToken, sessionAuth }) {

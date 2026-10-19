@@ -103,6 +103,10 @@ export const ROUTE_ACCESS_RULES = {
     description: "Backup dữ liệu — superadmin chọn một ngày để khôi phục",
     requiredPermissions: [PERMISSIONS.SYSTEM_BACKUP_MANAGE],
   },
+  "dashboard-audit-logs": {
+    description: "Nhật ký hệ thống",
+    requiredPermissions: [PERMISSIONS.AUDIT_LOGS_READ],
+  },
   "dashboard-ba-profiles": {
     description: "Hồ sơ nghiệp vụ đơn vị (trợ lý BA) — superadmin",
     requiredPermissions: [],

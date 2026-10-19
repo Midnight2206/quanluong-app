@@ -10,6 +10,7 @@
     "worker:email-verification:dev": "nodemon --watch src src/workers/email-verification.worker.js",
     "worker:avatar-processing": "node src/workers/avatar-processing.worker.js",
     "worker:avatar-processing:dev": "nodemon --watch src src/workers/avatar-processing.worker.js",
+    "worker:audit-log": "node src/workers/audit-log.worker.js",
     "prisma:generate": "prisma generate",
     "prisma:sync": "prisma generate && prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",

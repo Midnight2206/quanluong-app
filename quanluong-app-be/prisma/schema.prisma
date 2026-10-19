@@ -1721,3 +1721,29 @@ model BaProposal {
   @@index([unitId])
   @@index([status])
 }
+
+/// Nhật ký hệ thống — đăng nhập / đăng xuất (chỉ ghi thêm; không FK để giữ log khi xóa user/đơn vị).
+enum AuthEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+}
+
+model AuthEventLog {
+  id         BigInt        @id @default(autoincrement())
+  occurredAt DateTime      @default(now()) @db.DateTime(3)
+  type       AuthEventType
+  method     String        @db.VarChar(16)
+  userId     Int?
+  unitId     Int?
+  identifier String?       @db.VarChar(64)
+  failReason String?       @db.VarChar(32)
+  sessionId  String?       @db.VarChar(64)
+  ip         String?       @db.VarChar(45)
+  userAgent  String?       @db.VarChar(512)
+
+  @@index([unitId, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([type, occurredAt])
+  @@index([occurredAt])
+}

@@ -14,8 +14,11 @@ function createMariaDbAdapter() {
   });
 }
 
-const prisma = new PrismaClient({
+/** Client gốc — dùng cho ghi nhật ký (không qua extension audit). */
+const basePrisma = new PrismaClient({
   adapter: createMariaDbAdapter(),
 });
 
-export { prisma };
+const prisma = basePrisma;
+
+export { basePrisma, prisma };

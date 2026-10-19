@@ -699,6 +699,7 @@ export function ProfilePage() {
           <Card className="border-border/80 shadow-soft" id="doi-mat-khau">
             <CardContent className={cn(cardBody, "pt-5")}>
               <SectionHeader icon={Shield} title="Đổi mật khẩu" />
+              <p className="mb-2 text-xs text-muted-foreground">Hệ thống ghi nhật ký đăng nhập, trang đã xem và thay đổi dữ liệu.</p>
               <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
                 Sau khi đổi mật khẩu thành công, bạn sẽ đăng xuất và đăng nhập lại. Các phiên khác sẽ bị hủy;
                 nếu đã cấu hình email, hệ thống có thể gửi thông báo. Nhập sai mật khẩu hiện tại quá 5 lần trong

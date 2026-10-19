@@ -5,6 +5,7 @@ import {
   DatabaseBackup,
   FileText,
   Layers,
+  ScrollText,
   Shield,
   UserPlus,
   Users,
@@ -107,5 +108,13 @@ export const DASHBOARD_SUPERADMIN_TAB_META = [
     section: "Hệ thống",
     icon: BookOpen,
     routeAccessKey: "dashboard-ba-profiles",
+  },
+  {
+    path: "audit-logs",
+    label: "Nhật ký hệ thống",
+    shortLabel: "Nhật ký",
+    section: "Hệ thống",
+    icon: ScrollText,
+    routeAccessKey: "dashboard-audit-logs",
   },
 ];

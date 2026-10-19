@@ -347,6 +347,7 @@ export function LoginPage() {
           Gửi lại
         </Link>
       </p>
+      <p className="text-center text-xs text-muted-foreground">Hệ thống ghi nhật ký đăng nhập và thao tác.</p>
     </div>
   );
 }

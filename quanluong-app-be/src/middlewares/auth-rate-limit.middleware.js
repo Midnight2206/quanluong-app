@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import rateLimit from "express-rate-limit";
+import { recordAuthEvent } from "../infra/audit/auth-audit.js";
 
 /**
  * Hạn ngạch theo **khóa ghép**: IP + bản định danh không trùng lặp (email / đăng nhập / đoạn token).
@@ -75,7 +76,17 @@ const sensitiveAuthEndpointRateLimit = rateLimit({
   legacyHeaders: false,
   keyGenerator: rateLimitKey,
   skipSuccessfulRequests: false,
-  handler(_req, res) {
+  handler(req, res) {
+    if (/\/login$/.test(req.path ?? "")) {
+      recordAuthEvent({
+        type: "LOGIN_FAILED",
+        method: "password",
+        identifier: typeof req.body?.identifier === "string" ? req.body.identifier : null,
+        failReason: "RATE_LIMITED",
+        ip: req.ip,
+        userAgent: req.get("user-agent"),
+      });
+    }
     return res.status(429).json({
       success: false,
       message: "Quá nhiều yêu cầu đến bước đăng nhập / đăng ký. Vui lòng thử lại sau.",

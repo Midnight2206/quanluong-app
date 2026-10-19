@@ -5,6 +5,7 @@ import {
   getUserById,
   refreshSession,
 } from "../modules/auth/auth.service.js";
+import { setAuditActor } from "../infra/audit/audit-context.js";
 
 /**
  * Cookie access (`ql.at`) + optional session `ql.sid`; khi access hết hạn còn `ql.rt` thì refresh.
@@ -17,6 +18,7 @@ async function authMiddleware(req, res, next) {
 
   try {
     req.user = await authenticateAccessToken({ accessToken, sessionAuth });
+    setAuditActor(req.user);
     return next();
   } catch (authError) {
     if (!refreshToken) {
@@ -31,6 +33,7 @@ async function authMiddleware(req, res, next) {
       });
       setAuthCookies(res, session);
       req.user = await getUserById(session.user.id);
+      setAuditActor(req.user);
       return next();
     } catch {
       return next(authError);

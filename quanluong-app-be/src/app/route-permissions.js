@@ -14,6 +14,7 @@ import { CHUNG_TU_QUYET_TOAN_ROUTE_DEFINITIONS } from "../modules/chung-tu-quyet
 import { MIDNIGHT_ROUTE_DEFINITIONS } from "../modules/midnight-secret/midnight-secret.route-definitions.js";
 import { SYSTEM_BACKUP_ROUTE_DEFINITIONS } from "../modules/system-backup/system-backup.route-definitions.js";
 import { SYSTEM_INFRA_ROUTE_DEFINITIONS } from "../modules/system-infra/system-infra.route-definitions.js";
+import { AUDIT_LOGS_ROUTE_DEFINITIONS } from "../modules/audit-logs/audit-logs.route-definitions.js";
 import { getPermissionVi } from "../shared/constants/permission-catalog.vi.js";
 
 const ROUTE_PERMISSION_DEFINITIONS = [
@@ -33,6 +34,7 @@ const ROUTE_PERMISSION_DEFINITIONS = [
   ...MIDNIGHT_ROUTE_DEFINITIONS,
   ...SYSTEM_BACKUP_ROUTE_DEFINITIONS,
   ...SYSTEM_INFRA_ROUTE_DEFINITIONS,
+  ...AUDIT_LOGS_ROUTE_DEFINITIONS,
 ]
   .filter((route) => route.permission)
   .map((route) => {

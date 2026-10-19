@@ -44,4 +44,6 @@ export const PERMISSIONS = {
   SYSTEM_BACKUP_MANAGE: "system.backup.manage",
   SYSTEM_INFRA_MANAGE: "system.infra.manage",
   CHUNG_TU_PDF_TEMPLATES_MANAGE: "chungTu.pdfTemplates.manage",
+  AUDIT_LOGS_READ: "auditLogs.read",
+  AUDIT_LOGS_EXPORT: "auditLogs.export",
 };

@@ -20,6 +20,7 @@ import { systemBackupRouter } from "../modules/system-backup/system-backup.route
 import { systemInfraRouter } from "../modules/system-infra/system-infra.routes.js";
 import { lttpSupplierRouter } from "../modules/lttp-supplier/lttp-supplier.routes.js";
 import { baProfilesRouter } from "../modules/ba-profiles/ba-profiles.routes.js";
+import { auditLogsRouter } from "../modules/audit-logs/audit-logs.routes.js";
 import { respondSuccess } from "../shared/utils/responders.js";
 
 const router = express.Router();
@@ -54,6 +55,7 @@ router.use("/system-backup", systemBackupRouter);
 router.use("/system-infra", systemInfraRouter);
 router.use("/lttp-supplier", lttpSupplierRouter);
 router.use("/ba", baProfilesRouter);
+router.use("/audit-logs", auditLogsRouter);
 /** Cùng handler — tương thích client/clone cũ gọi `/api/lrtp/*` sau khi đã deploy code mới. */
 router.use("/lrtp", lttpRouter);
 

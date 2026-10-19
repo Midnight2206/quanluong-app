@@ -33,4 +33,5 @@ export const DASHBOARD_TAB_META = [
     nestedUnder: "lttp",
     routeAccessKey: "dashboard-lttp",
   },
+  { path: "audit-logs", label: "Nhật ký", routeAccessKey: "dashboard-audit-logs" },
 ];

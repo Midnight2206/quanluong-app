@@ -27,6 +27,7 @@ import { SuperadminInfraPanel } from "@/pages/dashboard/superadmin/SuperadminInf
 import { SuperadminBaProfilesPanel } from "@/pages/dashboard/superadmin/SuperadminBaProfilesPanel";
 import { SuperadminChungTuPdfTemplatesPanel } from "@/pages/dashboard/superadmin/SuperadminChungTuPdfTemplatesPanel";
 import { SuperadminUsersPanel } from "@/pages/dashboard/superadmin/SuperadminUsersPanel";
+import { AdminAuditLogsPanel } from "@/pages/dashboard/admin/AdminAuditLogsPanel";
 import { cn } from "@/utils/cn";
 import { DASHBOARD_LTTP_SUB_PATHS } from "@/pages/dashboard/dashboardTabMeta";
 
@@ -282,5 +283,13 @@ export function DashboardLttpTabPage() {
         />
       </div>
     </RouteApiGuard>
+  );
+}
+
+export function DashboardAuditLogsPage() {
+  return (
+    <div className="min-w-0">
+      <AdminAuditLogsPanel />
+    </div>
   );
 }

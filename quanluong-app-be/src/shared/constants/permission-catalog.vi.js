@@ -213,6 +213,14 @@ const PERMISSION_CATALOG_VI = {
     name: "Quản lý mẫu PDF chứng từ",
     description: "Tải, xem thử, xuất bản và ngưng mẫu PDF chứng từ. Không nằm trong gói admin mặc định.",
   },
+  "auditLogs.read": {
+    name: "Xem nhật ký hệ thống",
+    description: "Tra cứu nhật ký đăng nhập, sử dụng và thay đổi dữ liệu trong đơn vị mình và đơn vị cấp dưới.",
+  },
+  "auditLogs.export": {
+    name: "Xuất nhật ký hệ thống",
+    description: "Tải nhật ký hệ thống ra file Excel theo bộ lọc đang chọn.",
+  },
 };
 
 function getPermissionVi(code) {
