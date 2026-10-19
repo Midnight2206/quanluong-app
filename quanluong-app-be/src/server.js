@@ -1,6 +1,7 @@
 import http from "node:http";
 import { Server } from "socket.io";
 import { createApp } from "./app/app.js";
+import { enableAuditQueue } from "./infra/audit/audit-writer.js";
 import { config } from "./config/config.js";
 import { registerChatSocket } from "./modules/chat/chat.socket.js";
 import { assertProductionEnvSafety } from "./config/validate-production-env.js";
@@ -38,6 +39,7 @@ async function bootstrapServer() {
     );
   }
 
+  await enableAuditQueue();
   const app = createApp({ sessionStore: sessionStore ?? undefined });
   const apiServer = http.createServer(app);
 

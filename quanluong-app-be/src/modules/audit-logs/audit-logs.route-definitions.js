@@ -9,6 +9,8 @@ const READ = {
 
 const AUDIT_LOGS_ROUTE_DEFINITIONS = [
   { key: "listAuth", method: "GET", module: MODULE, path: "/auth", pathRoute: "/api/audit-logs/auth", permission: READ },
+  { key: "listChanges", method: "GET", module: MODULE, path: "/changes", pathRoute: "/api/audit-logs/changes", permission: READ },
+  { key: "getChange", method: "GET", module: MODULE, path: "/changes/:id", pathRoute: "/api/audit-logs/changes/:id", permission: READ },
   { key: "listUsers", method: "GET", module: MODULE, path: "/users", pathRoute: "/api/audit-logs/users", permission: READ },
 ];
 

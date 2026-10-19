@@ -84,6 +84,21 @@ const TABS = [
       ["Thiết bị", (r) => <span title={r.userAgent ?? ""}>{shortUa(r.userAgent)}</span>],
     ],
   },
+  {
+    id: "changes",
+    label: "Thay đổi dữ liệu",
+    typeOptions: [["", "Tất cả"], ...Object.entries(CHANGE_ACTIONS).map(([k, [l]]) => [k, l])],
+    typeParam: "action",
+    rowClick: true,
+    columns: [
+      ["Thời gian", (r) => <span className="tabular-nums">{fmtTime(r.occurredAt)}</span>],
+      ["Người dùng", (r) => (r.user ? r.user.fullName || r.user.username : "Hệ thống")],
+      ["Thao tác", (r) => <Badge map={CHANGE_ACTIONS} value={r.action} />],
+      ["Đối tượng", (r) => r.modelLabel ?? r.model],
+      ["Mã bản ghi", (r) => <span className="tabular-nums">{r.recordId ?? "—"}</span>],
+      ["Đơn vị", (r) => r.unitName ?? "—"],
+    ],
+  },
 ];
 
 function ChangeDiff({ id, onClose }) {
@@ -190,7 +205,7 @@ function LogTab({ tab }) {
         ) : null}
       </form>
 
-      {openId ? <ChangeDiff id={openId} onClose={() => setOpenId(null)} /> : null}
+      {openId && tab.id === "changes" ? <ChangeDiff id={openId} onClose={() => setOpenId(null)} /> : null}
 
       <div className="overflow-x-auto rounded-lg border border-border" data-local-scroll="true">
         <table className="w-full min-w-[44rem] text-sm">
@@ -236,4 +251,3 @@ export function AdminAuditLogsPanel() {
   );
 }
 
-export { CHANGE_ACTIONS, fmtDur };

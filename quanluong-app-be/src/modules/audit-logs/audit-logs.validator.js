@@ -16,4 +16,13 @@ const authQuerySchema = z.object({
   type: z.enum(["LOGIN_SUCCESS", "LOGIN_FAILED", "LOGOUT"]).optional(),
 });
 
-export { authQuerySchema, baseQuery, dateStr };
+const changesQuerySchema = z.object({
+  ...baseQuery,
+  action: z.enum(["CREATE", "UPDATE", "DELETE"]).optional(),
+  model: z.string().regex(/^[A-Za-z]{1,64}$/).optional(),
+  recordId: z.string().max(191).optional(),
+});
+
+const idParamsSchema = z.object({ id: z.string().regex(/^\d+$/) });
+
+export { authQuerySchema, baseQuery, changesQuerySchema, dateStr, idParamsSchema };

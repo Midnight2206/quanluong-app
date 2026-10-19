@@ -22,6 +22,7 @@ import { logger } from "../../shared/utils/logger.js";
 import { grantedPermissionRecords } from "./auth-granted-permissions.js";
 import { assertStoredPassword } from "./stored-password.js";
 import { recordAuthEvent } from "../../infra/audit/auth-audit.js";
+import { setAuditActor } from "../../infra/audit/audit-context.js";
 
 /** Đổi mã quyền cũ `lrtp.*` thành `lttp.*` tại chỗ để giữ `permissionId` và TypePermission. */
 const LEGACY_LRTP_TO_LTTP_PERMISSION_CODE = {
@@ -228,6 +229,7 @@ async function getCurrentUser(authUser) {
 }
 
 async function issueSessionForUser({ req, user, ipAddress, userAgent, method = "password" }) {
+  setAuditActor(user);
   const sessionId = crypto.randomUUID();
   const refreshTokenValue = createRefreshTokenValue();
   const refreshToken = await prisma.refreshToken.create({

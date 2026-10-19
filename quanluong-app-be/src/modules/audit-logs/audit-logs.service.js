@@ -2,6 +2,7 @@ import { basePrisma as prisma } from "../../infra/database/prisma/prisma.client.
 import { displayIp } from "../../infra/audit/ip-mask.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
+import { modelLabel } from "./audit-logs.labels.js";
 import { cursorWhere, nextCursor, resolveRange, scopeWhere } from "./audit-logs.utils.js";
 
 function range(q) {
@@ -59,6 +60,39 @@ async function listAuthEvents(scope, q, { cap } = {}) {
   return { items: await decorate(rows), nextCursor: cap ? null : nextCursor(rows, take) };
 }
 
+function changesWhere(scope, q) {
+  return {
+    ...scopeWhere(scope),
+    occurredAt: range(q),
+    ...(q.userId ? { userId: q.userId } : {}),
+    ...(q.action ? { action: q.action } : {}),
+    ...(q.model ? { model: q.model } : {}),
+    ...(q.recordId ? { recordId: q.recordId } : {}),
+  };
+}
+
+const withLabel = (r) => ({ ...r, modelLabel: modelLabel(r.model) });
+
+async function listDataChanges(scope, q, { cap } = {}) {
+  const take = cap ?? q.limit;
+  const rows = await prisma.dataChangeLog.findMany({
+    where: { ...changesWhere(scope, q), ...(cap ? {} : cursorWhere(q.cursor)) },
+    orderBy: { id: "desc" },
+    take,
+    ...(cap ? {} : { omit: { changes: true } }),
+  });
+  return { items: (await decorate(rows)).map(withLabel), nextCursor: cap ? null : nextCursor(rows, take) };
+}
+
+async function getDataChange(scope, id) {
+  const row = await prisma.dataChangeLog.findFirst({ where: { id: BigInt(id), ...scopeWhere(scope) } });
+  if (!row) {
+    throw new AppError({ message: "Không tìm thấy bản ghi nhật ký.", statusCode: 404, code: ERROR_CODES.NOT_FOUND });
+  }
+  const [item] = await decorate([row]);
+  return withLabel(item);
+}
+
 async function listScopeUsers(scope) {
   const users = await prisma.user.findMany({
     where: { deletedAt: null, ...scopeWhere(scope) },
@@ -69,4 +103,4 @@ async function listScopeUsers(scope) {
   return users.map((u) => ({ id: u.id, username: u.username, fullName: u.profile?.fullName ?? null }));
 }
 
-export { decorate, listAuthEvents, listScopeUsers, range, userMap };
+export { decorate, getDataChange, listAuthEvents, listDataChanges, listScopeUsers, range, userMap };

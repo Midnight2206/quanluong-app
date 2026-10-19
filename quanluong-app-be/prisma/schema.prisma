@@ -1747,3 +1747,24 @@ model AuthEventLog {
   @@index([type, occurredAt])
   @@index([occurredAt])
 }
+
+/// Nhật ký thay đổi dữ liệu (CREATE/UPDATE/DELETE) — ghi bởi Prisma extension, trường nhạy cảm đã ẩn.
+model DataChangeLog {
+  id         BigInt   @id @default(autoincrement())
+  occurredAt DateTime @default(now()) @db.DateTime(3)
+  userId     Int?
+  unitId     Int?
+  action     String   @db.VarChar(8)
+  model      String   @db.VarChar(64)
+  recordId   String?  @db.VarChar(191)
+  changes    Json
+  requestId  String?  @db.VarChar(64)
+  route      String?  @db.VarChar(128)
+  ip         String?  @db.VarChar(45)
+
+  @@index([unitId, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([model, recordId])
+  @@index([action, occurredAt])
+  @@index([occurredAt])
+}
