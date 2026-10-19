@@ -34,6 +34,11 @@ const FAIL_REASONS = {
   RATE_LIMITED: "Quá nhiều lần thử",
   ERROR: "Lỗi",
 };
+const ZALO_REASONS = { DENIED: "Từ chối cấp quyền", STATE: "Phiên không hợp lệ", PENDING: "Chờ duyệt" };
+const failReasonLabel = (code) => {
+  if (code?.startsWith("ZALO_")) return `Zalo: ${ZALO_REASONS[code.slice(5)] ?? code.slice(5).toLowerCase()}`;
+  return FAIL_REASONS[code] ?? code;
+};
 const CHANGE_ACTIONS = {
   CREATE: ["Thêm", "bg-success/15 text-success"],
   UPDATE: ["Sửa", "bg-info/15 text-info"],
@@ -77,7 +82,7 @@ const TABS = [
       ["Sự kiện", (r) => (
         <span className="inline-flex items-center gap-1.5">
           <Badge map={AUTH_TYPES} value={r.type} />
-          {r.failReason ? <span className="text-xs text-muted-foreground">{FAIL_REASONS[r.failReason] ?? r.failReason}</span> : null}
+          {r.failReason ? <span className="text-xs text-muted-foreground">{failReasonLabel(r.failReason)}</span> : null}
         </span>
       )],
       ["Đơn vị", (r) => r.unitName ?? "—"],

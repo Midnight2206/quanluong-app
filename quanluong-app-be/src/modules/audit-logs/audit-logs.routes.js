@@ -5,9 +5,9 @@ import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { unitScopeMiddleware } from "../../middlewares/unit-scope.middleware.js";
 import { permissionMiddleware } from "../../middlewares/permission.middleware.js";
 import { validateRequest } from "../../middlewares/validate-request.middleware.js";
-import { listUsageController, listUsagePagesController, usageBatchController, getChangeController, listAuthController, listChangesController, listUsersController } from "./audit-logs.controller.js";
+import { exportController, listUsageController, listUsagePagesController, usageBatchController, getChangeController, listAuthController, listChangesController, listUsersController } from "./audit-logs.controller.js";
 import { AUDIT_LOGS_ROUTE_DEFINITIONS } from "./audit-logs.route-definitions.js";
-import { authQuerySchema, changesQuerySchema, idParamsSchema, usageBatchBodySchema, usagePagesQuerySchema, usageQuerySchema } from "./audit-logs.validator.js";
+import { exportParamsSchema, authQuerySchema, changesQuerySchema, idParamsSchema, usageBatchBodySchema, usagePagesQuerySchema, usageQuerySchema } from "./audit-logs.validator.js";
 
 const perm = Object.fromEntries(AUDIT_LOGS_ROUTE_DEFINITIONS.map((r) => [r.key, r.permission.code]));
 
@@ -22,6 +22,14 @@ auditLogsRouter.post(
   asyncHandler(usageBatchController),
 );
 auditLogsRouter.use(unitScopeMiddleware);
+
+// Đăng ký trước "/changes/:id" để "/changes/export" không bị bắt nhầm.
+auditLogsRouter.get(
+  "/:tab/export",
+  validateRequest({ params: exportParamsSchema }),
+  permissionMiddleware([perm.exportLogs]),
+  asyncHandler(exportController),
+);
 
 auditLogsRouter.get(
   "/auth",

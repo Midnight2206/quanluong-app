@@ -1,3 +1,7 @@
+import { buildAuditExcel } from "./audit-logs.export.js";
+import { authQuerySchema, changesQuerySchema, usageQuerySchema } from "./audit-logs.validator.js";
+import { AppError } from "../../errors/app-error.js";
+import { ERROR_CODES } from "../../errors/error-codes.js";
 import { respondSuccess } from "../../shared/utils/responders.js";
 import { recordUsageBatch } from "../../infra/audit/usage-audit.js";
 import { listUsageDaily, listUsagePages, getDataChange, listAuthEvents, listDataChanges, listScopeUsers } from "./audit-logs.service.js";
@@ -37,4 +41,20 @@ async function usageBatchController(req, res) {
   return respondSuccess(res, { message: "Accepted", data });
 }
 
-export { listUsageController, listUsagePagesController, usageBatchController, getChangeController, listAuthController, listChangesController, listUsersController };
+const EXPORT_QUERY = { auth: authQuerySchema, changes: changesQuerySchema, usage: usageQuerySchema };
+
+async function exportController(req, res) {
+  const { tab } = req.validatedParams;
+  const parsed = EXPORT_QUERY[tab].safeParse(req.query);
+  if (!parsed.success) {
+    throw new AppError({ message: "Invalid request data", statusCode: 400, code: ERROR_CODES.VALIDATION_ERROR });
+  }
+  const q = parsed.data;
+  const { buffer } = await buildAuditExcel(tab, req.unitScope, q);
+  const name = `nhat-ky-${tab}-${new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10)}.xlsx`;
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+  return res.send(Buffer.from(buffer));
+}
+
+export { exportController, listUsageController, listUsagePagesController, usageBatchController, getChangeController, listAuthController, listChangesController, listUsersController };

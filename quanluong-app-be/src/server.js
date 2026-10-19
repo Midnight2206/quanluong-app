@@ -2,6 +2,7 @@ import http from "node:http";
 import { Server } from "socket.io";
 import { createApp } from "./app/app.js";
 import { enableAuditQueue } from "./infra/audit/audit-writer.js";
+import { AUDIT_RETENTION_SCHEDULE, cleanupAuditLogs } from "./infra/audit/audit-retention.js";
 import { config } from "./config/config.js";
 import { registerChatSocket } from "./modules/chat/chat.socket.js";
 import { assertProductionEnvSafety } from "./config/validate-production-env.js";
@@ -105,6 +106,15 @@ async function bootstrapServer() {
     {
       name: "refresh-token-cleanup",
     },
+  );
+
+  registerSchedule(
+    AUDIT_RETENTION_SCHEDULE,
+    async () => {
+      const deleted = await cleanupAuditLogs();
+      logger.info({ deleted }, "Audit logs retention cleanup");
+    },
+    { name: "audit-log-retention" },
   );
 
   apiServer.listen(config.app.port, () => {

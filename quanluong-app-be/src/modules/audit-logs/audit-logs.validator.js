@@ -45,6 +45,8 @@ const usageBatchBodySchema = z.object({
     .max(50),
 });
 
+const exportParamsSchema = z.object({ tab: z.enum(["auth", "changes", "usage"]) });
+
 const idParamsSchema = z.object({ id: z.string().regex(/^\d+$/) });
 
-export { authQuerySchema, baseQuery, changesQuerySchema, dateStr, idParamsSchema, usageBatchBodySchema, usagePagesQuerySchema, usageQuerySchema };
+export { exportParamsSchema, authQuerySchema, baseQuery, changesQuerySchema, dateStr, idParamsSchema, usageBatchBodySchema, usagePagesQuerySchema, usageQuerySchema };

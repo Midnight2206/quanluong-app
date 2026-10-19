@@ -17,6 +17,7 @@ import {
   verifyEmailWithToken,
 } from "./auth.service.js";
 import { getAttempt, patchAttempt } from "./zalo-attempt.store.js";
+import { recordAuthEvent } from "../../infra/audit/auth-audit.js";
 import { normalizeVnPhone } from "./zalo-phone.js";
 import {
   applyOauthProfile,
@@ -849,6 +850,18 @@ async function zaloLoginAuthorizeUrlController(req, res) {
 async function zaloLoginCallbackController(req, res) {
   const sessPreview = req.session?.zaloOAuthLogin;
   const origin = zaloPortalOrigin(sessPreview?.portal === "supplier" ? "supplier" : "main");
+  let zaloRawUser = null;
+  const zaloFail = (reason) => {
+    if (sessPreview?.mode === "link") return;
+    recordAuthEvent({
+      type: "LOGIN_FAILED",
+      method: "zalo",
+      user: zaloRawUser ? { id: zaloRawUser.id, unitId: zaloRawUser.unitId } : null,
+      failReason: `ZALO_${String(reason || "unknown").toUpperCase()}`.slice(0, 32),
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+  };
   try {
     ensureZaloConfigured();
   } catch {
@@ -857,6 +870,7 @@ async function zaloLoginCallbackController(req, res) {
 
   const { code, state, error: oauthError } = req.query;
   if (oauthError) {
+    zaloFail("denied");
     return res.redirect(302, zaloLoginErrorRedirect(origin, "denied"));
   }
   if (!code || !state || typeof code !== "string" || typeof state !== "string") {
@@ -864,6 +878,7 @@ async function zaloLoginCallbackController(req, res) {
   }
   const sess = req.session?.zaloOAuthLogin;
   if (!sess || sess.state !== state || !sess.codeVerifier) {
+    zaloFail("state");
     return res.redirect(302, zaloLoginErrorRedirect(origin, "state"));
   }
 
@@ -893,6 +908,7 @@ async function zaloLoginCallbackController(req, res) {
       where: { zaloUserId: profile.id },
       include: { type: { select: { name: true } } },
     });
+    zaloRawUser = raw;
     const existingUser = raw
       ? {
           id: raw.id,
@@ -928,11 +944,13 @@ async function zaloLoginCallbackController(req, res) {
       return res.redirect(302, `${portalOrigin}${from}`);
     }
     if (result.kind === "pending") {
+      zaloFail("pending");
       return res.redirect(302, zaloContinueRedirect(portalOrigin, { branch: "pending" }));
     }
     if (result.kind === "await_phone") {
       return res.redirect(302, zaloContinueRedirect(portalOrigin, { ticket: result.attempt.ticket }));
     }
+    zaloFail(result.code || "unknown");
     return res.redirect(302, zaloLoginErrorRedirect(portalOrigin, result.code || "unknown"));
   } catch (error) {
     const reason = zaloCallbackReason(error);
@@ -944,6 +962,7 @@ async function zaloLoginCallbackController(req, res) {
       },
       "Zalo login callback failed",
     );
+    zaloFail(reason);
     if (mode === "login") clearAuthCookies(res);
     return res.redirect(302, zaloLoginErrorRedirect(portalOrigin, reason));
   }
