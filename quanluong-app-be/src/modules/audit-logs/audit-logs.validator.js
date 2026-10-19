@@ -23,6 +23,28 @@ const changesQuerySchema = z.object({
   recordId: z.string().max(191).optional(),
 });
 
+const usageQuerySchema = z.object({ ...baseQuery, cursor: z.string().regex(/^\d+$/).optional() });
+
+const usagePagesQuerySchema = z.object({
+  userId: z.coerce.number().int().positive(),
+  day: dateStr,
+  kind: z.enum(["PAGE_VIEW", "ACTION"]).optional(),
+});
+
+const usageBatchBodySchema = z.object({
+  events: z
+    .array(
+      z.object({
+        kind: z.enum(["PAGE_VIEW", "HEARTBEAT", "ACTION"]),
+        path: z.string().max(1000),
+        label: z.string().max(128).optional(),
+        at: z.string().max(40).optional(),
+        sec: z.number().min(0).max(600).optional(),
+      }),
+    )
+    .max(50),
+});
+
 const idParamsSchema = z.object({ id: z.string().regex(/^\d+$/) });
 
-export { authQuerySchema, baseQuery, changesQuerySchema, dateStr, idParamsSchema };
+export { authQuerySchema, baseQuery, changesQuerySchema, dateStr, idParamsSchema, usageBatchBodySchema, usagePagesQuerySchema, usageQuerySchema };

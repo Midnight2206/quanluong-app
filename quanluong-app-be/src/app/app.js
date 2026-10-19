@@ -11,6 +11,7 @@ import { config } from "../config/config.js";
 import { router } from "./routes.js";
 import { requestContextMiddleware } from "../middlewares/request-context.middleware.js";
 import { auditContextMiddleware } from "../infra/audit/audit-context.js";
+import { usageActionMiddleware } from "../infra/audit/usage-audit.js";
 import { errorMiddleware } from "../middlewares/error.middleware.js";
 import { logger } from "../shared/utils/logger.js";
 
@@ -59,6 +60,7 @@ function createApp(options = {}) {
 
   app.use(requestContextMiddleware);
   app.use(auditContextMiddleware);
+  app.use(usageActionMiddleware);
   app.use(
     pinoHttp({
       logger,

@@ -48,3 +48,11 @@ export async function downloadAuditLogExcel(tab, filters) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+export function useAuditUsagePagesQuery(userId, day) {
+  return useQuery({
+    queryKey: ["auditLogs", "usagePages", String(userId), day],
+    queryFn: () => apiRequest({ url: "/audit-logs/usage/pages", method: "get", params: { userId, day }, skipTargetUnitHeader: true }),
+    enabled: Boolean(userId && day),
+  });
+}

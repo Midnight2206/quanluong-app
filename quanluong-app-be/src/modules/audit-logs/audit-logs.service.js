@@ -93,6 +93,49 @@ async function getDataChange(scope, id) {
   return withLabel(item);
 }
 
+function dayRange(q) {
+  const r = range(q);
+  const d = (x) => new Date(`${new Date(x.getTime() + 7 * 3600000).toISOString().slice(0, 10)}T00:00:00.000Z`);
+  return { gte: d(r.gte), lte: d(r.lte) };
+}
+
+/** Tổng thời gian sử dụng theo người dùng/ngày; phân trang offset (cursor = số dòng đã bỏ qua). */
+async function listUsageDaily(scope, q, { cap } = {}) {
+  const take = cap ?? q.limit;
+  const skip = cap ? 0 : Number(q.cursor || 0);
+  const rows = await prisma.usageSessionDaily.findMany({
+    where: { ...scopeWhere(scope), day: dayRange(q), ...(q.userId ? { userId: q.userId } : {}) },
+    orderBy: [{ day: "desc" }, { activeSec: "desc" }],
+    skip,
+    take,
+  });
+  const items = (await decorate(rows.map((r) => ({ ...r, id: `${r.userId}-${r.day.toISOString().slice(0, 10)}`, occurredAt: r.lastSeenAt }))))
+    .map((r) => ({ ...r, day: r.day.toISOString().slice(0, 10) }));
+  return { items, nextCursor: !cap && rows.length === take ? String(skip + take) : null };
+}
+
+async function listUsagePages(scope, q) {
+  const start = new Date(`${q.day}T00:00:00.000+07:00`);
+  const end = new Date(start.getTime() + 86400000);
+  const rows = await prisma.usageEvent.findMany({
+    where: { ...scopeWhere(scope), userId: q.userId, occurredAt: { gte: start, lt: end }, ...(q.kind ? { kind: q.kind } : {}) },
+    orderBy: { id: "asc" },
+    take: 1000,
+    omit: { sessionId: true },
+  });
+  return rows.map((r) => ({ ...r, id: String(r.id) }));
+}
+
+async function listUsageEvents(scope, q, { cap }) {
+  const rows = await prisma.usageEvent.findMany({
+    where: { ...scopeWhere(scope), occurredAt: range(q), ...(q.userId ? { userId: q.userId } : {}) },
+    orderBy: { id: "desc" },
+    take: cap,
+    omit: { sessionId: true },
+  });
+  return { items: await decorate(rows), nextCursor: null };
+}
+
 async function listScopeUsers(scope) {
   const users = await prisma.user.findMany({
     where: { deletedAt: null, ...scopeWhere(scope) },
@@ -103,4 +146,4 @@ async function listScopeUsers(scope) {
   return users.map((u) => ({ id: u.id, username: u.username, fullName: u.profile?.fullName ?? null }));
 }
 
-export { decorate, getDataChange, listAuthEvents, listDataChanges, listScopeUsers, range, userMap };
+export { decorate, getDataChange, listUsageDaily, listUsageEvents, listUsagePages, listAuthEvents, listDataChanges, listScopeUsers, range, userMap };

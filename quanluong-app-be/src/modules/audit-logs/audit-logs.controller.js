@@ -1,5 +1,6 @@
 import { respondSuccess } from "../../shared/utils/responders.js";
-import { getDataChange, listAuthEvents, listDataChanges, listScopeUsers } from "./audit-logs.service.js";
+import { recordUsageBatch } from "../../infra/audit/usage-audit.js";
+import { listUsageDaily, listUsagePages, getDataChange, listAuthEvents, listDataChanges, listScopeUsers } from "./audit-logs.service.js";
 
 async function listAuthController(req, res) {
   const data = await listAuthEvents(req.unitScope, req.validatedQuery);
@@ -21,4 +22,19 @@ async function getChangeController(req, res) {
   return respondSuccess(res, { message: "Fetched data change", data });
 }
 
-export { getChangeController, listAuthController, listChangesController, listUsersController };
+async function listUsageController(req, res) {
+  const data = await listUsageDaily(req.unitScope, req.validatedQuery);
+  return respondSuccess(res, { message: "Fetched usage", data });
+}
+
+async function listUsagePagesController(req, res) {
+  const data = await listUsagePages(req.unitScope, req.validatedQuery);
+  return respondSuccess(res, { message: "Fetched usage pages", data });
+}
+
+async function usageBatchController(req, res) {
+  const data = recordUsageBatch({ user: req.user, sessionId: req.session?.auth?.sessionId, events: req.validatedBody.events });
+  return respondSuccess(res, { message: "Accepted", data });
+}
+
+export { listUsageController, listUsagePagesController, usageBatchController, getChangeController, listAuthController, listChangesController, listUsersController };

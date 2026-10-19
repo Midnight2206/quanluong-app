@@ -12,6 +12,7 @@ import {
   useAuditChangeDetailQuery,
   useAuditLogListQuery,
   useAuditLogUsersQuery,
+  useAuditUsagePagesQuery,
 } from "@/features/audit-logs/api/auditLogsApi";
 import { notifyError } from "@/services/notify";
 import { fieldClassSm } from "@/utils/fieldClass";
@@ -99,7 +100,49 @@ const TABS = [
       ["Đơn vị", (r) => r.unitName ?? "—"],
     ],
   },
+  {
+    id: "usage",
+    label: "Sử dụng",
+    rowClick: true,
+    columns: [
+      ["Ngày", (r) => <span className="tabular-nums">{r.day}</span>],
+      ["Người dùng", (r) => (r.user ? r.user.fullName || r.user.username : "—")],
+      ["Thời gian hoạt động", (r) => <span className="tabular-nums">{fmtDur(r.activeSec)}</span>],
+      ["Số trang xem", (r) => <span className="tabular-nums">{r.pageViews}</span>],
+      ["Lần cuối", (r) => <span className="tabular-nums">{fmtTime(r.lastSeenAt)}</span>],
+      ["Đơn vị", (r) => r.unitName ?? "—"],
+    ],
+  },
 ];
+
+function UsagePages({ row, onClose }) {
+  const { data, isLoading, isError } = useAuditUsagePagesQuery(row.userId, row.day);
+  return (
+    <div className="space-y-2 rounded-lg border border-border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">{`${row.user?.fullName || row.user?.username || ""} · ${row.day}`}</p>
+        <Button variant="ghost" className="px-3 py-1 text-xs" onClick={onClose}>Đóng</Button>
+      </div>
+      {isLoading ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
+      {isError ? <p className="text-xs text-destructive">Không tải được dữ liệu.</p> : null}
+      {data?.length ? (
+        <div className="max-h-80 overflow-auto" data-local-scroll="true">
+          <table className="w-full text-xs">
+            <tbody>
+              {data.map((e) => (
+                <tr key={e.id} className="border-t border-border/60">
+                  <td className="py-1 pr-3 tabular-nums text-muted-foreground">{new Date(e.occurredAt).toLocaleTimeString("vi-VN")}</td>
+                  <td className="py-1 pr-3">{e.kind === "ACTION" ? (e.label ?? "Thao tác") : "Xem"}</td>
+                  <td className="break-all py-1">{e.path}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : !isLoading && !isError ? <p className="text-xs text-muted-foreground">Không có dữ liệu.</p> : null}
+    </div>
+  );
+}
 
 function ChangeDiff({ id, onClose }) {
   const { data, isLoading, isError } = useAuditChangeDetailQuery(id);
@@ -206,6 +249,9 @@ function LogTab({ tab }) {
       </form>
 
       {openId && tab.id === "changes" ? <ChangeDiff id={openId} onClose={() => setOpenId(null)} /> : null}
+      {openId && tab.id === "usage" && items.find((r) => r.id === openId) ? (
+        <UsagePages row={items.find((r) => r.id === openId)} onClose={() => setOpenId(null)} />
+      ) : null}
 
       <div className="overflow-x-auto rounded-lg border border-border" data-local-scroll="true">
         <table className="w-full min-w-[44rem] text-sm">

@@ -1768,3 +1768,34 @@ model DataChangeLog {
   @@index([action, occurredAt])
   @@index([occurredAt])
 }
+
+/// Sự kiện sử dụng: PAGE_VIEW (trang đã xem) / ACTION (thao tác ghi). Giữ 90 ngày.
+model UsageEvent {
+  id         BigInt   @id @default(autoincrement())
+  occurredAt DateTime @db.DateTime(3)
+  userId     Int
+  unitId     Int?
+  sessionId  String?  @db.VarChar(64)
+  kind       String   @db.VarChar(16)
+  path       String   @db.VarChar(255)
+  label      String?  @db.VarChar(128)
+
+  @@index([unitId, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([occurredAt])
+}
+
+/// Tổng thời gian sử dụng theo người dùng/ngày (giờ VN).
+model UsageSessionDaily {
+  userId      Int
+  day         DateTime @db.Date
+  unitId      Int?
+  activeSec   Int      @default(0)
+  pageViews   Int      @default(0)
+  firstSeenAt DateTime @db.DateTime(3)
+  lastSeenAt  DateTime @db.DateTime(3)
+
+  @@id([userId, day])
+  @@index([unitId, day])
+  @@index([day])
+}
