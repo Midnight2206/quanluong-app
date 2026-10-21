@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Eye, Loader2, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { TabPanel } from "@/components/common/TabPanel";
@@ -125,14 +125,10 @@ const TABS = [
   },
 ];
 
-function UsagePages({ row, onClose }) {
+function UsagePages({ row }) {
   const { data, isLoading, isError } = useAuditUsagePagesQuery(row.userId, row.day, row.source);
   return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">{`${row.user?.fullName || row.user?.username || ""} · ${row.day}`}</p>
-        <Button variant="ghost" className="px-3 py-1 text-xs" onClick={onClose}>Đóng</Button>
-      </div>
+    <div className="space-y-2">
       {isLoading ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
       {isError ? <p className="text-xs text-destructive">Không tải được dữ liệu.</p> : null}
       {data?.length ? (
@@ -154,7 +150,7 @@ function UsagePages({ row, onClose }) {
   );
 }
 
-function ChangeDiff({ id, onClose }) {
+function ChangeDiff({ id }) {
   const { data, isLoading, isError } = useAuditChangeDetailQuery(id);
   const changes = data?.changes ?? {};
   const rows = data?.action === "UPDATE"
@@ -162,14 +158,11 @@ function ChangeDiff({ id, onClose }) {
     : Object.entries(changes).map(([k, v]) => (data?.action === "DELETE" ? [k, v, undefined] : [k, undefined, v]));
   const show = (v) => (v === undefined ? "" : v === null ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v));
   return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">{data ? `${data.modelLabel ?? data.model} #${data.recordId}` : "Đang tải…"}</p>
-        <Button variant="ghost" className="px-3 py-1 text-xs" onClick={onClose}>Đóng</Button>
-      </div>
+    <div className="space-y-2">
+      {isLoading ? <p className="text-xs text-muted-foreground">Đang tải…</p> : null}
       {isError ? <p className="text-xs text-destructive">Không tải được dữ liệu.</p> : null}
       {!isLoading && data ? (
-        <div className="overflow-x-auto" data-local-scroll="true">
+        <div className="overflow-x-auto overscroll-x-contain">
           <table className="w-full text-xs">
             <thead className="text-left text-muted-foreground">
               <tr><th className="py-1 pr-3 font-medium">Trường</th><th className="py-1 pr-3 font-medium">Trước</th><th className="py-1 font-medium">Sau</th></tr>
@@ -190,20 +183,122 @@ function ChangeDiff({ id, onClose }) {
   );
 }
 
+function DetailRows({ rows }) {
+  return (
+    <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+      {rows.map(([label, value]) => (
+        <div key={label} className="min-w-0">
+          <dt className="text-xs text-muted-foreground">{label}</dt>
+          <dd className="mt-0.5 break-words">{value ?? "—"}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+const DETAIL_TITLES = { auth: "Chi tiết đăng nhập", changes: "Chi tiết thay đổi dữ liệu", usage: "Chi tiết sử dụng" };
+
+function LogDetailModal({ tab, row, onClose }) {
+  useEffect(() => {
+    if (!row) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [row, onClose]);
+
+  if (!row) return null;
+
+  const user = userLabel(row);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" role="presentation">
+      <button type="button" className="absolute inset-0 bg-background/80 backdrop-blur-[1px]" aria-label="Đóng" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="audit-log-detail-title"
+        className="relative flex max-h-[min(92dvh,48rem)] w-full max-w-3xl flex-col rounded-t-xl border border-border bg-card shadow-lg sm:rounded-xl"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-4 pb-3 pt-4 sm:px-5">
+          <div className="min-w-0">
+            <p id="audit-log-detail-title" className="text-sm font-semibold">{DETAIL_TITLES[tab.id] ?? "Chi tiết nhật ký"}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {tab.id === "changes" ? `${row.modelLabel ?? row.model ?? ""} #${row.recordId ?? "—"} · ${fmtTime(row.occurredAt)}` : `${user} · ${tab.id === "usage" ? row.day : fmtTime(row.occurredAt)}`}
+            </p>
+          </div>
+          <Button variant="ghost" className="shrink-0 px-2 py-1 text-xs" onClick={onClose} aria-label="Đóng chi tiết">
+            <X className="size-4" aria-hidden />
+          </Button>
+        </div>
+
+        <div data-local-scroll="true" className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain px-4 py-3 sm:px-5">
+          {tab.id === "auth" ? (
+            <DetailRows rows={[
+              ["Thời gian", fmtTime(row.occurredAt)],
+              ["Người dùng", user],
+              ["Tài khoản đăng nhập", row.identifier ?? row.user?.username],
+              ["Sự kiện", <span key="type" className="inline-flex items-center gap-1.5"><Badge map={AUTH_TYPES} value={row.type} />{row.failReason ? <span className="text-xs text-muted-foreground">{failReasonLabel(row.failReason)}</span> : null}</span>],
+              ["Đơn vị", row.unitName],
+              ["IP", row.ip],
+              ["Thiết bị", shortUa(row.userAgent)],
+              ["User agent", <span key="ua" className="break-all text-xs">{row.userAgent ?? "—"}</span>],
+            ]} />
+          ) : null}
+
+          {tab.id === "changes" ? (
+            <>
+              <DetailRows rows={[
+                ["Thời gian", fmtTime(row.occurredAt)],
+                ["Người dùng", user],
+                ["Thao tác", <Badge key="action" map={CHANGE_ACTIONS} value={row.action} />],
+                ["Đối tượng", row.modelLabel ?? row.model],
+                ["Mã bản ghi", row.recordId],
+                ["Đơn vị", row.unitName],
+              ]} />
+              <ChangeDiff id={row.id} />
+            </>
+          ) : null}
+
+          {tab.id === "usage" ? (
+            <>
+              <DetailRows rows={[
+                ["Ngày", row.day],
+                ["Người dùng", user],
+                ["Ứng dụng", USAGE_SOURCES[row.source] ?? row.source],
+                ["Thời gian hoạt động", fmtDur(row.activeSec)],
+                ["Số trang xem", row.pageViews],
+                ["Lần cuối", fmtTime(row.lastSeenAt)],
+                ["Đơn vị", row.unitName],
+              ]} />
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Trang / thao tác đã xem</p>
+                <UsagePages row={row} />
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 justify-end border-t border-border px-4 py-3 sm:px-5">
+          <Button variant="ghost" className="px-3 py-1.5 text-sm" onClick={onClose}>Đóng</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LogTab({ tab }) {
   const canExport = useHasPermission(PERMISSIONS.AUDIT_LOGS_EXPORT);
   const users = useAuditLogUsersQuery();
   const [draft, setDraft] = useState({ userId: "", from: todayVn(7), to: todayVn(0), type: "" });
   const [filters, setFilters] = useState(draft);
   const [cursors, setCursors] = useState([undefined]);
-  const [openId, setOpenId] = useState(null);
+  const [detail, setDetail] = useState(null);
   const [exporting, setExporting] = useState(false);
   const cursor = cursors[cursors.length - 1];
   const query = { userId: filters.userId, from: filters.from, to: filters.to, ...(tab.typeParam ? { [tab.typeParam]: filters.type } : {}) };
   const { data, isLoading, isError, isFetching } = useAuditLogListQuery(tab.id, query, cursor);
   const items = data?.items ?? [];
 
-  useEffect(() => setOpenId(null), [filters, cursor]);
+  useEffect(() => setDetail(null), [filters, cursor]);
 
   const apply = (e) => {
     e.preventDefault();
@@ -258,24 +353,33 @@ function LogTab({ tab }) {
         ) : null}
       </form>
 
-      {openId && tab.id === "changes" ? <ChangeDiff id={openId} onClose={() => setOpenId(null)} /> : null}
-      {openId && tab.id === "usage" && items.find((r) => r.id === openId) ? (
-        <UsagePages row={items.find((r) => r.id === openId)} onClose={() => setOpenId(null)} />
-      ) : null}
-
-      <div className="overflow-x-auto rounded-lg border border-border" data-local-scroll="true">
+      <div className="overflow-x-auto overscroll-x-contain rounded-lg border border-border">
         <table className="w-full min-w-[44rem] text-sm">
           <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-            <tr>{tab.columns.map(([h]) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr>
+            <tr>
+              {tab.columns.map(([h]) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}
+              <th className="px-3 py-2 font-medium">Chi tiết</th>
+            </tr>
           </thead>
           <tbody>
             {items.map((r) => (
               <tr
                 key={r.id}
                 className={cn("border-t border-border/60", tab.rowClick && "cursor-pointer hover:bg-muted/40")}
-                onClick={tab.rowClick ? () => setOpenId(r.id) : undefined}
+                onClick={tab.rowClick ? () => setDetail(r) : undefined}
               >
                 {tab.columns.map(([h, render]) => <td key={h} className="px-3 py-1.5 align-top">{render(r)}</td>)}
+                <td className="px-3 py-1.5 align-top">
+                  <Button
+                    variant="ghost"
+                    className="gap-1 px-2 py-1 text-xs whitespace-nowrap"
+                    onClick={(e) => { e.stopPropagation(); setDetail(r); }}
+                    aria-label={`Xem chi tiết dòng nhật ký ${r.id}`}
+                  >
+                    <Eye className="size-3.5" aria-hidden />
+                    Chi tiết
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -290,6 +394,8 @@ function LogTab({ tab }) {
         <Button variant="ghost" className="px-3 py-1 text-xs" disabled={cursors.length <= 1} onClick={() => setCursors(cursors.slice(0, -1))}>Trước</Button>
         <Button variant="ghost" className="px-3 py-1 text-xs" disabled={!data?.nextCursor} onClick={() => setCursors([...cursors, data.nextCursor])}>Sau</Button>
       </div>
+
+      <LogDetailModal tab={tab} row={detail} onClose={() => setDetail(null)} />
     </div>
   );
 }
