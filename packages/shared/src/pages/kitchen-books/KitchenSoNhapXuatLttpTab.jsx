@@ -12,6 +12,7 @@ import {
 } from "@/features/kitchen-books/api/kitchenBooksApi";
 import { useGetLttpCommoditiesQuery } from "@/features/lttp/api/lttpApi";
 import { notifyError, notifySuccess } from "@/services/notify";
+import { openKitchenLedgerMonthPdf } from "./kitchenLedgerMonthPdfOpen.js";
 import { cn } from "@/utils/cn";
 import { fieldClassSm } from "@/utils/fieldClass";
 import { KitchenLedgerAssistant } from "./KitchenLedgerAssistant.jsx";
@@ -93,6 +94,7 @@ export function KitchenSoNhapXuatLttpTab({
   const [openingLines, setOpeningLines] = useState([]);
   const [openingMoney, setOpeningMoney] = useState({ surplus: "0", shortfall: "0" });
   const [settingsForm, setSettingsForm] = useState(null);
+  const [exportingMonth, setExportingMonth] = useState(false);
 
   const skip = !canAccess || selectedUnitId == null || !menuDate;
   const { data: ledger, isLoading, error } = useGetKitchenLedgerQuery(
@@ -348,6 +350,21 @@ export function KitchenSoNhapXuatLttpTab({
     }
   }
 
+  async function onExportMonth() {
+    if (selectedUnitId == null || !menuDate || exportingMonth) return;
+    const tab = window.open("about:blank", "_blank");
+    setExportingMonth(true);
+    try {
+      await openKitchenLedgerMonthPdf({
+        unitId: selectedUnitId,
+        month: menuDate.slice(0, 7),
+        targetWindow: tab,
+      });
+    } finally {
+      setExportingMonth(false);
+    }
+  }
+
   const locked = ledger?.status === "locked";
   const disabled = locked || !ledger?.canEdit;
   const today = ymd(new Date());
@@ -367,15 +384,26 @@ export function KitchenSoNhapXuatLttpTab({
             setManualUnitId={setManualUnitId}
             user={user}
           />
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Ngày</span>
-            <input
-              type="date"
-              className={cn(fieldClassSm, "w-40")}
-              value={menuDate}
-              onChange={(event) => setMenuDate(event.target.value)}
-            />
-          </label>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Ngày</span>
+              <input
+                type="date"
+                className={cn(fieldClassSm, "w-40")}
+                value={menuDate}
+                onChange={(event) => setMenuDate(event.target.value)}
+              />
+            </label>
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-8 px-3 text-xs"
+              disabled={selectedUnitId == null || !menuDate || exportingMonth}
+              onClick={onExportMonth}
+            >
+              {exportingMonth ? "Đang xuất…" : "Xuất sổ tháng"}
+            </Button>
+          </div>
         </div>
 
         {selectedUnitId != null && menuDate ? (

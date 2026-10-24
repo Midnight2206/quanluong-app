@@ -9,6 +9,11 @@ const ledgerQuerySchema = z.object({
   date: dateSchema,
 });
 
+const ledgerMonthQuerySchema = z.object({
+  unitId: unitIdSchema,
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "month dạng YYYY-MM"),
+});
+
 const ledgerSettingsQuerySchema = z.object({
   unitId: unitIdSchema,
 });
@@ -143,6 +148,7 @@ const saveLedgerSettingsBodySchema = z.object({
 
 export {
   ledgerQuerySchema,
+  ledgerMonthQuerySchema,
   ledgerSettingsQuerySchema,
   headcountSchema,
   saveLedgerBodySchema,

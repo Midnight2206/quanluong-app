@@ -495,6 +495,18 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "exportKitchenLedgerMonthPdf",
+    method: "GET",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger/month-pdf",
+    pathRoute: "/api/kitchen-books/ledger/month-pdf",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Xuất PDF sổ nhập xuất LTTP cả tháng theo đơn vị.",
+    },
+  },
+  {
     key: "saveKitchenLedgerSettings",
     method: "PUT",
     module: KITCHEN_BOOKS_MODULE_NAME,

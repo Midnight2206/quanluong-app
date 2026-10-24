@@ -1,4 +1,5 @@
 import { respondSuccess } from "../../shared/utils/responders.js";
+import { exportLedgerMonthPdf } from "./kitchen-ledger-month-pdf.service.js";
 import {
   balanceLedger,
   getLedger,
@@ -82,8 +83,23 @@ async function saveLedgerSettingsController(req, res) {
   return respondSuccess(res, { message: "Đã lưu cấu hình sổ", data });
 }
 
+async function exportLedgerMonthPdfController(req, res) {
+  const { buffer, fileName, draftDays } = await exportLedgerMonthPdf(
+    req.validatedQuery,
+    req.user,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
+  if (draftDays.length) res.setHeader("X-Ledger-Draft-Days", draftDays.join(","));
+  res.send(buffer);
+}
+
 export {
   balanceLedgerController,
+  exportLedgerMonthPdfController,
   getLedgerController,
   getLedgerSettingsController,
   lockLedgerController,

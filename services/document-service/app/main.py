@@ -36,6 +36,7 @@ from app.folders.folder_service import (
 from app.models import Template
 from app.pagination import PaginationError, plan_pages
 from app.parse import parse_xlsx
+from app.render.kitchen_ledger_book import render_kitchen_ledger_book
 from app.render.pdf_renderer import render_pdf
 from app.render.signature_block import default_signature_block, parse_signature_block_config
 from app.templates.placeholder_data import generate_placeholder_data
@@ -867,6 +868,16 @@ class PaginationPlanBody(BaseModel):
     row_height_max: float = 28
     min_rows_last_page: int = 2
     stretch_strategy: str = "end_bias"
+
+
+@app.post("/v1/render/kitchen-ledger-book")
+def render_kitchen_ledger_book_route(body: dict, _: None = Depends(require_service_key)):
+    """Vẽ sổ tháng từ trang Node đã cắt. Không đụng Postgres."""
+    try:
+        pdf = render_kitchen_ledger_book(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=value_error_detail(exc))
+    return Response(content=pdf, media_type="application/pdf")
 
 
 @app.post("/v1/pagination/plan")

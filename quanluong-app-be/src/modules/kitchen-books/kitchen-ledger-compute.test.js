@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { assembleLedgerInput, fingerprintIssueSlips } from "./kitchen-ledger-assemble.js";
 import { computeFinance, computeLedger, planRations, splitLedgerPages } from "./kitchen-ledger-compute.js";
+import { sheetsFromLines } from "./kitchen-ledger-month-book.js";
 import { toScaled } from "./kitchen-ledger-decimal.js";
 import { DEFAULT_LEDGER_SETTINGS } from "./kitchen-ledger-settings.js";
 
@@ -158,6 +159,33 @@ test("cktc_17 khớp từng dòng và khối tài chính tới đồng", () => {
   same(split[0].carry.totalOutAmount, "7075180");
   assert.equal(split[1].lines.length, 2);
   assert.equal(split[1].carry, null);
+
+  const sheets = sheetsFromLines(result.lines, result.totals);
+  assert.equal(sheets[0].rows.length, 40);
+  assert.equal(sheets[0].carryOut.openingAmount, "15.702.720");
+  assert.equal(sheets[0].carryOut.inAmount, "5.623.000");
+  assert.equal(sheets[0].carryOut.totalInAmount, "21.325.720");
+  assert.equal(sheets[0].carryOut.mealAmount, "7.075.180");
+  assert.equal(sheets[0].carryOut.otherAmount, "");
+  assert.equal(sheets[0].carryOut.totalOutAmount, "7.075.180");
+  assert.equal(sheets[0].carryOut.openingQty, undefined);
+  assert.deepEqual(sheets[1].carryIn, sheets[0].carryOut);
+  assert.equal(sheets[1].carryOut, null);
+  assert.equal(sheets[1].showTotal, true);
+  assert.equal(sheets[1].showSignature, true);
+  assert.equal(sheets[0].showSignature, false);
+  assert.equal(sheets[1].totals.openingAmount, "20.261.530");
+  assert.equal(sheets[1].totals.mealAmount, "7.309.540");
+  assert.equal(sheets[1].totals.totalOutAmount, "7.309.540");
+  const fuel = sheets[1].rows[1];
+  assert.equal(fuel.name, "Chất đốt");
+  assert.equal(fuel.price, "");
+  assert.equal(fuel.openingQty, "\u2013");
+  assert.equal(fuel.totalInQty, "\u2013");
+  assert.equal(fuel.mealQty, "\u2013");
+  assert.equal(fuel.totalOutQty, "\u2013");
+  assert.equal(sheets[0].rows[0].price, "16.000");
+  assert.equal(sheets[0].rows[0].openingQty, "763,12");
 });
 
 test("FIFO: hết lô giá cũ rồi mới tới lô giá mới", () => {

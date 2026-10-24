@@ -39,6 +39,7 @@ import {
 } from "./kitchen-books.controller.js";
 import {
   balanceLedgerController,
+  exportLedgerMonthPdfController,
   getLedgerController,
   getLedgerSettingsController,
   lockLedgerController,
@@ -86,6 +87,7 @@ import {
 } from "./kitchen-books.validator.js";
 import {
   balanceLedgerBodySchema,
+  ledgerMonthQuerySchema,
   ledgerQuerySchema,
   ledgerSettingsQuerySchema,
   lockLedgerBodySchema,
@@ -358,6 +360,14 @@ kitchenBooksRouter.put(
   validateRequest({ body: saveLedgerSettingsBodySchema }),
   permissionMiddleware([routePermissions.saveKitchenLedgerSettings]),
   asyncHandler(saveLedgerSettingsController),
+);
+
+kitchenBooksRouter.get(
+  "/ledger/month-pdf",
+  dataScopeMw,
+  validateRequest({ query: ledgerMonthQuerySchema }),
+  permissionMiddleware([routePermissions.exportKitchenLedgerMonthPdf]),
+  asyncHandler(exportLedgerMonthPdfController),
 );
 
 kitchenBooksRouter.get(
