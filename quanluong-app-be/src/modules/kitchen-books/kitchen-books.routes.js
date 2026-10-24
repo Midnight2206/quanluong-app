@@ -37,6 +37,15 @@ import {
   resolveReceiptLineController,
   guaranteeFromIssueController,
 } from "./kitchen-books.controller.js";
+import {
+  balanceLedgerController,
+  getLedgerController,
+  getLedgerSettingsController,
+  lockLedgerController,
+  saveLedgerController,
+  saveLedgerSettingsController,
+  unlockLedgerController,
+} from "./kitchen-ledger.controller.js";
 import { KITCHEN_BOOKS_ROUTE_DEFINITIONS } from "./kitchen-books.route-definitions.js";
 import { menuAiSuggestRateLimit } from "../../middlewares/menu-ai-rate-limit.middleware.js";
 import {
@@ -66,6 +75,15 @@ import {
   updateReceiptSlipBodySchema,
   upsertReceiptSlipUnitSelfBodySchema,
 } from "./kitchen-books.validator.js";
+import {
+  balanceLedgerBodySchema,
+  ledgerQuerySchema,
+  ledgerSettingsQuerySchema,
+  lockLedgerBodySchema,
+  saveLedgerBodySchema,
+  saveLedgerSettingsBodySchema,
+  unlockLedgerBodySchema,
+} from "./kitchen-ledger.validator.js";
 
 const kitchenBooksRouter = express.Router();
 const LTTP_COMM = DATA_SCOPE_KINDS.LTTP_COMMODITY.code;
@@ -306,6 +324,62 @@ kitchenBooksRouter.delete(
   validateRequest({ params: receiptSlipIdParamsSchema }),
   permissionMiddleware([routePermissions.deleteKitchenReceiptSlip]),
   asyncHandler(deleteReceiptSlipController),
+);
+
+kitchenBooksRouter.get(
+  "/ledger/settings",
+  dataScopeMw,
+  validateRequest({ query: ledgerSettingsQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenLedgerSettings]),
+  asyncHandler(getLedgerSettingsController),
+);
+
+kitchenBooksRouter.put(
+  "/ledger/settings",
+  dataScopeMw,
+  validateRequest({ body: saveLedgerSettingsBodySchema }),
+  permissionMiddleware([routePermissions.saveKitchenLedgerSettings]),
+  asyncHandler(saveLedgerSettingsController),
+);
+
+kitchenBooksRouter.get(
+  "/ledger",
+  dataScopeMw,
+  validateRequest({ query: ledgerQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenLedger]),
+  asyncHandler(getLedgerController),
+);
+
+kitchenBooksRouter.put(
+  "/ledger",
+  dataScopeMw,
+  validateRequest({ body: saveLedgerBodySchema }),
+  permissionMiddleware([routePermissions.saveKitchenLedger]),
+  asyncHandler(saveLedgerController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/lock",
+  dataScopeMw,
+  validateRequest({ body: lockLedgerBodySchema }),
+  permissionMiddleware([routePermissions.lockKitchenLedger]),
+  asyncHandler(lockLedgerController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/unlock",
+  dataScopeMw,
+  validateRequest({ body: unlockLedgerBodySchema }),
+  permissionMiddleware([routePermissions.unlockKitchenLedger]),
+  asyncHandler(unlockLedgerController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/balance",
+  dataScopeMw,
+  validateRequest({ body: balanceLedgerBodySchema }),
+  permissionMiddleware([routePermissions.balanceKitchenLedger]),
+  asyncHandler(balanceLedgerController),
 );
 
 export { kitchenBooksRouter };

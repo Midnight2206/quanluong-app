@@ -176,6 +176,8 @@ model User {
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
   kitchenMenuSamplesCreated              KitchenMenuSample[] @relation("KitchenMenuSampleCreatedBy")
+  kitchenLedgerDaysLocked                KitchenLedgerDay[] @relation("KitchenLedgerDayLockedBy")
+  kitchenLedgerSettingsUpdated           KitchenLedgerSettings[] @relation("KitchenLedgerSettingsUpdatedBy")
   lttpSupplierLinks UserLttpSupplier[]
   baApiTokensCreated BaApiToken[] @relation("BaApiTokenCreatedBy")
 
@@ -686,6 +688,8 @@ model Unit {
   kitchenReceiptSlips       KitchenReceiptSlip[]
   kitchenReceiptSlipSerials KitchenReceiptSlipSerial[]
   kitchenMenuSamples        KitchenMenuSample[]
+  kitchenLedgerDays         KitchenLedgerDay[]
+  kitchenLedgerSettings     KitchenLedgerSettings?
   baUnitProfiles            BaUnitProfile[]
   baApiTokens               BaApiToken[]
   baProposals               BaProposal[]
@@ -833,6 +837,8 @@ model LttpCommodity {
   lttpAiCommodityHabits         LttpAiCommodityHabit[]
   lttpAiUomRules                LttpAiUomRule[]
   lttpAiDraftLines              LttpAiDraftLine[]
+  kitchenLedgerLots             KitchenLedgerLot[]
+  kitchenLedgerMovements        KitchenLedgerMovement[]
 
   @@unique([unitId, code])
   @@index([unitId])
@@ -1426,6 +1432,85 @@ model KitchenReceiptSlipLine {
   @@index([slipId])
   @@index([commodityId])
   @@index([slipId, lineSource, priceKind])
+}
+
+/// Cấu hình sổ nhập xuất theo đơn vị (ngưỡng thừa/thiếu, ΣS hay ΣO, mức ăn, gia vị).
+model KitchenLedgerSettings {
+  unitId      Int      @id
+  configJson  Json
+  updatedById Int?
+  updatedAt   DateTime @updatedAt
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  updatedBy   User?    @relation("KitchenLedgerSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
+}
+
+/// Một ngày sổ nhập xuất LTTP. snapshotJson là bản đã tính; khi chốt thì không tính lại.
+model KitchenLedgerDay {
+  id                 Int       @id @default(autoincrement())
+  unitId             Int
+  ledgerDate         DateTime  @db.Date
+  status             String    @default("draft") @db.VarChar(16)
+  lockedAt           DateTime?
+  lockedById         Int?
+  needsResignature   Boolean   @default(false)
+  slipFingerprint    String?   @db.VarChar(64)
+  selfSupplyNone     Boolean   @default(false)
+  headcountJson      Json?
+  otherIncomeJson    Json?
+  openingFinanceJson Json?
+  snapshotJson       Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  unit               Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  lockedBy           User?     @relation("KitchenLedgerDayLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+  lots               KitchenLedgerLot[]
+  movements          KitchenLedgerMovement[]
+
+  @@unique([unitId, ledgerDate])
+  @@index([lockedById])
+}
+
+/// Tồn cuối ngày — tồn đầu của ngày sau. Âm kho vẫn giữ để không làm mất thiếu.
+model KitchenLedgerLot {
+  id           Int              @id @default(autoincrement())
+  dayId        Int
+  sortOrder    Int              @default(0)
+  commodityId  Int?
+  itemName     String           @db.VarChar(255)
+  measureUnit  String           @db.VarChar(64)
+  unitPrice    Decimal          @db.Decimal(18, 4)
+  receivedDate DateTime         @db.Date
+  qty          Decimal          @db.Decimal(18, 4)
+  amount       Decimal          @db.Decimal(18, 2)
+  role         String           @db.VarChar(16)
+  displayDash  Boolean          @default(false)
+  day          KitchenLedgerDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  commodity    LttpCommodity?   @relation(fields: [commodityId], references: [id], onDelete: SetNull)
+
+  @@index([dayId])
+  @@index([commodityId])
+}
+
+/// Dòng người dùng nhập: tự bảo đảm, gạo, xuất khác, tồn đầu, nhập bù âm kho.
+model KitchenLedgerMovement {
+  id          Int              @id @default(autoincrement())
+  dayId       Int
+  sortOrder   Int              @default(0)
+  kind        String           @db.VarChar(32)
+  source      String           @db.VarChar(8)
+  commodityId Int?
+  itemName    String           @db.VarChar(255)
+  measureUnit String           @db.VarChar(64)
+  unitPrice   Decimal          @default(0) @db.Decimal(18, 4)
+  qty         Decimal          @db.Decimal(18, 4)
+  issuePolicy String           @default("today") @db.VarChar(16)
+  day         KitchenLedgerDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  commodity   LttpCommodity?   @relation(fields: [commodityId], references: [id], onDelete: SetNull)
+
+  @@index([dayId, kind])
+  @@index([commodityId])
 }
 
 /// Phiên bản bảng giá LTTP — một bản ghi / đơn vị / ngày áp dụng.

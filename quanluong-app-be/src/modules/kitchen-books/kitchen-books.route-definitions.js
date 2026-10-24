@@ -338,6 +338,90 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
       description: "Số lượng Trên BĐ gom từ phiếu xuất LTTP theo ngày và đơn vị nhận.",
     },
   },
+  {
+    key: "getKitchenLedger",
+    method: "GET",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger",
+    pathRoute: "/api/kitchen-books/ledger",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Xem sổ nhập xuất LTTP theo ngày.",
+    },
+  },
+  {
+    key: "saveKitchenLedger",
+    method: "PUT",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger",
+    pathRoute: "/api/kitchen-books/ledger",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Lưu quân số, gạo và nguồn đơn vị của sổ nhập xuất LTTP.",
+    },
+  },
+  {
+    key: "lockKitchenLedger",
+    method: "POST",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger/lock",
+    pathRoute: "/api/kitchen-books/ledger/lock",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Chốt ngày sổ nhập xuất LTTP.",
+    },
+  },
+  {
+    key: "unlockKitchenLedger",
+    method: "POST",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger/unlock",
+    pathRoute: "/api/kitchen-books/ledger/unlock",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Mở khóa ngày sổ nhập xuất LTTP.",
+    },
+  },
+  {
+    key: "balanceKitchenLedger",
+    method: "POST",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger/balance",
+    pathRoute: "/api/kitchen-books/ledger/balance",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Cân đối tồn âm sổ nhập xuất LTTP khi người dùng xác nhận.",
+    },
+  },
+  {
+    key: "getKitchenLedgerSettings",
+    method: "GET",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger/settings",
+    pathRoute: "/api/kitchen-books/ledger/settings",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Xem cấu hình sổ nhập xuất LTTP theo đơn vị.",
+    },
+  },
+  {
+    key: "saveKitchenLedgerSettings",
+    method: "PUT",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger/settings",
+    pathRoute: "/api/kitchen-books/ledger/settings",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Lưu cấu hình sổ nhập xuất LTTP theo đơn vị.",
+    },
+  },
 ];
 
 export { KITCHEN_BOOKS_ROUTE_DEFINITIONS };
