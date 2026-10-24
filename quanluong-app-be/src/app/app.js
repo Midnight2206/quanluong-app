@@ -36,6 +36,7 @@ function createApp(options = {}) {
         callback(new Error("Origin is not allowed by CORS policy."));
       },
       credentials: true,
+      exposedHeaders: ["X-Ledger-Draft-Days"],
     }),
   );
 

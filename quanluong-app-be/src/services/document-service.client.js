@@ -183,6 +183,23 @@ async function retireTemplate(templateId) {
   return readJsonResponse(response);
 }
 
+async function renderKitchenLedgerBook(book) {
+  const response = await requestDocument("/v1/render/kitchen-ledger-book", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(book),
+  });
+  try {
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    throw new AppError({
+      message: "Document service trả về dữ liệu không hợp lệ",
+      statusCode: 502,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+}
+
 async function renderDocumentPdf(templateId, body = {}) {
   const {
     fields = {},
@@ -367,6 +384,7 @@ export {
   previewTemplatePdfResponse,
   publishTemplate,
   renderDocumentPdf,
+  renderKitchenLedgerBook,
   renderStoredDocumentPdf,
   renderToDocumentFolder,
   retireTemplate,

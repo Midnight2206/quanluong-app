@@ -54,7 +54,15 @@ function extractJsonObject(text) {
   }
 }
 
-async function callOpenAiCompatible({ system, user }, cfg, fetchImpl) {
+function userContent(user, image) {
+  if (!image) return user;
+  return [
+    { type: "text", text: user },
+    { type: "image_url", image_url: { url: `data:${image.mime};base64,${image.base64}` } },
+  ];
+}
+
+async function callOpenAiCompatible({ system, user, image, temperature }, cfg, fetchImpl) {
   const base = String(cfg.baseUrl || "https://api.openai.com/v1").replace(/\/+$/, "");
   const res = await fetchImpl(`${base}/chat/completions`, {
     method: "POST",
@@ -64,13 +72,13 @@ async function callOpenAiCompatible({ system, user }, cfg, fetchImpl) {
     },
     body: JSON.stringify({
       model: cfg.model,
-      temperature: 0.4,
+      temperature: temperature ?? 0.4,
       // OpenRouter giữ credit theo trần này. Bỏ qua thì model Gemini xin 65536 và 402 khi số dư chỉ đủ ~16000.
       max_tokens: 8000,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
-        { role: "user", content: user },
+        { role: "user", content: userContent(user, image) },
       ],
     }),
     signal: AbortSignal.timeout(cfg.timeoutMs || 60_000),
@@ -87,16 +95,20 @@ async function callOpenAiCompatible({ system, user }, cfg, fetchImpl) {
   return data?.choices?.[0]?.message?.content ?? "";
 }
 
-async function callGemini({ system, user }, cfg, fetchImpl) {
+async function callGemini({ system, user, image, temperature }, cfg, fetchImpl) {
   const model = cfg.model || "gemini-2.0-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
+  const parts = [{ text: user }];
+  if (image) {
+    parts.push({ inlineData: { mimeType: image.mime, data: image.base64 } });
+  }
   const res = await fetchImpl(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
+      contents: [{ role: "user", parts }],
+      generationConfig: { responseMimeType: "application/json", temperature: temperature ?? 0.4 },
     }),
     signal: AbortSignal.timeout(cfg.timeoutMs || 60_000),
   });
@@ -112,12 +124,75 @@ async function callGemini({ system, user }, cfg, fetchImpl) {
   return data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") ?? "";
 }
 
-async function completeOnce({ system, user }, cfg, fetchImpl) {
+async function completeOnce({ system, user, image, temperature }, cfg, fetchImpl) {
   const provider = String(cfg.provider || "openai").toLowerCase();
   if (provider === "gemini") {
-    return callGemini({ system, user }, cfg, fetchImpl);
+    return callGemini({ system, user, image, temperature }, cfg, fetchImpl);
   }
-  return callOpenAiCompatible({ system, user }, cfg, fetchImpl);
+  return callOpenAiCompatible({ system, user, image, temperature }, cfg, fetchImpl);
+}
+
+function aiFailure(err) {
+  if (err instanceof AppError) return err;
+  const name = err?.name || "";
+  if (name === "TimeoutError" || name === "AbortError") {
+    return new AppError({
+      message: "AI không phản hồi. Nhập bằng tay.",
+      statusCode: 504,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+  return new AppError({
+    message: "AI không đọc được. Nhập bằng tay.",
+    statusCode: 502,
+    code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+  });
+}
+
+/**
+ * Trích JSON theo schema người gọi mô tả. Không ghi sổ, không tính lại số.
+ * @param {{ system: string, user: string, image?: { mime: string, base64: string }, temperature?: number }} prompt
+ * @param {{ fetchImpl?: typeof fetch, configOverride?: object, disabledMessage?: string, retryUserHint?: string }} [opts]
+ */
+async function extractStructured(prompt, opts = {}) {
+  const base = getMenuAiConfig(opts.configOverride);
+  if (!base?.apiKey) {
+    throw new AppError({
+      message: opts.disabledMessage || "AI chưa được cấu hình (thiếu MENU_AI_API_KEY).",
+      statusCode: 503,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+  const model = String(opts.model || "").trim();
+  const cfg = model ? { ...base, model } : base;
+  const fetchImpl = opts.fetchImpl || globalThis.fetch;
+  const temperature = prompt.temperature ?? 0;
+  let content;
+  try {
+    content = await completeOnce({ ...prompt, temperature }, cfg, fetchImpl);
+  } catch (err) {
+    throw aiFailure(err);
+  }
+  try {
+    return { data: extractJsonObject(content), model: cfg.model, provider: cfg.provider };
+  } catch (err) {
+    if (!(err instanceof AppError)) throw aiFailure(err);
+    try {
+      content = await completeOnce(
+        {
+          system: `${prompt.system}\nChi tra ve mot JSON object hop le, khong markdown, khong ten nguoi.`,
+          user: `JSON truoc do khong dung. ${opts.retryUserHint || "Tra lai dung schema."}\n\n${prompt.user}`,
+          image: prompt.image,
+          temperature,
+        },
+        cfg,
+        fetchImpl,
+      );
+    } catch (retryErr) {
+      throw aiFailure(retryErr);
+    }
+    return { data: extractJsonObject(content), model: cfg.model, provider: cfg.provider };
+  }
 }
 
 /**
@@ -147,4 +222,10 @@ async function completeMenuJson({ system, user }, opts = {}) {
   }
 }
 
-export { assertMenuAiConfigured, extractJsonObject, completeMenuJson, readMenuAiFromEnv };
+export {
+  assertMenuAiConfigured,
+  extractJsonObject,
+  completeMenuJson,
+  extractStructured,
+  readMenuAiFromEnv,
+};

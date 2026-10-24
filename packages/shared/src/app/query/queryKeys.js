@@ -135,6 +135,9 @@ export const qk = {
       String(unitId),
       String(date),
     ],
+    ledger: (unitId, date) => ["kitchenBooks", "ledger", String(unitId), String(date)],
+    ledgerSettings: (unitId) => ["kitchenBooks", "ledgerSettings", String(unitId)],
+    ledgerAssistant: (unitId, date) => ["kitchenBooks", "ledgerAssistant", String(unitId), String(date)],
   },
   chungTuQuyetToan: {
     root: ["chungTuQuyetToan"],

@@ -381,3 +381,157 @@ export function useDeleteKitchenReceiptSlipMutation() {
     },
   });
 }
+
+function invalidateLedger(qc, unitId, date) {
+  if (unitId == null) return;
+  const ledgerKey = date
+    ? qk.kitchenBooks.ledger(unitId, date)
+    : ["kitchenBooks", "ledger", String(unitId)];
+  qc.invalidateQueries({ queryKey: ledgerKey });
+  qc.invalidateQueries({ queryKey: qk.kitchenBooks.ledgerSettings(unitId) });
+}
+
+export function useGetKitchenLedgerQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.ledger(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/kitchen-books/ledger",
+        method: "get",
+        params: { unitId, date },
+      }),
+    enabled: skip !== true && unitId != null && Boolean(date),
+    ...rest,
+  });
+}
+
+export function useSaveKitchenLedgerMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger", method: "put", data: body }),
+    onSuccess: (_data, vars) => invalidateLedger(qc, vars?.unitId, vars?.date),
+  });
+}
+
+export function useLockKitchenLedgerMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/lock", method: "post", data: body }),
+    onSuccess: (_data, vars) => invalidateLedger(qc, vars?.unitId, vars?.date),
+  });
+}
+
+export function useUnlockKitchenLedgerMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/unlock", method: "post", data: body }),
+    onSuccess: (_data, vars) => invalidateLedger(qc, vars?.unitId, vars?.date),
+  });
+}
+
+export function useBalanceKitchenLedgerMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/balance", method: "post", data: body }),
+    onSuccess: (_data, vars) => invalidateLedger(qc, vars?.unitId, vars?.date),
+  });
+}
+
+export function useSaveKitchenLedgerSettingsMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/settings", method: "put", data: body }),
+    onSuccess: (_data, vars) => invalidateLedger(qc, vars?.unitId, null),
+  });
+}
+
+function invalidateAssistant(qc, unitId, date, { ledger = false } = {}) {
+  if (unitId == null) return;
+  qc.invalidateQueries({ queryKey: qk.kitchenBooks.ledgerAssistant(unitId, date) });
+  if (ledger) invalidateLedger(qc, unitId, null);
+}
+
+export function useGetKitchenLedgerAssistantQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.ledgerAssistant(unitId, date),
+    queryFn: () =>
+      apiRequest({
+        url: "/kitchen-books/ledger/assistant",
+        method: "get",
+        params: { unitId, date },
+      }),
+    enabled: skip !== true && unitId != null && Boolean(date),
+    ...rest,
+  });
+}
+
+export function useLedgerAssistantTurnMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/assistant/turn", method: "post", data: body }),
+    onSettled: (_data, _err, vars) => invalidateAssistant(qc, vars?.unitId, vars?.date),
+  });
+}
+
+export function useApplyLedgerAssistantMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/assistant/apply", method: "post", data: body }),
+    onSettled: (_data, _err, vars) => invalidateAssistant(qc, vars?.unitId, vars?.date, { ledger: true }),
+  });
+}
+
+export function useSaveLedgerAssistantProfileMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/assistant/profile", method: "put", data: body }),
+    onSuccess: (_data, vars) => invalidateAssistant(qc, vars?.unitId, vars?.date),
+  });
+}
+
+export function useAddLedgerAssistantMemoryMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/assistant/memory", method: "post", data: body }),
+    onSuccess: (_data, vars) => invalidateAssistant(qc, vars?.unitId, vars?.date),
+  });
+}
+
+export function useDeleteLedgerAssistantMemoryMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ unitId, id, date }) =>
+      apiRequest({
+        url: "/kitchen-books/ledger/assistant/memory",
+        method: "delete",
+        params: { unitId, id },
+      }).then((data) => ({ ...data, unitId, date })),
+    onSuccess: (data) => invalidateAssistant(qc, data?.unitId, data?.date),
+  });
+}
+
+export function useDeleteLedgerAssistantRuleMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: ({ unitId, id, date }) =>
+      apiRequest({
+        url: "/kitchen-books/ledger/assistant/rules",
+        method: "delete",
+        params: { unitId, id },
+      }).then((data) => ({ ...data, unitId, date })),
+    onSuccess: (data) => invalidateAssistant(qc, data?.unitId, data?.date),
+  });
+}

@@ -16,6 +16,12 @@ const DEFAULT_EXCLUDED_MODELS = [
   "ChatDirectReadState",
   "LttpAiCommodityHabit",
   "LttpAiAliasStat",
+  // Nội dung trợ lý làm sổ là riêng từng tài khoản. Không đưa vào nhật ký thay đổi.
+  "LedgerAssistantProfile",
+  "LedgerAssistantMemory",
+  "LedgerAssistantRuleNote",
+  "LedgerAssistantConversation",
+  "LedgerAssistantMessage",
 ];
 
 function excludedModels() {
