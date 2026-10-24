@@ -9,24 +9,19 @@ import {
 } from "./kitchen-books-scope.helpers.js";
 import { getLedger, saveLedger, saveLedgerSettings } from "./kitchen-ledger.service.js";
 import { mergeLedgerSettings, normalizeName } from "./kitchen-ledger-settings.js";
-import {
-  buildHeadcountPrompt,
-  diffHeadcount,
-  normalizeAiHeadcount,
-} from "./kitchen-ledger-ai-headcount.js";
+import { diffHeadcount } from "./kitchen-ledger-ai-headcount.js";
 import {
   briefAnomalies,
   fold,
   headcountLike,
-  normalizeMovementDraft,
   proposeSettings,
   questionDate,
   renderTool,
   routeIntent,
   routeQuestion,
   settingsPatch,
-  toolSchema,
 } from "./kitchen-ledger-assistant-core.js";
+import { ledgerAiModels, mapLedgerRecords, recordsPrompt } from "./kitchen-ledger-records.js";
 
 const MAX_IMAGE_BYTES = 4_000_000;
 const MEMORY_CAP = 30;
@@ -287,9 +282,13 @@ async function postTurn(payload, user, scope, effectiveUnitIds, dataScope, opts 
     return reply(ctx, "note", "Cân đối tồn âm chỉ chạy khi bấm nút Cân đối và xác nhận. Trợ lý không tự ghi dòng cân đối.");
   }
   if (intent === "rule") return turnRule(ctx);
-  if (intent === "headcount") return turnHeadcount(ctx);
-  if (intent === "movement") return turnMovement(ctx);
-  return turnQuestion(ctx);
+  if (intent === "question") return turnQuestion(ctx);
+  if (intent === "headcount") {
+    const nums = text.match(/\d+/g) || [];
+    const copy = nums.length < 5 ? headcountLike(text, payload.date) : null;
+    if (copy) return copyHeadcount(ctx, copy);
+  }
+  return turnRecords(ctx);
 }
 
 async function reply(ctx, kind, content, payloadJson = null) {
@@ -310,8 +309,9 @@ async function reply(ctx, kind, content, payloadJson = null) {
   };
 }
 
-async function callExtract(ctx, feature, prompt, { soft = false } = {}) {
-  const cfg = aiConfig(ctx.opts);
+async function callExtract(ctx, feature, prompt, { soft = false, model } = {}) {
+  const base = aiConfig(ctx.opts);
+  const cfg = model ? { ...base, model } : base;
   const extract = ctx.opts.extractStructured ?? extractStructured;
   const inputSha = sha256(`${ctx.text}\n${ctx.image?.base64 || ""}`);
   const inputBytes = Buffer.byteLength(ctx.text) + (ctx.image?.bytes || 0);
@@ -319,9 +319,10 @@ async function callExtract(ctx, feature, prompt, { soft = false } = {}) {
   try {
     const extracted = await extract(prompt, {
       configOverride: ctx.opts.configOverride,
+      model,
       fetchImpl: ctx.opts.fetchImpl,
       disabledMessage: "AI đang tắt (chưa có MENU_AI_API_KEY). Nhập tay ở bảng phía trên.",
-      retryUserHint: "Tra ve dung JSON. Khong ten nguoi.",
+      retryUserHint: "Tra ve dung JSON records. Khong ten nguoi. Khong chon vi tri tren so.",
     });
     return { extracted, ...meta };
   } catch (err) {
@@ -341,31 +342,98 @@ async function markOk(ctx, meta) {
   );
 }
 
-async function turnHeadcount(ctx) {
-  const nums = ctx.text.match(/\d+/g) || [];
-  const copy = nums.length < 5 ? headcountLike(ctx.text, ctx.payload.date) : null;
-  if (copy) return copyHeadcount(ctx, copy);
+function draftKind(mapped) {
+  const head = mapped.headcountDays.length > 0;
+  const lines = mapped.lines.length > 0;
+  const rules = mapped.proposals.length > 0;
+  if (head && !lines && !rules) return "headcount_draft";
+  if (lines && !head && !rules) return "movement_draft";
+  if (rules && !head && !lines) return "rule_note";
+  return "records_draft";
+}
+
+async function turnRecords(ctx) {
+  if (ctx.intent === "movement" && !ctx.text) throw fail("Nhập câu hàng. Ảnh hóa đơn để bước sau.", 400);
   const settings = ctx.opts.settings ?? await loadSettings(ctx.db, ctx.unitId);
   const facts = await memoryLines(ctx.db, ctx.user.id, ctx.unitId);
   const profile = await profileOf(ctx.db, ctx.user.id, ctx.unitId);
-  const meta = await callExtract(ctx, "kitchen-ledger-headcount", {
-    system: `${toneLine(profile.tone)} ${buildHeadcountPrompt(settings, ctx.payload.date)} ${facts.length ? `Ghi nho: ${facts.join(" | ")}` : ""}`,
+  let commodities = [];
+  if (ctx.intent !== "headcount") {
+    const loadCommodities = ctx.opts.loadCommodities ?? ((storageUnitId) => ctx.db.lttpCommodity.findMany({
+      where: { unitId: storageUnitId, isActive: true },
+      select: { id: true, name: true, measureUnit: true },
+      orderBy: { name: "asc" },
+      take: 500,
+    }));
+    commodities = await loadCommodities(ctx.dataScope.storageUnitId);
+  }
+  const feature = ctx.intent === "movement" ? "kitchen-ledger-movement" : "kitchen-ledger-headcount";
+  const meta = await callExtract(ctx, feature, {
+    system: `${toneLine(profile.tone)} ${recordsPrompt({ settings, anchorDate: ctx.payload.date, commodities, facts })}`,
     user: ctx.text || "Doc anh so cham com. Chi dem nguoi an tung bua va tung muc. Khong chep ten.",
     image: ctx.image ? { mime: ctx.image.mime, base64: ctx.image.base64 } : undefined,
     temperature: 0,
-  });
-  let draft;
+  }, { model: ledgerAiModels().extract });
+  let mapped;
   try {
-    draft = normalizeAiHeadcount(meta.extracted.data, { settings, anchorDate: ctx.payload.date });
+    mapped = mapLedgerRecords(meta.extracted.data, {
+      settings,
+      anchorDate: ctx.payload.date,
+      commodities,
+      ricePattern: settings.riceNamePattern,
+    });
   } catch (err) {
     await writeUsage(ctx.db, usageRow(
       ctx.user.id, ctx.unitId, meta.feature, meta.extracted, meta.inputSha, meta.inputBytes, "error",
     ));
-    await reply(ctx, "error", err?.message || "AI trả về quân số không đúng mẫu.");
+    await reply(ctx, "error", err?.message || "AI trả về bản ghi không đúng mẫu. Nhập tay ở bảng phía trên.");
     throw err;
   }
   await markOk(ctx, meta);
-  return reply(ctx, "headcount_draft", "Bản nháp quân số. Sửa rồi bấm ghi. Số trên sổ chỉ đổi sau khi ghi.", draft);
+  const actionable = mapped.headcountDays.length || mapped.lines.length || mapped.proposals.length;
+  if (!actionable) {
+    return answerRecords(ctx, mapped);
+  }
+  const kind = draftKind(mapped);
+  const parts = [];
+  if (mapped.headcountDays.length) parts.push("quân số");
+  if (mapped.lines.length) parts.push("dòng hàng");
+  if (mapped.proposals.length) parts.push("cấu hình");
+  const note = mapped.notes.map((row) => row.text).join(" ");
+  const content = `Bản nháp ${parts.join(" và ")}. Sửa rồi bấm ghi. Số trên sổ chỉ đổi sau khi ghi.${note ? ` ${note}` : ""}`;
+  return reply(ctx, kind, content, {
+    date: mapped.lines.length === 1 ? mapped.lines[0].date : ctx.payload.date,
+    days: mapped.headcountDays,
+    warnings: mapped.headcountWarnings,
+    lines: mapped.lines,
+    proposals: mapped.proposals,
+    notes: mapped.notes,
+  });
+}
+
+async function answerRecords(ctx, mapped) {
+  const question = mapped.questions[0];
+  if (!question) {
+    const text = mapped.notes.map((row) => row.text).join("\n") || "Không thấy bản ghi để ghi vào sổ.";
+    return reply(ctx, "note", text);
+  }
+  const readLedger = ctx.opts.getLedger ?? getLedger;
+  let view;
+  try {
+    view = await readLedger(
+      { unitId: ctx.unitId, date: question.date || ctx.payload.date },
+      ctx.scope,
+      ctx.effectiveUnitIds,
+      ctx.dataScope,
+    );
+  } catch (err) {
+    return reply(ctx, "answer", err?.message || "Chưa đọc được sổ.");
+  }
+  return reply(ctx, "answer", renderTool(question.tool, view, question.itemName), {
+    tool: question.tool,
+    date: question.date || ctx.payload.date,
+    itemName: question.itemName || "",
+  });
 }
 
 async function copyHeadcount(ctx, copy) {
@@ -390,54 +458,6 @@ async function copyHeadcount(ctx, copy) {
   return reply(ctx, "headcount_draft", `Bản nháp lấy từ ngày ${copy.ref}. Soát lại rồi ghi.`, {
     days: [day],
     warnings: day.warnings,
-  });
-}
-
-function movementPrompt(commodities) {
-  const names = commodities.slice(0, 120).map((row) => `${row.name} (${row.measureUnit})`).join(", ");
-  return [
-    "Tach cau thanh dong hang. Khong tinh tien, khong ke ten nguoi.",
-    "intent: unit_purchase (mua ngoai, don vi mua TT, cot I), unit_tgsx (don vi TGSX, cot J), rice (gao, cot G), other_out (xuat khac, cot P), on_guarantee (tren BD, khong phai gao).",
-    "unitPrice la dong. 180k = 180000.",
-    names ? `Danh muc: ${names}.` : "",
-    'JSON: {"lines":[{"name":"muc","qty":5,"uom":"kg","unitPrice":180000,"intent":"unit_purchase","confidence":0.9}]}',
-  ].join(" ");
-}
-
-async function turnMovement(ctx) {
-  if (!ctx.text) throw fail("Nhập câu hàng. Ảnh hóa đơn để bước sau.", 400);
-  const settings = ctx.opts.settings ?? await loadSettings(ctx.db, ctx.unitId);
-  const loadCommodities = ctx.opts.loadCommodities ?? ((storageUnitId) => ctx.db.lttpCommodity.findMany({
-    where: { unitId: storageUnitId, isActive: true },
-    select: { id: true, name: true, measureUnit: true },
-    orderBy: { name: "asc" },
-    take: 500,
-  }));
-  const commodities = await loadCommodities(ctx.dataScope.storageUnitId);
-  const profile = await profileOf(ctx.db, ctx.user.id, ctx.unitId);
-  const meta = await callExtract(ctx, "kitchen-ledger-movement", {
-    system: `${toneLine(profile.tone)} ${movementPrompt(commodities)}`,
-    user: ctx.text,
-    temperature: 0,
-  });
-  let draft;
-  try {
-    draft = normalizeMovementDraft(meta.extracted.data, {
-      text: ctx.text,
-      commodities,
-      ricePattern: settings.riceNamePattern,
-    });
-  } catch (err) {
-    await writeUsage(ctx.db, usageRow(
-      ctx.user.id, ctx.unitId, meta.feature, meta.extracted, meta.inputSha, meta.inputBytes, "error",
-    ));
-    await reply(ctx, "error", err?.message || "AI trả về dòng hàng không đúng mẫu.");
-    throw err;
-  }
-  await markOk(ctx, meta);
-  return reply(ctx, "movement_draft", "Bản nháp dòng hàng. Giá trên sổ lấy từ bảng giá nếu đã có. Ghi mới vào sổ.", {
-    date: ctx.payload.date,
-    ...draft,
   });
 }
 
@@ -466,14 +486,23 @@ async function turnQuestion(ctx) {
   let picked = routeQuestion(ctx.text, (view.lines || []).map((line) => line.name));
   if (!picked && aiConfig(ctx.opts).apiKey) {
     const meta = await callExtract(ctx, "kitchen-ledger-question", {
-      system: 'Chon mot tool de doc so da tinh. Khong tinh lai. Khong ke ten nguoi. JSON: {"tool":"explain_finance","itemName":""}. tool: explain_finance, anomalies, item_stock, receipts, issues.',
+      system: `${toneLine("ngan_gon")} ${recordsPrompt({ anchorDate: date, questionOnly: true })}`,
       user: ctx.text,
       temperature: 0,
-    }, { soft: true });
-    const parsed = meta ? toolSchema.safeParse(meta.extracted.data) : null;
-    if (parsed?.success) {
-      picked = parsed.data;
-      await markOk(ctx, meta);
+    }, { soft: true, model: ledgerAiModels().question });
+    if (meta) {
+      try {
+        const mapped = mapLedgerRecords(meta.extracted.data, { anchorDate: date });
+        await markOk(ctx, meta);
+        const question = mapped.questions[0];
+        if (question && !mapped.headcountDays.length && !mapped.lines.length && !mapped.proposals.length) {
+          picked = { tool: question.tool, itemName: question.itemName || "" };
+        }
+      } catch (err) {
+        await writeUsage(ctx.db, usageRow(
+          ctx.user.id, ctx.unitId, meta.feature, meta.extracted, meta.inputSha, meta.inputBytes, "error",
+        ));
+      }
     }
   }
   if (!picked) {
@@ -493,6 +522,9 @@ async function applyDraft(payload, user, scope, effectiveUnitIds, dataScope, opt
   const db = opts.prisma ?? defaultPrisma;
   const message = await ownedMessage(db, Number(payload.messageId), user.id, unitId);
   if (!message) throw fail("Không thấy bản nháp của tài khoản này.", 404, ERROR_CODES.NOT_FOUND);
+  if (message.kind === "records_draft") {
+    return applyRecords(message, payload, user, unitId, db, scope, effectiveUnitIds, dataScope, opts);
+  }
   if (message.kind === "headcount_draft") {
     return applyHeadcount(message, payload, db, scope, effectiveUnitIds, dataScope, opts);
   }
@@ -501,6 +533,18 @@ async function applyDraft(payload, user, scope, effectiveUnitIds, dataScope, opt
   }
   if (message.kind === "rule_note") return applyRule(message, payload, user, db, scope, effectiveUnitIds, dataScope, opts);
   throw fail("Tin này không phải bản nháp để ghi.", 400);
+}
+
+async function applyRecords(message, payload, user, unitId, db, scope, effectiveUnitIds, dataScope, opts) {
+  const hasHead = (payload.headcountDays || []).length > 0;
+  const hasLines = (payload.movementLines || []).length > 0;
+  const hasRules = Boolean(payload.acceptProposals);
+  if (!hasHead && !hasLines && !hasRules) throw fail("Chưa có bản ghi để ghi.", 400);
+  const out = { messageId: message.id };
+  if (hasHead) Object.assign(out, await applyHeadcount(message, payload, db, scope, effectiveUnitIds, dataScope, opts));
+  if (hasLines) Object.assign(out, await applyMovement(message, payload, unitId, db, scope, effectiveUnitIds, dataScope, opts));
+  if (hasRules) Object.assign(out, await applyRule(message, payload, user, db, scope, effectiveUnitIds, dataScope, opts));
+  return out;
 }
 
 async function applyHeadcount(message, payload, db, scope, effectiveUnitIds, dataScope, opts) {
@@ -527,9 +571,11 @@ async function applyHeadcount(message, payload, db, scope, effectiveUnitIds, dat
       saved.push({ date: day.date, ok: false, message: err?.message || "Không lưu được." });
     }
   }
+  const nextPayload = { ...message.payloadJson, confirmed: days, changes, saved };
+  message.payloadJson = nextPayload;
   await db.ledgerAssistantMessage.update({
     where: { id: message.id },
-    data: { payloadJson: { ...message.payloadJson, confirmed: days, changes, saved } },
+    data: { payloadJson: nextPayload },
   });
   return { messageId: message.id, saved, changes };
 }
@@ -625,9 +671,11 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
   } catch (err) {
     saved = { ok: false, message: err?.message || "Không lưu được." };
   }
+  const nextPayload = { ...message.payloadJson, confirmed, savedOk: saved?.ok !== false };
+  message.payloadJson = nextPayload;
   await db.ledgerAssistantMessage.update({
     where: { id: message.id },
-    data: { payloadJson: { ...message.payloadJson, confirmed, savedOk: saved?.ok !== false } },
+    data: { payloadJson: nextPayload },
   });
   return { messageId: message.id, saved };
 }
@@ -644,9 +692,11 @@ async function applyRule(message, payload, user, db, scope, effectiveUnitIds, da
     effectiveUnitIds,
     dataScope,
   );
+  const nextPayload = { ...message.payloadJson, accepted: true };
+  message.payloadJson = nextPayload;
   await db.ledgerAssistantMessage.update({
     where: { id: message.id },
-    data: { payloadJson: { ...message.payloadJson, accepted: true } },
+    data: { payloadJson: nextPayload },
   });
   return { messageId: message.id, settings };
 }

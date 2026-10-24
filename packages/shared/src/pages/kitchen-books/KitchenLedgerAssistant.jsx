@@ -39,6 +39,7 @@ function HeadcountDraft({ message, days, onChange, onApply, busy }) {
       {days.map((day) => (
         <div key={day.date} className="rounded-lg border border-border p-2">
           <p className="mb-1 font-medium">{day.date}</p>
+          {day.source ? <p className="mb-1 text-muted-foreground">“{day.source}”</p> : null}
           {(day.warnings || []).map((warning) => <Note key={warning} tone="warn">{warning}</Note>)}
           <table className="w-full text-left text-xs">
             <thead>
@@ -80,10 +81,11 @@ function MovementDraft({ message, lines, onChange, onApply, busy }) {
   const savable = lines.some((line) => line.savable);
   return (
     <div className="flex flex-col gap-2">
-      <p>{message.content}</p>
+      {message.content ? <p>{message.content}</p> : null}
       {lines.map((line, index) => (
         <div key={`${line.name}-${index}`} className={cn("rounded-lg border border-border p-2 text-xs", low(line.confidence) && "bg-amber-500/15")}>
-          <p className="font-medium">{line.name} · cột {line.source} · {line.measureUnit}</p>
+          <p className="font-medium">{line.name} · {line.place || "Dòng hàng"}{line.measureUnit ? ` · ${line.measureUnit}` : ""}</p>
+          {line.sourceSnippet ? <p className="text-muted-foreground">“{line.sourceSnippet}”</p> : null}
           {line.warning ? <Note tone="warn">{line.warning}</Note> : null}
           {line.priceNote ? <p className="text-muted-foreground">{line.priceNote}</p> : null}
           {line.savable ? (
@@ -142,7 +144,7 @@ export function KitchenLedgerAssistant({ unitId, date }) {
       notifyError("Nhập nội dung hoặc chọn ảnh.");
       return;
     }
-    const sendImage = !intent || intent === "headcount";
+    const sendImage = intent !== "rule" && intent !== "question";
     try {
       await turn({
         unitId,
@@ -161,13 +163,19 @@ export function KitchenLedgerAssistant({ unitId, date }) {
     }
   }
 
-  function daysOf(message) {
-    return edits[message.id] || message.payloadJson?.days || [];
-  }
+function daysOf(message) {
+  const stored = edits[message.id];
+  if (stored && !Array.isArray(stored) && stored.days) return stored.days;
+  if (Array.isArray(stored) && message.kind === "headcount_draft") return stored;
+  return message.payloadJson?.days || [];
+}
 
-  function linesOf(message) {
-    return edits[message.id] || message.payloadJson?.lines || [];
-  }
+function linesOf(message) {
+  const stored = edits[message.id];
+  if (stored && !Array.isArray(stored) && stored.lines) return stored.lines;
+  if (Array.isArray(stored) && message.kind !== "headcount_draft") return stored;
+  return message.payloadJson?.lines || [];
+}
 
   function changeMeal(message, dayDate, amount, meal, value) {
     const days = daysOf(message).map((day) => {
@@ -182,7 +190,12 @@ export function KitchenLedgerAssistant({ unitId, date }) {
         },
       };
     });
-    setEdits((prev) => ({ ...prev, [message.id]: days }));
+    setEdits((prev) => ({
+      ...prev,
+      [message.id]: message.kind === "records_draft"
+        ? { days, lines: prev[message.id]?.lines || message.payloadJson?.lines || [] }
+        : days,
+    }));
   }
 
   async function applyHeadcount(message) {
@@ -345,7 +358,7 @@ export function KitchenLedgerAssistant({ unitId, date }) {
       <div className="mb-2 flex max-h-80 flex-col gap-2 overflow-y-auto" data-local-scroll="true">
         {(data?.messages || []).map((message) => (
           <article key={message.id} className={cn("rounded-lg px-2 py-1 text-sm", message.role === "user" ? "bg-muted" : "bg-background")}>
-            {message.kind === "headcount_draft" ? (
+            {message.kind === "headcount_draft" || (message.kind === "records_draft" && daysOf(message).length) ? (
               <HeadcountDraft
                 message={message}
                 days={daysOf(message)}
@@ -354,21 +367,26 @@ export function KitchenLedgerAssistant({ unitId, date }) {
                 onApply={() => applyHeadcount(message)}
               />
             ) : null}
-            {message.kind === "movement_draft" ? (
+            {message.kind === "movement_draft" || (message.kind === "records_draft" && linesOf(message).length) ? (
               <MovementDraft
-                message={message}
+                message={message.kind === "records_draft" ? { ...message, content: "" } : message}
                 lines={linesOf(message)}
                 busy={busy}
                 onChange={(index, key, value) => {
                   const lines = linesOf(message).map((line, i) => (i === index ? { ...line, [key]: value } : line));
-                  setEdits((prev) => ({ ...prev, [message.id]: lines }));
+                  setEdits((prev) => ({
+                    ...prev,
+                    [message.id]: message.kind === "records_draft"
+                      ? { days: prev[message.id]?.days || message.payloadJson?.days || [], lines }
+                      : lines,
+                  }));
                 }}
                 onApply={() => applyMovement(message)}
               />
             ) : null}
-            {message.kind === "rule_note" ? (
+            {message.kind === "rule_note" || (message.kind === "records_draft" && (message.payloadJson?.proposals || []).length) ? (
               <div className="flex flex-col gap-2">
-                <p>{message.content}</p>
+                {message.kind === "rule_note" ? <p>{message.content}</p> : null}
                 {(message.payloadJson?.proposals || []).length ? (
                   <Button variant="primary" disabled={busy || message.payloadJson.accepted} onClick={() => applyRule(message)}>
                     Áp dụng cấu hình
@@ -376,7 +394,7 @@ export function KitchenLedgerAssistant({ unitId, date }) {
                 ) : null}
               </div>
             ) : null}
-            {message.kind !== "headcount_draft" && message.kind !== "movement_draft" && message.kind !== "rule_note" ? (
+            {message.kind !== "headcount_draft" && message.kind !== "movement_draft" && message.kind !== "records_draft" && message.kind !== "rule_note" ? (
               <p className="whitespace-pre-wrap">{message.content}</p>
             ) : null}
           </article>

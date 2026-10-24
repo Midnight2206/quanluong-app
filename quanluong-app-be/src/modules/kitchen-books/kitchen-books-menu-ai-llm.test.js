@@ -100,6 +100,23 @@ test("extractStructured gửi nhiệt độ 0 và ảnh, không đổi completeM
   assert.equal(out.model, "gpt-test");
 });
 
+test("extractStructured dùng model của lượt gọi", async () => {
+  let body;
+  const out = await extractStructured(
+    { system: "s", user: "u" },
+    {
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(init.body);
+        return { ok: true, json: async () => ({ choices: [{ message: { content: '{"records":[]}' } }] }) };
+      },
+      configOverride: cfg,
+      model: "google/gemini-3.5-flash",
+    },
+  );
+  assert.equal(body.model, "google/gemini-3.5-flash");
+  assert.equal(out.model, "google/gemini-3.5-flash");
+});
+
 test("extractStructured tắt khi thiếu khóa", async () => {
   await assert.rejects(
     () => extractStructured({ system: "s", user: "u" }, { configOverride: { ...cfg, apiKey: "" } }),

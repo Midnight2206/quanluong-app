@@ -3,6 +3,7 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { assembleLedgerInput } from "./kitchen-ledger-assemble.js";
 import { classifyItem, computeLedger } from "./kitchen-ledger-compute.js";
+import { buildDayStructure } from "./kitchen-ledger-day-structure.js";
 import {
   assertKitchenLogicalMatchesDataScope,
   assertKitchenWriteUnit,
@@ -29,6 +30,10 @@ function assertScope(unitId, scope, effectiveUnitIds, dataScope) {
 
 function dec(value) {
   return value == null ? "0" : String(value);
+}
+
+function withStructure(view) {
+  return { ...view, structure: buildDayStructure(view) };
 }
 
 function movementDto(row) {
@@ -222,7 +227,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
 
   if (locked && day.snapshotJson?.lines && !opts.recompute) {
     const mismatch = Boolean(day.slipFingerprint && day.slipFingerprint !== assembled.fingerprint);
-    return {
+    return withStructure({
       ...base,
       ledgerBlocked: false,
       slipMismatch: mismatch,
@@ -237,11 +242,11 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
       warnings: [...assembled.warnings, ...(day.snapshotJson.warnings || [])],
       canLock: false,
       fingerprint: assembled.fingerprint,
-    };
+    });
   }
 
   if (assembled.blockers.length) {
-    return {
+    return withStructure({
       ...base,
       ledgerBlocked: true,
       slipMismatch: false,
@@ -253,7 +258,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
       suggestions: [],
       canLock: false,
       fingerprint: assembled.fingerprint,
-    };
+    });
   }
 
   const computed = computeLedger({
@@ -263,7 +268,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
     prevSurplus,
     prevShortfall,
   });
-  return {
+  return withStructure({
     ...base,
     ledgerBlocked: false,
     slipMismatch: false,
@@ -277,7 +282,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
     closingLots: computed.closingLots,
     canLock: !locked && Boolean(day?.headcountJson),
     fingerprint: assembled.fingerprint,
-  };
+  });
 }
 
 async function persistComputed(dayId, view, { lock = false, userId = null } = {}) {

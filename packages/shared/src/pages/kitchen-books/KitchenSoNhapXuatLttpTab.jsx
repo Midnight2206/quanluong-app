@@ -370,7 +370,9 @@ export function KitchenSoNhapXuatLttpTab({
   const today = ymd(new Date());
   const hour = new Date().getHours();
   const showOpening = ledger && (ledger.carriedFrom == null || ledger.carriedFrom === "stock_count" || menuDate.endsWith("-01"));
-  const finance = ledger?.finance;
+  const finance = ledger?.structure?.finance ?? ledger?.finance;
+  const mealSlots = ledger?.structure?.headcount?.meals?.map((row) => [row.key, row.label]) || MEALS;
+  const extraSlots = ledger?.structure?.headcount?.extras?.map((row) => [row.key, row.label]) || EXTRAS;
   const busy = saveState.isLoading || lockState.isLoading || unlockState.isLoading || balanceState.isLoading;
 
   return (
@@ -454,10 +456,13 @@ export function KitchenSoNhapXuatLttpTab({
             <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
               <div className="min-w-0">
                 {ledger.ledgerBlocked ? (
-                  <Note>Sổ chưa lập vì thiếu phiếu xuất hoặc bảng giá. Quân số và dòng nhập vẫn lưu được.</Note>
-                ) : (
-                  <KitchenLedgerGrid lines={ledger.lines} totals={ledger.totals} />
-                )}
+                  <Note>Sổ chưa lập vì thiếu phiếu xuất hoặc bảng giá. Khung ngày vẫn hiện để nhập quân số và dòng hàng.</Note>
+                ) : null}
+                <KitchenLedgerGrid
+                  lines={ledger.structure?.rows || ledger.lines}
+                  totals={ledger.structure?.totals ?? ledger.totals}
+                  columns={ledger.structure?.columns}
+                />
               </div>
               <aside className="rounded-lg border border-border bg-card p-3 text-xs">
                 <h3 className="mb-2 text-sm font-semibold">Công khai tài chính</h3>
@@ -465,7 +470,7 @@ export function KitchenSoNhapXuatLttpTab({
                 {headcount?.levels?.map((level, index) => (
                   <div key={level.dailyAmount} className="mb-2 border-b border-border/70 pb-2">
                     <p className="font-medium">Mức {formatLedgerNumber(level.dailyAmount, { blankZero: false })}</p>
-                    {MEALS.map(([meal, label]) => {
+                    {mealSlots.map(([meal, label]) => {
                       const server = finance?.levels?.[index]?.meals?.find((row) => row.meal === meal);
                       return (
                         <label key={meal} className="mt-1 grid grid-cols-[4.5rem_1fr_auto] items-center gap-1">
@@ -491,7 +496,7 @@ export function KitchenSoNhapXuatLttpTab({
                 ))}
                 <div className="mb-2 border-b border-border/70 pb-2">
                   <p className="font-medium">Ăn thêm</p>
-                  {EXTRAS.map(([key, label]) => {
+                  {extraSlots.map(([key, label]) => {
                     const server = finance?.extras?.find((row) => row.key === key);
                     return (
                       <label key={key} className="mt-1 grid grid-cols-[4.5rem_1fr_auto] items-center gap-1">

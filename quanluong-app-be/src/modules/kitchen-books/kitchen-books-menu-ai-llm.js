@@ -155,14 +155,16 @@ function aiFailure(err) {
  * @param {{ fetchImpl?: typeof fetch, configOverride?: object, disabledMessage?: string, retryUserHint?: string }} [opts]
  */
 async function extractStructured(prompt, opts = {}) {
-  const cfg = getMenuAiConfig(opts.configOverride);
-  if (!cfg?.apiKey) {
+  const base = getMenuAiConfig(opts.configOverride);
+  if (!base?.apiKey) {
     throw new AppError({
       message: opts.disabledMessage || "AI chưa được cấu hình (thiếu MENU_AI_API_KEY).",
       statusCode: 503,
       code: ERROR_CODES.INTERNAL_SERVER_ERROR,
     });
   }
+  const model = String(opts.model || "").trim();
+  const cfg = model ? { ...base, model } : base;
   const fetchImpl = opts.fetchImpl || globalThis.fetch;
   const temperature = prompt.temperature ?? 0;
   let content;

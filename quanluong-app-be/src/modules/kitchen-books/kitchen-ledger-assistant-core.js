@@ -1,6 +1,3 @@
-import { z } from "zod";
-import { AppError } from "../../errors/app-error.js";
-import { ERROR_CODES } from "../../errors/error-codes.js";
 import { normalizeName } from "./kitchen-ledger-settings.js";
 import { resolveDate } from "./kitchen-ledger-ai-headcount.js";
 
@@ -51,110 +48,6 @@ function questionDate(text, anchorDate) {
   const month = named?.[2] || slash?.[2] || String(anchorDate).slice(5, 7);
   const year = named?.[3] || String(anchorDate).slice(0, 4);
   return resolveDate(`${day}/${month}/${year}`, anchorDate) || anchorDate;
-}
-
-function parseMoneyToken(raw) {
-  const text = String(raw ?? "").trim().toLowerCase().replace(/\s/g, "");
-  if (!text) return null;
-  const k = text.endsWith("k");
-  const body = k ? text.slice(0, -1) : text;
-  const n = Number(body.replace(/\./g, "").replace(",", "."));
-  if (!Number.isFinite(n) || n < 0) return null;
-  return k ? n * 1000 : n;
-}
-
-function inflatePrice(price, text) {
-  if (price == null || price >= 1000) return price ?? null;
-  if (new RegExp(`(^|\\D)${price}\\s*k`, "i").test(String(text))) return price * 1000;
-  return price;
-}
-
-const movementLineSchema = z.object({
-  name: z.string().min(1).max(255),
-  qty: z.coerce.number().positive().max(1_000_000_000),
-  uom: z.string().max(64).optional().nullable(),
-  unitPrice: z.preprocess((value) => {
-    if (value == null || value === "") return null;
-    return parseMoneyToken(value);
-  }, z.number().nonnegative().max(1_000_000_000_000).nullable()),
-  intent: z.enum(["unit_purchase", "unit_tgsx", "rice", "other_out", "on_guarantee"]).optional(),
-  confidence: z.preprocess((value) => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : undefined;
-  }, z.number().min(0).max(1).optional()),
-});
-
-const movementPayloadSchema = z.object({
-  lines: z.array(movementLineSchema).min(1).max(40),
-});
-
-function matchCommodity(name, commodities) {
-  const key = normalizeName(name);
-  if (!key) return [];
-  return (commodities || []).filter((row) => {
-    const item = normalizeName(row.name);
-    return item === key || item.startsWith(key) || key.startsWith(item);
-  });
-}
-
-function normalizeMovementDraft(raw, { text = "", commodities = [], ricePattern = "gạo" } = {}) {
-  const parsed = movementPayloadSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new AppError({
-      message: "AI trả về dòng hàng không đúng mẫu. Nhập tay ở các ô phía trên.",
-      statusCode: 502,
-      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
-    });
-  }
-  const warnings = [];
-  const lines = [];
-  for (const row of parsed.data.lines) {
-    const rice = normalizeName(row.name).includes(normalizeName(ricePattern));
-    let kind = "self_supply";
-    let source = "I";
-    let savable = true;
-    let warning = "";
-    const intent = rice ? "rice" : (row.intent || "unit_purchase");
-    if (intent === "rice" || rice) {
-      kind = "rice";
-      source = "G";
-    } else if (intent === "unit_tgsx") {
-      source = "J";
-    } else if (intent === "other_out") {
-      kind = "other_out";
-      source = "P";
-    } else if (intent === "on_guarantee") {
-      savable = false;
-      warning = "Trên BĐ lấy từ phiếu xuất, không nhập tay (trừ gạo).";
-    }
-    const hits = matchCommodity(row.name, commodities);
-    const commodity = hits.length === 1 ? hits[0] : null;
-    if (!rice && kind === "self_supply" && !commodity) {
-      savable = false;
-      warning = warning || (hits.length > 1 ? "Nhiều mặt hàng trùng tên. Chọn ở bảng nhập." : "Chưa khớp danh mục. Nhập ở bảng Đơn vị bảo đảm.");
-    }
-    const unitPrice = inflatePrice(row.unitPrice, text);
-    if (kind === "rice" && !commodity && unitPrice == null) {
-      savable = false;
-      warning = warning || "Gạo chưa có trong danh mục thì cần đơn giá.";
-    }
-    if (hits.length > 1) warnings.push(`${row.name}: nhiều mã trùng tên.`);
-    lines.push({
-      name: commodity?.name || row.name,
-      commodityId: commodity?.id ?? null,
-      measureUnit: commodity?.measureUnit || row.uom || "",
-      qty: row.qty,
-      unitPrice,
-      kind,
-      source,
-      issuePolicy: "today",
-      confidence: row.confidence ?? 0.85,
-      savable,
-      warning,
-      priceNote: unitPrice != null ? "Nếu đã có bảng giá, sổ lấy giá bảng." : "",
-    });
-  }
-  return { lines, warnings };
 }
 
 function numberIn(text) {
@@ -316,22 +209,15 @@ function routeQuestion(text, lineNames = []) {
   return null;
 }
 
-const toolSchema = z.object({
-  tool: z.enum(["explain_finance", "anomalies", "item_stock", "receipts", "issues"]),
-  itemName: z.string().max(80).optional(),
-});
-
 export {
   LOW,
   briefAnomalies,
   fold,
   headcountLike,
-  normalizeMovementDraft,
   proposeSettings,
   questionDate,
   renderTool,
   routeIntent,
   routeQuestion,
   settingsPatch,
-  toolSchema,
 };

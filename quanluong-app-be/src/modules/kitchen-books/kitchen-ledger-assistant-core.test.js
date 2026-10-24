@@ -3,7 +3,6 @@ import test from "node:test";
 import {
   briefAnomalies,
   headcountLike,
-  normalizeMovementDraft,
   proposeSettings,
   questionDate,
   renderTool,
@@ -12,43 +11,8 @@ import {
   settingsPatch,
 } from "./kitchen-ledger-assistant-core.js";
 
-const commodities = [
-  { id: 1, name: "Mực ống", measureUnit: "Kg" },
-  { id: 2, name: "Sữa đặc", measureUnit: "Hộp" },
-  { id: 3, name: "Sữa tươi", measureUnit: "Hộp" },
-  { id: 4, name: "Gạo tẻ", measureUnit: "Kg" },
-];
-
-test("câu mua ngoài tách cột, 180k và sữa trùng tên", () => {
+test("câu mua ngoài là bản ghi hàng, không phải hỏi sổ", () => {
   assert.equal(routeIntent("mua ngoài 5kg mực 180k, sữa 40 hộp"), "movement");
-  const draft = normalizeMovementDraft({
-    lines: [
-      { name: "mực", qty: 5, uom: "kg", unitPrice: 180, intent: "unit_purchase", confidence: 0.9 },
-      { name: "sữa", qty: 40, uom: "hộp", unitPrice: 15000, intent: "unit_purchase" },
-    ],
-  }, { text: "mua ngoài 5kg mực 180k, sữa 40 hộp", commodities });
-  assert.equal(draft.lines[0].name, "Mực ống");
-  assert.equal(draft.lines[0].commodityId, 1);
-  assert.equal(draft.lines[0].source, "I");
-  assert.equal(draft.lines[0].kind, "self_supply");
-  assert.equal(draft.lines[0].unitPrice, 180000);
-  assert.equal(draft.lines[0].savable, true);
-  assert.equal(draft.lines[1].savable, false);
-  assert.match(draft.lines[1].warning, /trùng tên/);
-});
-
-test("gạo vào cột G, hàng trên BĐ không ghi tay", () => {
-  const draft = normalizeMovementDraft({
-    lines: [
-      { name: "gạo tẻ", qty: 10, uom: "kg", unitPrice: 16000, intent: "on_guarantee" },
-      { name: "thịt", qty: 2, uom: "kg", unitPrice: 100000, intent: "on_guarantee" },
-    ],
-  }, { text: "gạo và thịt trên bảo đảm", commodities });
-  assert.equal(draft.lines[0].kind, "rice");
-  assert.equal(draft.lines[0].source, "G");
-  assert.equal(draft.lines[0].commodityId, 4);
-  assert.equal(draft.lines[0].savable, true);
-  assert.equal(draft.lines[1].savable, false);
 });
 
 test("quy tắc chữ ra đề nghị cấu hình, phần còn lại chỉ là ghi chú", () => {

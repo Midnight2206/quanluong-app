@@ -52,19 +52,30 @@ function totalText(totals, column) {
   return formatLedgerNumber(totals[field]);
 }
 
-export function KitchenLedgerGrid({ lines, totals }) {
+function columnsOf(columns) {
+  if (!columns?.length) return COLUMNS;
+  const byKey = new Map(COLUMNS.map((column) => [column.key, column]));
+  return columns.map((column) => {
+    const local = byKey.get(column.key);
+    if (!local) return { key: column.key, label: column.label, align: "right", title: column.label };
+    return { ...local, label: column.label || local.label };
+  });
+}
+
+export function KitchenLedgerGrid({ lines, totals, columns }) {
+  const shown = columnsOf(columns);
   const rows = lines || [];
   return (
     <StickyResponsiveTable ariaLabel="Sổ nhập xuất LTTP" stickyLevel={2}>
       <table className="w-full min-w-[78rem] border-collapse text-left text-[11px]">
         <colgroup>
-          {COLUMNS.map((column) => (
+          {shown.map((column) => (
             <col key={column.key} style={{ width: column.width }} />
           ))}
         </colgroup>
         <thead>
           <tr className="bg-secondary text-[10px] text-muted-foreground">
-            {COLUMNS.map((column) => (
+            {shown.map((column) => (
               <th
                 key={column.key}
                 title={column.title}
@@ -81,7 +92,7 @@ export function KitchenLedgerGrid({ lines, totals }) {
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-sm text-muted-foreground">
+              <td colSpan={shown.length} className="px-3 py-6 text-center text-sm text-muted-foreground">
                 Chưa có dòng hàng. Nhập quân số và nguồn hàng, rồi lưu để lập sổ.
               </td>
             </tr>
@@ -91,7 +102,7 @@ export function KitchenLedgerGrid({ lines, totals }) {
                 {index === 40 ? (
                   <tr>
                     <td
-                      colSpan={COLUMNS.length}
+                      colSpan={shown.length}
                       className="border-y border-border bg-muted/50 px-2 py-1 text-center text-[10px] font-medium text-muted-foreground"
                     >
                       Cộng sang trang
@@ -99,7 +110,7 @@ export function KitchenLedgerGrid({ lines, totals }) {
                   </tr>
                 ) : null}
                 <tr className={line.negative ? "bg-destructive/10" : undefined}>
-                  {COLUMNS.map((column) => (
+                  {shown.map((column) => (
                     <td
                       key={column.key}
                       className={cn(
@@ -117,7 +128,7 @@ export function KitchenLedgerGrid({ lines, totals }) {
           )}
           {rows.length > 0 ? (
             <tr className="bg-muted/40 font-semibold">
-              {COLUMNS.map((column) => (
+              {shown.map((column) => (
                 <td
                   key={column.key}
                   className={cn(

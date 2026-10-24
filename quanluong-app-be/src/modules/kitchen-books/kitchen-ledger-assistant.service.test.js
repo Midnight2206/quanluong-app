@@ -157,15 +157,29 @@ test("quân số nhiều ngày, sửa rồi ghi, thống kê không chứa nội
       prompt = value;
       return {
         data: {
-          days: [
-            { date: "18/10", levels: [
-              { dailyAmount: 72000, sang: 91, trua: 97, chieu: 97, confidence: 0.95 },
-              { dailyAmount: 130000, sang: 0, trua: 0, chieu: 0, confidence: 0.95 },
-            ], extras: { benhXa: 0, benhNhan: 0, omTrai: 0, leTet: 0, confidence: 0.9 } },
-            { date: "19/10", levels: [
-              { dailyAmount: 72000, sang: 91, trua: 120, chieu: 100, confidence: 0.4 },
-              { dailyAmount: 130000, sang: 0, trua: 0, chieu: 0 },
-            ], extras: { benhXa: 0, benhNhan: 0, omTrai: 0, leTet: 0, confidence: 0.9 } },
+          records: [
+            {
+              type: "headcount",
+              date: "18/10",
+              levels: [
+                { dailyAmount: 72000, sang: 91, trua: 97, chieu: 97 },
+                { dailyAmount: 130000, sang: 0, trua: 0, chieu: 0 },
+              ],
+              extras: { benhXa: 0, benhNhan: 0, omTrai: 0, leTet: 0 },
+              confidence: 0.95,
+              source: "18/10: 91 97 97",
+            },
+            {
+              type: "headcount",
+              date: "19/10",
+              levels: [
+                { dailyAmount: 72000, sang: 91, trua: 120, chieu: 100 },
+                { dailyAmount: 130000, sang: 0, trua: 0, chieu: 0 },
+              ],
+              extras: { benhXa: 0, benhNhan: 0, omTrai: 0, leTet: 0 },
+              confidence: 0.4,
+              source: "19/10: 91 120 100",
+            },
           ],
         },
         model: "gpt-test",
@@ -265,6 +279,7 @@ test("như 17/10 lấy quân số trên sổ, không gọi AI", async () => {
 test("câu hàng ghi thêm vào dòng sẵn có", async () => {
   const db = createDb();
   const saved = [];
+  let prompt;
   const posted = await postTurn({
     unitId: 7,
     date: "2026-10-24",
@@ -277,16 +292,22 @@ test("câu hàng ghi thêm vào dòng sẵn có", async () => {
       { id: 2, name: "Sữa đặc", measureUnit: "Hộp" },
       { id: 3, name: "Sữa tươi", measureUnit: "Hộp" },
     ],
-    extractStructured: async () => ({
-      data: { lines: [
-        { name: "mực", qty: 5, uom: "kg", unitPrice: "180k", intent: "unit_purchase", confidence: 0.92 },
-        { name: "sữa", qty: 40, uom: "hộp", intent: "unit_purchase", confidence: 0.4 },
-      ] },
-      model: "gpt-test",
-      provider: "openai",
-    }),
+    extractStructured: async (value) => {
+      prompt = value;
+      return {
+        data: { records: [
+          { type: "outside_purchase", date: "2026-10-24", name: "mực", qty: 5, uom: "kg", unitPrice: "180k", confidence: 0.92, source: "mua ngoài 5kg mực 180k", column: "G" },
+          { type: "outside_purchase", date: "2026-10-24", name: "sữa", qty: 40, uom: "hộp", confidence: 0.4, source: "sữa 40 hộp" },
+        ] },
+        model: "gpt-test",
+        provider: "openai",
+      };
+    },
   }));
+  assert.equal(/cột|cot [GHIJP]\b/i.test(prompt.system), false);
   assert.equal(posted.message.payloadJson.lines[0].savable, true);
+  assert.equal(posted.message.payloadJson.lines[0].source, "I");
+  assert.equal(posted.message.payloadJson.lines[0].place, "Đơn vị BĐ mua TT");
   assert.equal(posted.message.payloadJson.lines[1].savable, false);
   await applyDraft({
     unitId: 7,
@@ -349,7 +370,9 @@ test("câu chưa nhận ra thì AI chỉ chọn công cụ, số lấy từ sổ
   }, user, scope, null, dataScope, ctx(db, {
     configOverride: on,
     extractStructured: async () => ({
-      data: { tool: "explain_finance", surplus: 1 },
+      data: {
+        records: [{ type: "question", topic: "finance", confidence: 0.9, source: "khối tiền", surplus: 1 }],
+      },
       model: "gpt-test",
       provider: "openai",
     }),
@@ -373,6 +396,35 @@ test("câu chưa nhận ra thì AI chỉ chọn công cụ, số lấy từ sổ
   assert.equal(posted.message.content.includes("surplus"), false);
   assert.equal(db.state.usage[0].feature, "kitchen-ledger-question");
   assertUsagePrivate(db, "giải thích giúp khối tiền");
+});
+
+test("câu hỏi không nhận dòng hàng dù mô hình trả bản ghi nhập", async () => {
+  const db = createDb();
+  const posted = await postTurn({
+    unitId: 7,
+    date: "2026-10-21",
+    text: "giải thích giúp khối tiền",
+  }, user, scope, null, dataScope, ctx(db, {
+    configOverride: on,
+    extractStructured: async () => ({
+      data: {
+        records: [{
+          type: "outside_purchase",
+          date: "2026-10-21",
+          name: "mực",
+          qty: 5,
+          confidence: 0.9,
+          source: "mua mực",
+        }],
+      },
+      model: "gpt-test",
+      provider: "openai",
+    }),
+    getLedger: async () => ({ date: "2026-10-21", ledgerBlocked: false, lines: [], finance: null }),
+  }));
+  assert.equal(posted.message.kind, "answer");
+  assert.match(posted.message.content, /Hỏi cụ thể hơn/);
+  assert.equal(posted.message.payloadJson, null);
 });
 
 test("quy tắc lưu ghi chú và chỉ áp dụng đúng đề nghị đã lưu", async () => {
