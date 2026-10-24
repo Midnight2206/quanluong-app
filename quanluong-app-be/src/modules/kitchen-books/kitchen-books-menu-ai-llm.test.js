@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { completeMenuJson, extractJsonObject } from "./kitchen-books-menu-ai-llm.js";
+import { completeMenuJson, extractJsonObject, extractStructured } from "./kitchen-books-menu-ai-llm.js";
 
 test("extractJsonObject parses raw object", () => {
   const o = extractJsonObject('{"periods":{"sang":{"dishes":[]}}}');
@@ -71,4 +71,38 @@ test("completeMenuJson retries once on bad JSON", async () => {
   );
   assert.equal(calls, 2);
   assert.ok(out.periods.sang);
+});
+
+const cfg = {
+  provider: "openai",
+  apiKey: "test-key",
+  model: "gpt-test",
+  baseUrl: "https://example.test/v1",
+  timeoutMs: 5000,
+};
+
+test("extractStructured gửi nhiệt độ 0 và ảnh, không đổi completeMenuJson", async () => {
+  let body;
+  const out = await extractStructured(
+    { system: "sys", user: "đếm", image: { mime: "image/jpeg", base64: "aGk=" }, temperature: 0 },
+    {
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(init.body);
+        return { ok: true, json: async () => ({ choices: [{ message: { content: '{"days":[]}' } }] }) };
+      },
+      configOverride: cfg,
+    },
+  );
+  assert.equal(body.temperature, 0);
+  assert.equal(body.max_tokens, 8000);
+  assert.equal(body.messages[1].content[1].image_url.url, "data:image/jpeg;base64,aGk=");
+  assert.deepEqual(out.data, { days: [] });
+  assert.equal(out.model, "gpt-test");
+});
+
+test("extractStructured tắt khi thiếu khóa", async () => {
+  await assert.rejects(
+    () => extractStructured({ system: "s", user: "u" }, { configOverride: { ...cfg, apiKey: "" } }),
+    (err) => err.statusCode === 503,
+  );
 });

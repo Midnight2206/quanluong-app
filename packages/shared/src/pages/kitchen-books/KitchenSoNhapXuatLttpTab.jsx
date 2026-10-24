@@ -14,6 +14,7 @@ import { useGetLttpCommoditiesQuery } from "@/features/lttp/api/lttpApi";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 import { fieldClassSm } from "@/utils/fieldClass";
+import { KitchenLedgerAssistant } from "./KitchenLedgerAssistant.jsx";
 import { KitchenBooksAccessGate } from "./KitchenBooksAccessGate.jsx";
 import { KitchenBooksUnitPicker } from "./KitchenBooksUnitPicker.jsx";
 import { blankLine, LineTable, Note, QtyInput } from "./KitchenLedgerEntry.jsx";
@@ -376,6 +377,10 @@ export function KitchenSoNhapXuatLttpTab({
             />
           </label>
         </div>
+
+        {selectedUnitId != null && menuDate ? (
+          <KitchenLedgerAssistant unitId={selectedUnitId} date={menuDate} />
+        ) : null}
 
         {isLoading ? <p className="text-sm text-muted-foreground">Đang tải sổ…</p> : null}
         {error ? <Note tone="bad">{errText(error)}</Note> : null}

@@ -144,6 +144,7 @@ const saveLedgerSettingsBodySchema = z.object({
 export {
   ledgerQuerySchema,
   ledgerSettingsQuerySchema,
+  headcountSchema,
   saveLedgerBodySchema,
   lockLedgerBodySchema,
   unlockLedgerBodySchema,
