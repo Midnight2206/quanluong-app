@@ -4,6 +4,13 @@ import { ERROR_CODES } from "../../errors/error-codes.js";
 import { assembleLedgerInput } from "./kitchen-ledger-assemble.js";
 import { classifyItem, computeLedger } from "./kitchen-ledger-compute.js";
 import { buildDayStructure } from "./kitchen-ledger-day-structure.js";
+import { buildDayFrame } from "./kitchen-ledger-frame.js";
+import {
+  editSlipLines,
+  mergeSlipDraft,
+  normalizeSlipLines,
+  slipLineChanges,
+} from "./kitchen-ledger-slip-roundtrip.js";
 import {
   assertKitchenLogicalMatchesDataScope,
   assertKitchenWriteUnit,
@@ -30,10 +37,6 @@ function assertScope(unitId, scope, effectiveUnitIds, dataScope) {
 
 function dec(value) {
   return value == null ? "0" : String(value);
-}
-
-function withStructure(view) {
-  return { ...view, structure: buildDayStructure(view) };
 }
 
 function movementDto(row) {
@@ -79,6 +82,18 @@ function incomeOf(raw) {
   };
 }
 
+function scheduleOf(raw) {
+  const text = String(raw?.text ?? "").trim();
+  if (!text) return null;
+  return { text: text.slice(0, 2000) };
+}
+
+function roundMoney2(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0.00";
+  return (Math.round(n * 100) / 100).toFixed(2);
+}
+
 async function loadSettings(unitId) {
   const row = await prisma.kitchenLedgerSettings.findUnique({ where: { unitId } });
   return mergeLedgerSettings(row?.configJson);
@@ -121,13 +136,19 @@ async function loadSlips(unitId, ledgerDate) {
   });
   return slips.map((slip) => ({
     id: slip.id,
+    slipNo: slip.slipNo,
+    unitId: slip.unitId,
+    recipientUnitId: slip.recipientUnitId,
+    issueDate: slip.issueDate,
     updatedAt: slip.updatedAt,
     lines: (slip.lines || []).map((line) => ({
+      id: line.id,
       commodityId: line.commodityId,
       quantity: dec(line.quantity),
       unitPrice: dec(line.unitPrice),
       tgsxPrice: line.tgsxPrice == null ? null : dec(line.tgsxPrice),
       priceKind: line.priceKind,
+      lineNote: line.lineNote || "",
       commodity: line.commodity,
     })),
   }));
@@ -150,6 +171,11 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
   const settings = await loadSettings(unitId);
   const day = opts.day ?? await findDay(unitId, ledgerDate);
   const slips = await loadSlips(unitId, ledgerDate);
+  function withStructure(view) {
+    const structure = buildDayStructure(view);
+    const next = { ...view, structure };
+    return { ...next, frame: buildDayFrame(next, slips) };
+  }
   const prices = await loadPriceRows(dataScope.storageUnitId, ledgerDate);
   const prev = await prisma.kitchenLedgerDay.findUnique({
     where: { unitId_ledgerDate: { unitId, ledgerDate: shiftDate(ledgerDate, -1) } },
@@ -215,6 +241,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
     headcount,
     previousHeadcount: prev?.headcountJson ? normalizeHeadcount(prev.headcountJson, settings) : null,
     otherIncome: incomeOf(day?.otherIncomeJson),
+    schedule: scheduleOf(day?.scheduleJson),
     movements: (day?.movements || []).map(movementDto),
     settings,
     carriedFrom: useStockCount ? "stock_count" : prev ? ymd(prev.ledgerDate) : null,
@@ -232,7 +259,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
       ledgerBlocked: false,
       slipMismatch: mismatch,
       slipMismatchMessage: mismatch
-        ? "Phiếu xuất đã thay đổi sau khi chốt ngày. Số trên sổ là bản đã chốt. Nút Đồng bộ sẽ có ở bước sau."
+        ? "Phiếu xuất đã thay đổi sau khi chốt ngày. Số trên sổ là bản đã chốt. Mở khóa ngày để sổ lấy lại phiếu."
         : null,
       lines: day.snapshotJson.lines,
       finance: day.snapshotJson.finance,
@@ -444,6 +471,7 @@ async function saveLedger(payload, scope, effectiveUnitIds, dataScope) {
   const data = {};
   if (payload.headcount) data.headcountJson = normalizeHeadcount(payload.headcount, settings);
   if (payload.otherIncome) data.otherIncomeJson = incomeOf(payload.otherIncome);
+  if (payload.schedule !== undefined) data.scheduleJson = scheduleOf(payload.schedule);
   if (payload.selfSupply) data.selfSupplyNone = Boolean(payload.selfSupply.none);
   if (payload.opening && (payload.opening.surplus != null || payload.opening.shortfall != null)) {
     data.openingFinanceJson = {
@@ -552,6 +580,110 @@ async function balanceLedger(payload, scope, effectiveUnitIds, dataScope) {
   return { ...(await buildView(unitId, ledgerDate, dataScope)), applied: true };
 }
 
+async function writeSlipQuantities(lines) {
+  const touched = new Set();
+  await prisma.$transaction(async (tx) => {
+    for (const line of lines) {
+      const amount = roundMoney2(Number(line.quantity) * Number(line.unitPrice || 0));
+      const priceKind = line.priceKind === "tgsx" ? "tgsx" : "market";
+      if (line.lineId) {
+        await tx.lttpIssueSlipLine.update({
+          where: { id: line.lineId },
+          data: { quantity: line.quantity, amount },
+        });
+      } else {
+        await tx.lttpIssueSlipLine.create({
+          data: {
+            slipId: line.slipId,
+            commodityId: line.commodityId,
+            quantity: line.quantity,
+            unitPrice: String(line.unitPrice ?? 0),
+            priceKind,
+            amount,
+            ...(line.lineNote ? { lineNote: String(line.lineNote).slice(0, 500) } : {}),
+          },
+        });
+      }
+      if (line.slipId) touched.add(line.slipId);
+    }
+  });
+  return touched;
+}
+
+async function afterSlipWrite({ slips, touched, dateYmd, userId }) {
+  const changed = slips.filter((slip) => touched.has(slip.id));
+  try {
+    const { syncKitchenReceiptOnGuaranteeFromIssueSlips } = await import("./kitchen-books-receipt-sync.service.js");
+    const recipientUnitId = changed[0]?.recipientUnitId || slips[0]?.recipientUnitId;
+    await syncKitchenReceiptOnGuaranteeFromIssueSlips({
+      recipientUnitId,
+      dateYmd,
+      actorUserId: userId,
+    });
+  } catch (err) {
+    console.error("[kitchen-ledger] đồng bộ phiếu nhập sau phiếu xuất", err);
+  }
+  try {
+    const { markChungTuDocumentsStaleForLttpIssueSlipChange } = await import(
+      "../chung-tu-quyet-toan/chung-tu-document.service.js"
+    );
+    for (const slip of changed) {
+      await markChungTuDocumentsStaleForLttpIssueSlipChange({
+        unitId: slip.unitId,
+        recipientUnitId: slip.recipientUnitId,
+        issueDate: slip.issueDate,
+        issueSlipId: slip.id,
+      });
+    }
+  } catch (err) {
+    console.error("[kitchen-ledger] đánh dấu chứng từ cũ sau phiếu xuất", err);
+  }
+}
+
+async function syncLedgerSlip(payload, userId, scope, effectiveUnitIds, dataScope) {
+  const unitId = Number(payload.unitId);
+  assertScope(unitId, scope, effectiveUnitIds, dataScope);
+  const ledgerDate = parseDateOnly(payload.date);
+  const existing = await findDay(unitId, ledgerDate);
+  assertDraft(existing);
+  const slips = await loadSlips(unitId, ledgerDate);
+  if (!slips.length) {
+    throw new AppError({
+      message: "Chưa có phiếu xuất để ghi cân đối.",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  }
+  const before = normalizeSlipLines(slips);
+  let after;
+  if (payload.lines?.length) {
+    after = editSlipLines(before, payload.lines);
+  } else {
+    const view = await buildView(unitId, ledgerDate, dataScope, { day: existing });
+    if (!view.frame.slipDraft.length) {
+      throw new AppError({
+        message: "Không có dòng cân đối để ghi vào phiếu.",
+        statusCode: 409,
+        code: ERROR_CODES.CONFLICT,
+      });
+    }
+    after = mergeSlipDraft(before, view.frame.slipDraft);
+  }
+  const changes = slipLineChanges(before, after);
+  if (!changes.updates.length && !changes.creates.length) {
+    throw new AppError({
+      message: changes.skipped.length
+        ? "Không ghi được vào phiếu. Dòng chưa có mã hàng, thường là gạo, nhập tay trên sổ."
+        : "Không thấy dòng phiếu khớp mặt hàng.",
+      statusCode: 409,
+      code: ERROR_CODES.CONFLICT,
+    });
+  }
+  const touched = await writeSlipQuantities([...changes.updates, ...changes.creates]);
+  await afterSlipWrite({ slips, touched, dateYmd: ymd(ledgerDate), userId });
+  return buildView(unitId, ledgerDate, dataScope);
+}
+
 async function getLedgerSettings(query, scope, effectiveUnitIds, dataScope) {
   const unitId = Number(query.unitId);
   assertScope(unitId, scope, effectiveUnitIds, dataScope);
@@ -580,4 +712,5 @@ export {
   balanceLedger,
   getLedgerSettings,
   saveLedgerSettings,
+  syncLedgerSlip,
 };

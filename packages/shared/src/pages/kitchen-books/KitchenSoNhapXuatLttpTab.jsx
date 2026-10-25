@@ -8,6 +8,7 @@ import {
   useLockKitchenLedgerMutation,
   useSaveKitchenLedgerMutation,
   useSaveKitchenLedgerSettingsMutation,
+  useSyncKitchenLedgerSlipMutation,
   useUnlockKitchenLedgerMutation,
 } from "@/features/kitchen-books/api/kitchenBooksApi";
 import { useGetLttpCommoditiesQuery } from "@/features/lttp/api/lttpApi";
@@ -16,6 +17,7 @@ import { openKitchenLedgerMonthPdf } from "./kitchenLedgerMonthPdfOpen.js";
 import { cn } from "@/utils/cn";
 import { fieldClassSm } from "@/utils/fieldClass";
 import { KitchenLedgerAssistant } from "./KitchenLedgerAssistant.jsx";
+import { KitchenLedgerDayAside } from "./KitchenLedgerDayAside.jsx";
 import { KitchenBooksAccessGate } from "./KitchenBooksAccessGate.jsx";
 import { KitchenBooksUnitPicker } from "./KitchenBooksUnitPicker.jsx";
 import { blankLine, LineTable, Note, QtyInput } from "./KitchenLedgerEntry.jsx";
@@ -94,6 +96,7 @@ export function KitchenSoNhapXuatLttpTab({
   const [openingLines, setOpeningLines] = useState([]);
   const [openingMoney, setOpeningMoney] = useState({ surplus: "0", shortfall: "0" });
   const [settingsForm, setSettingsForm] = useState(null);
+  const [scheduleText, setScheduleText] = useState("");
   const [exportingMonth, setExportingMonth] = useState(false);
 
   const skip = !canAccess || selectedUnitId == null || !menuDate;
@@ -106,6 +109,7 @@ export function KitchenSoNhapXuatLttpTab({
   const [lockLedger, lockState] = useLockKitchenLedgerMutation();
   const [unlockLedger, unlockState] = useUnlockKitchenLedgerMutation();
   const [balanceLedger, balanceState] = useBalanceKitchenLedgerMutation();
+  const [syncSlip, syncState] = useSyncKitchenLedgerSlipMutation();
   const [saveSettings, settingsState] = useSaveKitchenLedgerSettingsMutation();
 
   useEffect(() => {
@@ -130,6 +134,7 @@ export function KitchenSoNhapXuatLttpTab({
       surplus: formatLedgerInput(ledger.openingFinance?.surplus),
       shortfall: formatLedgerInput(ledger.openingFinance?.shortfall),
     });
+    setScheduleText(ledger.schedule?.text || ledger.frame?.inputs?.schedule?.text || "");
   }, [ledger]);
 
   useEffect(() => {
@@ -199,6 +204,7 @@ export function KitchenSoNhapXuatLttpTab({
           truyLinh: parseViNumber(income.truyLinh) ?? 0,
           thuKhach: parseViNumber(income.thuKhach) ?? 0,
         },
+        schedule: { text: scheduleText.trim() },
       }).unwrap();
     }, "Đã lưu quân số");
   }
@@ -320,6 +326,24 @@ export function KitchenSoNhapXuatLttpTab({
     }, "Đã nhập cân đối");
   }
 
+  async function onSyncSlip() {
+    const draft = (ledger?.frame?.slipDraft || []).filter((row) => row.commodityId);
+    if (!draft.length) {
+      notifyError("Không có dòng cân đối có mã hàng để ghi vào phiếu.");
+      return;
+    }
+    const detail = draft
+      .map((row) => `${row.name}: thêm ${formatLedgerNumber(row.qty, { blankZero: false })} ${row.uom}`)
+      .join("\n");
+    const ok = window.confirm(
+      `Thêm dòng «Cân đối sổ» vào phiếu xuất? Dòng này vào trên bảo đảm và không tính xuất ăn. Không bấm thêm Cân đối tồn âm cho cùng phần thiếu.\n\n${detail}`,
+    );
+    if (!ok) return;
+    await run(async () => {
+      await syncSlip({ unitId: selectedUnitId, date: menuDate }).unwrap();
+    }, "Đã ghi cân đối vào phiếu xuất");
+  }
+
   async function onSaveSettings() {
     if (!settingsForm) return;
     const threshold = parseViNumber(settingsForm.balanceWarnThreshold);
@@ -373,7 +397,9 @@ export function KitchenSoNhapXuatLttpTab({
   const finance = ledger?.structure?.finance ?? ledger?.finance;
   const mealSlots = ledger?.structure?.headcount?.meals?.map((row) => [row.key, row.label]) || MEALS;
   const extraSlots = ledger?.structure?.headcount?.extras?.map((row) => [row.key, row.label]) || EXTRAS;
-  const busy = saveState.isLoading || lockState.isLoading || unlockState.isLoading || balanceState.isLoading;
+  const busy = saveState.isLoading || lockState.isLoading || unlockState.isLoading || balanceState.isLoading || syncState.isLoading;
+  const stock = ledger?.frame?.books?.stock;
+  const slipDraft = (ledger?.frame?.slipDraft || []).filter((row) => row.commodityId);
 
   return (
     <KitchenBooksAccessGate permissionLabel="kitchenBooks.access" allowed={canAccess}>
@@ -387,15 +413,6 @@ export function KitchenSoNhapXuatLttpTab({
             user={user}
           />
           <div className="flex flex-wrap items-end gap-2">
-            <label className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Ngày</span>
-              <input
-                type="date"
-                className={cn(fieldClassSm, "w-40")}
-                value={menuDate}
-                onChange={(event) => setMenuDate(event.target.value)}
-              />
-            </label>
             <Button
               type="button"
               variant="secondary"
@@ -453,123 +470,64 @@ export function KitchenSoNhapXuatLttpTab({
               <Note tone="bad">Có mặt hàng tồn âm. Cân đối chỉ chạy khi bấm nút và xác nhận.</Note>
             ) : null}
 
-            <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_20rem]">
-              <div className="min-w-0">
+            <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
+              <section className="min-w-0 rounded-md border border-border bg-card p-3 shadow-sm">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setMenuDate(addDays(menuDate, -1))}>
+                    Ngày trước
+                  </Button>
+                  <div className="text-center">
+                    <h2 className="text-sm font-semibold">Sổ nhập xuất LTTP</h2>
+                    <p className="text-xs text-muted-foreground">Công khai tài chính ngày</p>
+                    <input
+                      aria-label="Ngày sổ"
+                      type="date"
+                      className={cn(fieldClassSm, "mx-auto mt-1 w-40")}
+                      value={menuDate}
+                      onChange={(event) => setMenuDate(event.target.value)}
+                    />
+                  </div>
+                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setMenuDate(addDays(menuDate, 1))}>
+                    Ngày sau
+                  </Button>
+                </div>
                 {ledger.ledgerBlocked ? (
-                  <Note>Sổ chưa lập vì thiếu phiếu xuất hoặc bảng giá. Khung ngày vẫn hiện để nhập quân số và dòng hàng.</Note>
+                  <Note>Sổ chưa lập vì thiếu phiếu xuất hoặc bảng giá. Trang ngày vẫn hiện để nhập quân số và dòng hàng.</Note>
                 ) : null}
                 <KitchenLedgerGrid
-                  lines={ledger.structure?.rows || ledger.lines}
-                  totals={ledger.structure?.totals ?? ledger.totals}
-                  columns={ledger.structure?.columns}
+                  lines={stock?.rows || ledger.structure?.rows || ledger.lines}
+                  totals={stock?.totals ?? ledger.structure?.totals ?? ledger.totals}
+                  columns={stock?.columns || ledger.structure?.columns}
                 />
-              </div>
-              <aside className="rounded-lg border border-border bg-card p-3 text-xs">
-                <h3 className="mb-2 text-sm font-semibold">Công khai tài chính</h3>
-                <p className="mb-2 text-muted-foreground">ĐVT: đồng</p>
-                {headcount?.levels?.map((level, index) => (
-                  <div key={level.dailyAmount} className="mb-2 border-b border-border/70 pb-2">
-                    <p className="font-medium">Mức {formatLedgerNumber(level.dailyAmount, { blankZero: false })}</p>
-                    {mealSlots.map(([meal, label]) => {
-                      const server = finance?.levels?.[index]?.meals?.find((row) => row.meal === meal);
-                      return (
-                        <label key={meal} className="mt-1 grid grid-cols-[4.5rem_1fr_auto] items-center gap-1">
-                          <span>{label}</span>
-                          <input
-                            aria-label={`${label} mức ${level.dailyAmount}`}
-                            inputMode="numeric"
-                            className={fieldClassSm}
-                            disabled={disabled}
-                            value={level[meal]}
-                            onChange={(event) => {
-                              const next = headcount.levels.map((row, rowIndex) => (
-                                rowIndex === index ? { ...row, [meal]: event.target.value } : row
-                              ));
-                              markEntry(setHeadcount)({ ...headcount, levels: next });
-                            }}
-                          />
-                          <span className="tabular-nums text-muted-foreground">{server ? moneyText(server.amount) : ""}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                ))}
-                <div className="mb-2 border-b border-border/70 pb-2">
-                  <p className="font-medium">Ăn thêm</p>
-                  {extraSlots.map(([key, label]) => {
-                    const server = finance?.extras?.find((row) => row.key === key);
-                    return (
-                      <label key={key} className="mt-1 grid grid-cols-[4.5rem_1fr_auto] items-center gap-1">
-                        <span>{label}</span>
-                        <input
-                          aria-label={label}
-                          inputMode="numeric"
-                          className={fieldClassSm}
-                          disabled={disabled}
-                          value={headcount?.extras?.[key] ?? 0}
-                          onChange={(event) => markEntry(setHeadcount)({
-                            ...headcount,
-                            extras: { ...headcount.extras, [key]: event.target.value },
-                          })}
-                        />
-                        <span className="tabular-nums text-muted-foreground">{server ? moneyText(server.amount) : ""}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-                <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
-                  <dt>Cộng</dt><dd className="text-right tabular-nums">{finance ? moneyText(finance.subtotal) : "—"}</dd>
-                  <dt>Thừa hôm trước</dt><dd className="text-right tabular-nums">{finance ? moneyText(finance.prevSurplus) : "—"}</dd>
-                  <dt>Bù giá gạo</dt><dd className="text-right tabular-nums">{finance ? moneyText(finance.riceSubsidy) : "—"}</dd>
-                </dl>
-                {[
-                  ["anThem", "Ăn thêm"],
-                  ["truyLinh", "Truy lĩnh"],
-                  ["thuKhach", "Thu của khách"],
-                ].map(([key, label]) => (
-                  <label key={key} className="mt-1 grid grid-cols-[1fr_6.5rem] items-center gap-1">
-                    <span>{label}</span>
-                    <input
-                      aria-label={label}
-                      inputMode="decimal"
-                      className={fieldClassSm}
-                      disabled={disabled}
-                      value={income[key]}
-                      onChange={(event) => markEntry(setIncome)({ ...income, [key]: event.target.value })}
-                    />
-                  </label>
-                ))}
-                <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 border-t border-border pt-2">
-                  <dt className="font-medium">Cộng thu</dt>
-                  <dd className="text-right font-medium tabular-nums">{finance ? moneyText(finance.totalIncome) : "—"}</dd>
-                  <dt>Tiền đã sử dụng</dt>
-                  <dd className="text-right tabular-nums">{finance ? moneyText(finance.spent) : "—"}</dd>
-                  <dt>Thiếu hôm trước</dt>
-                  <dd className="text-right tabular-nums">{finance ? moneyText(finance.prevShortfall) : "—"}</dd>
-                  <dt className="font-medium">Cộng chi</dt>
-                  <dd className="text-right font-medium tabular-nums">{finance ? moneyText(finance.totalSpent) : "—"}</dd>
-                  <dt>Thừa trong ngày</dt>
-                  <dd className="text-right tabular-nums">{finance ? moneyText(finance.surplus) : "—"}</dd>
-                  <dt>Thiếu trong ngày</dt>
-                  <dd className={cn("text-right tabular-nums", finance?.shortfall && finance.shortfall !== "0" && "font-semibold text-destructive")}>
-                    {finance ? moneyText(finance.shortfall) : "—"}
-                  </dd>
-                </dl>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" className="h-8 px-3 text-xs" disabled={disabled || busy} onClick={saveHeadcount}>
-                    Lưu quân số
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="h-8 px-3 text-xs"
-                    disabled={disabled || !ledger.previousHeadcount}
-                    onClick={() => markEntry(setHeadcount)(ledger.previousHeadcount)}
-                  >
-                    Lấy quân số hôm trước
-                  </Button>
-                </div>
-              </aside>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Nhập trên bảo đảm lấy từ phiếu xuất của đơn vị trong ngày.
+                  {" "}
+                  <a className="underline" href="/lttp-nhap-xuat">Mở phiếu xuất kho</a>
+                  . Sửa phiếu rồi quay lại, trang sổ lấy số mới.
+                </p>
+              </section>
+              <KitchenLedgerDayAside
+                headcount={headcount}
+                finance={finance}
+                mealSlots={mealSlots}
+                extraSlots={extraSlots}
+                income={income}
+                disabled={disabled}
+                busy={busy}
+                previousHeadcount={ledger.previousHeadcount}
+                onHeadcount={markEntry(setHeadcount)}
+                onIncome={markEntry(setIncome)}
+                onSaveHeadcount={saveHeadcount}
+                onCopyPrevious={() => markEntry(setHeadcount)(ledger.previousHeadcount)}
+                scheduleText={scheduleText}
+                onSchedule={markEntry(setScheduleText)}
+                selfLines={selfLines}
+                selfNone={selfNone}
+                commodities={commodities}
+                onSelfChange={markEntry(setSelfLines)}
+                onSaveSelf={saveSelf}
+                onSelfNone={() => saveSelf(true)}
+              />
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -586,24 +544,19 @@ export function KitchenSoNhapXuatLttpTab({
               >
                 Cân đối tồn âm
               </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={disabled || busy || ledger.ledgerBlocked || !slipDraft.length}
+                onClick={onSyncSlip}
+              >
+                Ghi cân đối vào phiếu xuất
+              </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Ghi vào phiếu thêm dòng «Cân đối sổ» trên phiếu xuất, không tính xuất ăn. Cân đối tồn âm ghi cột đơn vị. Chỉ dùng một trong hai cho cùng một phần thiếu.
+            </p>
 
-            <LineTable
-              title="Đơn vị bảo đảm"
-              hint={selfNone ? "Đã xác nhận không có nguồn đơn vị trong ngày." : "Cột I mua TT và cột J TGSX. Trên BĐ lấy từ phiếu xuất, không sửa ở đây."}
-              lines={selfLines}
-              disabled={disabled}
-              commodities={commodities}
-              mode="self"
-              onChange={markEntry(setSelfLines)}
-              onSave={() => saveSelf(false)}
-              saving={busy}
-              extra={(
-                <Button type="button" variant="secondary" className="h-8 px-2 text-xs" disabled={disabled || busy} onClick={() => saveSelf(true)}>
-                  Không có
-                </Button>
-              )}
-            />
             <LineTable
               title="Gạo — Trên BĐ mua TT"
               hint="Gạo nhập tay. Các mặt hàng khác trên phiếu xuất không sửa được."

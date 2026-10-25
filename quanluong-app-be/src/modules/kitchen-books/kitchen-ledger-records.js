@@ -36,6 +36,7 @@ function recordsPrompt({ settings, anchorDate, commodities = [], facts = [], que
     "type outside_purchase: mua ngoai. type stock_in: nhap kho, origin unit_purchase hoac unit_tgsx. type stock_out: xuat khac, khong phai xuat an.",
     "Hang da co tren phieu xuat thi khong tao ban ghi. Gao nhap tay van la outside_purchase hoac stock_in.",
     "type setting chi khi cau doi quy tac: field balanceWarnThreshold, spentBasis (meal_out hoac total_out), holidayLunchOnly, milk.mode (purchase hoac patient_plus_levels).",
+    "type schedule: lich lam viec trong ngay, chi la chu, khong doi so tren so.",
     "type note: ghi chu, khong phai so lieu.",
     "Moi ban ghi co confidence 0 den 1 va source la doan trich ngan. Don gia la dong, 180k = 180000.",
     `Nam neo ${open.slice(0, 4)}. Ngay dang mo ${open}.`,
@@ -169,6 +170,7 @@ function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePat
   const proposals = [];
   const questions = [];
   const notes = [];
+  const schedules = [];
   const headcountInputs = [];
   const sourceByDate = new Map();
   for (const record of parsed.data.records) {
@@ -195,6 +197,13 @@ function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePat
         confidence: record.confidence,
         source: record.source,
       });
+    } else if (record.type === "schedule") {
+      schedules.push({
+        date: resolveDate(record.date, anchorDate) || anchorDate || "",
+        text: record.text,
+        confidence: record.confidence,
+        source: record.source,
+      });
     } else {
       notes.push({ text: record.text, confidence: record.confidence, source: record.source });
     }
@@ -212,6 +221,7 @@ function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePat
     proposals,
     questions,
     notes,
+    schedules,
   };
 }
 

@@ -93,6 +93,13 @@ const ledgerRecordSchema = z.discriminatedUnion("type", [
     confidence,
     source,
   }),
+  z.object({
+    type: z.literal("schedule"),
+    date: day,
+    text: z.string().trim().min(1).max(2000),
+    confidence,
+    source,
+  }),
 ]);
 
 const ledgerRecordBatchSchema = z.object({

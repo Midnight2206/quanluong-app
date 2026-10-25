@@ -86,6 +86,19 @@ const saveLedgerBodySchema = z.object({
     shortfall: z.coerce.number().min(0).max(1_000_000_000_000).optional(),
     lines: z.array(openingLineSchema).max(400).optional(),
   }).optional(),
+  schedule: z.object({
+    text: z.string().max(2000),
+  }).nullable().optional(),
+});
+
+const syncLedgerSlipBodySchema = z.object({
+  unitId: unitIdSchema,
+  date: dateSchema,
+  lines: z.array(z.object({
+    commodityId: z.coerce.number().int().positive(),
+    priceKind: z.enum(["market", "tgsx"]).optional(),
+    quantity: qtySchema,
+  })).max(200).optional(),
 });
 
 const lockLedgerBodySchema = z.object({
@@ -156,4 +169,5 @@ export {
   unlockLedgerBodySchema,
   balanceLedgerBodySchema,
   saveLedgerSettingsBodySchema,
+  syncLedgerSlipBodySchema,
 };

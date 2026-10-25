@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { BALANCE_NOTE } from "./kitchen-ledger-slip-roundtrip.js";
 import { classifyItem } from "./kitchen-ledger-compute.js";
 import { scaledToString, toScaled } from "./kitchen-ledger-decimal.js";
 import { mergeLedgerSettings, normalizeName } from "./kitchen-ledger-settings.js";
@@ -87,6 +88,7 @@ function assembleLedgerInput({
         });
         continue;
       }
+      const balanceLine = String(line.lineNote || "") === BALANCE_NOTE;
       const source = String(line.priceKind || "").toLowerCase() === "tgsx" ? "H" : "G";
       const listPrice = priceOf(priceById.get(Number(line.commodityId)), source);
       if (listPrice == null) {
@@ -110,7 +112,7 @@ function assembleLedgerInput({
         unitPrice: listPrice,
         qty,
         commodityId: line.commodityId,
-        balance: false,
+        balance: balanceLine,
         issuePolicy: "today",
       });
     }

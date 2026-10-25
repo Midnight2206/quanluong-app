@@ -91,6 +91,10 @@ test("cân đối không bị hiểu là câu tính sổ", () => {
   assert.equal(routeIntent("cân đối âm kho giúp"), "question");
 });
 
+test("lịch làm việc đi vào trợ lý sổ, không thành câu hỏi", () => {
+  assert.equal(routeIntent("Lịch làm việc 14/10: trực bếp sáng"), "movement");
+});
+
 test("như 17/10 trỏ ngày trên sổ", () => {
   assert.equal(routeIntent("như 17/10"), "headcount");
   assert.deepEqual(headcountLike("22/10 như 17/10", "2026-10-21"), {

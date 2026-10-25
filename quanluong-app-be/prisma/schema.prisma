@@ -1470,6 +1470,8 @@ model KitchenLedgerDay {
   headcountJson      Json?
   otherIncomeJson    Json?
   openingFinanceJson Json?
+  /// Lịch làm việc trong ngày. Không đổi số sổ.
+  scheduleJson       Json?
   snapshotJson       Json?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt

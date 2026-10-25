@@ -20,6 +20,19 @@ const MEALS = [["sang", "Sáng"], ["trua", "Trưa"], ["chieu", "Chiều"]];
 const EXTRAS = [["benhXa", "Bệnh xá"], ["benhNhan", "Bệnh nhân"], ["omTrai", "Ốm"], ["leTet", "Lễ tết"]];
 const INTENTS = [["", "Tự nhận"], ["headcount", "Quân số"], ["movement", "Hàng"], ["rule", "Quy tắc"], ["question", "Hỏi sổ"]];
 
+function ScheduleDraft({ message, onApply, busy, showContent }) {
+  const rows = message.payloadJson?.schedules || [];
+  return (
+    <div className="flex flex-col gap-2">
+      {showContent ? <p>{message.content}</p> : null}
+      {rows.map((row) => (
+        <p key={row.date} className="text-xs">{row.date}: {row.text}</p>
+      ))}
+      <Button variant="primary" disabled={busy || !rows.length} onClick={onApply}>Ghi lịch làm việc</Button>
+    </div>
+  );
+}
+
 function errText(error) {
   const data = error?.data;
   if (data && typeof data === "object" && data.message) return data.message;
@@ -230,6 +243,23 @@ function linesOf(message) {
     }
   }
 
+  async function applySchedule(message) {
+    const rows = message.payloadJson?.schedules || [];
+    try {
+      const result = await applyDraft({
+        unitId,
+        date,
+        messageId: message.id,
+        schedules: rows.map((row) => ({ date: row.date, text: row.text })),
+      }).unwrap();
+      const bad = (result.saved || []).filter((row) => !row.ok);
+      if (bad.length) notifyError(bad.map((row) => `${row.date}: ${row.message}`).join(" "));
+      else notifySuccess("Đã ghi lịch làm việc");
+    } catch (err) {
+      notifyError(errText(err));
+    }
+  }
+
   async function applyRule(message) {
     try {
       await applyDraft({ unitId, date, messageId: message.id, acceptProposals: true }).unwrap();
@@ -384,6 +414,14 @@ function linesOf(message) {
                 onApply={() => applyMovement(message)}
               />
             ) : null}
+            {message.kind === "schedule_draft" || (message.kind === "records_draft" && (message.payloadJson?.schedules || []).length) ? (
+              <ScheduleDraft
+                message={message}
+                busy={busy}
+                showContent={message.kind === "schedule_draft"}
+                onApply={() => applySchedule(message)}
+              />
+            ) : null}
             {message.kind === "rule_note" || (message.kind === "records_draft" && (message.payloadJson?.proposals || []).length) ? (
               <div className="flex flex-col gap-2">
                 {message.kind === "rule_note" ? <p>{message.content}</p> : null}
@@ -394,7 +432,7 @@ function linesOf(message) {
                 ) : null}
               </div>
             ) : null}
-            {message.kind !== "headcount_draft" && message.kind !== "movement_draft" && message.kind !== "records_draft" && message.kind !== "rule_note" ? (
+            {message.kind !== "headcount_draft" && message.kind !== "movement_draft" && message.kind !== "records_draft" && message.kind !== "rule_note" && message.kind !== "schedule_draft" ? (
               <p className="whitespace-pre-wrap">{message.content}</p>
             ) : null}
           </article>
@@ -412,7 +450,7 @@ function linesOf(message) {
         className={cn(fieldClassSm, "mb-2 min-h-20 w-full")}
         maxLength={20000}
         value={text}
-        placeholder="18/10: 91 97 97 · 0 0 0, hoặc mua ngoài 5kg mực 180k, hoặc hỏi thừa thiếu"
+        placeholder="18/10: 91 97 97 · 0 0 0, mua ngoài 5kg mực, lịch làm việc trực sáng, hoặc hỏi thừa thiếu"
         onChange={(event) => setText(event.target.value)}
       />
       <div className="flex flex-wrap items-center gap-2">

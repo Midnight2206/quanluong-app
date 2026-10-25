@@ -23,6 +23,7 @@ function routeIntent(text, hasImage = false) {
   }
   if (/nhu\s*\d{1,2}\s*[/.]\s*\d{1,2}/.test(n) && nums.length < 5) return "headcount";
   if (/(mua|kg|hop|lit|xuat them)/.test(n)) return "movement";
+  if (/lich lam viec|lich truc|lich bep/.test(n)) return "movement";
   return "question";
 }
 

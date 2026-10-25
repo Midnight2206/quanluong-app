@@ -399,6 +399,18 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     },
   },
   {
+    key: "syncKitchenLedgerSlip",
+    method: "POST",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/ledger/slip-sync",
+    pathRoute: "/api/kitchen-books/ledger/slip-sync",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Ghi cân đối hoặc số lượng đã sửa từ sổ vào phiếu xuất LTTP của ngày.",
+    },
+  },
+  {
     key: "getKitchenLedgerSettings",
     method: "GET",
     module: KITCHEN_BOOKS_MODULE_NAME,
