@@ -1,3 +1,7 @@
+/**
+ * Bản ghi trợ lý sổ. Image backend chỉ có /app, nên file này nằm trong quanluong-app-be.
+ * Web giữ bản sao packages/shared/src/pages/kitchen-books/ledgerRecords.js — hai file phải giống nhau.
+ */
 import { z } from "zod";
 
 const count = z.coerce.number().int().min(0).max(100000);
