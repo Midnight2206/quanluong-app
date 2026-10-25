@@ -176,6 +176,13 @@ model User {
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
   kitchenMenuSamplesCreated              KitchenMenuSample[] @relation("KitchenMenuSampleCreatedBy")
+  kitchenLedgerDaysLocked                KitchenLedgerDay[] @relation("KitchenLedgerDayLockedBy")
+  kitchenLedgerSettingsUpdated           KitchenLedgerSettings[] @relation("KitchenLedgerSettingsUpdatedBy")
+  ledgerAssistantProfiles                LedgerAssistantProfile[]
+  ledgerAssistantMemories                LedgerAssistantMemory[]
+  ledgerAssistantRuleNotes               LedgerAssistantRuleNote[]
+  ledgerAssistantConversations           LedgerAssistantConversation[]
+  ledgerAssistantUsages                  LedgerAssistantUsage[]
   lttpSupplierLinks UserLttpSupplier[]
   baApiTokensCreated BaApiToken[] @relation("BaApiTokenCreatedBy")
 
@@ -686,6 +693,13 @@ model Unit {
   kitchenReceiptSlips       KitchenReceiptSlip[]
   kitchenReceiptSlipSerials KitchenReceiptSlipSerial[]
   kitchenMenuSamples        KitchenMenuSample[]
+  kitchenLedgerDays              KitchenLedgerDay[]
+  kitchenLedgerSettings          KitchenLedgerSettings?
+  ledgerAssistantProfiles        LedgerAssistantProfile[]
+  ledgerAssistantMemories        LedgerAssistantMemory[]
+  ledgerAssistantRuleNotes       LedgerAssistantRuleNote[]
+  ledgerAssistantConversations   LedgerAssistantConversation[]
+  ledgerAssistantUsages          LedgerAssistantUsage[]
   baUnitProfiles            BaUnitProfile[]
   baApiTokens               BaApiToken[]
   baProposals               BaProposal[]
@@ -833,6 +847,8 @@ model LttpCommodity {
   lttpAiCommodityHabits         LttpAiCommodityHabit[]
   lttpAiUomRules                LttpAiUomRule[]
   lttpAiDraftLines              LttpAiDraftLine[]
+  kitchenLedgerLots             KitchenLedgerLot[]
+  kitchenLedgerMovements        KitchenLedgerMovement[]
 
   @@unique([unitId, code])
   @@index([unitId])
@@ -1426,6 +1442,170 @@ model KitchenReceiptSlipLine {
   @@index([slipId])
   @@index([commodityId])
   @@index([slipId, lineSource, priceKind])
+}
+
+/// Cấu hình sổ nhập xuất theo đơn vị (ngưỡng thừa/thiếu, ΣS hay ΣO, mức ăn, gia vị).
+model KitchenLedgerSettings {
+  unitId      Int      @id
+  configJson  Json
+  updatedById Int?
+  updatedAt   DateTime @updatedAt
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  updatedBy   User?    @relation("KitchenLedgerSettingsUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById])
+}
+
+/// Một ngày sổ nhập xuất LTTP. snapshotJson là bản đã tính; khi chốt thì không tính lại.
+model KitchenLedgerDay {
+  id                 Int       @id @default(autoincrement())
+  unitId             Int
+  ledgerDate         DateTime  @db.Date
+  status             String    @default("draft") @db.VarChar(16)
+  lockedAt           DateTime?
+  lockedById         Int?
+  needsResignature   Boolean   @default(false)
+  slipFingerprint    String?   @db.VarChar(64)
+  selfSupplyNone     Boolean   @default(false)
+  headcountJson      Json?
+  otherIncomeJson    Json?
+  openingFinanceJson Json?
+  snapshotJson       Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  unit               Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  lockedBy           User?     @relation("KitchenLedgerDayLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
+  lots               KitchenLedgerLot[]
+  movements          KitchenLedgerMovement[]
+
+  @@unique([unitId, ledgerDate])
+  @@index([lockedById])
+}
+
+/// Tồn cuối ngày — tồn đầu của ngày sau. Âm kho vẫn giữ để không làm mất thiếu.
+model KitchenLedgerLot {
+  id           Int              @id @default(autoincrement())
+  dayId        Int
+  sortOrder    Int              @default(0)
+  commodityId  Int?
+  itemName     String           @db.VarChar(255)
+  measureUnit  String           @db.VarChar(64)
+  unitPrice    Decimal          @db.Decimal(18, 4)
+  receivedDate DateTime         @db.Date
+  qty          Decimal          @db.Decimal(18, 4)
+  amount       Decimal          @db.Decimal(18, 2)
+  role         String           @db.VarChar(16)
+  displayDash  Boolean          @default(false)
+  day          KitchenLedgerDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  commodity    LttpCommodity?   @relation(fields: [commodityId], references: [id], onDelete: SetNull)
+
+  @@index([dayId])
+  @@index([commodityId])
+}
+
+/// Dòng người dùng nhập: tự bảo đảm, gạo, xuất khác, tồn đầu, nhập bù âm kho.
+model KitchenLedgerMovement {
+  id          Int              @id @default(autoincrement())
+  dayId       Int
+  sortOrder   Int              @default(0)
+  kind        String           @db.VarChar(32)
+  source      String           @db.VarChar(8)
+  commodityId Int?
+  itemName    String           @db.VarChar(255)
+  measureUnit String           @db.VarChar(64)
+  unitPrice   Decimal          @default(0) @db.Decimal(18, 4)
+  qty         Decimal          @db.Decimal(18, 4)
+  issuePolicy String           @default("today") @db.VarChar(16)
+  day         KitchenLedgerDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  commodity   LttpCommodity?   @relation(fields: [commodityId], references: [id], onDelete: SetNull)
+
+  @@index([dayId, kind])
+  @@index([commodityId])
+}
+
+/// Tên, giọng và tuỳ chọn của trợ lý làm sổ. Riêng từng tài khoản và đơn vị.
+model LedgerAssistantProfile {
+  userId      Int
+  unitId      Int
+  displayName String   @default("Trợ lý làm sổ") @db.VarChar(40)
+  tone        String   @default("ngan_gon") @db.VarChar(16)
+  preferences Json
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@id([userId, unitId])
+}
+
+model LedgerAssistantMemory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  unitId    Int
+  fact      String   @db.VarChar(240)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([userId, unitId])
+}
+
+model LedgerAssistantRuleNote {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  unitId    Int
+  title     String   @db.VarChar(120)
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([userId, unitId, createdAt])
+}
+
+model LedgerAssistantConversation {
+  id        Int                        @id @default(autoincrement())
+  userId    Int
+  unitId    Int
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
+  user      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit      Unit                       @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  messages  LedgerAssistantMessage[]
+
+  @@index([userId, unitId, updatedAt])
+}
+
+model LedgerAssistantMessage {
+  id             Int                         @id @default(autoincrement())
+  conversationId Int
+  role           String                      @db.VarChar(16)
+  kind           String                      @db.VarChar(32)
+  content        String                      @db.Text
+  payloadJson    Json?
+  createdAt      DateTime                    @default(now())
+  conversation   LedgerAssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+/// Thống kê lần gọi AI: không có nội dung tin nhắn. Superadmin chỉ thấy bảng này qua nhật ký thay đổi.
+model LedgerAssistantUsage {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  unitId      Int
+  feature     String   @db.VarChar(64)
+  provider    String   @db.VarChar(16)
+  model       String   @db.VarChar(80)
+  inputSha256 String   @db.VarChar(64)
+  inputBytes  Int
+  status      String   @db.VarChar(16)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, createdAt])
+  @@index([userId, createdAt])
+  @@index([feature, createdAt])
 }
 
 /// Phiên bản bảng giá LTTP — một bản ghi / đơn vị / ngày áp dụng.

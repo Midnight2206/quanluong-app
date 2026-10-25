@@ -37,8 +37,27 @@ import {
   resolveReceiptLineController,
   guaranteeFromIssueController,
 } from "./kitchen-books.controller.js";
+import {
+  balanceLedgerController,
+  exportLedgerMonthPdfController,
+  getLedgerController,
+  getLedgerSettingsController,
+  lockLedgerController,
+  saveLedgerController,
+  saveLedgerSettingsController,
+  unlockLedgerController,
+} from "./kitchen-ledger.controller.js";
+import {
+  addAssistantMemoryController,
+  applyAssistantController,
+  deleteAssistantMemoryController,
+  deleteAssistantRuleController,
+  getAssistantController,
+  postAssistantTurnController,
+  saveAssistantProfileController,
+} from "./kitchen-ledger-assistant.controller.js";
 import { KITCHEN_BOOKS_ROUTE_DEFINITIONS } from "./kitchen-books.route-definitions.js";
-import { menuAiSuggestRateLimit } from "../../middlewares/menu-ai-rate-limit.middleware.js";
+import { ledgerAiExtractRateLimit, menuAiSuggestRateLimit } from "../../middlewares/menu-ai-rate-limit.middleware.js";
 import {
   catalogIdParamsSchema,
   catalogIdQuerySchema,
@@ -66,6 +85,25 @@ import {
   updateReceiptSlipBodySchema,
   upsertReceiptSlipUnitSelfBodySchema,
 } from "./kitchen-books.validator.js";
+import {
+  balanceLedgerBodySchema,
+  ledgerMonthQuerySchema,
+  ledgerQuerySchema,
+  ledgerSettingsQuerySchema,
+  lockLedgerBodySchema,
+  saveLedgerBodySchema,
+  saveLedgerSettingsBodySchema,
+  unlockLedgerBodySchema,
+} from "./kitchen-ledger.validator.js";
+import {
+  assistantApplyBodySchema,
+  assistantMemoryBodySchema,
+  assistantMemoryDeleteSchema,
+  assistantProfileBodySchema,
+  assistantQuerySchema,
+  assistantRuleDeleteSchema,
+  assistantTurnBodySchema,
+} from "./kitchen-ledger-assistant.validator.js";
 
 const kitchenBooksRouter = express.Router();
 const LTTP_COMM = DATA_SCOPE_KINDS.LTTP_COMMODITY.code;
@@ -306,6 +344,127 @@ kitchenBooksRouter.delete(
   validateRequest({ params: receiptSlipIdParamsSchema }),
   permissionMiddleware([routePermissions.deleteKitchenReceiptSlip]),
   asyncHandler(deleteReceiptSlipController),
+);
+
+kitchenBooksRouter.get(
+  "/ledger/settings",
+  dataScopeMw,
+  validateRequest({ query: ledgerSettingsQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenLedgerSettings]),
+  asyncHandler(getLedgerSettingsController),
+);
+
+kitchenBooksRouter.put(
+  "/ledger/settings",
+  dataScopeMw,
+  validateRequest({ body: saveLedgerSettingsBodySchema }),
+  permissionMiddleware([routePermissions.saveKitchenLedgerSettings]),
+  asyncHandler(saveLedgerSettingsController),
+);
+
+kitchenBooksRouter.get(
+  "/ledger/month-pdf",
+  dataScopeMw,
+  validateRequest({ query: ledgerMonthQuerySchema }),
+  permissionMiddleware([routePermissions.exportKitchenLedgerMonthPdf]),
+  asyncHandler(exportLedgerMonthPdfController),
+);
+
+kitchenBooksRouter.get(
+  "/ledger",
+  dataScopeMw,
+  validateRequest({ query: ledgerQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenLedger]),
+  asyncHandler(getLedgerController),
+);
+
+kitchenBooksRouter.put(
+  "/ledger",
+  dataScopeMw,
+  validateRequest({ body: saveLedgerBodySchema }),
+  permissionMiddleware([routePermissions.saveKitchenLedger]),
+  asyncHandler(saveLedgerController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/lock",
+  dataScopeMw,
+  validateRequest({ body: lockLedgerBodySchema }),
+  permissionMiddleware([routePermissions.lockKitchenLedger]),
+  asyncHandler(lockLedgerController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/unlock",
+  dataScopeMw,
+  validateRequest({ body: unlockLedgerBodySchema }),
+  permissionMiddleware([routePermissions.unlockKitchenLedger]),
+  asyncHandler(unlockLedgerController),
+);
+
+kitchenBooksRouter.get(
+  "/ledger/assistant",
+  dataScopeMw,
+  validateRequest({ query: assistantQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenLedgerAssistant]),
+  asyncHandler(getAssistantController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/assistant/turn",
+  dataScopeMw,
+  ledgerAiExtractRateLimit,
+  validateRequest({ body: assistantTurnBodySchema }),
+  permissionMiddleware([routePermissions.postKitchenLedgerAssistantTurn]),
+  asyncHandler(postAssistantTurnController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/assistant/apply",
+  dataScopeMw,
+  validateRequest({ body: assistantApplyBodySchema }),
+  permissionMiddleware([routePermissions.applyKitchenLedgerAssistant]),
+  asyncHandler(applyAssistantController),
+);
+
+kitchenBooksRouter.put(
+  "/ledger/assistant/profile",
+  dataScopeMw,
+  validateRequest({ body: assistantProfileBodySchema }),
+  permissionMiddleware([routePermissions.saveKitchenLedgerAssistantProfile]),
+  asyncHandler(saveAssistantProfileController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/assistant/memory",
+  dataScopeMw,
+  validateRequest({ body: assistantMemoryBodySchema }),
+  permissionMiddleware([routePermissions.addKitchenLedgerAssistantMemory]),
+  asyncHandler(addAssistantMemoryController),
+);
+
+kitchenBooksRouter.delete(
+  "/ledger/assistant/memory",
+  dataScopeMw,
+  validateRequest({ query: assistantMemoryDeleteSchema }),
+  permissionMiddleware([routePermissions.deleteKitchenLedgerAssistantMemory]),
+  asyncHandler(deleteAssistantMemoryController),
+);
+
+kitchenBooksRouter.delete(
+  "/ledger/assistant/rules",
+  dataScopeMw,
+  validateRequest({ query: assistantRuleDeleteSchema }),
+  permissionMiddleware([routePermissions.deleteKitchenLedgerAssistantRule]),
+  asyncHandler(deleteAssistantRuleController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/balance",
+  dataScopeMw,
+  validateRequest({ body: balanceLedgerBodySchema }),
+  permissionMiddleware([routePermissions.balanceKitchenLedger]),
+  asyncHandler(balanceLedgerController),
 );
 
 export { kitchenBooksRouter };

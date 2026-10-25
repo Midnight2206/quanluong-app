@@ -267,7 +267,7 @@ export function KitchenBooksPage() {
       {
         id: "so-nhap-xuat-lttp",
         label: "Sổ nhập xuất LTTP",
-        panel: <KitchenSoNhapXuatLttpTab />,
+        panel: <KitchenSoNhapXuatLttpTab {...menuTabProps} />,
       },
       {
         id: "so-thuc-don",
