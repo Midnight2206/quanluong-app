@@ -1,11 +1,21 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import test from "node:test";
-import { ledgerRecordBatchSchema } from "../../../../packages/shared/src/pages/kitchen-books/ledgerRecords.js";
+import { fileURLToPath } from "node:url";
+import { ledgerRecordBatchSchema } from "./ledgerRecords.js";
 import { computeFinance, planRations } from "./kitchen-ledger-compute.js";
 import { toScaled } from "./kitchen-ledger-decimal.js";
 import { buildDayStructure } from "./kitchen-ledger-day-structure.js";
 import { ledgerAiModels, mapLedgerRecords, recordsPrompt } from "./kitchen-ledger-records.js";
 import { DEFAULT_LEDGER_SETTINGS } from "./kitchen-ledger-settings.js";
+
+test("schema web là bản sao schema trong image backend", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const backend = readFileSync(join(here, "ledgerRecords.js"), "utf8");
+  const web = readFileSync(join(here, "../../../../packages/shared/src/pages/kitchen-books/ledgerRecords.js"), "utf8");
+  assert.equal(backend, web);
+});
 
 function same(actual, expected) {
   assert.equal(toScaled(actual), toScaled(expected), `${actual} ≠ ${expected}`);

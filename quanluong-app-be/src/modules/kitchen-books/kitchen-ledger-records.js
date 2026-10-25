@@ -3,7 +3,7 @@ import { ERROR_CODES } from "../../errors/error-codes.js";
 import {
   QUESTION_TOPIC,
   ledgerRecordBatchSchema,
-} from "../../../../packages/shared/src/pages/kitchen-books/ledgerRecords.js";
+} from "./ledgerRecords.js";
 import { normalizeAiHeadcount, resolveDate } from "./kitchen-ledger-ai-headcount.js";
 import { mergeLedgerSettings, normalizeName } from "./kitchen-ledger-settings.js";
 
