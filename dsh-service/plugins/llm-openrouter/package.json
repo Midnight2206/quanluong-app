@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-llm-openrouter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH LLM adapter that calls OpenRouter's OpenAI-compatible API."
+}

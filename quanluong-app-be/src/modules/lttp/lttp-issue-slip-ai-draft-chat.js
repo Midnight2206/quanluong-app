@@ -1,5 +1,6 @@
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
+import { dshCallFields } from "../ai-gateway/dsh-context.js";
 import { completeMenuJson } from "../kitchen-books/kitchen-books-menu-ai-llm.js";
 import { buildDraftPatchPrompt } from "./lttp-issue-slip-ai-extract.js";
 import { getIssueSlipAiDraft, lockDraft } from "./lttp-issue-slip-ai-draft.js";
@@ -97,7 +98,15 @@ async function proposeIssueSlipAiDraftChat(prisma, input, opts = {}) {
           lines,
           message: input.message,
         }),
-        opts.completeOpts,
+        {
+          ...opts.completeOpts,
+          dsh: opts.completeOpts?.dsh || dshCallFields({
+            accountId: input.actorUserId,
+            unitId: draft.storageUnitId,
+            surface: "web",
+            feature: "lttp-issue-slip-chat",
+          }),
+        },
       );
     } catch (error) {
       draftChatError(error);

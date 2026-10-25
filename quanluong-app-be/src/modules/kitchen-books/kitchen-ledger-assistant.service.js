@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { prisma as defaultPrisma } from "../../infra/database/prisma/prisma.client.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
+import { dshCallFields } from "../ai-gateway/dsh-context.js";
 import { extractStructured, readMenuAiFromEnv } from "./kitchen-books-menu-ai-llm.js";
 import {
   assertKitchenLogicalMatchesDataScope,
@@ -321,6 +322,19 @@ async function callExtract(ctx, feature, prompt, { soft = false, model } = {}) {
       configOverride: ctx.opts.configOverride,
       model,
       fetchImpl: ctx.opts.fetchImpl,
+      dshFetch: ctx.opts.dshFetch,
+      engine: ctx.opts.engine,
+      dshServiceUrl: ctx.opts.dshServiceUrl,
+      dshServiceToken: ctx.opts.dshServiceToken,
+      dsh: dshCallFields({
+        accountId: ctx.user.id,
+        unitId: ctx.unitId,
+        surface: ctx.opts.surface || "web",
+        feature,
+        scope: ctx.scope,
+        effectiveUnitIds: ctx.effectiveUnitIds,
+        dataScope: ctx.dataScope,
+      }),
       disabledMessage: "AI đang tắt (chưa có MENU_AI_API_KEY). Nhập tay ở bảng phía trên.",
       retryUserHint: "Tra ve dung JSON records. Khong ten nguoi. Khong chon vi tri tren so.",
     });

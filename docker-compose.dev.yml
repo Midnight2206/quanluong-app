@@ -141,6 +141,14 @@ services:
       ui:
         condition: service_started
 
+  dsh:
+    volumes:
+      - ./dsh-service/src:/app/src
+      - ./dsh-service/plugins:/app/plugins
+      - ./dsh-service/profiles:/app/profiles
+      - dsh_home:/var/lib/dsh
+    command: ["node", "--watch", "src/index.js"]
+
 volumes:
   ui_web_next:
   ui_superadmin_next:
