@@ -1,0 +1,43 @@
+Quân lương — third-party Agent Skills notice
+================================================
+
+This tree vendors Apache-2.0 skills so Cursor IDE and Cursor cloud agents can load them from `.cursor/skills/`. Each third-party skill folder contains its upstream LICENSE file. The Apache License, Version 2.0, applies to those folders. A copy of the license text is in each folder (`LICENSE` or `LICENSE.txt`).
+
+Upstream revisions pinned for this import:
+
+- anthropics/skills @ dbd4588f9e1033efb41dad4bef2f7947c8993d44
+  https://github.com/anthropics/skills
+  Folders: webapp-testing, frontend-design, mcp-builder, skill-creator
+  Copyright: Anthropic, PBC (see each LICENSE.txt)
+
+- anthropics/knowledge-work-plugins @ 33d3dea41a341b341d4f5da2e8801ae0c89be2b8
+  https://github.com/anthropics/knowledge-work-plugins
+  Plugin: data
+  Folders: explore-data, validate-data, sql-queries, write-query,
+  data-visualization, build-dashboard, statistical-analysis,
+  data-context-extractor
+  Copyright: Anthropic, PBC (see each LICENSE)
+
+- anthropics/claude-plugins-official @ 58267944f92187b7d6a1c822165c96c81c864806
+  https://github.com/anthropics/claude-plugins-official
+  Plugins: code-review, pr-review-toolkit
+  Folder: pr-review (Cursor skill plus unmodified prompts in references/upstream/)
+  Copyright: Anthropic, PBC (see pr-review/LICENSE)
+
+Local modifications to the data-plugin skills (Apache-2.0 section 4):
+
+- `argument-hint` and `user-invocable` were moved under `metadata` so the
+  frontmatter only uses properties accepted by skill-creator's
+  quick_validate.py. The values are unchanged.
+- Skills that linked to `../../CONNECTORS.md` now link to `CONNECTORS.md`
+  copied into that skill folder. The connector text is unchanged.
+
+Not included, on purpose: skills/docx, skills/pdf, skills/pptx, and skills/xlsx
+from anthropics/skills. Those are source-available, not Apache-2.0.
+`quanluong-document-exports` is an original short skill for this app's
+document-service and is not a copy of those skills.
+
+Original skills written for this repo (not Anthropic's copyright):
+quanluong-ui-testing, quanluong-data-context, quanluong-document-exports.
+The pr-review/SKILL.md entry point is an original Cursor procedure that
+points at the upstream prompts.
