@@ -247,6 +247,21 @@
   }
 }
 
+@keyframes ledger-assistant-nudge {
+  0%, 70%, 100% {
+    transform: translateY(0);
+    box-shadow: 0 8px 22px hsl(var(--primary) / 0.35);
+  }
+  82% {
+    transform: translateY(-5px);
+    box-shadow: 0 0 0 12px hsl(var(--primary) / 0);
+  }
+}
+
+.ledger-assistant-bubble {
+  animation: ledger-assistant-nudge 2.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -255,6 +270,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .ledger-assistant-bubble {
+    animation: none !important;
   }
 }
 

@@ -97,44 +97,47 @@ function expr(count, price, amount) {
   return `${left} x ${mid} = ${right}`;
 }
 
+function financeRow(label, value, tone) {
+  return { label, value, tone };
+}
+
 function financeLines(finance) {
   if (!finance) return [];
-  const lines = [{ label: "Thu", value: "" }];
+  const lines = [financeRow("Thu", "", "heading")];
   for (const level of finance.levels || []) {
-    lines.push({
-      label: "- Mức:",
-      value: formatLedgerNumber(level.dailyAmount, { blankZero: false }),
-    });
+    lines.push(financeRow("- Mức:", formatLedgerNumber(level.dailyAmount, { blankZero: false }), "line"));
     for (const meal of level.meals || []) {
-      lines.push({
-        label: `+ ${MEAL_LABEL[meal.meal] || meal.meal}:`,
-        value: expr(meal.headcount, meal.price, meal.amount),
-      });
+      lines.push(financeRow(
+        `+ ${MEAL_LABEL[meal.meal] || meal.meal}:`,
+        expr(meal.headcount, meal.price, meal.amount),
+        "line",
+      ));
     }
   }
-  lines.push({ label: "Ăn thêm", value: "" });
+  lines.push(financeRow("Ăn thêm", "", "heading"));
   for (const extra of finance.extras || []) {
-    lines.push({
-      label: `+ ${EXTRA_LABEL[extra.key] || extra.key}`,
-      value: expr(extra.count, extra.rate, extra.amount),
-    });
+    lines.push(financeRow(
+      `+ ${EXTRA_LABEL[extra.key] || extra.key}`,
+      expr(extra.count, extra.rate, extra.amount),
+      "line",
+    ));
   }
   const other = finance.otherIncome || {};
   lines.push(
-    { label: "Cộng:", value: formatLedgerNumber(finance.subtotal) },
-    { label: "- Thừa hôm trước", value: formatLedgerNumber(finance.prevSurplus) },
-    { label: "- Bù giá gạo:", value: formatLedgerNumber(finance.riceSubsidy) },
-    { label: "- Ăn thêm:", value: formatLedgerNumber(other.anThem) },
-    { label: "- Truy lĩnh:", value: formatLedgerNumber(other.truyLinh) },
-    { label: "- Thu của khách:", value: formatLedgerNumber(other.thuKhach) },
-    { label: "Cộng thu:", value: formatLedgerNumber(finance.totalIncome) },
-    { label: "Chi", value: "" },
-    { label: "- Tiền đã sử dụng:", value: formatLedgerNumber(finance.spent) },
-    { label: "- Thiếu hôm trước:", value: formatLedgerNumber(finance.prevShortfall) },
-    { label: "Cộng chi:", value: formatLedgerNumber(finance.totalSpent) },
-    { label: "So sánh", value: "" },
-    { label: "Thừa trong ngày:", value: formatLedgerNumber(finance.surplus) },
-    { label: "Thiếu trong ngày:", value: formatLedgerNumber(finance.shortfall) },
+    financeRow("Cộng:", formatLedgerNumber(finance.subtotal), "total"),
+    financeRow("- Thừa hôm trước", formatLedgerNumber(finance.prevSurplus), "line"),
+    financeRow("- Bù giá gạo:", formatLedgerNumber(finance.riceSubsidy), "line"),
+    financeRow("- Ăn thêm:", formatLedgerNumber(other.anThem), "line"),
+    financeRow("- Truy lĩnh:", formatLedgerNumber(other.truyLinh), "line"),
+    financeRow("- Thu của khách:", formatLedgerNumber(other.thuKhach), "line"),
+    financeRow("Cộng thu:", formatLedgerNumber(finance.totalIncome), "total"),
+    financeRow("Chi", "", "heading"),
+    financeRow("- Tiền đã sử dụng:", formatLedgerNumber(finance.spent), "line"),
+    financeRow("- Thiếu hôm trước:", formatLedgerNumber(finance.prevShortfall), "line"),
+    financeRow("Cộng chi:", formatLedgerNumber(finance.totalSpent), "total"),
+    financeRow("So sánh", "", "heading"),
+    financeRow("Thừa trong ngày:", formatLedgerNumber(finance.surplus), "line"),
+    financeRow("Thiếu trong ngày:", formatLedgerNumber(finance.shortfall), "line"),
   );
   return lines;
 }

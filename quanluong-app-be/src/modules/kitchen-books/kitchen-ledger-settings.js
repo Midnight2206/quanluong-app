@@ -47,6 +47,25 @@ const DEFAULT_LEDGER_SETTINGS = {
     },
   ],
   extraRates: { benhXa: 14400, benhNhan: 54000, omTrai: 20000, leTet: 108000 },
+  signatures: {
+    soNhapXuat: [
+      { key: "quan_ly", title: "Quản lý đơn vị", name: "" },
+      { key: "truc_ban", title: "Trực ban", name: "" },
+      { key: "chi_huy", title: "Chỉ huy đơn vị", name: "" },
+    ],
+    cktc: [
+      { key: "nguoi_lap", title: "Người lập", name: "" },
+      { key: "thu_truong", title: "Thủ trưởng đơn vị", name: "" },
+    ],
+    soThucDon: [
+      { key: "bep_truong", title: "Bếp trưởng", name: "" },
+      { key: "quan_ly", title: "Quản lý đơn vị", name: "" },
+    ],
+    soTheoDoi: [
+      { key: "nguoi_ghi", title: "Người ghi sổ", name: "" },
+      { key: "chi_huy", title: "Chỉ huy đơn vị", name: "" },
+    ],
+  },
   balanceRound: {
     defaultStep: 1,
     fuelStep: 100000,
@@ -67,6 +86,31 @@ const DEFAULT_LEDGER_SETTINGS = {
 
 const MEALS = ["sang", "trua", "chieu"];
 
+const SIGNATURE_BOOKS = Object.keys(DEFAULT_LEDGER_SETTINGS.signatures);
+
+function slotText(value, max) {
+  return String(value ?? "").trim().slice(0, max);
+}
+
+function mergeSignatures(partial) {
+  const src = partial && typeof partial === "object" ? partial : {};
+  const out = {};
+  for (const book of SIGNATURE_BOOKS) {
+    const defaults = DEFAULT_LEDGER_SETTINGS.signatures[book];
+    const rows = Array.isArray(src[book]) ? src[book] : [];
+    out[book] = defaults.map((slot) => {
+      const hit = rows.find((row) => row && row.key === slot.key) || {};
+      const title = hit.title == null ? slot.title : slotText(hit.title, 80);
+      return {
+        key: slot.key,
+        title: title || slot.title,
+        name: slotText(hit.name, 120),
+      };
+    });
+  }
+  return out;
+}
+
 function mergeLedgerSettings(partial) {
   const src = partial && typeof partial === "object" ? partial : {};
   return {
@@ -82,6 +126,7 @@ function mergeLedgerSettings(partial) {
     },
     spices: src.spices ?? DEFAULT_LEDGER_SETTINGS.spices,
     levels: src.levels ?? DEFAULT_LEDGER_SETTINGS.levels,
+    signatures: mergeSignatures(src.signatures),
   };
 }
 
@@ -114,7 +159,9 @@ function nameMatchesRule(name, match) {
 export {
   DEFAULT_LEDGER_SETTINGS,
   MEALS,
+  SIGNATURE_BOOKS,
   mergeLedgerSettings,
+  mergeSignatures,
   emptyHeadcount,
   normalizeName,
   nameMatchesRule,

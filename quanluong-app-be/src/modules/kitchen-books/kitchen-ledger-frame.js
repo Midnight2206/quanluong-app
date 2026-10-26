@@ -66,6 +66,8 @@ function buildDayFrame(view = {}, slips = []) {
         totals: structure.totals || null,
       },
       finance: view.finance || null,
+      financeLines: structure.financeLines || [],
+      dateLine: structure.dateLine || "",
       plan: view.plan || null,
     },
     slipDraft: slipDraftOf(view.suggestions, locked),

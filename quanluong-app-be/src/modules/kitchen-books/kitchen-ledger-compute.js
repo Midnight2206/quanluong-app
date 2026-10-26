@@ -14,6 +14,7 @@ import {
   sub,
   toScaled,
 } from "./kitchen-ledger-decimal.js";
+import { sortLedgerLines } from "./kitchen-ledger-line-order.js";
 import { MEALS, mergeLedgerSettings, nameMatchesRule, normalizeName } from "./kitchen-ledger-settings.js";
 
 const EXTRA_KEYS = ["benhXa", "benhNhan", "omTrai", "leTet"];
@@ -31,6 +32,10 @@ function classifyItem(name, measureUnit, settings) {
 }
 
 function levelRule(settings, level) {
+  if (level?.code) {
+    const byCode = settings.levels.find((row) => String(row.code) === String(level.code));
+    if (byCode) return byCode;
+  }
   return settings.levels.find((row) => Number(row.dailyAmount) === Number(level.dailyAmount)) ?? null;
 }
 
@@ -171,20 +176,6 @@ function computeFinance({
   };
 }
 
-function cmpPrice(a, b) {
-  const pa = toScaled(a);
-  const pb = toScaled(b);
-  if (pa === pb) return 0;
-  return pa < pb ? -1 : 1;
-}
-
-function roleRank(role) {
-  if (role === "rice") return 0;
-  if (role === "spice") return 2;
-  if (role === "fuel") return 3;
-  return 1;
-}
-
 function emptyLot(seed) {
   return {
     name: seed.name,
@@ -197,6 +188,8 @@ function emptyLot(seed) {
     displayDash: Boolean(seed.displayDash),
     receivedDate: seed.receivedDate || "0000-01-01",
     groupOrder: seed.groupOrder,
+    groupCode: seed.groupCode || "",
+    groupSort: Number.isFinite(seed.groupSort) ? seed.groupSort : null,
     openingQty: 0n,
     inG: 0n,
     inH: 0n,
@@ -304,6 +297,8 @@ function lineFromLot(lot) {
     displayDash: lot.displayDash,
     receivedDate: lot.receivedDate,
     groupOrder: lot.groupOrder,
+    groupCode: lot.groupCode,
+    groupSort: lot.groupSort,
     openingQty: scaledToString(lot.openingQty),
     openingAmount: scaledToString(openingAmount),
     inG: scaledToString(lot.inG),
@@ -385,7 +380,13 @@ function splitLedgerPages(lines, options = {}) {
 function ensureLot(map, orderRef, seed) {
   const key = lotPriceKey(seed.name, seed.unitPrice);
   const existing = map.get(key);
-  if (existing) return existing;
+  if (existing) {
+    if (!existing.groupCode && seed.groupCode) {
+      existing.groupCode = seed.groupCode;
+      existing.groupSort = Number.isFinite(seed.groupSort) ? seed.groupSort : null;
+    }
+    return existing;
+  }
   if (orderRef.byItem[normalizeName(seed.name)] == null) {
     orderRef.byItem[normalizeName(seed.name)] = orderRef.next;
     orderRef.next += 1;
@@ -476,18 +477,9 @@ function computeLedger(raw) {
     if (other !== 0n) allocateOther(group, other);
   }
 
-  const lines = [...lots.values()]
-    .map(lineFromLot)
-    .filter((line) => !isBlankLine(line))
-    .sort((a, b) => {
-      const rank = roleRank(a.role) - roleRank(b.role);
-      if (rank) return rank;
-      if (a.groupOrder !== b.groupOrder) return a.groupOrder - b.groupOrder;
-      if (a.receivedDate !== b.receivedDate) return a.receivedDate < b.receivedDate ? -1 : 1;
-      const priceDelta = cmpPrice(a.unitPrice, b.unitPrice);
-      return priceDelta;
-    })
-    .map((line, index) => ({ ...line, tt: index + 1 }));
+  const lines = sortLedgerLines(
+    [...lots.values()].map(lineFromLot).filter((line) => !isBlankLine(line)),
+  ).map((line, index) => ({ ...line, tt: index + 1 }));
 
   const sumMealOut = sumField(lines, "mealAmount");
   const sumTotalOut = sumField(lines, "totalOutAmount");

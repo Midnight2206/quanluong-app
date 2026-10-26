@@ -8,6 +8,7 @@ import {
   assertKitchenWriteUnit,
 } from "./kitchen-books-scope.helpers.js";
 import { getLedger, saveLedger, saveLedgerSettings } from "./kitchen-ledger.service.js";
+import { withUnitMealLevels } from "./kitchen-ledger-meal-rates.js";
 import { mergeLedgerSettings, normalizeName } from "./kitchen-ledger-settings.js";
 import { diffHeadcount } from "./kitchen-ledger-ai-headcount.js";
 import {
@@ -68,9 +69,11 @@ function imageOf(payload) {
   return { mime: payload.imageMime, base64: b64, bytes };
 }
 
-async function loadSettings(db, unitId) {
+async function loadSettings(db, unitId, asOfYmd) {
   const row = await db.kitchenLedgerSettings.findUnique({ where: { unitId } });
-  return mergeLedgerSettings(row?.configJson);
+  const settings = mergeLedgerSettings(row?.configJson);
+  if (!asOfYmd) return settings;
+  return (await withUnitMealLevels(db, unitId, settings, asOfYmd)).settings;
 }
 
 async function conversationOf(db, userId, unitId) {
@@ -358,7 +361,7 @@ function draftKind(mapped) {
 
 async function turnRecords(ctx) {
   if (ctx.intent === "movement" && !ctx.text) throw fail("Nhập câu hàng. Ảnh hóa đơn để bước sau.", 400);
-  const settings = ctx.opts.settings ?? await loadSettings(ctx.db, ctx.unitId);
+  const settings = ctx.opts.settings ?? await loadSettings(ctx.db, ctx.unitId, ctx.payload?.date);
   const facts = await memoryLines(ctx.db, ctx.user.id, ctx.unitId);
   const profile = await profileOf(ctx.db, ctx.user.id, ctx.unitId);
   let commodities = [];

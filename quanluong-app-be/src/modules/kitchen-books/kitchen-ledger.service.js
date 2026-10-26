@@ -16,7 +16,8 @@ import {
   assertKitchenWriteUnit,
   parseDateOnly,
 } from "./kitchen-books-scope.helpers.js";
-import { emptyHeadcount, mergeLedgerSettings } from "./kitchen-ledger-settings.js";
+import { alignHeadcount, withUnitMealLevels, writeStandardMealSelection } from "./kitchen-ledger-meal-rates.js";
+import { mergeLedgerSettings } from "./kitchen-ledger-settings.js";
 
 function ymd(date) {
   const d = parseDateOnly(date);
@@ -54,24 +55,7 @@ function movementDto(row) {
 }
 
 function normalizeHeadcount(raw, settings) {
-  const base = emptyHeadcount(settings);
-  if (!raw) return base;
-  const levels = (raw.levels || []).map((level) => ({
-    code: level.code ?? "",
-    dailyAmount: Number(level.dailyAmount),
-    sang: Number(level.sang) || 0,
-    trua: Number(level.trua) || 0,
-    chieu: Number(level.chieu) || 0,
-  }));
-  return {
-    levels: levels.length ? levels : base.levels,
-    extras: {
-      benhXa: Number(raw.extras?.benhXa) || 0,
-      benhNhan: Number(raw.extras?.benhNhan) || 0,
-      omTrai: Number(raw.extras?.omTrai) || 0,
-      leTet: Number(raw.extras?.leTet) || 0,
-    },
-  };
+  return alignHeadcount(raw, settings.levels);
 }
 
 function incomeOf(raw) {
@@ -97,6 +81,29 @@ function roundMoney2(value) {
 async function loadSettings(unitId) {
   const row = await prisma.kitchenLedgerSettings.findUnique({ where: { unitId } });
   return mergeLedgerSettings(row?.configJson);
+}
+
+async function loadEffectiveSettings(unitId, ledgerDate) {
+  const settings = await loadSettings(unitId);
+  return withUnitMealLevels(prisma, unitId, settings, ymd(ledgerDate));
+}
+
+async function loadCommodityMap(storageUnitId) {
+  const rows = await prisma.lttpCommodity.findMany({
+    where: { unitId: storageUnitId },
+    select: {
+      id: true,
+      name: true,
+      measureUnit: true,
+      group: { select: { code: true, sortOrder: true } },
+    },
+  });
+  return new Map(rows.map((row) => [row.id, {
+    name: row.name,
+    measureUnit: row.measureUnit,
+    groupCode: row.group?.code || "",
+    groupSort: row.group?.sortOrder ?? null,
+  }]));
 }
 
 async function findDay(unitId, ledgerDate) {
@@ -132,7 +139,7 @@ async function loadSlips(unitId, ledgerDate) {
   const slips = await prisma.lttpIssueSlip.findMany({
     where: { recipientUnitId: unitId, issueDate: ledgerDate },
     orderBy: [{ slipNo: "asc" }, { id: "asc" }],
-    include: { lines: { include: { commodity: true } } },
+    include: { lines: { include: { commodity: { include: { group: { select: { code: true, sortOrder: true } } } } } } },
   });
   return slips.map((slip) => ({
     id: slip.id,
@@ -168,7 +175,9 @@ function mapPrevLots(prev) {
 }
 
 async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
-  const settings = await loadSettings(unitId);
+  const resolved = await loadEffectiveSettings(unitId, ledgerDate);
+  const settings = resolved.settings;
+  const mealRates = resolved.mealRates;
   const day = opts.day ?? await findDay(unitId, ledgerDate);
   const slips = await loadSlips(unitId, ledgerDate);
   function withStructure(view) {
@@ -219,7 +228,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
     priceRows: prices.priceRows,
     priceTablePresent: prices.priceTablePresent,
     openingLots: useStockCount ? [] : mapPrevLots(prev),
-    commodityById: new Map(),
+    commodityById: await loadCommodityMap(dataScope.storageUnitId),
   });
 
   const locked = day?.status === "locked";
@@ -244,6 +253,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
     schedule: scheduleOf(day?.scheduleJson),
     movements: (day?.movements || []).map(movementDto),
     settings,
+    mealRates,
     carriedFrom: useStockCount ? "stock_count" : prev ? ymd(prev.ledgerDate) : null,
     slipCount: assembled.slipCount,
     priceTable: prices.priceTable,
@@ -453,7 +463,7 @@ async function saveLedger(payload, scope, effectiveUnitIds, dataScope) {
   const ledgerDate = parseDateOnly(payload.date);
   const existing = await findDay(unitId, ledgerDate);
   assertDraft(existing);
-  const settings = await loadSettings(unitId);
+  const settings = (await loadEffectiveSettings(unitId, ledgerDate)).settings;
   const day = existing ?? await ensureDay(unitId, ledgerDate);
   const storageUnitId = dataScope.storageUnitId;
   const selfRows = payload.selfSupply
@@ -693,13 +703,20 @@ async function getLedgerSettings(query, scope, effectiveUnitIds, dataScope) {
 async function saveLedgerSettings(payload, userId, scope, effectiveUnitIds, dataScope) {
   const unitId = Number(payload.unitId);
   assertScope(unitId, scope, effectiveUnitIds, dataScope);
-  const { unitId: _unitId, ...patch } = payload;
+  const { unitId: _unitId, mealSelection, ...patch } = payload;
   const current = await loadSettings(unitId);
-  const configJson = mergeLedgerSettings({ ...current, ...patch, milk: { ...current.milk, ...(patch.milk || {}) } });
-  await prisma.kitchenLedgerSettings.upsert({
-    where: { unitId },
-    create: { unitId, configJson, updatedById: userId },
-    update: { configJson, updatedById: userId },
+  const configJson = mergeLedgerSettings({
+    ...current,
+    ...patch,
+    milk: { ...current.milk, ...(patch.milk || {}) },
+  });
+  await prisma.$transaction(async (tx) => {
+    if (mealSelection) await writeStandardMealSelection(tx, unitId, mealSelection);
+    await tx.kitchenLedgerSettings.upsert({
+      where: { unitId },
+      create: { unitId, configJson, updatedById: userId },
+      update: { configJson, updatedById: userId },
+    });
   });
   return { unitId, settings: configJson };
 }

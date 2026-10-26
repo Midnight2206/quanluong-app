@@ -16,8 +16,9 @@ import { notifyError, notifySuccess } from "@/services/notify";
 import { openKitchenLedgerMonthPdf } from "./kitchenLedgerMonthPdfOpen.js";
 import { cn } from "@/utils/cn";
 import { fieldClassSm } from "@/utils/fieldClass";
-import { KitchenLedgerAssistant } from "./KitchenLedgerAssistant.jsx";
+import { KitchenLedgerAssistantBubble } from "./KitchenLedgerAssistant.jsx";
 import { KitchenLedgerDayAside } from "./KitchenLedgerDayAside.jsx";
+import { KitchenLedgerSettingsPanel } from "./KitchenLedgerSettingsPanel.jsx";
 import { KitchenBooksAccessGate } from "./KitchenBooksAccessGate.jsx";
 import { KitchenBooksUnitPicker } from "./KitchenBooksUnitPicker.jsx";
 import { blankLine, LineTable, Note, QtyInput } from "./KitchenLedgerEntry.jsx";
@@ -150,6 +151,7 @@ export function KitchenSoNhapXuatLttpTab({
       requirePriceTable: Boolean(settings.requirePriceTable),
       riceManualOnGuarantee: Boolean(settings.riceManualOnGuarantee),
       milkMode: settings.milk?.mode || "patient_plus_levels",
+      signatures: settings.signatures,
     });
   }, [ledger]);
 
@@ -365,10 +367,22 @@ export function KitchenSoNhapXuatLttpTab({
         requirePriceTable: settingsForm.requirePriceTable,
         riceManualOnGuarantee: settingsForm.riceManualOnGuarantee,
         milk: { mode: settingsForm.milkMode },
+        signatures: settingsForm.signatures,
       }).unwrap();
       settingsDirty.current = false;
-      entryDirty.current = false;
       notifySuccess("Đã lưu cấu hình đơn vị");
+    } catch (err) {
+      notifyError(errText(err));
+    }
+  }
+
+  async function saveMeals(rates) {
+    try {
+      await saveSettings({
+        unitId: selectedUnitId,
+        mealSelection: { validFrom: menuDate, rates },
+      }).unwrap();
+      notifySuccess("Đã lưu mức ăn của đơn vị");
     } catch (err) {
       notifyError(errText(err));
     }
@@ -426,7 +440,7 @@ export function KitchenSoNhapXuatLttpTab({
         </div>
 
         {selectedUnitId != null && menuDate ? (
-          <KitchenLedgerAssistant unitId={selectedUnitId} date={menuDate} />
+          <KitchenLedgerAssistantBubble unitId={selectedUnitId} date={menuDate} />
         ) : null}
 
         {isLoading ? <p className="text-sm text-muted-foreground">Đang tải sổ…</p> : null}
@@ -497,7 +511,9 @@ export function KitchenSoNhapXuatLttpTab({
                 <KitchenLedgerGrid
                   lines={stock?.rows || ledger.structure?.rows || ledger.lines}
                   totals={stock?.totals ?? ledger.structure?.totals ?? ledger.totals}
-                  columns={stock?.columns || ledger.structure?.columns}
+                  financeLines={ledger.structure?.financeLines || ledger.frame?.books?.financeLines}
+                  dateLine={ledger.structure?.dateLine || ledger.frame?.books?.dateLine}
+                  signatures={ledger.settings?.signatures}
                 />
                 <p className="mt-2 text-xs text-muted-foreground">
                   Nhập trên bảo đảm lấy từ phiếu xuất của đơn vị trong ngày.
@@ -517,6 +533,8 @@ export function KitchenSoNhapXuatLttpTab({
                 previousHeadcount={ledger.previousHeadcount}
                 onHeadcount={markEntry(setHeadcount)}
                 onIncome={markEntry(setIncome)}
+                mealRates={ledger.mealRates}
+                onSaveMeals={saveMeals}
                 onSaveHeadcount={saveHeadcount}
                 onCopyPrevious={() => markEntry(setHeadcount)(ledger.previousHeadcount)}
                 scheduleText={scheduleText}
@@ -618,126 +636,15 @@ export function KitchenSoNhapXuatLttpTab({
               </section>
             ) : null}
 
-            <details className="rounded-lg border border-border bg-card p-3">
-              <summary className="cursor-pointer text-sm font-semibold">Cấu hình đơn vị</summary>
-              {settingsForm ? (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="grid gap-1 text-xs">
-                    Tiền đã sử dụng
-                    <select
-                      className={fieldClassSm}
-                      value={settingsForm.spentBasis}
-                      onChange={(event) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, spentBasis: event.target.value });
-                      }}
-                    >
-                      <option value="total_out">Cộng xuất (ΣS) — sổ đang làm</option>
-                      <option value="meal_out">Xuất ăn (ΣO)</option>
-                    </select>
-                  </label>
-                  <label className="grid gap-1 text-xs">
-                    Ngưỡng thừa/thiếu (đồng)
-                    <QtyInput
-                      label="Ngưỡng"
-                      value={settingsForm.balanceWarnThreshold}
-                      onChange={(balanceWarnThreshold) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, balanceWarnThreshold });
-                      }}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs">
-                    Giá gạo quyết toán
-                    <QtyInput
-                      label="Giá gạo quyết toán"
-                      value={settingsForm.riceSettlementPrice}
-                      onChange={(riceSettlementPrice) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, riceSettlementPrice });
-                      }}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs">
-                    Chất đốt mỗi suất
-                    <QtyInput
-                      label="Chất đốt mỗi suất"
-                      value={settingsForm.fuelPerServing}
-                      onChange={(fuelPerServing) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, fuelPerServing });
-                      }}
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs">
-                    Sữa
-                    <select
-                      className={fieldClassSm}
-                      value={settingsForm.milkMode}
-                      onChange={(event) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, milkMode: event.target.value });
-                      }}
-                    >
-                      <option value="patient_plus_levels">Bệnh nhân + mức trong cấu hình</option>
-                      <option value="purchase">Mua theo ngày (Đại đội 5)</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.holidayLunchOnly}
-                      onChange={(event) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, holidayLunchOnly: event.target.checked });
-                      }}
-                    />
-                    Lễ tết chỉ tính bữa trưa
-                  </label>
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.requireIssueSlip}
-                      onChange={(event) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, requireIssueSlip: event.target.checked });
-                      }}
-                    />
-                    Bắt buộc có phiếu xuất
-                  </label>
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.requirePriceTable}
-                      onChange={(event) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, requirePriceTable: event.target.checked });
-                      }}
-                    />
-                    Bắt buộc có bảng giá
-                  </label>
-                  <label className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={settingsForm.riceManualOnGuarantee}
-                      onChange={(event) => {
-                        settingsDirty.current = true;
-                        setSettingsForm({ ...settingsForm, riceManualOnGuarantee: event.target.checked });
-                      }}
-                    />
-                    Gạo trên phiếu không ghi vào Trên BĐ
-                  </label>
-                  <div className="sm:col-span-2">
-                    <Button type="button" className="h-8 px-3 text-xs" disabled={settingsState.isLoading} onClick={onSaveSettings}>
-                      Lưu cấu hình
-                    </Button>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Mặc định theo bếp tiểu đoàn. Mức ăn, định lượng gia vị và bước làm tròn nằm trong cấu hình đơn vị, không gắn cứng một bếp.
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-            </details>
+            <KitchenLedgerSettingsPanel
+              settings={settingsForm}
+              saving={settingsState.isLoading}
+              onChange={(next) => {
+                settingsDirty.current = true;
+                setSettingsForm(next);
+              }}
+              onSave={onSaveSettings}
+            />
           </>
         ) : null}
       </div>

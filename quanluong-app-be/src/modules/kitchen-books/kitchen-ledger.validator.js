@@ -25,7 +25,7 @@ const headcountSchema = z.object({
     sang: z.coerce.number().min(0).max(100000),
     trua: z.coerce.number().min(0).max(100000),
     chieu: z.coerce.number().min(0).max(100000),
-  })).min(1).max(6),
+  })).min(1).max(12),
   extras: z.object({
     benhXa: z.coerce.number().min(0).max(100000).optional(),
     benhNhan: z.coerce.number().min(0).max(100000).optional(),
@@ -149,7 +149,45 @@ const saveLedgerSettingsBodySchema = z.object({
     fromPatientExtra: z.boolean().optional(),
     levelDailyAmounts: z.array(z.coerce.number()).max(6).optional(),
   }).optional(),
-  levels: z.array(levelSchema).min(1).max(6).optional(),
+  levels: z.array(levelSchema).min(1).max(12).optional(),
+  signatures: z.object({
+    soNhapXuat: z.array(z.object({
+      key: z.string().max(40),
+      title: z.string().max(80),
+      name: z.string().max(120),
+    })).max(6),
+    cktc: z.array(z.object({
+      key: z.string().max(40),
+      title: z.string().max(80),
+      name: z.string().max(120),
+    })).max(6),
+    soThucDon: z.array(z.object({
+      key: z.string().max(40),
+      title: z.string().max(80),
+      name: z.string().max(120),
+    })).max(6),
+    soTheoDoi: z.array(z.object({
+      key: z.string().max(40),
+      title: z.string().max(80),
+      name: z.string().max(120),
+    })).max(6),
+  }).partial().optional(),
+  mealSelection: z.object({
+    validFrom: dateSchema,
+    rates: z.array(z.object({
+      mealAllowanceRateId: z.coerce.number().int().positive(),
+      percents: z.object({
+        sang: z.coerce.number().min(0).max(100),
+        trua: z.coerce.number().min(0).max(100),
+        chieu: z.coerce.number().min(0).max(100),
+      }),
+      periodAmounts: z.object({
+        sang: z.coerce.number().int().nonnegative(),
+        trua: z.coerce.number().int().nonnegative(),
+        chieu: z.coerce.number().int().nonnegative(),
+      }).optional(),
+    })).min(1).max(12),
+  }).optional(),
   spices: z.array(z.object({
     match: z.string().min(1).max(80),
     peoplePerUnit: z.coerce.number().positive().optional(),

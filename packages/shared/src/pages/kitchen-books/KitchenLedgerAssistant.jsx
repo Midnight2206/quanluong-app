@@ -465,3 +465,47 @@ function linesOf(message) {
     </section>
   );
 }
+
+export function KitchenLedgerAssistantBubble({ unitId, date }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(event) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <>
+      {open ? (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center p-3 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label="Trợ lý làm sổ">
+          <button type="button" className="absolute inset-0 bg-black/40" aria-label="Đóng trợ lý" onClick={() => setOpen(false)} />
+          <div className="relative z-10 flex max-h-[min(42rem,calc(100dvh-2rem))] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-card shadow-float">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <h2 className="text-sm font-semibold">Trợ lý làm sổ</h2>
+              <Button type="button" variant="ghost" className="h-8 px-2 text-xs" onClick={() => setOpen(false)}>Đóng</Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3" data-local-scroll="true">
+              <KitchenLedgerAssistant unitId={unitId} date={date} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {open ? null : (
+        <button
+          type="button"
+          className="ledger-assistant-bubble fixed bottom-6 right-6 z-50 flex h-14 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg print:hidden"
+          aria-expanded={false}
+          aria-label="Mở trợ lý làm sổ"
+          onClick={() => setOpen(true)}
+        >
+          <span aria-hidden="true" className="text-lg leading-none">✦</span>
+          Trợ lý
+        </button>
+      )}
+    </>
+  );
+}

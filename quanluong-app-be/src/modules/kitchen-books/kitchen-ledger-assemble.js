@@ -30,6 +30,16 @@ function fingerprintIssueSlips(slips) {
   return createHash("sha256").update(parts.join("\n")).digest("hex");
 }
 
+function groupMeta(commodity) {
+  if (!commodity) return { groupCode: "", groupSort: null };
+  const group = commodity.group;
+  const sort = commodity.groupSort ?? group?.sortOrder;
+  return {
+    groupCode: commodity.groupCode || group?.code || "",
+    groupSort: Number.isFinite(sort) ? sort : null,
+  };
+}
+
 function priceOf(row, source) {
   if (!row) return null;
   if (source === "H" || source === "J") return row.tgsxPrice ?? null;
@@ -71,7 +81,14 @@ function assembleLedgerInput({
   const receipts = [];
   const otherIssues = [];
   const issuePolicies = {};
-  const resolvedOpening = openingLots.map((lot) => ({ ...lot }));
+  const resolvedOpening = openingLots.map((lot) => {
+    const group = groupMeta(lot.commodityId ? commodityById.get(Number(lot.commodityId)) : null);
+    return {
+      ...lot,
+      groupCode: lot.groupCode || group.groupCode,
+      groupSort: lot.groupSort ?? group.groupSort,
+    };
+  });
 
   for (const slip of slips) {
     for (const line of slip.lines || []) {
@@ -114,6 +131,7 @@ function assembleLedgerInput({
         commodityId: line.commodityId,
         balance: balanceLine,
         issuePolicy: "today",
+        ...groupMeta(commodity),
       });
     }
   }
@@ -164,6 +182,7 @@ function assembleLedgerInput({
       commodityId: named.commodityId,
       balance: movement.kind === "balance",
       issuePolicy: movement.issuePolicy || (movement.kind === "balance" ? "keep" : "today"),
+      ...named.group,
     });
   }
 
@@ -200,6 +219,7 @@ function resolveCommodity(movement, commodityById) {
     name: commodity?.name || movement.itemName || "",
     uom: commodity?.measureUnit || movement.measureUnit || "",
     commodityId: movement.commodityId ?? null,
+    group: groupMeta(commodity),
   };
 }
 
@@ -212,6 +232,7 @@ function movementToOpening(movement, commodityById) {
     qty: movement.qty,
     commodityId: named.commodityId,
     receivedDate: "1970-01-01",
+    ...named.group,
   };
 }
 

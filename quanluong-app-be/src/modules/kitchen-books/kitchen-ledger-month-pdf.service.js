@@ -9,6 +9,7 @@ import { getLttpIssueSlipSignatureSettings } from "../lttp/lttp-issue-slip-signa
 import { renderKitchenLedgerBook } from "../../services/document-service.client.js";
 import { buildMonthBook, countBookPages, daysInMonth } from "./kitchen-ledger-month-book.js";
 import { getLedger } from "./kitchen-ledger.service.js";
+import { mergeLedgerSettings } from "./kitchen-ledger-settings.js";
 
 function text(value) {
   return value == null ? "" : String(value).trim();
@@ -35,6 +36,17 @@ async function approverName(userId, db) {
   return [text(user.profile?.rankFull), fullName].filter(Boolean).join(" ");
 }
 
+async function ledgerSignatureSlots(unitId, db) {
+  if (typeof db.kitchenLedgerSettings?.findUnique !== "function") return null;
+  const row = await db.kitchenLedgerSettings.findUnique({ where: { unitId } });
+  return mergeLedgerSettings(row?.configJson).signatures;
+}
+
+function namedSlot(signatures, key) {
+  const hit = (signatures?.soNhapXuat || []).find((slot) => slot.key === key);
+  return text(hit?.name);
+}
+
 async function resolveSignatures(unitId, user, scope, effectiveUnitIds, dataScope, deps) {
   const settings = await deps.getSignatureSettings({ unitId }, scope, effectiveUnitIds, dataScope);
   const slot = pickNguoiDuyetSlot(settings?.signatureBlock);
@@ -48,10 +60,18 @@ async function resolveSignatures(unitId, user, scope, effectiveUnitIds, dataScop
   if (quanLyImage) signatureImages.quan_ly = quanLyImage;
   if (chiHuyImage) signatureImages.chi_huy = chiHuyImage;
   const keeper = keeperName(user?.profile);
+  const configured = deps.loadLedgerSignatures
+    ? await deps.loadLedgerSignatures(unitId)
+    : await ledgerSignatureSlots(unitId, deps.prisma ?? prisma);
+  const pick = (key, fallback) => namedSlot(configured, key) || fallback;
   return {
-    commander: chiHuy,
-    keeper,
-    signatures: { quan_ly: keeper, truc_ban: "", chi_huy: chiHuy },
+    commander: pick("chi_huy", chiHuy),
+    keeper: pick("quan_ly", keeper),
+    signatures: {
+      quan_ly: pick("quan_ly", keeper),
+      truc_ban: pick("truc_ban", ""),
+      chi_huy: pick("chi_huy", chiHuy),
+    },
     signatureImages,
   };
 }
@@ -83,6 +103,8 @@ async function exportLedgerMonthPdf(query, user, scope, effectiveUnitIds, dataSc
     getSignatureSettings: deps.getSignatureSettings ?? getLttpIssueSlipSignatureSettings,
     resolveApproverName: deps.resolveApproverName ?? ((id) => approverName(id, db)),
     loadSignature: deps.loadSignature ?? loadUserSignatureDataUrl,
+    loadLedgerSignatures: deps.loadLedgerSignatures,
+    prisma: db,
   });
   const unit = await db.unit.findUnique({ where: { id: unitId }, select: { name: true } });
   const book = buildMonthBook({
