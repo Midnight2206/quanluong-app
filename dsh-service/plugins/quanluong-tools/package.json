@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH tools that call the Quan Luong backend. Drafts only. No writes."
+}

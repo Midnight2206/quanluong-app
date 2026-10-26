@@ -109,11 +109,14 @@ async function getMenuDetailController(req, res) {
 }
 
 async function suggestMenuAiController(req, res) {
+  const raw = String(req.get("x-app-surface") || "web").trim().toLowerCase();
+  const surface = raw === "superadmin" || raw === "supplier" || raw === "web" ? raw : "web";
   const data = await suggestMenuDay(
     req.validatedBody,
     req.unitScope,
     req.effectiveUnitIds,
     req.dataScope,
+    { actorId: req.user?.id, surface },
   );
   return respondSuccess(res, { message: "Đã tạo gợi ý thực đơn", data });
 }

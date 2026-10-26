@@ -13,13 +13,19 @@ function ctx(req) {
   return [req.unitScope, req.effectiveUnitIds, req.dataScope];
 }
 
+function surfaceOf(req) {
+  const raw = String(req.get("x-app-surface") || "web").trim().toLowerCase();
+  if (raw === "superadmin" || raw === "supplier" || raw === "web") return raw;
+  return "web";
+}
+
 async function getAssistantController(req, res) {
   const data = await getAssistant(req.validatedQuery, req.user, ...ctx(req));
   return respondSuccess(res, { message: "Đã tải trợ lý làm sổ", data });
 }
 
 async function postAssistantTurnController(req, res) {
-  const data = await postTurn(req.validatedBody, req.user, ...ctx(req));
+  const data = await postTurn(req.validatedBody, req.user, ...ctx(req), { surface: surfaceOf(req) });
   return respondSuccess(res, { message: "Đã trả lời", data });
 }
 

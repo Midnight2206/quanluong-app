@@ -106,6 +106,12 @@ function ctx(db, extra = {}) {
     saveLedger: extra.saveLedger,
     saveLedgerSettings: extra.saveLedgerSettings,
     loadCommodities: extra.loadCommodities,
+    fetchImpl: extra.fetchImpl,
+    dshFetch: extra.dshFetch,
+    surface: extra.surface,
+    engine: extra.engine,
+    dshServiceUrl: extra.dshServiceUrl,
+    dshServiceToken: extra.dshServiceToken,
   };
 }
 
@@ -470,4 +476,68 @@ test("AI tắt vẫn trả lời khi câu hỏi chọn được công cụ", asy
   assert.equal(state.enabled, false);
   assert.equal(state.profile.displayName, "Trợ lý làm sổ");
   assert.match(state.brief[0].message, /phiếu/);
+});
+
+function noteJson() {
+  return JSON.stringify({
+    records: [{ type: "note", text: "khong co hang", confidence: 0.9, source: "mua" }],
+  });
+}
+
+test("trợ lý sổ đi qua DSH và không gọi OpenRouter trực tiếp", async () => {
+  let direct = 0;
+  const db = createDb();
+  const posted = await postTurn({
+    unitId: 7,
+    date: "2026-10-21",
+    text: "mua 2 kg gao",
+    intent: "movement",
+  }, user, scope, null, dataScope, ctx(db, {
+      configOverride: on,
+      engine: "dsh",
+      dshServiceUrl: "http://dsh.test",
+      dshServiceToken: "token",
+      loadCommodities: async () => [],
+      fetchImpl: async () => {
+        direct += 1;
+        throw new Error("direct path should not run");
+      },
+      dshFetch: async (url) => {
+        if (String(url).endsWith("/v1/sessions")) {
+          return { ok: true, status: 201, json: async () => ({ id: "session-acct-4-unit-7-web" }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ content: noteJson(), model: "google/gemini-3.8-flash" }) };
+      },
+    }));
+  assert.equal(direct, 0);
+  assert.equal(posted.message.kind, "note");
+  assert.match(posted.message.content, /khong co hang/);
+  assert.equal(db.state.usage.at(-1).provider, "dsh");
+});
+
+test("trợ lý sổ dùng đường trực tiếp khi DSH không chạy", async () => {
+  let direct = 0;
+  const db = createDb();
+  const posted = await postTurn({
+    unitId: 7,
+    date: "2026-10-21",
+    text: "mua 2 kg gao",
+    intent: "movement",
+  }, user, scope, null, dataScope, ctx(db, {
+    configOverride: on,
+    engine: "dsh",
+    dshServiceUrl: "http://dsh.test",
+    dshServiceToken: "token",
+    loadCommodities: async () => [],
+    dshFetch: async () => {
+      throw Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
+    },
+    fetchImpl: async () => {
+      direct += 1;
+      return { ok: true, json: async () => ({ choices: [{ message: { content: noteJson() } }] }) };
+    },
+  }));
+  assert.equal(direct, 1);
+  assert.equal(posted.message.kind, "note");
+  assert.equal(db.state.usage.at(-1).provider, "openai");
 });

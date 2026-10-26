@@ -30,11 +30,16 @@ services:
         condition: service_completed_successfully
       document:
         condition: service_started
+      dsh:
+        condition: service_started
     ports:
       - "3000:3000"
       - "3030:3030"
     environment:
       BACKUP_DIR: /var/backups/quanluong
+      AI_ENGINE: ${AI_ENGINE:-dsh}
+      DSH_SERVICE_URL: http://dsh:3090
+      DSH_SERVICE_TOKEN: ${DSH_SERVICE_TOKEN:-dev-dsh-token-change-me}
     volumes:
       - media_data:/data/media
       - backup_data:/var/backups/quanluong
@@ -245,6 +250,66 @@ services:
       qdrant:
         condition: service_healthy
 
+  # DeepSeek Harness. Internal only: no host port. The API falls back to direct
+  # model calls when this process is down (AI_ENGINE=dsh).
+  dsh:
+    build:
+      context: ./dsh-service
+    image: quanluong-dsh:latest
+    container_name: quanluong-dsh
+    restart: unless-stopped
+    environment:
+      DSH_SERVICE_TOKEN: ${DSH_SERVICE_TOKEN:-dev-dsh-token-change-me}
+      DSH_RUNTIME: sdk
+      DSH_PROFILE: sdk-minimal
+      DSH_HOME: /var/lib/dsh
+      DSH_MODEL: ${LEDGER_AI_QUESTION_MODEL:-google/gemini-3.8-flash}
+      DSH_SPLIT_PROFILES: ${DSH_SPLIT_PROFILES:-0}
+      OPENROUTER_API_KEY: ${MENU_AI_API_KEY:-}
+      MENU_AI_API_KEY: ${MENU_AI_API_KEY:-}
+      MENU_AI_BASE_URL: ${MENU_AI_BASE_URL:-https://openrouter.ai/api/v1}
+      LEDGER_TOOL_BACKEND_URL: http://app:3000
+      PORT: "3090"
+    volumes:
+      - dsh_home:/var/lib/dsh
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3090/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # Optional admin UI. Off unless you add --profile dsh-web.
+  # DSH refuses a wildcard bind, so the command picks the container address.
+  dsh-web:
+    profiles: ["dsh-web"]
+    image: quanluong-dsh:latest
+    build:
+      context: ./dsh-service
+    container_name: quanluong-dsh-web
+    restart: unless-stopped
+    command:
+      [
+        "sh",
+        "-c",
+        "dsh --profile web --no-open --host \"$(hostname -i | awk '{print $1}')\" --port 3080",
+      ]
+    ports:
+      - "127.0.0.1:3080:3080"
+    environment:
+      DSH_HOME: /var/lib/dsh-web
+      OPENROUTER_API_KEY: ${MENU_AI_API_KEY:-}
+      MENU_AI_API_KEY: ${MENU_AI_API_KEY:-}
+      MENU_AI_BASE_URL: ${MENU_AI_BASE_URL:-https://openrouter.ai/api/v1}
+    volumes:
+      - dsh_web_home:/var/lib/dsh-web
+
   # Vector store cho AI thực đơn (optional). Tắt bằng cách không set QDRANT_URL trên app.
   qdrant:
     image: qdrant/qdrant:v1.13.2
@@ -274,3 +339,5 @@ volumes:
   media_data:
   backup_data:
   qdrant_data:
+  dsh_home:
+  dsh_web_home:

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { resetDshSessions } from "../ai-gateway/dsh-client.js";
 import { completeMenuJson, extractJsonObject, extractStructured } from "./kitchen-books-menu-ai-llm.js";
 
 test("extractJsonObject parses raw object", () => {
@@ -122,4 +123,110 @@ test("extractStructured tắt khi thiếu khóa", async () => {
     () => extractStructured({ system: "s", user: "u" }, { configOverride: { ...cfg, apiKey: "" } }),
     (err) => err.statusCode === 503,
   );
+});
+
+const dshOpts = {
+  engine: "dsh",
+  dshServiceUrl: "http://dsh.test",
+  dshServiceToken: "token",
+};
+
+test("menu JSON uses DSH and keeps the parsed shape", async () => {
+  resetDshSessions();
+  let direct = 0;
+  const out = await completeMenuJson(
+    { system: "sys", user: "usr" },
+    {
+      ...dshOpts,
+      configOverride: cfg,
+      fetchImpl: async () => {
+        direct += 1;
+        throw new Error("direct");
+      },
+      dshFetch: async (url) => {
+        if (String(url).endsWith("/v1/sessions")) {
+          return { ok: true, status: 201, json: async () => ({ id: "session-acct-system-unit-0-web" }) };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ content: '{"periods":{"sang":{"dishes":[]}}}' }),
+        };
+      },
+    },
+  );
+  assert.equal(direct, 0);
+  assert.ok(out.periods.sang);
+});
+
+test("menu JSON falls back to OpenRouter when DSH is down", async () => {
+  resetDshSessions();
+  let body;
+  const out = await completeMenuJson(
+    { system: "sys", user: "usr" },
+    {
+      ...dshOpts,
+      configOverride: cfg,
+      dshFetch: async () => {
+        throw new Error("ECONNREFUSED");
+      },
+      fetchImpl: async (_url, init) => {
+        body = JSON.parse(init.body);
+        return { ok: true, json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }) };
+      },
+    },
+  );
+  assert.equal(body.max_tokens, 8000);
+  assert.equal(out.ok, true);
+});
+
+test("DSH auth failure does not call the direct model", async () => {
+  resetDshSessions();
+  let direct = 0;
+  await assert.rejects(
+    () => completeMenuJson(
+      { system: "sys", user: "usr" },
+      {
+        ...dshOpts,
+        configOverride: cfg,
+        dshFetch: async () => ({ ok: false, status: 401, json: async () => ({ error: "Unauthorized" }) }),
+        fetchImpl: async () => {
+          direct += 1;
+          return { ok: true, json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }) };
+        },
+      },
+    ),
+    (err) => err.statusCode === 502,
+  );
+  assert.equal(direct, 0);
+});
+
+test("a missing DSH session is opened once more", async () => {
+  resetDshSessions();
+  let sessions = 0;
+  let messages = 0;
+  const out = await completeMenuJson(
+    { system: "sys", user: "usr" },
+    {
+      ...dshOpts,
+      configOverride: cfg,
+      fetchImpl: async () => {
+        throw new Error("direct");
+      },
+      dshFetch: async (url) => {
+        if (String(url).endsWith("/v1/sessions")) {
+          sessions += 1;
+          return { ok: true, status: 201, json: async () => ({ id: `session-${sessions}` }) };
+        }
+        messages += 1;
+        if (messages === 1) {
+          return { ok: false, status: 404, json: async () => ({ error: "Session not found" }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ content: '{"ok":true}' }) };
+      },
+    },
+  );
+  assert.equal(sessions, 2);
+  assert.equal(messages, 2);
+  assert.equal(out.ok, true);
 });

@@ -21,9 +21,12 @@ import { systemInfraRouter } from "../modules/system-infra/system-infra.routes.j
 import { lttpSupplierRouter } from "../modules/lttp-supplier/lttp-supplier.routes.js";
 import { baProfilesRouter } from "../modules/ba-profiles/ba-profiles.routes.js";
 import { auditLogsRouter } from "../modules/audit-logs/audit-logs.routes.js";
+import { dshInternalRouter } from "../modules/ai-gateway/tools.routes.js";
 import { respondSuccess } from "../shared/utils/responders.js";
 
 const router = express.Router();
+
+router.use("/internal/dsh", dshInternalRouter);
 
 router.get("/health", (_req, res) => {
   return respondSuccess(res, {
