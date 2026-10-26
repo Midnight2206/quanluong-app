@@ -49,7 +49,7 @@ function systemText(body) {
   if (body.grantId) {
     lines.push(`Tool grant id: ${body.grantId}. Pass this exact grantId to every Quan Luong tool. Do not invent another id.`);
   }
-  lines.push("Before drafting, call load_quanluong_skill for the matching rules. Finish with the JSON object the user asked for.");
+  lines.push("Before a ledger draft, call load_quanluong_skill with name ledger-extract. Before a question about ledger figures, call it with explore-data and then validate-data. Quote checks from read_ledger_day. Do not invent totals. Finish with the JSON object the user asked for when they asked for records.");
   return lines.filter(Boolean).join("\n\n");
 }
 

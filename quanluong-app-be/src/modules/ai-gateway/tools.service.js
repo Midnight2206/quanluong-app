@@ -25,6 +25,85 @@ function requireGrant(id, tool) {
   return grant;
 }
 
+function asNumber(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function sumField(lines, field) {
+  let sum = 0;
+  let seen = false;
+  for (const line of lines) {
+    const n = asNumber(line?.[field]);
+    if (n == null) continue;
+    seen = true;
+    sum += n;
+  }
+  return seen ? sum : null;
+}
+
+/** Official anomaly list. The model quotes this. It does not recompute it. */
+export function ledgerChecks(view) {
+  const lines = Array.isArray(view?.lines) ? view.lines : [];
+  const negativeStock = [];
+  const missingPrice = [];
+  for (const line of lines) {
+    const closing = asNumber(line.closingQty);
+    if (line.negative === true || (closing != null && closing < 0)) {
+      negativeStock.push({
+        name: String(line.name || ""),
+        closingQty: line.closingQty ?? null,
+        uom: line.uom || "",
+      });
+    }
+    const priceMissing = line.unitPrice == null || line.unitPrice === "";
+    if (priceMissing && line.role !== "fuel" && line.displayDash !== true) {
+      missingPrice.push({ name: String(line.name || ""), role: line.role || "" });
+    }
+  }
+  for (const warning of view?.warnings || []) {
+    if (warning?.code !== "negative_stock") continue;
+    const name = String(warning.name || "");
+    if (name && negativeStock.some((row) => row.name === name)) continue;
+    negativeStock.push({ name, closingQty: null, uom: "", message: warning.message || "" });
+  }
+  const finance = view?.finance || null;
+  const totals = view?.totals || null;
+  const totalMismatches = [];
+  if (totals) {
+    for (const field of ["openingAmount", "inAmount", "mealAmount", "totalOutAmount"]) {
+      const summed = sumField(lines, field);
+      const official = asNumber(totals[field]);
+      if (summed == null || official == null) continue;
+      if (Math.abs(summed - official) > 0.5) {
+        totalMismatches.push({ field, lineSum: String(summed), official: String(totals[field]) });
+      }
+    }
+  }
+  return {
+    source: "computeLedger",
+    negativeStock,
+    missingPrice,
+    balance: finance ? {
+      warn: Boolean(finance.balanceWarn),
+      surplus: finance.surplus ?? null,
+      shortfall: finance.shortfall ?? null,
+      spent: finance.spent ?? null,
+      totalIncome: finance.totalIncome ?? null,
+      threshold: finance.balanceWarnThreshold ?? null,
+    } : null,
+    planServings: view?.plan?.servings ?? null,
+    slipMismatch: Boolean(view?.slipMismatch),
+    slipMismatchMessage: view?.slipMismatchMessage || "",
+    totalMismatches,
+    warnings: (view?.warnings || []).map((row) => ({
+      code: row.code || "",
+      message: row.message || "",
+    })),
+  };
+}
+
 function trimLedger(view) {
   return {
     date: view?.date || "",
@@ -33,13 +112,17 @@ function trimLedger(view) {
     lines: (view?.lines || []).map((line) => ({
       name: line.name,
       qty: line.qty,
-      kind: line.kind,
+      kind: line.kind || line.role || "",
+      uom: line.uom || "",
+      closingQty: line.closingQty ?? null,
+      unitPrice: line.unitPrice ?? null,
     })),
     movements: (view?.movements || []).map((row) => ({
       kind: row.kind,
       itemName: row.itemName,
       qty: row.qty,
     })),
+    checks: ledgerChecks(view),
   };
 }
 

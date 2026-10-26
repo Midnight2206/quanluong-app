@@ -53,6 +53,30 @@ Write the rules in short sentences.
 
 `name` must be kebab-case and must match the folder name. The model reads the file with `load_quanluong_skill`. On startup the service also copies these files to `$DSH_HOME/skills`.
 
+## Add an Anthropic-style skill
+
+DSH runs the markdown only. Do not copy helper scripts, Python, or tools that exist only in Claude.
+
+1. Read the source skill. Keep the job (what the user is asking). Drop anything that runs code or needs a tool this app does not have.
+2. Point every number at a Quan Luong tool. For the ledger, that is `read_ledger_day` and its `checks` object. The server already ran `computeLedger`. The skill tells the model to quote `checks`, not to add the numbers again.
+3. Say the model does not write. Draft tools return `committed: false`. The user confirms in the app.
+4. If the source is Apache-2.0, add a line at the top of `SKILL.md` naming the source file, and add the file to `plugins/quanluong-skills/NOTICE`. The license text is `Apache-2.0-LICENSE` in that folder.
+5. Do not copy Anthropic skills whose license is not Apache-2.0. The docx, pdf, pptx, and xlsx skills are not Apache-2.0. Leave them out.
+6. Add the skill name to the test in `dsh-service/test/api.test.js` so a missing file fails `node --test`.
+
+`explore-data` and `validate-data` are the examples. `data-visualization` and `statistical-analysis` were skipped because they are Python chart and statistics steps, and this assistant answers in text.
+
+## MCP tools
+
+`src/mcp-server.js` exposes the same read and draft tools over stdio. The profile patch starts `@deepseek-ai/dsh-mcp-client` against that file. The native tools stay in place. If the MCP process fails, the model can still call `read_ledger_day`.
+
+When you add a tool:
+
+1. Add it in `plugins/quanluong-tools` and in `src/mcp-server.js`.
+2. Mark it read-only. Do not accept `commit`, `save`, or `apply`. Use a strict object schema.
+3. Add `mcp__quanluong__<tool name>` to the allow list in `plugins/quanluong-policy/index.js`. Any other `mcp__` name is denied.
+4. The backend still checks the grant. A new tool needs a route under `/api/internal/dsh/tools/` and a feature prefix.
+
 ## Add a hook
 
 Follow `plugins/quanluong-audit/index.js` and `plugins/quanluong-policy/index.js`.

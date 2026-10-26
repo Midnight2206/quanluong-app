@@ -26,7 +26,7 @@ function promptOf(request) {
   const lines = [
     request.system || "",
     request.grantId ? `Tool grant id: ${request.grantId}. Pass this exact grantId to Quan Luong tools. Do not invent another id.` : "",
-    "Load a Quan Luong skill with load_quanluong_skill before you draft records.",
+    "Before a ledger draft, load ledger-extract. Before a question about figures, load explore-data and validate-data. Quote checks from the ledger read. Do not invent totals.",
     `Surface: ${request.surface}. Account ${request.accountId}, unit ${request.unitId}.`,
     request.text || "",
   ];
@@ -89,7 +89,10 @@ export function createSdkRuntime(config) {
     const dir = path.join(config.home, "patches");
     await mkdir(dir, { recursive: true });
     const file = path.join(dir, `${config.splitProfiles ? surface : "quanluong"}.yml`);
-    await writeFile(file, renderProfilePatch(config.pluginsDir, config.splitProfiles ? surface : "web"), "utf8");
+    await writeFile(file, renderProfilePatch(config.pluginsDir, config.splitProfiles ? surface : "web", {
+      token: config.token,
+      backendUrl: config.backendUrl,
+    }), "utf8");
     return file;
   }
 

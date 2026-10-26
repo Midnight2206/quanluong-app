@@ -1,4 +1,6 @@
-# Example only. Not loaded at startup.
+# Not loaded. The running client is written by src/profile-patch.js
+# at boot: stdio, serverName quanluong, command node src/mcp-server.js.
+# This file only shows the shape. Do not add a second server here.
 #
 # @deepseek-ai/dsh already depends on @deepseek-ai/dsh-mcp-client, so a profile
 # can consume an external MCP server. The config schema changes between

@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import test from "node:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createScriptedRuntime } from "../src/scripted-runtime.js";
 import { createServer } from "../src/server.js";
 import { renderProfilePatch } from "../src/profile-patch.js";
 import { decide } from "../plugins/quanluong-policy/index.js";
 import { listSkills, loadSkill } from "../plugins/quanluong-skills/catalog.js";
+import { publishSkills } from "../src/skills-publish.js";
 import { readLedgerDay } from "../plugins/quanluong-tools/client.js";
 import { streamOpenRouter, toOpenAiMessages } from "../plugins/llm-openrouter/adapter.js";
 import { isBootFailure, responseFromRun } from "../src/sdk-runtime.js";
@@ -138,20 +140,49 @@ test("profile patch lists first-party plugins with absolute paths", () => {
   assert.match(patch, /\/opt\/plugins\/quanluong-tools\/index\.js/);
   const admin = renderProfilePatch("/opt/plugins", "superadmin");
   assert.equal(admin.includes("quanluong-tools"), false);
+  assert.match(admin, /serverName: quanluong/);
+  assert.match(admin, /\/opt\/src\/mcp-server\.js/);
+  assert.equal(admin.includes("dev-dsh-token"), false);
 });
 
 test("policy denies host tools and commits", () => {
   assert.equal(decide({ name: "bash" }).kind, "deny");
   assert.equal(decide({ name: "propose_ledger_records", arguments: { commit: true } }).kind, "deny");
   assert.equal(decide({ name: "read_ledger_day", arguments: { grantId: "g" } }), null);
+  assert.equal(decide({ name: "mcp__quanluong__read_ledger_day", arguments: { grantId: "g" } }), null);
+  assert.equal(decide({ name: "mcp__other__bash" }).kind, "deny");
 });
 
 test("skills expose ledger, menu, and issue-slip rules", async () => {
   const skills = await listSkills();
-  assert.deepEqual(skills.map((skill) => skill.name), ["issue-slip-rules", "ledger-rules", "menu-rules"]);
+  assert.deepEqual(skills.map((skill) => skill.name), [
+    "explore-data",
+    "issue-slip-rules",
+    "ledger-extract",
+    "ledger-rules",
+    "menu-rules",
+    "validate-data",
+  ]);
   const ledger = await loadSkill("ledger-rules");
   assert.match(ledger.body, /do not write the ledger/i);
+  const explore = await loadSkill("explore-data");
+  const validate = await loadSkill("validate-data");
+  const extract = await loadSkill("ledger-extract");
+  assert.match(explore.body, /read_ledger_day/);
+  assert.match(explore.body, /do not write/i);
+  assert.match(validate.body, /negativeStock/);
+  assert.match(validate.body, /do not write/i);
+  assert.match(extract.body, /"records"/);
+  assert.equal(explore.body.includes("matplotlib"), false);
   assert.equal(await loadSkill("../etc/passwd"), null);
+  assert.equal(await loadSkill("data-visualization"), null);
+  assert.equal(await loadSkill("statistical-analysis"), null);
+  const home = await mkdtemp(path.join(tmpdir(), "dsh-skills-"));
+  const published = await publishSkills(path.join(path.dirname(new URL(import.meta.url).pathname), "../plugins/quanluong-skills/skills"), home);
+  const copied = await readFile(path.join(published, "explore-data", "SKILL.md"), "utf8");
+  assert.match(copied, /name: explore-data/);
+  const validateCopied = await readFile(path.join(published, "validate-data", "SKILL.md"), "utf8");
+  assert.match(validateCopied, /name: validate-data/);
 });
 
 test("ledger tool client posts the grant and does not send a commit flag", async () => {
@@ -217,6 +248,42 @@ test("OpenRouter adapter emits usage before finish", async () => {
     messages: [{ role: "user", content: [{ type: "text", text: "hi" }, { type: "image", data: "abc", mimeType: "image/jpeg" }] }],
   });
   assert.match(messages[0].content[1].image_url.url, /^data:image\/jpeg;base64,/);
+});
+
+test("MCP server lists read and draft tools and rejects a commit flag", async () => {
+  const { Client } = await import("@modelcontextprotocol/client");
+  const { StdioClientTransport } = await import("@modelcontextprotocol/client/stdio");
+  const serverFile = path.join(path.dirname(fileURLToPath(import.meta.url)), "../src/mcp-server.js");
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [serverFile],
+    env: {
+      ...process.env,
+      LEDGER_TOOL_BACKEND_URL: "http://127.0.0.1:9",
+      DSH_SERVICE_TOKEN: "t",
+      QUANLUONG_TOOL_FEATURES: "ledger,menu,issue-slip",
+    },
+    stderr: "pipe",
+  });
+  const client = new Client({ name: "quanluong-test", version: "0" });
+  await client.connect(transport);
+  try {
+    const listed = await client.listTools();
+    assert.deepEqual(listed.tools.map((tool) => tool.name).sort(), [
+      "propose_issue_slip_lines",
+      "propose_ledger_records",
+      "read_ledger_day",
+      "read_menu_day",
+    ]);
+    const rejected = await client.callTool({
+      name: "read_ledger_day",
+      arguments: { grantId: "g", date: "2026-10-21", commit: true },
+    });
+    assert.equal(rejected.isError, true);
+    assert.match(JSON.stringify(rejected), /commit/);
+  } finally {
+    await client.close();
+  }
 });
 
 test("only boot failures are treated as DSH down", () => {

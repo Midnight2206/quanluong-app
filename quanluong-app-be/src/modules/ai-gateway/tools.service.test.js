@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createToolGrant, clearToolGrants } from "./grants.js";
-import { proposeIssueSlipDraft, proposeLedgerDraft, readLedgerDay } from "./tools.service.js";
+import { ledgerChecks, proposeIssueSlipDraft, proposeLedgerDraft, readLedgerDay } from "./tools.service.js";
 
 test("ledger propose is a draft and ledger read uses the grant scope", async () => {
   clearToolGrants();
@@ -46,6 +46,40 @@ test("a menu grant cannot read the ledger", async () => {
     () => readLedgerDay({ grantId, date: "2026-10-21" }, { getLedger: async () => ({}) }),
     (err) => err.statusCode === 403,
   );
+});
+
+test("ledger checks quote server figures and do not recompute a balance", () => {
+  const checks = ledgerChecks({
+    lines: [
+      { name: "Gạo", closingQty: "-2", unitPrice: "18000", role: "rice", mealAmount: "10" },
+      { name: "Muối", unitPrice: "", role: "spice" },
+      { name: "Chất đốt", role: "fuel", unitPrice: "1", mealAmount: "0" },
+    ],
+    totals: { mealAmount: "99" },
+    finance: {
+      balanceWarn: true,
+      surplus: "0",
+      shortfall: "5000",
+      spent: "100",
+      totalIncome: "90",
+      balanceWarnThreshold: "20000",
+    },
+    warnings: [{ code: "negative_stock", name: "Gạo", message: "Gạo âm" }],
+    slipMismatch: true,
+    slipMismatchMessage: "phiếu đổi",
+    plan: { servings: 40 },
+  });
+  assert.equal(checks.source, "computeLedger");
+  assert.equal(checks.negativeStock.length, 1);
+  assert.equal(checks.negativeStock[0].closingQty, "-2");
+  assert.deepEqual(checks.missingPrice, [{ name: "Muối", role: "spice" }]);
+  assert.equal(checks.balance.warn, true);
+  assert.equal(checks.balance.shortfall, "5000");
+  assert.equal(checks.balance.spent, "100");
+  assert.equal(checks.planServings, 40);
+  assert.equal(checks.slipMismatch, true);
+  assert.equal(checks.totalMismatches[0].field, "mealAmount");
+  assert.equal(checks.totalMismatches[0].official, "99");
 });
 
 test("issue-slip propose does not commit", () => {

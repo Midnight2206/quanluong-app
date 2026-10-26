@@ -31,10 +31,10 @@ The tools call back to `http://app:3000/api/internal/dsh/...` with the same `DSH
 | SDK profile `sdk-minimal` | Yes. One long-lived process per model, cap 4. |
 | `LlmAdapter.stream()` | Yes. Our OpenRouter adapter. |
 | Plugins | Yes. First-party plugins under `plugins/`. |
-| Skills | Yes. `SKILL.md` files plus the `load_quanluong_skill` tool. Copies also go to `$DSH_HOME/skills` for `dsh-skill-filesystem` when that plugin is in the profile. |
+| Skills | Yes. `SKILL.md` files plus the `load_quanluong_skill` tool. Copies also go to `$DSH_HOME/skills`. Ledger figure skills are `explore-data` and `validate-data` (adapted from Anthropic's Apache-2.0 data plugin; see `plugins/quanluong-skills/NOTICE`). `ledger-extract` is the record JSON schema. |
 | Hooks | Yes. `llm/stream`, `tools/result`, `tools/pre-execute`. |
 | Sessions | Yes. One session id per account, unit, and surface (`web`, `superadmin`, `supplier`). |
-| MCP client | Not turned on. `@deepseek-ai/dsh` already depends on `@deepseek-ai/dsh-mcp-client`. See `profiles/mcp.example.yml`. |
+| MCP client | Yes. `@deepseek-ai/dsh-mcp-client` 0.2.1-rc.2 talks stdio to `src/mcp-server.js`. The server exposes the same read and draft tools, with the same token and grant. `failOnStartupError` is false, so a dead MCP process does not stop the native tools. Other MCP tool names are denied. |
 | `dsh web` | Optional. Compose profile `dsh-web`. Off by default. |
 | `@openma/dsh-agents-plugins-bridge` | Not used. Still a developer preview. |
 | `dsh-cordis-universal-adapter` | Not used. Same reason. |
