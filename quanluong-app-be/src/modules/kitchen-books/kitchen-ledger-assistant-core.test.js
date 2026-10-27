@@ -22,7 +22,6 @@ test("quy tắc chữ ra đề nghị cấu hình, phần còn lại chỉ là g
     balanceWarnThreshold: 10000,
     spentBasis: "meal_out",
     holidayLunchOnly: true,
-    milk: { mode: "purchase" },
   });
   assert.deepEqual(proposeSettings("Bếp này không chiên dầu vào thứ hai."), []);
 });

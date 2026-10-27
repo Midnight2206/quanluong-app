@@ -94,7 +94,7 @@ def _book(tail=None):
                 "date": "2026-10-02",
                 "dateLine": "Ngày 02 tháng 10 năm 2026",
                 "draft": True,
-                "note": "Chưa đủ phiếu hoặc bảng giá",
+                "note": "",
                 "financeLines": [],
                 "sheets": [{
                     "rows": [],

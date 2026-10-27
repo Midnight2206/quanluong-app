@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { ledgerRecordBatchSchema } from "./ledgerRecords.js";
-import { computeFinance, planRations } from "./kitchen-ledger-compute.js";
+import { computeFinance } from "./kitchen-ledger-compute.js";
 import { toScaled } from "./kitchen-ledger-decimal.js";
 import { buildDayStructure } from "./kitchen-ledger-day-structure.js";
 import { ledgerAiModels, mapLedgerRecords, recordsPrompt } from "./kitchen-ledger-records.js";
@@ -22,13 +22,13 @@ function same(actual, expected) {
 }
 
 const commodities = [
-  { id: 1, name: "Mực ống", measureUnit: "Kg" },
+  { id: 1, name: "Mực ống", measureUnit: "Kg", sourceKind: "market", grade: "loại 1" },
   { id: 2, name: "Sữa đặc", measureUnit: "Hộp" },
   { id: 3, name: "Sữa tươi", measureUnit: "Hộp" },
-  { id: 4, name: "Gạo tẻ", measureUnit: "Kg" },
+  { id: 4, name: "Gạo tẻ", measureUnit: "Kg", sourceKind: "tgsx", grade: "loại 1" },
 ];
 
-test("schema từ chối bản ghi thiếu confidence, type lạ, hoặc dạng cột cũ", () => {
+test("schema từ chối bản ghi thiếu confidence hoặc type lạ, và giữ cột gạo", () => {
   assert.equal(ledgerRecordBatchSchema.safeParse({
     records: [{ type: "note", text: "thiếu mẫu", source: "a" }],
   }).success, false);
@@ -52,12 +52,12 @@ test("schema từ chối bản ghi thiếu confidence, type lạ, hoặc dạng 
     }],
   });
   assert.equal(parsed.success, true);
-  assert.equal(parsed.data.records[0].column, undefined);
+  assert.equal(parsed.data.records[0].column, "G");
   assert.equal(parsed.data.records[0].intent, undefined);
   assert.equal(parsed.data.records[0].unitPrice, 180000);
 });
 
-test("máy chủ đặt mua ngoài vào đơn vị mua, gạo vào trên bảo đảm", () => {
+test("mua ngoài vào đơn vị, gạo phải chọn cột, hàng thường không vào Trên BĐ", () => {
   const mapped = mapLedgerRecords({
     records: [
       {
@@ -66,9 +66,17 @@ test("máy chủ đặt mua ngoài vào đơn vị mua, gạo vào trên bảo �
         name: "mực",
         qty: 5,
         unitPrice: "180k",
-        column: "G",
         confidence: 0.9,
         source: "mua mực",
+      },
+      {
+        type: "outside_purchase",
+        date: "13/10/2026",
+        name: "mực",
+        qty: 1,
+        column: "G",
+        confidence: 0.9,
+        source: "mực cột G",
       },
       {
         type: "outside_purchase",
@@ -83,6 +91,17 @@ test("máy chủ đặt mua ngoài vào đơn vị mua, gạo vào trên bảo �
         date: "13/10/2026",
         name: "gạo tẻ",
         qty: 10,
+        origin: "unit_tgsx",
+        unitPrice: 16000,
+        confidence: 0.8,
+        source: "gạo thiếu cột",
+      },
+      {
+        type: "stock_in",
+        date: "13/10/2026",
+        name: "gạo tẻ",
+        qty: 10,
+        column: "J",
         origin: "unit_tgsx",
         unitPrice: 16000,
         confidence: 0.8,
@@ -105,13 +124,19 @@ test("máy chủ đặt mua ngoài vào đơn vị mua, gạo vào trên bảo �
   assert.equal(mapped.lines[0].unitPrice, 180000);
   assert.equal(mapped.lines[0].savable, true);
   assert.equal(mapped.lines[1].savable, false);
-  assert.match(mapped.lines[1].warning, /trùng tên/);
-  assert.equal(mapped.lines[2].kind, "rice");
-  assert.equal(mapped.lines[2].source, "G");
-  assert.equal(mapped.lines[2].commodityId, 4);
-  assert.equal(mapped.lines[3].kind, "other_out");
-  assert.equal(mapped.lines[3].source, "P");
-  assert.equal(mapped.lines[3].place, "Xuất khác");
+  assert.match(mapped.lines[1].warning, /Trên BĐ/);
+  assert.equal(mapped.lines[2].savable, false);
+  assert.match(mapped.lines[2].warning, /trùng tên/);
+  assert.equal(mapped.lines[3].savable, false);
+  assert.match(mapped.lines[3].warning, /cột/);
+  assert.equal(mapped.lines[4].kind, "rice");
+  assert.equal(mapped.lines[4].source, "J");
+  assert.equal(mapped.lines[4].commodityId, 4);
+  assert.equal(mapped.lines[4].savable, true);
+  assert.equal(mapped.lines[5].kind, "other_out");
+  assert.equal(mapped.lines[5].source, "P");
+  assert.equal(mapped.lines[5].place, "Xuất khác");
+  assert.equal(mapped.lines[5].savable, true);
 });
 
 test("cấu hình sai thì cả lô bị từ chối", () => {
@@ -154,10 +179,6 @@ test("bản ghi quân số 13/10 thành quân số rồi computeFinance ra thi�
   assert.equal(headcount.levels[1].chieu, 35);
   assert.equal(headcount.extras.benhXa, 3);
   assert.equal(headcount.extras.omTrai, 5);
-  const plan = planRations({ settings: DEFAULT_LEDGER_SETTINGS, headcount });
-  same(plan.riceKg, "72.97");
-  same(plan.fuelAmount, "234080");
-  same(plan.milkQty, "37");
   const finance = computeFinance({
     settings: DEFAULT_LEDGER_SETTINGS,
     headcount,

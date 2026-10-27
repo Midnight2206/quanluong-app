@@ -134,8 +134,38 @@ def _span_box(widths, col, span):
     return x, w
 
 
-def _draw_header(c, origin_x, y_top, widths, cells) -> float:
-    band = HEADER_H / HEADER_ROWS
+def _layout(book):
+    layout = book.get("layout") if isinstance(book, dict) else None
+    return layout if isinstance(layout, dict) else {}
+
+
+def _header_rows(book) -> int:
+    count = _layout(book).get("headerRowCount")
+    return int(count) if count else HEADER_ROWS
+
+
+def _font_data(book) -> float:
+    size = _layout(book).get("fontData")
+    return float(size) if size else FONT_DATA
+
+
+def _side_header(book, side, date_line):
+    layout = _layout(book)
+    key = "leftHeader" if side == "left" else "rightHeader"
+    cells = layout.get(key)
+    if not cells:
+        if side == "left":
+            return LEFT_HEADER
+        return list(RIGHT_HEADER) + [(8, 1, 2, 1, date_line or "Ngày")]
+    header = [tuple(cell) for cell in cells]
+    if side == "right":
+        slot = layout.get("dateCell") or [8, 1, 2, 1]
+        header.append((int(slot[0]), int(slot[1]), int(slot[2]), int(slot[3]), date_line or "Ngày"))
+    return header
+
+
+def _draw_header(c, origin_x, y_top, widths, cells, header_rows=HEADER_ROWS) -> float:
+    band = HEADER_H / header_rows
     for col, row, span, rows, text in cells:
         x, w = _span_box(widths, col, span)
         _draw_cell(
@@ -145,13 +175,13 @@ def _draw_header(c, origin_x, y_top, widths, cells) -> float:
     return y_top - HEADER_H
 
 
-def _draw_data_row(c, origin_x, y_top, widths, keys, aligns, values, font) -> float:
+def _draw_data_row(c, origin_x, y_top, widths, keys, aligns, values, font, font_size=FONT_DATA) -> float:
     x = origin_x
     for key, width in zip(keys, widths):
         align = aligns.get(key, "center")
         if key == "name":
             align = "left"
-        _draw_cell(c, x, y_top, width, ROW_H, values.get(key, ""), font, FONT_DATA, align)
+        _draw_cell(c, x, y_top, width, ROW_H, values.get(key, ""), font, font_size, align)
         x += width
     return y_top - ROW_H
 
@@ -304,11 +334,12 @@ def _draw_side(c, book, day, sheet, side, page_w, page_h) -> None:
     else:
         c.drawRightString(page_w - PAGE.margin_right, y, "ĐVT: Đồng")
     y -= 12
+    header_rows = _header_rows(book)
+    font_size = _font_data(book)
     if left:
-        y = _draw_header(c, PAGE.margin_left, y, widths, LEFT_HEADER)
+        y = _draw_header(c, PAGE.margin_left, y, widths, _side_header(book, "left", day.get("dateLine")), header_rows)
     else:
-        header = list(RIGHT_HEADER) + [(8, 1, 2, 1, day.get("dateLine") or "Ngày")]
-        y = _draw_header(c, PAGE.margin_left, y, widths, header)
+        y = _draw_header(c, PAGE.margin_left, y, widths, _side_header(book, "right", day.get("dateLine")), header_rows)
     keys = LEFT_KEYS if left else RIGHT_KEYS
     aligns = LEFT_ALIGN if left else RIGHT_ALIGN
     money_map = LEFT_MONEY if left else RIGHT_MONEY
@@ -318,7 +349,7 @@ def _draw_side(c, book, day, sheet, side, page_w, page_h) -> None:
             c, PAGE.margin_left, y, widths, keys, money_map, "Mang sang", sheet["carryIn"], label_index,
         )
     for row in sheet.get("rows") or []:
-        y = _draw_data_row(c, PAGE.margin_left, y, widths, keys, aligns, row, FONT_REGULAR)
+        y = _draw_data_row(c, PAGE.margin_left, y, widths, keys, aligns, row, FONT_REGULAR, font_size)
     if day.get("note") and not sheet.get("rows"):
         y = _draw_data_row(
             c, PAGE.margin_left, y, widths, keys, aligns,

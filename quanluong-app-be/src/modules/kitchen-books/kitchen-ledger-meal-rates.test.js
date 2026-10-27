@@ -39,7 +39,7 @@ test("mức đơn vị thay mức mặc định và quân số khớp theo mức
   assert.equal(next.levels.length, 1);
   assert.equal(next.levels[0].code, "9");
   assert.equal(next.levels[0].mealPrices.trua, 28800);
-  assert.deepEqual(next.levels[0].riceGrams, DEFAULT_LEDGER_SETTINGS.levels[0].riceGrams);
+  assert.equal(next.levels[0].riceGrams, undefined);
 
   const head = alignHeadcount({
     levels: [

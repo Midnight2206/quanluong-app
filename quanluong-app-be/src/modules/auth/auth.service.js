@@ -1009,8 +1009,59 @@ async function bootstrapAuthSystem(routeDefinitions = []) {
   });
 
   await ensureUnitLevelPermissionCapsSeed();
+  await copyLedgerPermissionsFromAccess();
 
   await bootstrapSuperadmin(superadminType.id);
+}
+
+const LEDGER_GRANT_CODES = [
+  "kitchenBooks.view",
+  "kitchenBooks.save",
+  "kitchenBooks.lock",
+  "kitchenBooks.unlock",
+  "kitchenBooks.settings",
+  "kitchenBooks.export",
+];
+
+async function copyGrant(rows, key, model, upsert) {
+  const access = rows.access;
+  const targets = rows.targets;
+  if (!access || !targets.length) return;
+  const held = await model.findMany({ where: { permissionId: access.id }, select: { [key]: true } });
+  for (const row of held) {
+    for (const target of targets) {
+      await upsert(row[key], target.id);
+    }
+  }
+}
+
+async function copyLedgerPermissionsFromAccess() {
+  const access = await prisma.permission.findUnique({
+    where: { code: "kitchenBooks.access" },
+    select: { id: true },
+  });
+  if (!access) return;
+  const targets = await prisma.permission.findMany({
+    where: { code: { in: LEDGER_GRANT_CODES } },
+    select: { id: true },
+  });
+  if (!targets.length) return;
+  const pack = { access, targets };
+  await copyGrant(pack, "typeId", prisma.typePermission, (typeId, permissionId) => prisma.typePermission.upsert({
+    where: { typeId_permissionId: { typeId, permissionId } },
+    create: { typeId, permissionId },
+    update: {},
+  }));
+  await copyGrant(pack, "jobTitleId", prisma.jobTitlePermission, (jobTitleId, permissionId) => prisma.jobTitlePermission.upsert({
+    where: { jobTitleId_permissionId: { jobTitleId, permissionId } },
+    create: { jobTitleId, permissionId },
+    update: {},
+  }));
+  await copyGrant(pack, "depth", prisma.unitLevelPermissionCap, (depth, permissionId) => prisma.unitLevelPermissionCap.upsert({
+    where: { depth_permissionId: { depth, permissionId } },
+    create: { depth, permissionId },
+    update: {},
+  }));
 }
 
 async function cleanupExpiredRefreshTokens() {

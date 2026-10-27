@@ -154,6 +154,29 @@ function assertLttpLogicalMatchesDataScope(unitId, dataScope) {
  * @param {number} logicalUnitId
  * @param {number | null | undefined} callerUnitId — `req.user.unitId`
  */
+async function assertLevel1IssueSlipWriter(callerUnitId) {
+  const id = Number(callerUnitId);
+  if (!Number.isInteger(id) || id <= 0) return;
+  const unit = await prisma.unit.findUnique({ where: { id }, select: { depth: true } });
+  if (!unit || unit.depth !== 0) {
+    throw new AppError({
+      message: "Chỉ cấp 1 được lập, sửa hoặc xóa phiếu xuất kho.",
+      statusCode: 403,
+      code: ERROR_CODES.FORBIDDEN,
+    });
+  }
+}
+
+async function syncKitchenLedgerFromIssueSlip({ recipientUnitId, dateYmd, actorUserId }) {
+  try {
+    const { resyncLedgerAfterSlipChange } = await import("../kitchen-books/kitchen-ledger.service.js");
+    return await resyncLedgerAfterSlipChange({ recipientUnitId, dateYmd, actorUserId });
+  } catch (err) {
+    console.error("[kitchen-ledger] resync after issue slip", err);
+    return [];
+  }
+}
+
 function assertIssueSlipLogicalUnitIsCallerUnit(logicalUnitId, callerUnitId) {
   const own = Number(callerUnitId);
   if (!Number.isInteger(own) || own <= 0) {
@@ -248,6 +271,8 @@ function mapCommodity(row) {
     code: row.code,
     name: row.name,
     measureUnit: row.measureUnit,
+    sourceKind: row.sourceKind || null,
+    grade: row.grade || null,
     conversionRate: row.conversionRate != null ? Number(row.conversionRate) : null,
     isActive: row.isActive,
     createdAt: row.createdAt,
@@ -1076,6 +1101,7 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
   const { unitId, issueDate, note, lines } = payload;
   assertLttpLogicalMatchesDataScope(unitId, dataScope);
   assertIssueSlipLogicalUnitIsCallerUnit(unitId, callerUnitId);
+  await assertLevel1IssueSlipWriter(callerUnitId);
   assertUnitIdInScope(unitId, scope);
   assertUnitInEffectiveBranch(unitId, effectiveUnitIds);
   if (!Array.isArray(lines) || lines.length === 0) {
@@ -1318,7 +1344,12 @@ async function createIssueSlip(payload, userId, scope, effectiveUnitIds, dataSco
   } catch (err) {
     console.error("[kitchen-receipt-sync] after createIssueSlip", err);
   }
-  return mapIssueSlip(slip);
+  const ledgerNotices = await syncKitchenLedgerFromIssueSlip({
+    recipientUnitId,
+    dateYmd: issueD.toISOString().slice(0, 10),
+    actorUserId: userId,
+  });
+  return { ...mapIssueSlip(slip), ledgerNotices };
 }
 
 async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope, callerUnitId) {
@@ -1332,6 +1363,7 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope, 
   }
   assertCommodityRowStorage(existing.unitId, dataScope);
   assertIssueSlipLogicalUnitIsCallerUnit(dataScope.logicalUnitId, callerUnitId);
+  await assertLevel1IssueSlipWriter(callerUnitId);
   assertUnitIdInScope(dataScope.logicalUnitId, scope);
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
 
@@ -1591,7 +1623,20 @@ async function updateIssueSlip(id, payload, scope, effectiveUnitIds, dataScope, 
   } catch (err) {
     console.error("[kitchen-receipt-sync] after updateIssueSlip", err);
   }
-  return mapIssueSlip(slip);
+  const dateYmd = existing.issueDate.toISOString().slice(0, 10);
+  const ledgerNotices = await syncKitchenLedgerFromIssueSlip({
+    recipientUnitId,
+    dateYmd,
+    actorUserId: existing.createdById,
+  });
+  if (Number(existing.recipientUnitId) !== Number(recipientUnitId)) {
+    ledgerNotices.push(...await syncKitchenLedgerFromIssueSlip({
+      recipientUnitId: existing.recipientUnitId,
+      dateYmd,
+      actorUserId: existing.createdById,
+    }));
+  }
+  return { ...mapIssueSlip(slip), ledgerNotices };
 }
 
 /**
@@ -1612,6 +1657,7 @@ async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveU
   }
   assertCommodityRowStorage(existing.unitId, dataScope);
   assertIssueSlipLogicalUnitIsCallerUnit(dataScope.logicalUnitId, callerUnitId);
+  await assertLevel1IssueSlipWriter(callerUnitId);
   assertUnitIdInScope(dataScope.logicalUnitId, scope);
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
 
@@ -1671,11 +1717,16 @@ async function resyncIssueSlipLinePricesFromEffectiveTable(id, scope, effectiveU
   } catch (err) {
     console.error("[kitchen-receipt-sync] after resyncIssueSlipLinePrices", err);
   }
+  const ledgerNotices = await syncKitchenLedgerFromIssueSlip({
+    recipientUnitId: existing.recipientUnitId,
+    dateYmd: existing.issueDate.toISOString().slice(0, 10),
+    actorUserId: existing.createdById,
+  });
   const slip = await prisma.lttpIssueSlip.findUnique({
     where: { id: existing.id },
     include: issueSlipInclude,
   });
-  return mapIssueSlip(slip);
+  return { ...mapIssueSlip(slip), ledgerNotices };
 }
 
 async function listIssueSlips(
@@ -2011,6 +2062,7 @@ async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope, callerUni
   }
   assertCommodityRowStorage(slip.unitId, dataScope);
   assertIssueSlipLogicalUnitIsCallerUnit(dataScope.logicalUnitId, callerUnitId);
+  await assertLevel1IssueSlipWriter(callerUnitId);
   assertUnitIdInScope(dataScope.logicalUnitId, scope);
   assertUnitInEffectiveBranch(dataScope.logicalUnitId, effectiveUnitIds);
   const recipientUnitId = slip.recipientUnitId;
@@ -2036,7 +2088,8 @@ async function deleteIssueSlip(id, scope, effectiveUnitIds, dataScope, callerUni
   } catch (err) {
     console.error("[kitchen-receipt-sync] after deleteIssueSlip", err);
   }
-  return { ok: true };
+  const ledgerNotices = await syncKitchenLedgerFromIssueSlip({ recipientUnitId, dateYmd, actorUserId });
+  return { ok: true, ledgerNotices };
 }
 
 async function listPriceTables({ unitId, from, to }, scope, effectiveUnitIds, dataScope) {

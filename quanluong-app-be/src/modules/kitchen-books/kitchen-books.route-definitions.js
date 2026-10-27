@@ -345,7 +345,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger",
     pathRoute: "/api/kitchen-books/ledger",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_VIEW,
       name: "Kitchen books",
       description: "Xem sổ nhập xuất LTTP theo ngày.",
     },
@@ -357,7 +357,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger",
     pathRoute: "/api/kitchen-books/ledger",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_SAVE,
       name: "Kitchen books",
       description: "Lưu quân số, gạo và nguồn đơn vị của sổ nhập xuất LTTP.",
     },
@@ -369,7 +369,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/lock",
     pathRoute: "/api/kitchen-books/ledger/lock",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_LOCK,
       name: "Kitchen books",
       description: "Chốt ngày sổ nhập xuất LTTP.",
     },
@@ -381,7 +381,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/unlock",
     pathRoute: "/api/kitchen-books/ledger/unlock",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_UNLOCK,
       name: "Kitchen books",
       description: "Mở khóa ngày sổ nhập xuất LTTP.",
     },
@@ -393,9 +393,9 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/balance",
     pathRoute: "/api/kitchen-books/ledger/balance",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_SAVE,
       name: "Kitchen books",
-      description: "Cân đối tồn âm sổ nhập xuất LTTP khi người dùng xác nhận.",
+      description: "Đường cũ. Sổ không ghi số cân đối vào phiếu xuất.",
     },
   },
   {
@@ -405,9 +405,9 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/slip-sync",
     pathRoute: "/api/kitchen-books/ledger/slip-sync",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_SAVE,
       name: "Kitchen books",
-      description: "Ghi cân đối hoặc số lượng đã sửa từ sổ vào phiếu xuất LTTP của ngày.",
+      description: "Đường cũ. Sổ không ghi ngược số vào phiếu xuất.",
     },
   },
   {
@@ -417,7 +417,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/settings",
     pathRoute: "/api/kitchen-books/ledger/settings",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_VIEW,
       name: "Kitchen books",
       description: "Xem cấu hình sổ nhập xuất LTTP theo đơn vị.",
     },
@@ -429,7 +429,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/assistant",
     pathRoute: "/api/kitchen-books/ledger/assistant",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_VIEW,
       name: "Kitchen books",
       description: "Xem hội thoại, ghi nhớ và quy tắc trợ lý làm sổ của chính tài khoản.",
     },
@@ -453,7 +453,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/assistant/apply",
     pathRoute: "/api/kitchen-books/ledger/assistant/apply",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_SAVE,
       name: "Kitchen books",
       description: "Ghi bản nháp trợ lý làm sổ vào sổ sau khi người dùng xác nhận.",
     },
@@ -513,7 +513,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/month-pdf",
     pathRoute: "/api/kitchen-books/ledger/month-pdf",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_EXPORT,
       name: "Kitchen books",
       description: "Xuất PDF sổ nhập xuất LTTP cả tháng theo đơn vị.",
     },
@@ -525,7 +525,7 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
     path: "/ledger/settings",
     pathRoute: "/api/kitchen-books/ledger/settings",
     permission: {
-      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      code: PERMISSIONS.KITCHEN_BOOKS_SETTINGS,
       name: "Kitchen books",
       description: "Lưu cấu hình sổ nhập xuất LTTP theo đơn vị.",
     },

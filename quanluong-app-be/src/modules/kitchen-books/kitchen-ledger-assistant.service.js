@@ -282,7 +282,7 @@ async function postTurn(payload, user, scope, effectiveUnitIds, dataScope, opts 
   });
   const ctx = { db, user, unitId, text, image, intent, payload, scope, effectiveUnitIds, dataScope, opts, conversation };
   if (!payload.intent && /can doi/.test(fold(text)) && intent === "question") {
-    return reply(ctx, "note", "Cân đối tồn âm chỉ chạy khi bấm nút Cân đối và xác nhận. Trợ lý không tự ghi dòng cân đối.");
+    return reply(ctx, "note", "Tồn âm vẫn hiện trên sổ. Chưa chốt ngày và chưa xuất sổ khi còn âm. Trợ lý không tự ghi dòng cân đối.");
   }
   if (intent === "rule") return turnRule(ctx);
   if (intent === "question") return turnQuestion(ctx);
@@ -527,6 +527,7 @@ async function turnQuestion(ctx) {
 
 async function applyDraft(payload, user, scope, effectiveUnitIds, dataScope, opts = {}) {
   assertOwner(user);
+  opts.userId = user.id;
   const unitId = Number(payload.unitId);
   assertScope(unitId, scope, effectiveUnitIds, dataScope);
   const db = opts.prisma ?? defaultPrisma;
@@ -634,17 +635,28 @@ function existingLines(view, kind) {
         source: row.source === "J" ? "J" : "I",
         qty: Number(row.qty),
         issuePolicy: row.issuePolicy || "today",
+        sourceKind: row.sourceKind || undefined,
+        grade: row.grade || undefined,
       };
     }
     if (kind === "rice") {
       return {
         commodityId: row.commodityId || undefined,
         name: row.itemName,
+        source: row.source,
         qty: Number(row.qty),
         unitPrice: Number(row.unitPrice),
+        sourceKind: row.sourceKind || undefined,
+        grade: row.grade || undefined,
       };
     }
-    return { commodityId: row.commodityId || undefined, name: row.itemName, qty: Number(row.qty) };
+    return {
+      commodityId: row.commodityId || undefined,
+      name: row.itemName,
+      qty: Number(row.qty),
+      sourceKind: row.sourceKind || undefined,
+      grade: row.grade || undefined,
+    };
   });
 }
 
@@ -666,7 +678,7 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
   const readLedger = opts.getLedger ?? getLedger;
   const date = message.payloadJson?.date;
   const view = await readLedger({ unitId, date }, scope, effectiveUnitIds, dataScope);
-  const grouped = { self_supply: [], rice: [], other_out: [] };
+  const grouped = { self_supply: [], rice: [], other_out: [], meal_out: [] };
   for (const line of lines) {
     if (!grouped[line.kind]) throw fail("Dòng nháp không ghi được vào sổ.", 400);
     grouped[line.kind].push(line);
@@ -681,6 +693,8 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
           source: line.source,
           qty: line.qty,
           issuePolicy: line.issuePolicy || "today",
+          sourceKind: line.sourceKind || undefined,
+          grade: line.grade || undefined,
         })),
       ],
     };
@@ -692,8 +706,11 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
         ...grouped.rice.map((line) => ({
           commodityId: line.commodityId || undefined,
           name: line.name,
+          source: line.source,
           qty: line.qty,
           unitPrice: line.unitPrice ?? undefined,
+          sourceKind: line.sourceKind || undefined,
+          grade: line.grade || undefined,
         })),
       ],
     };
@@ -706,6 +723,23 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
           commodityId: line.commodityId || undefined,
           name: line.name,
           qty: line.qty,
+          sourceKind: line.sourceKind || undefined,
+          grade: line.grade || undefined,
+        })),
+      ],
+    };
+  }
+  if (grouped.meal_out.length) {
+    body.mealOut = {
+      lines: [
+        ...existingLines(view, "meal_out"),
+        ...grouped.meal_out.map((line) => ({
+          commodityId: line.commodityId || undefined,
+          name: line.name,
+          qty: line.qty,
+          unitPrice: line.unitPrice ?? undefined,
+          sourceKind: line.sourceKind || undefined,
+          grade: line.grade || undefined,
         })),
       ],
     };
@@ -713,7 +747,7 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
   const save = opts.saveLedger ?? saveLedger;
   let saved;
   try {
-    saved = await save(body, scope, effectiveUnitIds, dataScope);
+    saved = await save(body, scope, effectiveUnitIds, dataScope, { userId: opts.userId ?? null, source: "assistant" });
   } catch (err) {
     saved = { ok: false, message: err?.message || "Không lưu được." };
   }

@@ -177,6 +177,7 @@ model User {
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
   kitchenMenuSamplesCreated              KitchenMenuSample[] @relation("KitchenMenuSampleCreatedBy")
   kitchenLedgerDaysLocked                KitchenLedgerDay[] @relation("KitchenLedgerDayLockedBy")
+  kitchenLedgerChanges                   KitchenLedgerChange[]
   kitchenLedgerSettingsUpdated           KitchenLedgerSettings[] @relation("KitchenLedgerSettingsUpdatedBy")
   ledgerAssistantProfiles                LedgerAssistantProfile[]
   ledgerAssistantMemories                LedgerAssistantMemory[]
@@ -833,6 +834,8 @@ model LttpCommodity {
   measureUnit    String          @db.VarChar(64)
   conversionRate Decimal?        @db.Decimal(18, 8)
   isActive       Boolean         @default(true)
+  sourceKind     String?         @db.VarChar(16)
+  grade          String?         @db.VarChar(16)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   unit           Unit            @relation(fields: [unitId], references: [id], onDelete: Cascade)
@@ -1473,12 +1476,15 @@ model KitchenLedgerDay {
   /// Lịch làm việc trong ngày. Không đổi số sổ.
   scheduleJson       Json?
   snapshotJson       Json?
+  version            Int       @default(0)
+  pdfFingerprint     String?   @db.VarChar(64)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   unit               Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
   lockedBy           User?     @relation("KitchenLedgerDayLockedBy", fields: [lockedById], references: [id], onDelete: SetNull)
   lots               KitchenLedgerLot[]
   movements          KitchenLedgerMovement[]
+  changes            KitchenLedgerChange[]
 
   @@unique([unitId, ledgerDate])
   @@index([lockedById])
@@ -1518,11 +1524,32 @@ model KitchenLedgerMovement {
   unitPrice   Decimal          @default(0) @db.Decimal(18, 4)
   qty         Decimal          @db.Decimal(18, 4)
   issuePolicy String           @default("today") @db.VarChar(16)
+  sourceKind  String?          @db.VarChar(16)
+  grade       String?          @db.VarChar(16)
+  manualTemporary Boolean      @default(false)
   day         KitchenLedgerDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
   commodity   LttpCommodity?   @relation(fields: [commodityId], references: [id], onDelete: SetNull)
 
   @@index([dayId, kind])
   @@index([commodityId])
+}
+
+/// Ai đổi ngày sổ, lúc nào, từ đâu. Không lưu token.
+model KitchenLedgerChange {
+  id         Int              @id @default(autoincrement())
+  dayId      Int
+  userId     Int?
+  action     String           @db.VarChar(32)
+  source     String           @db.VarChar(16)
+  reason     String?          @db.VarChar(500)
+  beforeJson Json?
+  afterJson  Json?
+  createdAt  DateTime         @default(now())
+  day        KitchenLedgerDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  user       User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([dayId])
+  @@index([userId])
 }
 
 /// Tên, giọng và tuỳ chọn của trợ lý làm sổ. Riêng từng tài khoản và đơn vị.

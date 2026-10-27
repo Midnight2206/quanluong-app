@@ -33,9 +33,10 @@ function recordsPrompt({ settings, anchorDate, commodities = [], facts = [], que
     "Doi cau hoac anh thanh mang ban ghi. Khong chon vi tri tren so, khong tinh tien, khong ke ten nguoi.",
     "type headcount: quan so sang, trua, chieu theo tung muc an. An them: benhXa, benhNhan, omTrai, leTet.",
     `Cac muc, dung thu tu: ${levels}. Mau 18/10: 91 97 97 · 0 0 0 la muc dau roi muc sau.`,
-    "type outside_purchase: mua ngoai. type stock_in: nhap kho, origin unit_purchase hoac unit_tgsx. type stock_out: xuat khac, khong phai xuat an.",
-    "Hang da co tren phieu xuat thi khong tao ban ghi. Gao nhap tay van la outside_purchase hoac stock_in.",
-    "type setting chi khi cau doi quy tac: field balanceWarnThreshold, spentBasis (meal_out hoac total_out), holidayLunchOnly, milk.mode (purchase hoac patient_plus_levels).",
+    "type outside_purchase: mua ngoai vao don vi bao dam. type stock_in: nhap kho, origin unit_purchase hoac unit_tgsx. type meal_out: so luong xuat an. type stock_out: xuat khac.",
+    "Hang da co tren phieu xuat thi khong tao ban ghi vao cot Tren BD. Gao nhap tay can column G, H, I hoac J.",
+    "Moi hang can sourceKind market hoac tgsx va grade. Khong doan pham cap.",
+    "type setting chi khi cau doi quy tac: field balanceWarnThreshold, spentBasis (meal_out hoac total_out), holidayLunchOnly.",
     "type schedule: lich lam viec trong ngay, chi la chu, khong doi so tren so.",
     "type note: ghi chu, khong phai so lieu.",
     "Moi ban ghi co confidence 0 den 1 va source la doan trich ngan. Don gia la dong, 180k = 180000.",
@@ -85,23 +86,42 @@ function placeLine(record, { commodities, ricePattern }) {
     kind = "other_out";
     source = "P";
     place = "Xuất khác";
+  } else if (record.type === "meal_out") {
+    kind = "meal_out";
+    source = "N";
+    place = "Xuất ăn";
   } else if (rice) {
     kind = "rice";
-    source = "G";
-    place = "Gạo, nhập tay trên bảo đảm";
+    if (!["G", "H", "I", "J"].includes(record.column)) {
+      savable = false;
+      warning = "Chọn cột G/H/I/J cho gạo.";
+      source = "";
+    } else {
+      source = record.column;
+    }
+    place = "Gạo nhập tay – tạm thời";
+  } else if (record.column === "G" || record.column === "H") {
+    savable = false;
+    warning = "Cột Trên BĐ chỉ lấy từ phiếu xuất. Hàng này ghi vào đơn vị bảo đảm.";
   } else if (record.type === "stock_in" && record.origin === "unit_tgsx") {
     source = "J";
     place = "Đơn vị BĐ TGSX";
   }
-  if (!rice && kind === "self_supply" && !commodity) {
+  if (!rice && (kind === "self_supply" || kind === "meal_out") && !commodity) {
     savable = false;
-    warning = hits.length > 1
+    warning = warning || (hits.length > 1
       ? "Nhiều mặt hàng trùng tên. Chọn ở bảng nhập."
-      : "Chưa khớp danh mục. Nhập ở bảng Đơn vị bảo đảm.";
+      : "Chưa khớp danh mục. Nhập ở bảng.");
   }
   if (kind === "rice" && !commodity && record.unitPrice == null) {
     savable = false;
     warning = warning || "Gạo chưa có trong danh mục thì cần đơn giá.";
+  }
+  const sourceKind = record.sourceKind || commodity?.sourceKind || "";
+  const grade = record.grade || commodity?.grade || "";
+  if (!sourceKind || !grade) {
+    savable = false;
+    warning = warning || "Chưa có nguồn Mua TT/TGSX hoặc phẩm cấp.";
   }
   return {
     name: commodity?.name || record.name,
@@ -111,6 +131,8 @@ function placeLine(record, { commodities, ricePattern }) {
     unitPrice: record.unitPrice ?? null,
     kind,
     source,
+    sourceKind: sourceKind || null,
+    grade: grade || null,
     place,
     issuePolicy: "today",
     confidence: record.confidence,
@@ -150,16 +172,7 @@ function placeSetting(record) {
       source: record.source,
     };
   }
-  if (value !== "purchase" && value !== "patient_plus_levels") {
-    throw reject("Chế độ sữa không đúng mẫu.");
-  }
-  return {
-    field,
-    value,
-    label: value === "purchase" ? "Sữa: mua theo ngày" : "Sữa: bệnh nhân + mức cấu hình",
-    confidence: record.confidence,
-    source: record.source,
-  };
+  throw reject("Cấu hình này không còn trong sổ.");
 }
 
 function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePattern } = {}) {
@@ -182,7 +195,7 @@ function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePat
         levels: record.levels.map((level) => ({ ...level, confidence: record.confidence })),
         extras: record.extras ? { ...record.extras, confidence: record.confidence } : null,
       });
-    } else if (record.type === "outside_purchase" || record.type === "stock_in" || record.type === "stock_out") {
+    } else if (record.type === "outside_purchase" || record.type === "stock_in" || record.type === "stock_out" || record.type === "meal_out") {
       lines.push({
         ...placeLine(record, { commodities, ricePattern: pattern }),
         date: resolveDate(record.date, anchorDate) || anchorDate || "",

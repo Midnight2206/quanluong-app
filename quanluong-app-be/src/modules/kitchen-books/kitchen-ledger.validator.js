@@ -34,24 +34,43 @@ const headcountSchema = z.object({
   }).optional(),
 });
 
+const sourceKindSchema = z.enum(["market", "tgsx"]);
+const gradeSchema = z.string().trim().min(1).max(16);
+
 const selfSupplyLineSchema = z.object({
   commodityId: z.coerce.number().int().positive(),
   source: z.enum(["I", "J"]),
   qty: qtySchema,
+  sourceKind: sourceKindSchema.optional(),
+  grade: gradeSchema.optional(),
   issuePolicy: z.enum(["today", "all", "keep"]).optional(),
 });
 
 const riceLineSchema = z.object({
   commodityId: z.coerce.number().int().positive().optional(),
   name: z.string().max(255).optional(),
+  source: z.enum(["G", "H", "I", "J"]),
   qty: qtySchema,
   unitPrice: z.coerce.number().nonnegative().max(1_000_000_000).optional(),
+  sourceKind: sourceKindSchema.optional(),
+  grade: gradeSchema.optional(),
+});
+
+const mealOutLineSchema = z.object({
+  commodityId: z.coerce.number().int().positive().optional(),
+  name: z.string().max(255).optional(),
+  qty: qtySchema,
+  unitPrice: z.coerce.number().nonnegative().max(1_000_000_000).optional(),
+  sourceKind: sourceKindSchema.optional(),
+  grade: gradeSchema.optional(),
 });
 
 const otherOutLineSchema = z.object({
   commodityId: z.coerce.number().int().positive().optional(),
   name: z.string().max(255).optional(),
   qty: qtySchema,
+  sourceKind: sourceKindSchema.optional(),
+  grade: gradeSchema.optional(),
 });
 
 const openingLineSchema = z.object({
@@ -70,6 +89,7 @@ const saveLedgerBodySchema = z.object({
     anThem: z.coerce.number().min(0).max(1_000_000_000_000).optional(),
     truyLinh: z.coerce.number().min(0).max(1_000_000_000_000).optional(),
     thuKhach: z.coerce.number().min(0).max(1_000_000_000_000).optional(),
+    riceSubsidy: z.coerce.number().min(0).max(1_000_000_000_000).optional(),
   }).optional(),
   selfSupply: z.object({
     none: z.boolean().optional(),
@@ -77,6 +97,9 @@ const saveLedgerBodySchema = z.object({
   }).optional(),
   rice: z.object({
     lines: z.array(riceLineSchema).max(20),
+  }).optional(),
+  mealOut: z.object({
+    lines: z.array(mealOutLineSchema).max(400),
   }).optional(),
   otherOut: z.object({
     lines: z.array(otherOutLineSchema).max(200),
@@ -89,6 +112,7 @@ const saveLedgerBodySchema = z.object({
   schedule: z.object({
     text: z.string().max(2000),
   }).nullable().optional(),
+  version: z.coerce.number().int().nonnegative().optional(),
 });
 
 const syncLedgerSlipBodySchema = z.object({
@@ -110,6 +134,7 @@ const lockLedgerBodySchema = z.object({
 const unlockLedgerBodySchema = z.object({
   unitId: unitIdSchema,
   date: dateSchema,
+  reason: z.string().trim().min(1).max(500),
 });
 
 const balanceLedgerBodySchema = z.object({
@@ -126,11 +151,6 @@ const levelSchema = z.object({
     trua: z.coerce.number().nonnegative(),
     chieu: z.coerce.number().nonnegative(),
   }),
-  riceGrams: z.object({
-    sang: z.coerce.number().nonnegative(),
-    trua: z.coerce.number().nonnegative(),
-    chieu: z.coerce.number().nonnegative(),
-  }),
 });
 
 const saveLedgerSettingsBodySchema = z.object({
@@ -138,17 +158,6 @@ const saveLedgerSettingsBodySchema = z.object({
   spentBasis: z.enum(["total_out", "meal_out"]).optional(),
   balanceWarnThreshold: z.coerce.number().positive().max(1_000_000_000).optional(),
   holidayLunchOnly: z.boolean().optional(),
-  riceSettlementPrice: z.coerce.number().nonnegative().optional(),
-  fuelPerServing: z.coerce.number().nonnegative().optional(),
-  requireIssueSlip: z.boolean().optional(),
-  requirePriceTable: z.boolean().optional(),
-  riceManualOnGuarantee: z.boolean().optional(),
-  milk: z.object({
-    mode: z.enum(["patient_plus_levels", "purchase"]).optional(),
-    boxesPerPerson: z.coerce.number().positive().optional(),
-    fromPatientExtra: z.boolean().optional(),
-    levelDailyAmounts: z.array(z.coerce.number()).max(6).optional(),
-  }).optional(),
   levels: z.array(levelSchema).min(1).max(12).optional(),
   signatures: z.object({
     soNhapXuat: z.array(z.object({
@@ -188,13 +197,6 @@ const saveLedgerSettingsBodySchema = z.object({
       }).optional(),
     })).min(1).max(12),
   }).optional(),
-  spices: z.array(z.object({
-    match: z.string().min(1).max(80),
-    peoplePerUnit: z.coerce.number().positive().optional(),
-    qtyPerUnit: z.coerce.number().nonnegative().optional(),
-    roundStep: z.coerce.number().positive().optional(),
-    fixedQty: z.coerce.number().nonnegative().optional(),
-  })).max(40).optional(),
 });
 
 export {

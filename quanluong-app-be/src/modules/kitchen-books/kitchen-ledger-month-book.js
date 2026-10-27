@@ -1,5 +1,6 @@
 import { splitLedgerPages } from "./kitchen-ledger-compute.js";
 import { toScaled } from "./kitchen-ledger-decimal.js";
+import { LEDGER_PRINT_LAYOUT } from "./kitchen-ledger-layout.js";
 
 const DASH = "\u2013";
 const MEAL_LABEL = { sang: "Sáng", trua: "Trưa", chieu: "Chiều" };
@@ -165,16 +166,16 @@ function emptySheet() {
 
 function buildMonthBook({ year, month, unitName, dayViews, cover = {}, signatures = {}, signatureImages = {}, signatureImageLayout = null }) {
   const days = (dayViews || []).map((view) => {
-    const blocked = Boolean(view.ledgerBlocked) || !view.lines;
+    const notLoaded = view.lines == null;
     const draft = view.status !== "locked";
     const parts = String(view.date || "").split("-").map(Number);
     return {
       date: view.date,
       dateLine: parts.length === 3 ? dateLine(parts[0], parts[1], parts[2]) : "",
       draft,
-      blocked,
-      note: blocked ? "Chưa đủ phiếu hoặc bảng giá" : "",
-      sheets: blocked ? [emptySheet()] : sheetsFromLines(view.lines, view.totals),
+      blocked: notLoaded,
+      note: "",
+      sheets: notLoaded ? [emptySheet()] : sheetsFromLines(view.lines, view.totals),
       financeLines: financeLines(view.finance),
     };
   });
@@ -196,6 +197,7 @@ function buildMonthBook({ year, month, unitName, dayViews, cover = {}, signature
     },
     signatureImages: signatureImages || {},
     signatureImageLayout,
+    layout: LEDGER_PRINT_LAYOUT,
     days,
     // ponytail: đuôi sổ (biên bản tịnh kho + báo cáo công khai I–VII) gắn sau qua `tail`.
     tail: null,

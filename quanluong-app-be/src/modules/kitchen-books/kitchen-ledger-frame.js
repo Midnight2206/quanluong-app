@@ -22,19 +22,8 @@ function pulledSlips(slips) {
   }));
 }
 
-function slipDraftOf(suggestions, locked) {
-  if (locked) return [];
-  return (suggestions || [])
-    .filter((row) => Number(row.suggestQty) > 0)
-    .map((row) => ({
-      commodityId: row.commodityId ?? null,
-      name: row.name,
-      uom: row.uom || "",
-      unitPrice: row.unitPrice,
-      qty: row.suggestQty,
-      priceKind: "market",
-      reason: "balance",
-    }));
+function slipDraftOf() {
+  return [];
 }
 
 function buildDayFrame(view = {}, slips = []) {

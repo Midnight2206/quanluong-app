@@ -8,6 +8,7 @@ import { pickNguoiDuyetSlot } from "../lttp/lttp-issue-slip-signature-defaults.j
 import { getLttpIssueSlipSignatureSettings } from "../lttp/lttp-issue-slip-signature-settings.service.js";
 import { renderKitchenLedgerBook } from "../../services/document-service.client.js";
 import { buildMonthBook, countBookPages, daysInMonth } from "./kitchen-ledger-month-book.js";
+import { negativeItems } from "./kitchen-ledger-rules.js";
 import { getLedger } from "./kitchen-ledger.service.js";
 import { mergeLedgerSettings } from "./kitchen-ledger-settings.js";
 
@@ -99,6 +100,15 @@ async function exportLedgerMonthPdf(query, user, scope, effectiveUnitIds, dataSc
       });
     }
   }
+  const negatives = dayViews.flatMap((view) => negativeItems(view.lines, view.date));
+  if (negatives.length) {
+    throw new AppError({
+      message: "Còn tồn âm. Không xuất sổ khi còn âm.",
+      statusCode: 409,
+      code: "negative_stock",
+      details: { items: negatives },
+    });
+  }
   const signed = await resolveSignatures(unitId, user, scope, effectiveUnitIds, dataScope, {
     getSignatureSettings: deps.getSignatureSettings ?? getLttpIssueSlipSignatureSettings,
     resolveApproverName: deps.resolveApproverName ?? ((id) => approverName(id, db)),
@@ -118,6 +128,15 @@ async function exportLedgerMonthPdf(query, user, scope, effectiveUnitIds, dataSc
     signatureImageLayout: LTTP_ISSUE_SLIP_SIGNATURE_IMAGE_LAYOUT,
   });
   const buffer = await render(book);
+  if (typeof db.kitchenLedgerDay?.update === "function") {
+    for (const view of dayViews) {
+      if (!view.dayId || !view.fingerprint) continue;
+      await db.kitchenLedgerDay.update({
+        where: { id: view.dayId },
+        data: { pdfFingerprint: view.fingerprint },
+      });
+    }
+  }
   const fileName = `So-nhap-xuat-LTTP-${month}.pdf`;
   const ctx = (deps.getAuditContext ?? getAuditContext)() || {};
   await db.dataChangeLog.create({

@@ -5,11 +5,8 @@
  */
 import {
   add,
-  divByNumber,
   min,
   mul,
-  roundHalfUpToStep,
-  roundUpToStep,
   scaledToString,
   sub,
   toScaled,
@@ -17,17 +14,18 @@ import {
 import { sortLedgerLines } from "./kitchen-ledger-line-order.js";
 import { MEALS, mergeLedgerSettings, nameMatchesRule, normalizeName } from "./kitchen-ledger-settings.js";
 
+/** Chỉ xếp dòng gia vị trên ngày chưa có nhóm hàng. Không xuất số. */
+const SPICE_PREFIXES = ["dầu ăn", "nước mắm", "muối", "mỳ chính", "mì chính", "tiêu", "ớt bột", "đường", "hành khô", "tỏi khô"];
+
 const EXTRA_KEYS = ["benhXa", "benhNhan", "omTrai", "leTet"];
 
 function classifyItem(name, measureUnit, settings) {
   const n = normalizeName(name);
   const uom = normalizeName(measureUnit);
-  if (settings.riceNamePattern && n.includes(normalizeName(settings.riceNamePattern))) return "rice";
+  const rice = normalizeName(settings?.riceNamePattern || "gạo");
+  if (rice && n.includes(rice)) return "rice";
   if (n.includes("chất đốt") || uom === "đ") return "fuel";
-  if (n.includes("sữa")) return "milk";
-  for (const spice of settings.spices) {
-    if (nameMatchesRule(n, spice.match)) return "spice";
-  }
+  if (SPICE_PREFIXES.some((prefix) => nameMatchesRule(n, prefix))) return "spice";
   return "fresh";
 }
 
@@ -46,56 +44,6 @@ function headcountOf(level, meal) {
 function extrasOf(headcount) {
   const src = headcount?.extras ?? {};
   return Object.fromEntries(EXTRA_KEYS.map((key) => [key, toScaled(src[key] ?? 0)]));
-}
-
-function planRations({ settings, headcount }) {
-  const s = mergeLedgerSettings(settings);
-  const levels = Array.isArray(headcount?.levels) ? headcount.levels : [];
-  let servings = 0n;
-  let riceGrams = 0n;
-  for (const level of levels) {
-    const rule = levelRule(s, level);
-    for (const meal of MEALS) {
-      const hc = headcountOf(level, meal);
-      servings = add(servings, mul(toScaled(s.servingWeights[meal]), hc));
-      if (rule) riceGrams = add(riceGrams, mul(hc, toScaled(rule.riceGrams[meal])));
-    }
-  }
-  const riceKg = divByNumber(riceGrams, 1000);
-  const fuelAmount = mul(servings, toScaled(s.fuelPerServing));
-  const extras = extrasOf(headcount);
-  let milkQty = 0n;
-  if (s.milk.mode !== "purchase") {
-    if (s.milk.fromPatientExtra) {
-      milkQty = add(milkQty, mul(extras.benhNhan, toScaled(s.milk.boxesPerPerson)));
-    }
-    const watched = new Set((s.milk.levelDailyAmounts || []).map(Number));
-    for (const level of levels) {
-      if (!watched.has(Number(level.dailyAmount))) continue;
-      const people = MEALS.reduce((best, meal) => {
-        const hc = headcountOf(level, meal);
-        return hc > best ? hc : best;
-      }, 0n);
-      milkQty = add(milkQty, mul(people, toScaled(s.milk.boxesPerPerson)));
-    }
-  }
-  const spices = s.spices.map((spice) => {
-    const raw = spice.fixedQty != null
-      ? toScaled(spice.fixedQty)
-      : divByNumber(mul(servings, toScaled(spice.qtyPerUnit)), spice.peoplePerUnit);
-    const qty = spice.fixedQty != null ? raw : roundHalfUpToStep(raw, toScaled(spice.roundStep ?? 0.1));
-    return { match: spice.match, qty: scaledToString(qty), qtyScaled: qty };
-  });
-  return {
-    servings: scaledToString(servings),
-    riceKg: scaledToString(riceKg),
-    riceKgScaled: riceKg,
-    fuelAmount: scaledToString(fuelAmount),
-    fuelAmountScaled: fuelAmount,
-    milkQty: scaledToString(milkQty),
-    milkQtyScaled: milkQty,
-    spices,
-  };
 }
 
 function computeFinance({
@@ -217,13 +165,6 @@ function addReceipt(lot, source, qty, balance) {
   if (balance) lot.inBalance = add(lot.inBalance, qty);
 }
 
-function freshMealQty(lot, policy) {
-  const purch = sub(inTotal(lot), lot.inBalance);
-  if (policy === "keep") return 0n;
-  if (policy === "all") return add(lot.openingQty, purch);
-  return purch;
-}
-
 function allocateFifo(lots, needed) {
   let left = needed;
   const ordered = [...lots].sort((a, b) => {
@@ -260,16 +201,6 @@ function allocateOther(lots, needed) {
   if (left > 0n && ordered.length) {
     ordered[ordered.length - 1].otherQty = add(ordered[ordered.length - 1].otherQty, left);
   }
-}
-
-function spiceRuleFor(name, settings) {
-  return settings.spices.find((spice) => nameMatchesRule(name, spice.match)) ?? null;
-}
-
-function stepFor(name, role, settings) {
-  if (role === "fuel") return toScaled(settings.balanceRound.fuelStep);
-  const hit = settings.balanceRound.steps.find((row) => nameMatchesRule(name, row.match));
-  return toScaled(hit?.step ?? settings.balanceRound.defaultStep);
 }
 
 function money(qty, price) {
@@ -324,28 +255,6 @@ function sumField(lines, field) {
   return lines.reduce((acc, line) => add(acc, toScaled(line[field])), 0n);
 }
 
-function suggestBalance(lines, settings) {
-  const s = mergeLedgerSettings(settings);
-  const out = [];
-  for (const line of lines) {
-    const closing = toScaled(line.closingQty);
-    if (closing >= 0n) continue;
-    const step = stepFor(line.name, line.role, s);
-    const suggest = roundUpToStep(-closing, step);
-    out.push({
-      name: line.name,
-      uom: line.uom,
-      unitPrice: line.unitPrice,
-      commodityId: line.commodityId,
-      role: line.role,
-      shortfall: scaledToString(-closing),
-      suggestQty: scaledToString(suggest),
-      source: "I",
-    });
-  }
-  return out;
-}
-
 function splitLedgerPages(lines, options = {}) {
   const singlePageMax = options.singlePageMax ?? 28;
   const pageCapacity = options.pageCapacity ?? 40;
@@ -396,13 +305,38 @@ function ensureLot(map, orderRef, seed) {
   return lot;
 }
 
+function ensureIssuedLots(lots, groups, orderRef, rows, settings, date) {
+  for (const issue of rows || []) {
+    const key = normalizeName(issue.name);
+    if (!key || groups.has(key)) continue;
+    const role = classifyItem(issue.name, issue.uom, settings);
+    const lot = ensureLot(lots, orderRef, {
+      name: issue.name,
+      uom: issue.uom || "",
+      unitPrice: role === "fuel" ? 1 : (issue.unitPrice ?? 0),
+      commodityId: issue.commodityId ?? null,
+      role,
+      displayDash: role === "fuel",
+      receivedDate: date,
+    });
+    groups.set(key, [lot]);
+  }
+}
+
+function qtyByName(rows) {
+  const map = new Map();
+  for (const issue of rows || []) {
+    const key = normalizeName(issue.name);
+    map.set(key, add(map.get(key) || 0n, toScaled(issue.qty)));
+  }
+  return map;
+}
+
 function computeLedger(raw) {
   const settings = mergeLedgerSettings(raw.settings);
-  const plan = planRations({ settings, headcount: raw.headcount });
   const date = raw.date || "0000-01-01";
   const lots = new Map();
   const orderRef = { next: 0, byItem: {} };
-  const policy = new Map();
 
   for (const opening of raw.openingLots || []) {
     const role = opening.role || classifyItem(opening.name, opening.uom, settings);
@@ -431,17 +365,7 @@ function computeLedger(raw) {
       receivedDate: receipt.receivedDate || date,
     });
     addReceipt(lot, receipt.source || "I", qty, Boolean(receipt.balance));
-    const prev = policy.get(lot.itemKey);
-    const next = receipt.issuePolicy || "today";
-    policy.set(lot.itemKey, prev === "all" || next === "all" ? "all" : next);
   }
-
-  for (const [name, value] of Object.entries(raw.issuePolicies || {})) {
-    const key = normalizeName(name);
-    if (value === "all" || !policy.has(key)) policy.set(key, value);
-  }
-
-  ensureRuleLots(lots, orderRef, settings, plan, raw.priceHints || [], date);
 
   const groups = new Map();
   for (const lot of lots.values()) {
@@ -449,30 +373,15 @@ function computeLedger(raw) {
     list.push(lot);
     groups.set(lot.itemKey, list);
   }
+  ensureIssuedLots(lots, groups, orderRef, raw.mealIssues, settings, date);
+  ensureIssuedLots(lots, groups, orderRef, raw.otherIssues, settings, date);
 
-  const otherByItem = new Map();
-  for (const issue of raw.otherIssues || []) {
-    const key = normalizeName(issue.name);
-    otherByItem.set(key, add(otherByItem.get(key) || 0n, toScaled(issue.qty)));
-  }
+  const mealByItem = qtyByName(raw.mealIssues);
+  const otherByItem = qtyByName(raw.otherIssues);
 
   for (const [itemKey, group] of groups) {
-    const role = group[0].role;
-    if (role === "fuel") {
-      allocateFifo(group, plan.fuelAmountScaled);
-    } else if (role === "rice") {
-      allocateFifo(group, plan.riceKgScaled);
-    } else if (role === "milk" && settings.milk.mode !== "purchase") {
-      allocateFifo(group, plan.milkQtyScaled);
-    } else if (role === "spice") {
-      const rule = spiceRuleFor(group[0].name, settings);
-      const planned = plan.spices.find((row) => row.match === rule?.match);
-      allocateFifo(group, planned?.qtyScaled ?? 0n);
-    } else {
-      for (const lot of group) {
-        lot.mealQty = freshMealQty(lot, policy.get(itemKey) || "today");
-      }
-    }
+    const meal = mealByItem.get(itemKey) || 0n;
+    if (meal !== 0n) allocateFifo(group, meal);
     const other = otherByItem.get(itemKey) || 0n;
     if (other !== 0n) allocateOther(group, other);
   }
@@ -483,13 +392,7 @@ function computeLedger(raw) {
 
   const sumMealOut = sumField(lines, "mealAmount");
   const sumTotalOut = sumField(lines, "totalOutAmount");
-  const riceSubsidy = lines
-    .filter((line) => line.role === "rice")
-    .reduce((acc, line) => {
-      const gap = sub(toScaled(line.unitPrice), toScaled(settings.riceSettlementPrice));
-      if (gap <= 0n) return acc;
-      return add(acc, mul(toScaled(line.mealQty), gap));
-    }, 0n);
+  const riceSubsidy = toScaled(raw.riceSubsidy ?? raw.otherIncome?.riceSubsidy ?? 0);
 
   const finance = computeFinance({
     settings,
@@ -502,13 +405,17 @@ function computeLedger(raw) {
     sumTotalOut,
   });
 
-  const suggestions = suggestBalance(lines, settings);
-  const warnings = suggestions.map((row) => ({
-    code: "negative_stock",
-    name: row.name,
-    message: `${row.name} âm ${row.shortfall} ${row.uom}. Đề nghị nhập ${row.suggestQty} ${row.uom} vào Đơn vị BĐ mua TT.`,
-    ...row,
-  }));
+  const warnings = lines.filter((line) => line.negative).map((line) => {
+    const shortfall = String(line.closingQty).replace(/^-/, "");
+    return {
+      code: "negative_stock",
+      name: line.name,
+      uom: line.uom,
+      date,
+      shortfall,
+      message: `${line.name} tồn âm ${shortfall} ${line.uom}. Không chốt và không xuất sổ khi còn âm.`,
+    };
+  });
   if (finance.balanceWarn) {
     warnings.push({
       code: "balance_threshold",
@@ -518,16 +425,10 @@ function computeLedger(raw) {
 
   return {
     date,
-    plan: {
-      servings: plan.servings,
-      riceKg: plan.riceKg,
-      fuelAmount: plan.fuelAmount,
-      milkQty: plan.milkQty,
-      spices: plan.spices.map(({ match, qty }) => ({ match, qty })),
-    },
+    plan: null,
     lines,
     finance,
-    suggestions,
+    suggestions: [],
     warnings,
     totals: {
       openingAmount: scaledToString(sumField(lines, "openingAmount")),
@@ -558,69 +459,9 @@ function isBlankLine(line) {
   return fields.every((field) => toScaled(line[field]) === 0n);
 }
 
-function ensureRuleLots(lots, orderRef, settings, plan, hints, date) {
-  const have = (role, match) => [...lots.values()].some((lot) => {
-    if (lot.role !== role) return false;
-    return match ? nameMatchesRule(lot.name, match) : true;
-  });
-  const hintFor = (role, match) => hints.find((hint) => {
-    const roleOk = (hint.role || classifyItem(hint.name, hint.uom, settings)) === role;
-    return roleOk && (!match || nameMatchesRule(hint.name, match));
-  });
-  if (plan.riceKgScaled > 0n && !have("rice")) {
-    const hint = hintFor("rice");
-    ensureLot(lots, orderRef, {
-      name: hint?.name || "Gạo",
-      uom: hint?.uom || "Kg",
-      unitPrice: hint?.unitPrice ?? settings.riceSettlementPrice,
-      commodityId: hint?.commodityId ?? null,
-      role: "rice",
-      receivedDate: date,
-    });
-  }
-  for (const spice of plan.spices) {
-    if (spice.qtyScaled === 0n || have("spice", spice.match)) continue;
-    const hint = hintFor("spice", spice.match);
-    if (!hint) continue;
-    ensureLot(lots, orderRef, {
-      name: hint.name,
-      uom: hint.uom,
-      unitPrice: hint.unitPrice,
-      commodityId: hint.commodityId ?? null,
-      role: "spice",
-      receivedDate: date,
-    });
-  }
-  if (plan.milkQtyScaled > 0n && settings.milk.mode !== "purchase" && !have("milk")) {
-    const hint = hintFor("milk");
-    if (hint) {
-      ensureLot(lots, orderRef, {
-        name: hint.name,
-        uom: hint.uom || "Hộp",
-        unitPrice: hint.unitPrice,
-        commodityId: hint.commodityId ?? null,
-        role: "milk",
-        receivedDate: date,
-      });
-    }
-  }
-  if (plan.fuelAmountScaled > 0n && !have("fuel")) {
-    ensureLot(lots, orderRef, {
-      name: "Chất đốt",
-      uom: "đ",
-      unitPrice: 1,
-      role: "fuel",
-      displayDash: true,
-      receivedDate: date,
-    });
-  }
-}
-
 export {
   classifyItem,
-  planRations,
   computeFinance,
   computeLedger,
-  suggestBalance,
   splitLedgerPages,
 };

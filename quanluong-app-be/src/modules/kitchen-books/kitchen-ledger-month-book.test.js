@@ -126,7 +126,9 @@ test("ngày chưa chốt vào bìa, đuôi sổ để null, khối tài chính l
   assert.equal(book.tail, null);
   assert.deepEqual(book.cover.draftDays, ["2026-10-02"]);
   assert.equal(book.cover.dateLine, "Ngày 01 tháng 10 năm 2026");
-  assert.equal(book.days[1].note, "Chưa đủ phiếu hoặc bảng giá");
+  assert.equal(book.days[1].note, "");
+  assert.equal(book.layout.headerRowCount, 4);
+  assert.equal(book.layout.leftHeader.some((cell) => cell[4] === "TG CB"), true);
   assert.equal(book.days[1].financeLines.length, 0);
   assert.equal(book.days[1].sheets[0].showTotal, false);
   assert.equal(countBookPages(book), 5);

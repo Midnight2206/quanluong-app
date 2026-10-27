@@ -6,7 +6,7 @@ import { toScaled } from "./kitchen-ledger-decimal.js";
 import { buildDayStructure } from "./kitchen-ledger-day-structure.js";
 import { buildDayFrame } from "./kitchen-ledger-frame.js";
 import { mapLedgerRecords, recordsPrompt } from "./kitchen-ledger-records.js";
-import { editSlipLines, mergeSlipDraft, normalizeSlipLines } from "./kitchen-ledger-slip-roundtrip.js";
+import { editSlipLines, normalizeSlipLines } from "./kitchen-ledger-slip-roundtrip.js";
 
 function same(actual, expected) {
   assert.equal(toScaled(actual), toScaled(expected), `${actual} ≠ ${expected}`);
@@ -141,11 +141,9 @@ test("khung ngày gom quân số, phiếu trên bảo đảm và sổ đã tính
   assert.equal(frame.books.stock.columns.some((column) => column.key === "inG" && column.role === "slip"), true);
   assert.equal(frame.books.stock.rows.some((row) => row.name === "Mực"), true);
   assert.equal(frame.books.finance, computed.finance);
-  const draft = frame.slipDraft.find((row) => row.name === "Mực");
-  same(draft.qty, computed.suggestions.find((row) => row.name === "Mực").suggestQty);
-  same(draft.qty, "5");
-  const locked = buildDayFrame({ ...frame, status: "locked", suggestions: computed.suggestions, structure: {} }, slips);
-  assert.equal(locked.slipDraft.length, 0);
+  same(muc.closingQty, "-3");
+  assert.equal(frame.slipDraft.length, 0);
+  assert.equal(computed.suggestions.length, 0);
 });
 
 test("tồn cuối ngày trước là tồn đầu ngày sau", () => {
@@ -165,18 +163,19 @@ test("tồn cuối ngày trước là tồn đầu ngày sau", () => {
   const first = named(day1.computed.lines, "Mực");
   same(first.openingQty, "10");
   same(first.inG, "2");
-  same(first.closingQty, "10");
+  same(first.mealQty, "0");
+  same(first.closingQty, "12");
   const day2 = run({
     date: "2026-10-14",
     slips: [{ id: 10, slipNo: 1, updatedAt: "2026-10-14T00:00:00.000Z", lines: [] }],
     openingLots: day1.computed.closingLots,
   });
-  same(named(day2.computed.lines, "Mực").openingQty, "10");
-  same(named(day2.frame.books.stock.rows, "Mực").openingQty, "10");
+  same(named(day2.computed.lines, "Mực").openingQty, "12");
+  same(named(day2.frame.books.stock.rows, "Mực").openingQty, "12");
   assert.equal(day2.frame.pulled.carryFrom, "2026-10-13");
 });
 
-test("sửa phiếu và cộng cân đối rồi sổ trên bảo đảm đổi theo", () => {
+test("sửa phiếu đổi G/H, gạo nhập tay không bị phiếu ghi đè", () => {
   const rice = {
     id: 5,
     commodityId: 4,
@@ -185,12 +184,39 @@ test("sửa phiếu và cộng cân đối rồi sổ trên bảo đảm đổi 
     priceKind: "market",
     commodity: { name: "Gạo tẻ", measureUnit: "Kg" },
   };
+  const ricePrice = { commodityId: 4, name: "Gạo tẻ", measureUnit: "Kg", unitPrice: "16000", tgsxPrice: null };
   const slips = [slipOf(2, [rice])];
   const first = run({ slips, movements: otherOut });
-  same(named(first.computed.lines, "Mực").inG, "2");
-  same(named(first.computed.lines, "Mực").closingQty, "-5");
-  assert.equal(first.computed.lines.some((line) => line.name === "Gạo tẻ" && toScaled(line.inG) === toScaled("3")), false);
-  assert.equal(first.assembled.warnings.some((row) => row.code === "rice_on_slip_ignored"), true);
+  first.assembled = assembleLedgerInput({
+    date: "2026-10-14",
+    settings: {},
+    slips,
+    movements: otherOut,
+    priceRows: [...priceRows, ricePrice],
+    priceTablePresent: true,
+  });
+  const withRice = assembleLedgerInput({
+    date: "2026-10-14",
+    settings: {},
+    slips,
+    movements: otherOut,
+    priceRows: [...priceRows, ricePrice],
+  });
+  assert.equal(withRice.input.receipts.some((row) => row.name === "Gạo tẻ" && row.source === "G"), true);
+  const manual = assembleLedgerInput({
+    date: "2026-10-14",
+    settings: {},
+    slips,
+    movements: [
+      ...otherOut,
+      { kind: "rice", source: "I", itemName: "Gạo tẻ", measureUnit: "Kg", qty: "1", unitPrice: "16000" },
+    ],
+    priceRows: [...priceRows, ricePrice],
+  });
+  const riceLines = manual.input.receipts.filter((row) => row.name === "Gạo tẻ");
+  assert.equal(riceLines.length, 1);
+  assert.equal(riceLines[0].source, "I");
+  same(riceLines[0].qty, "1");
 
   const edited = editSlipLines(normalizeSlipLines(slips), [{
     commodityId: 1,
@@ -199,17 +225,8 @@ test("sửa phiếu và cộng cân đối rồi sổ trên bảo đảm đổi 
   }]);
   const editedBook = run({ slips: slipsFrom(slips, edited), movements: otherOut });
   same(named(editedBook.computed.lines, "Mực").inG, "5");
-
-  const draft = first.frame.slipDraft.filter((row) => row.name === "Mực");
-  const merged = mergeSlipDraft(normalizeSlipLines(slips), draft);
-  const added = merged.find((line) => line.lineNote === "Cân đối sổ");
-  same(added.quantity, "5");
-  same(merged.find((line) => line.lineId === 4).quantity, "2");
-  const balanced = run({ slips: slipsFrom(slips, merged), movements: otherOut });
-  same(named(balanced.computed.lines, "Mực").inG, "7");
-  same(named(balanced.computed.lines, "Mực").mealQty, "2");
-  same(named(balanced.computed.lines, "Mực").closingQty, "0");
-  assert.equal(balanced.frame.slipDraft.some((row) => row.name === "Mực"), false);
+  assert.equal(editedBook.frame.slipDraft.length, 0);
+  assert.equal(edited.some((line) => line.lineNote === "Cân đối sổ"), false);
 });
 
 test("lịch làm việc là bản ghi chữ, máy chủ không tính từ đó", () => {

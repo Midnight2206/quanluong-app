@@ -50,11 +50,6 @@ function parseAmounts(raw) {
   return out;
 }
 
-function riceGramsFor(dailyAmount, fallbackLevels) {
-  const hit = (fallbackLevels || []).find((level) => Number(level.dailyAmount) === Number(dailyAmount));
-  return hit?.riceGrams || { sang: 140, trua: 270, chieu: 270 };
-}
-
 function amountsForRate(rate, splitRows, fallbackLevels) {
   const muc = Math.floor(Number(rate.mucTienAn));
   const latest = (splitRows || []).filter((row) => row.mealAllowanceRateId === rate.id).at(-1);
@@ -72,7 +67,6 @@ function levelsFromSelection(selected, fallbackLevels) {
     rateId: rate.id,
     dailyAmount: rate.mucTienAn,
     mealPrices: rate.periodAmounts,
-    riceGrams: riceGramsFor(rate.mucTienAn, fallbackLevels),
   }));
 }
 

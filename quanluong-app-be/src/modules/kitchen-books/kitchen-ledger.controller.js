@@ -27,6 +27,7 @@ async function saveLedgerController(req, res) {
     req.unitScope,
     req.effectiveUnitIds,
     req.dataScope,
+    { userId: req.user?.id ?? null, source: "manual" },
   );
   return respondSuccess(res, { message: "Đã lưu sổ nhập xuất LTTP", data });
 }
@@ -48,6 +49,7 @@ async function unlockLedgerController(req, res) {
     req.unitScope,
     req.effectiveUnitIds,
     req.dataScope,
+    { userId: req.user?.id ?? null },
   );
   return respondSuccess(res, { message: "Đã mở khóa ngày", data });
 }

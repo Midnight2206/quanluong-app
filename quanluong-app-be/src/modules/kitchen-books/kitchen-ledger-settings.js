@@ -1,49 +1,23 @@
 /**
  * Mặc định theo bếp tiểu đoàn (bộ chung). Bếp khác ghi đè theo đơn vị
- * (ví dụ ĐD5: ngưỡng 10.000, lễ tết chỉ trưa, sữa theo ngày bay).
+ * (ví dụ ĐD5: ngưỡng 10.000, lễ tết chỉ trưa). Không chứa định mức xuất.
  * XĐ-2: tiền đã sử dụng mặc định Σ Cộng xuất (ΣS), đúng sổ đang làm.
  */
 const DEFAULT_LEDGER_SETTINGS = {
   spentBasis: "total_out",
   balanceWarnThreshold: 20000,
   holidayLunchOnly: false,
-  riceSettlementPrice: 16000,
-  fuelPerServing: 2200,
-  servingWeights: { sang: 0.2, trua: 0.4, chieu: 0.4 },
   riceNamePattern: "gạo",
-  riceManualOnGuarantee: true,
-  requireIssueSlip: true,
-  requirePriceTable: true,
-  milk: {
-    mode: "patient_plus_levels",
-    boxesPerPerson: 1,
-    fromPatientExtra: true,
-    levelDailyAmounts: [130000],
-  },
-  spices: [
-    { match: "dầu ăn", peoplePerUnit: 25, qtyPerUnit: 1, roundStep: 0.1 },
-    { match: "nước mắm", peoplePerUnit: 20, qtyPerUnit: 1, roundStep: 0.1 },
-    { match: "muối", peoplePerUnit: 80, qtyPerUnit: 1, roundStep: 0.1 },
-    { match: "mỳ chính", peoplePerUnit: 250, qtyPerUnit: 1, roundStep: 0.1 },
-    { match: "mì chính", peoplePerUnit: 250, qtyPerUnit: 1, roundStep: 0.1 },
-    { match: "tiêu", peoplePerUnit: 40, qtyPerUnit: 0.1, roundStep: 0.1 },
-    { match: "ớt bột", peoplePerUnit: 40, qtyPerUnit: 0.1, roundStep: 0.1 },
-    { match: "đường", peoplePerUnit: 200, qtyPerUnit: 1, roundStep: 0.1 },
-    { match: "hành khô", fixedQty: 0.4 },
-    { match: "tỏi khô", fixedQty: 0.4 },
-  ],
   levels: [
     {
       code: "72",
       dailyAmount: 72000,
       mealPrices: { sang: 14400, trua: 28800, chieu: 28800 },
-      riceGrams: { sang: 140, trua: 270, chieu: 270 },
     },
     {
       code: "130",
       dailyAmount: 130000,
       mealPrices: { sang: 14400, trua: 86800, chieu: 28800 },
-      riceGrams: { sang: 140, trua: 280, chieu: 280 },
     },
   ],
   extraRates: { benhXa: 14400, benhNhan: 54000, omTrai: 20000, leTet: 108000 },
@@ -64,22 +38,6 @@ const DEFAULT_LEDGER_SETTINGS = {
     soTheoDoi: [
       { key: "nguoi_ghi", title: "Người ghi sổ", name: "" },
       { key: "chi_huy", title: "Chỉ huy đơn vị", name: "" },
-    ],
-  },
-  balanceRound: {
-    defaultStep: 1,
-    fuelStep: 100000,
-    steps: [
-      { match: "dầu", step: 1 },
-      { match: "mắm", step: 1 },
-      { match: "muối", step: 1 },
-      { match: "mỳ chính", step: 1 },
-      { match: "mì chính", step: 1 },
-      { match: "đường", step: 1 },
-      { match: "tiêu", step: 0.5 },
-      { match: "ớt", step: 0.5 },
-      { match: "hành", step: 0.5 },
-      { match: "tỏi", step: 0.5 },
     ],
   },
 };
@@ -111,21 +69,33 @@ function mergeSignatures(partial) {
   return out;
 }
 
+function levelWithoutNorms(level) {
+  return {
+    code: level.code ?? "",
+    dailyAmount: Number(level.dailyAmount),
+    mealPrices: {
+      sang: Number(level.mealPrices?.sang) || 0,
+      trua: Number(level.mealPrices?.trua) || 0,
+      chieu: Number(level.mealPrices?.chieu) || 0,
+    },
+  };
+}
+
 function mergeLedgerSettings(partial) {
   const src = partial && typeof partial === "object" ? partial : {};
+  const levels = Array.isArray(src.levels) && src.levels.length
+    ? src.levels.map(levelWithoutNorms)
+    : DEFAULT_LEDGER_SETTINGS.levels.map(levelWithoutNorms);
+  const threshold = Number(src.balanceWarnThreshold);
   return {
-    ...DEFAULT_LEDGER_SETTINGS,
-    ...src,
-    servingWeights: { ...DEFAULT_LEDGER_SETTINGS.servingWeights, ...(src.servingWeights || {}) },
-    milk: { ...DEFAULT_LEDGER_SETTINGS.milk, ...(src.milk || {}) },
+    spentBasis: src.spentBasis === "meal_out" ? "meal_out" : "total_out",
+    balanceWarnThreshold: Number.isFinite(threshold) && threshold > 0
+      ? threshold
+      : DEFAULT_LEDGER_SETTINGS.balanceWarnThreshold,
+    holidayLunchOnly: Boolean(src.holidayLunchOnly),
+    riceNamePattern: String(src.riceNamePattern || DEFAULT_LEDGER_SETTINGS.riceNamePattern),
+    levels,
     extraRates: { ...DEFAULT_LEDGER_SETTINGS.extraRates, ...(src.extraRates || {}) },
-    balanceRound: {
-      ...DEFAULT_LEDGER_SETTINGS.balanceRound,
-      ...(src.balanceRound || {}),
-      steps: src.balanceRound?.steps ?? DEFAULT_LEDGER_SETTINGS.balanceRound.steps,
-    },
-    spices: src.spices ?? DEFAULT_LEDGER_SETTINGS.spices,
-    levels: src.levels ?? DEFAULT_LEDGER_SETTINGS.levels,
     signatures: mergeSignatures(src.signatures),
   };
 }

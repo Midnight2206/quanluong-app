@@ -256,7 +256,17 @@ export function KitchenLedgerDayAside({
       <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
         <dt>Cộng</dt><dd className="text-right tabular-nums">{finance ? moneyText(finance.subtotal) : "—"}</dd>
         <dt>Thừa hôm trước</dt><dd className="text-right tabular-nums">{finance ? moneyText(finance.prevSurplus) : "—"}</dd>
-        <dt>Bù giá gạo</dt><dd className="text-right tabular-nums">{finance ? moneyText(finance.riceSubsidy) : "—"}</dd>
+        <dt>Bù giá gạo</dt>
+        <dd>
+          <input
+            aria-label="Bù giá gạo"
+            inputMode="decimal"
+            className={fieldClassSm}
+            disabled={disabled}
+            value={income.riceSubsidy ?? ""}
+            onChange={(event) => onIncome({ ...income, riceSubsidy: event.target.value })}
+          />
+        </dd>
       </dl>
       {[
         ["anThem", "Ăn thêm"],

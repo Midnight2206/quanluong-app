@@ -45,36 +45,9 @@ export function KitchenLedgerSettingsPanel({ settings, saving, onChange, onSave 
           Ngưỡng thừa/thiếu (đồng)
           <QtyInput label="Ngưỡng" value={settings.balanceWarnThreshold} onChange={(balanceWarnThreshold) => setFlag("balanceWarnThreshold", balanceWarnThreshold)} />
         </label>
-        <label className="grid gap-1 text-xs">
-          Giá gạo quyết toán
-          <QtyInput label="Giá gạo quyết toán" value={settings.riceSettlementPrice} onChange={(riceSettlementPrice) => setFlag("riceSettlementPrice", riceSettlementPrice)} />
-        </label>
-        <label className="grid gap-1 text-xs">
-          Chất đốt mỗi suất
-          <QtyInput label="Chất đốt mỗi suất" value={settings.fuelPerServing} onChange={(fuelPerServing) => setFlag("fuelPerServing", fuelPerServing)} />
-        </label>
-        <label className="grid gap-1 text-xs">
-          Sữa
-          <select className={fieldClassSm} value={settings.milkMode} onChange={(event) => setFlag("milkMode", event.target.value)}>
-            <option value="patient_plus_levels">Bệnh nhân + mức trong cấu hình</option>
-            <option value="purchase">Mua theo ngày (Đại đội 5)</option>
-          </select>
-        </label>
         <label className="flex items-center gap-2 text-xs">
           <input type="checkbox" checked={settings.holidayLunchOnly} onChange={(event) => setFlag("holidayLunchOnly", event.target.checked)} />
           Lễ tết chỉ tính bữa trưa
-        </label>
-        <label className="flex items-center gap-2 text-xs">
-          <input type="checkbox" checked={settings.requireIssueSlip} onChange={(event) => setFlag("requireIssueSlip", event.target.checked)} />
-          Bắt buộc có phiếu xuất
-        </label>
-        <label className="flex items-center gap-2 text-xs">
-          <input type="checkbox" checked={settings.requirePriceTable} onChange={(event) => setFlag("requirePriceTable", event.target.checked)} />
-          Bắt buộc có bảng giá
-        </label>
-        <label className="flex items-center gap-2 text-xs">
-          <input type="checkbox" checked={settings.riceManualOnGuarantee} onChange={(event) => setFlag("riceManualOnGuarantee", event.target.checked)} />
-          Gạo trên phiếu không ghi vào Trên BĐ
         </label>
         <div className="sm:col-span-2 space-y-3 border-t border-border pt-3">
           <h3 className="text-sm font-semibold">Chữ ký từng sổ</h3>

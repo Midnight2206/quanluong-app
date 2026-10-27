@@ -18,6 +18,8 @@ export function blankLine(partial = {}) {
     source: "I",
     qty: "",
     unitPrice: "",
+    sourceKind: "",
+    grade: "",
     issuePolicy: "today",
     ...partial,
   };
@@ -35,6 +37,50 @@ export function Note({ children, tone = "muted" }) {
     >
       {children}
     </p>
+  );
+}
+
+function IdentityFields({ line, disabled, onPatch, showPrice }) {
+  const known = line.sourceKind === "market" || line.sourceKind === "tgsx";
+  const complete = known && String(line.grade || "").trim();
+  return (
+    <div className="grid gap-1">
+      {complete ? (
+        <span className="self-center text-xs text-muted-foreground">
+          {line.sourceKind === "tgsx" ? "TGSX" : "Mua TT"} · {line.grade}
+        </span>
+      ) : (
+        <>
+          <select
+            aria-label="Nguồn hàng"
+            className={fieldClassSm}
+            value={known ? line.sourceKind : ""}
+            disabled={disabled}
+            onChange={(event) => onPatch({ sourceKind: event.target.value })}
+          >
+            <option value="">Nguồn</option>
+            <option value="market">Mua TT</option>
+            <option value="tgsx">TGSX</option>
+          </select>
+          <input
+            aria-label="Phẩm cấp"
+            className={fieldClassSm}
+            placeholder="Phẩm cấp"
+            value={line.grade}
+            disabled={disabled}
+            onChange={(event) => onPatch({ grade: event.target.value })}
+          />
+        </>
+      )}
+      {showPrice ? (
+        <QtyInput
+          label="Đơn giá"
+          value={line.unitPrice}
+          disabled={disabled}
+          onChange={(unitPrice) => onPatch({ unitPrice })}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -61,7 +107,7 @@ export function LineTable({ title, hint, lines, disabled, commodities, mode, onC
         <h3 className="text-sm font-semibold">{title}</h3>
         <div className="flex flex-wrap gap-2">
           {extra}
-          <Button type="button" variant="ghost" className="h-8 px-2 text-xs" disabled={disabled} onClick={() => onChange([...lines, blankLine()])}>
+          <Button type="button" variant="ghost" className="h-8 px-2 text-xs" disabled={disabled} onClick={() => onChange([...lines, blankLine(mode === "rice" ? { source: "G" } : {})])}>
             Thêm dòng
           </Button>
           <Button type="button" className="h-8 px-3 text-xs" disabled={disabled || saving} onClick={onSave}>
@@ -82,9 +128,24 @@ export function LineTable({ title, hint, lines, disabled, commodities, mode, onC
                 commodityId: commodity.id,
                 name: commodity.name || "",
                 measureUnit: commodity.measureUnit || "",
+                sourceKind: commodity.sourceKind || line.sourceKind || "",
+                grade: commodity.grade || line.grade || "",
               })}
             />
-            {mode === "self" ? (
+            {mode === "rice" ? (
+              <select
+                aria-label="Cột gạo"
+                className={fieldClassSm}
+                value={line.source || "G"}
+                disabled={disabled}
+                onChange={(event) => patch(line.key, { source: event.target.value })}
+              >
+                <option value="G">Trên BĐ mua TT</option>
+                <option value="H">Trên BĐ TGSX</option>
+                <option value="I">Đơn vị mua TT</option>
+                <option value="J">Đơn vị TGSX</option>
+              </select>
+            ) : mode === "self" ? (
               <select
                 aria-label="Nguồn"
                 className={fieldClassSm}
@@ -106,24 +167,19 @@ export function LineTable({ title, hint, lines, disabled, commodities, mode, onC
               />
             )}
             <QtyInput label="Số lượng" value={line.qty} disabled={disabled} onChange={(qty) => patch(line.key, { qty })} />
-            {mode === "self" ? (
-              <select
-                aria-label="Cách xuất"
-                className={fieldClassSm}
-                value={line.issuePolicy}
-                disabled={disabled}
-                onChange={(event) => patch(line.key, { issuePolicy: event.target.value })}
-              >
-                <option value="today">Xuất phần nhập hôm nay</option>
-                <option value="all">Xuất cả tồn</option>
-                <option value="keep">Giữ lại</option>
-              </select>
-            ) : (
+            {mode === "opening" ? (
               <QtyInput
                 label="Đơn giá"
                 value={line.unitPrice}
                 disabled={disabled || Boolean(line.commodityId)}
                 onChange={(unitPrice) => patch(line.key, { unitPrice })}
+              />
+            ) : (
+              <IdentityFields
+                line={line}
+                disabled={disabled}
+                showPrice={mode === "rice" && !line.commodityId}
+                onPatch={(partial) => patch(line.key, partial)}
               />
             )}
             <Button type="button" variant="ghost" className="h-8 px-2 text-xs" disabled={disabled} onClick={() => onChange(lines.filter((row) => row.key !== line.key))}>

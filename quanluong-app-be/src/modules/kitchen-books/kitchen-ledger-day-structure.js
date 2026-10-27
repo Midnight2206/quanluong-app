@@ -28,7 +28,7 @@ const DAY_COLUMNS = [
   { key: "inAmount", label: "Thành tiền", role: "computed" },
   { key: "totalInQty", label: "Số lượng", role: "computed" },
   { key: "totalInAmount", label: "Thành tiền", role: "computed" },
-  { key: "mealQty", label: "Số lượng", role: "computed" },
+  { key: "mealQty", label: "Số lượng", role: "manual" },
   { key: "mealAmount", label: "Thành tiền", role: "computed" },
   { key: "otherQty", label: "Số lượng", role: "manual" },
   { key: "otherAmount", label: "Thành tiền", role: "computed" },
@@ -55,9 +55,7 @@ function buildDayStructure(view = {}) {
     status: view.status || "draft",
     locked: view.status === "locked",
     ledgerBlocked: blocked,
-    note: blocked
-      ? (view.blockers?.[0]?.message || "Chưa đủ phiếu hoặc bảng giá")
-      : "",
+    note: blocked ? (view.blockers?.[0]?.message || "") : "",
     columns: DAY_COLUMNS,
     dateLine: dateLineOf(view.date),
     financeLines: financeLines(view.finance),
@@ -74,6 +72,7 @@ function buildDayStructure(view = {}) {
     manual: {
       selfSupply: rowsOf("self_supply", view.movements),
       rice: rowsOf("rice", view.movements),
+      mealOut: rowsOf("meal_out", view.movements),
       otherOut: rowsOf("other_out", view.movements),
       opening: rowsOf("opening", view.movements),
     },
