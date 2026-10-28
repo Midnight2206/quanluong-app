@@ -91,36 +91,43 @@ function sheetsFromLines(lines, totals) {
 }
 
 function expr(count, price, amount) {
-  if (!hasMoney(count) && !hasMoney(amount)) return "";
+  if (!hasMoney(count) && !hasMoney(amount)) return { text: "", parts: null };
   const left = formatLedgerNumber(count, { blankZero: false });
   const mid = formatLedgerNumber(price, { blankZero: false });
   const right = formatLedgerNumber(amount, { blankZero: false });
-  return `${left} x ${mid} = ${right}`;
+  return {
+    text: `${left} x ${mid} = ${right}`,
+    parts: { count: left, price: mid, amount: right },
+  };
 }
 
-function financeRow(label, value, tone) {
-  return { label, value, tone };
+function financeRow(label, value, tone, extra = {}) {
+  return { label, value, tone, ...extra };
 }
 
 function financeLines(finance) {
   if (!finance) return [];
   const lines = [financeRow("Thu", "", "heading")];
   for (const level of finance.levels || []) {
-    lines.push(financeRow("- Mức:", formatLedgerNumber(level.dailyAmount, { blankZero: false }), "line"));
+    lines.push(financeRow("- Mức:", formatLedgerNumber(level.dailyAmount, { blankZero: false }), "line", { align: "center" }));
     for (const meal of level.meals || []) {
+      const shown = expr(meal.headcount, meal.price, meal.amount);
       lines.push(financeRow(
         `+ ${MEAL_LABEL[meal.meal] || meal.meal}:`,
-        expr(meal.headcount, meal.price, meal.amount),
+        shown.text,
         "line",
+        { parts: shown.parts },
       ));
     }
   }
   lines.push(financeRow("Ăn thêm", "", "heading"));
   for (const extra of finance.extras || []) {
+    const shown = expr(extra.count, extra.rate, extra.amount);
     lines.push(financeRow(
       `+ ${EXTRA_LABEL[extra.key] || extra.key}`,
-      expr(extra.count, extra.rate, extra.amount),
+      shown.text,
       "line",
+      { parts: shown.parts },
     ));
   }
   const other = finance.otherIncome || {};
@@ -186,6 +193,7 @@ function buildMonthBook({ year, month, unitName, dayViews, cover = {}, signature
     cover: {
       unitName: unitName || "",
       commander: cover.commander || "",
+      commanderRankName: cover.commanderRankName || cover.commander || "",
       keeper: cover.keeper || "",
       dateLine: dateLine(year, month, 1),
       draftDays: days.filter((day) => day.draft).map((day) => day.date),

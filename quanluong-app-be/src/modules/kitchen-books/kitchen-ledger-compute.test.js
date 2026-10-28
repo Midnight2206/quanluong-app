@@ -171,6 +171,11 @@ test("cktc_17 khớp từng dòng và khối tài chính tới đồng", () => {
 
   const split = splitLedgerPages(result.lines);
   assert.equal(split[0].lines.length, 40);
+  const short = { name: "Gạo" };
+  const day01 = splitLedgerPages(Array.from({ length: 45 }, () => short));
+  const day03 = splitLedgerPages(Array.from({ length: 38 }, () => short));
+  assert.deepEqual(day01.map((page) => page.lines.length), [43, 2]);
+  assert.deepEqual(day03.map((page) => page.lines.length), [36, 2]);
   same(split[0].carry.openingAmount, "15702720");
   same(split[0].carry.inAmount, "5623000");
   same(split[0].carry.totalInAmount, "21325720");

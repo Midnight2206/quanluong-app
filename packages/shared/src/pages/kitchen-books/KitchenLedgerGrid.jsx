@@ -35,6 +35,14 @@ function totalText(totals, column) {
 function CktcCell({ row }) {
   if (!row) return null;
   if (row.tone === "heading" || !row.value) return row.label;
+  if (row.align === "center") {
+    return (
+      <span className="flex items-baseline gap-2">
+        <span>{row.label}</span>
+        <span className="flex-1 text-center tabular-nums">{row.value}</span>
+      </span>
+    );
+  }
   return (
     <span className="flex items-baseline justify-between gap-2">
       <span>{row.label}</span>
@@ -89,7 +97,7 @@ export function KitchenLedgerGrid({ lines, totals, financeLines, dateLine, signa
                     rowSpan={item.rowSpan}
                     colSpan={item.colSpan}
                     className={cn(
-                      "border-b border-r border-border px-1 py-1 text-center font-semibold leading-tight",
+                      "whitespace-pre-line border-b border-r border-border px-1 py-1 text-center font-semibold leading-tight",
                       item.id === "name" && "text-left",
                       item.id === "cktc" && "min-w-[16rem] align-middle",
                     )}
@@ -147,7 +155,7 @@ export function KitchenLedgerGrid({ lines, totals, financeLines, dateLine, signa
                     style={pinStyle(column)}
                     className={cn(
                       "border-t border-r border-border bg-muted px-1 py-1.5 tabular-nums",
-                      column.key === "name" ? "text-left" : "text-right",
+                      column.key === "name" ? "text-center font-bold" : "text-right",
                       column.pin != null && "sticky z-10 print:static",
                     )}
                   >

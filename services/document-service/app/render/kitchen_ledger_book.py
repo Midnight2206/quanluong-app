@@ -1,7 +1,7 @@
-"""Sổ nhập xuất LTTP — A4 dọc. Node đã cắt trang (splitLedgerPages); file này chỉ vẽ.
+"""Sổ nhập xuất LTTP — A4 dọc, số đo đã gồm tỉ lệ in 97 %.
 
-Thứ tự: bìa, rồi từng ngày trang trái (A–K) rồi trang phải (L–U). Không chèn trang trắng.
-`tail` khác null là móc đuôi sổ (biên bản tịnh kho + báo cáo công khai I–VII), chưa vẽ nội dung đó.
+Node cắt trang (splitLedgerPages). File này chỉ vẽ cho khớp mẫu
+docs/print-templates. Đuôi sổ 9 trang chưa vẽ: `tail` khác null chỉ thêm một trang móc.
 """
 
 from __future__ import annotations
@@ -13,382 +13,447 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 
-from app.render.fonts import FONT_BOLD, FONT_BOLD_ITALIC, FONT_REGULAR
-from app.render.signature_block import draw_signature_block
-from app.template.metadata import PageMeta, SignatureBlockConfig, SignatureSlot
+from app.render.fonts import FONT_BOLD, FONT_BOLD_ITALIC, FONT_ITALIC, FONT_REGULAR
 
-PAGE = PageMeta(
-    page_size="A4",
-    orientation="portrait",
-    margin_top=22,
-    margin_right=31,
-    margin_bottom=22,
-    margin_left=31,
-)
-HEADER_ROWS = 5
-HEADER_H = 54
-ROW_H = 12
-FONT_DATA = 7
-FONT_HEAD = 6.5
-
-# Cột A–K và L–U. Rộng tương đối; render co cho vừa khổ in.
-LEFT_WIDTHS = [16, 200, 26, 44, 30, 52, 28, 26, 28, 26, 50]
-RIGHT_WIDTHS = [30, 52, 30, 52, 30, 52, 30, 52, 108, 97]
-LEFT_KEYS = [
-    "stt", "name", "uom", "price", "openingQty", "openingAmount",
-    "inG", "inH", "inI", "inJ", "inAmount",
+ROW_H = 14.55
+HEADER_HS = [31.2, 14.55, 14.55, 14.55, 14.55]
+HEADER_H = sum(HEADER_HS)
+FIRST_TOP = 57.7
+NEXT_TOP = 43.1
+MIN_FIRST_ROWS = 28
+THIN = 0.73
+HAIR = 0.1
+LEFT_X = 31.2
+LEFT_WIDTHS = [24.5, 159.3, 26.3, 42.5, 31.6, 58.6, 35.3, 35.3, 32.8, 32.9, 53.2]
+RIGHT_WIDTHS = [32.8, 52.0, 33.5, 53.2, 31.6, 32.9, 31.6, 52.1, 95.0, 114.3]
+LEFT_SPEC = [
+    ("stt", "center", 12),
+    ("name", "left", 12),
+    ("uom", "center", 12),
+    ("price", "right", 11),
+    ("openingQty", "center", 11),
+    ("openingAmount", "right", 11),
+    ("inG", "center", 11),
+    ("inH", "center", 11),
+    ("inI", "center", 11),
+    ("inJ", "center", 11),
+    ("inAmount", "right", 10),
 ]
-RIGHT_KEYS = [
-    "totalInQty", "totalInAmount", "mealQty", "mealAmount",
-    "otherQty", "otherAmount", "totalOutQty", "totalOutAmount",
+RIGHT_SPEC = [
+    ("totalInQty", "center", 10),
+    ("totalInAmount", "right", 10),
+    ("mealQty", "center", 11),
+    ("mealAmount", "right", 11),
+    ("otherQty", "center", 11),
+    ("otherAmount", "right", 11),
+    ("totalOutQty", "center", 11),
+    ("totalOutAmount", "right", 11),
 ]
-LEFT_MONEY = {5: "openingAmount", 10: "inAmount"}
-RIGHT_MONEY = {1: "totalInAmount", 3: "mealAmount", 5: "otherAmount", 7: "totalOutAmount"}
-LEFT_ALIGN = {"name": "left", "openingAmount": "right", "inAmount": "right", "price": "right"}
-RIGHT_ALIGN = {
-    "totalInAmount": "right", "mealAmount": "right",
-    "otherAmount": "right", "totalOutAmount": "right",
-}
-
-# (cột, hàng, colspan, rowspan, chữ) — tiêu đề lặp mỗi trang, dòng 2–6 của mẫu.
-LEFT_HEADER = [
-    (0, 0, 1, 5, "TT"),
-    (1, 0, 1, 5, "Tên LTTP-Chất đốt"),
-    (2, 0, 1, 5, "ĐVT"),
-    (3, 0, 1, 5, "Đơn giá"),
-    (4, 0, 2, 1, "Ngày trước\nchuyển qua"),
-    (6, 0, 5, 1, "Nhập trong ngày"),
-    (4, 1, 1, 4, "Số\nlượng"),
-    (5, 1, 1, 4, "Thành\ntiền"),
-    (6, 1, 4, 1, "Số lượng"),
-    (10, 1, 1, 4, "Thành\ntiền"),
-    (6, 2, 2, 1, "Trên BĐ"),
-    (8, 2, 2, 1, "Đơn vị BĐ"),
-    (6, 3, 1, 2, "Mua TT"),
-    (7, 3, 1, 1, "TG"),
-    (8, 3, 1, 2, "Mua TT"),
-    (9, 3, 1, 1, "TG"),
-    (7, 4, 1, 1, "CB"),
-    (9, 4, 1, 1, "CB"),
-]
-RIGHT_HEADER = [
-    (0, 0, 2, 1, "Cộng nhập"),
-    (2, 0, 2, 1, "Xuất ăn\ntrong ngày"),
-    (4, 0, 2, 1, "Xuất khác"),
-    (6, 0, 2, 1, "Cộng xuất"),
-    (8, 0, 2, 1, "CÔNG KHAI\nTÀI CHÍNH"),
-    (0, 1, 1, 4, "Số\nlượng"),
-    (1, 1, 1, 4, "Thành\ntiền"),
-    (2, 1, 1, 4, "Số\nlượng"),
-    (3, 1, 1, 4, "Thành\ntiền"),
-    (4, 1, 1, 4, "Số\nlượng"),
-    (5, 1, 1, 4, "Thành\ntiền"),
-    (6, 1, 1, 4, "Số\nlượng"),
-    (7, 1, 1, 4, "Thành\ntiền"),
-    (8, 2, 2, 3, ""),
-]
+LEFT_MONEY = {5, 10}
+RIGHT_MONEY = {1, 3, 5, 7}
+# Mốc trong cột U, đo trên PDF mẫu.
+U_COUNT_RIGHT = 11.7
+U_X = 14.6
+U_PRICE = 23.3
+U_EQ = 58.1
+U_AMOUNT_RIGHT = 114.0
 
 
-def _fit_widths(widths: list[float], total: float) -> list[float]:
-    raw = sum(widths) or 1
-    scaled = [w * total / raw for w in widths[:-1]]
-    scaled.append(total - sum(scaled))
-    return scaled
+def _xs(widths: list[float]) -> list[float]:
+    points = [LEFT_X]
+    for width in widths:
+        points.append(round(points[-1] + width, 4))
+    return points
 
 
-def _fit_size(text: str, font: str, size: float, width: float) -> float:
-    fitted = size
-    while fitted > 4.5 and stringWidth(text, font, fitted) > width:
-        fitted -= 0.25
-    return fitted
+def _size(nominal: float) -> float:
+    return nominal * 0.97
 
 
-def _draw_cell(c, x, y_top, w, h, text, font, size, align="center") -> None:
+def _hline(c, x0, x1, top, page_h, width) -> None:
+    y = page_h - top
     c.setStrokeColor(black)
-    c.setFillColor(black)
-    c.setLineWidth(0.3)
-    c.rect(x, y_top - h, w, h, stroke=1, fill=0)
+    c.setLineWidth(width)
+    c.line(x0, y, x1, y)
+
+
+def _vlines(c, xs, top, bottom, page_h, skip=()) -> None:
+    c.setStrokeColor(black)
+    c.setLineWidth(THIN)
+    y0 = page_h - bottom
+    y1 = page_h - top
+    for index, x in enumerate(xs):
+        if index in skip:
+            continue
+        c.line(x, y0, x, y1)
+
+
+def _baseline(top, height, size, page_h, lines=1) -> float:
+    line_h = size + 1.15
+    block = line_h * lines
+    first = top + height / 2 - block / 2 + size * 0.78
+    return page_h - first
+
+
+def _text(c, x, top, width, height, text, font, nominal, align, page_h) -> None:
     raw = "" if text is None else str(text)
     if not raw:
         return
+    size = _size(nominal)
     lines = raw.split("\n")
-    inner = max(w - 3, 4)
-    fitted = min(_fit_size(line, font, size, inner) for line in lines)
-    c.setFont(font, fitted)
-    line_h = fitted + 1.1
-    block = line_h * len(lines)
-    baseline = y_top - (h - block) / 2 - fitted
+    c.setFillColor(black)
+    c.setFont(font, size)
+    line_h = size + 1.15
     for index, line in enumerate(lines):
-        yy = baseline - index * line_h
+        baseline = _baseline(top, height, size, page_h, len(lines)) - index * line_h
         if align == "left":
-            c.drawString(x + 1.5, yy, line)
+            c.drawString(x + 1.5, baseline, line)
         elif align == "right":
-            c.drawRightString(x + w - 1.5, yy, line)
+            c.drawRightString(x + width - 1.3, baseline, line)
         else:
-            c.drawCentredString(x + w / 2, yy, line)
+            c.drawCentredString(x + width / 2, baseline, line)
 
 
-def _span_box(widths, col, span):
-    x = sum(widths[:col])
-    w = sum(widths[col:col + span])
-    return x, w
+def _span(xs, col, span):
+    return xs[col], xs[col + span] - xs[col]
 
 
-def _layout(book):
-    layout = book.get("layout") if isinstance(book, dict) else None
-    return layout if isinstance(layout, dict) else {}
+def _header_texts(side, date_line):
+    if side == "left":
+        return [
+            (0, 0, 1, 5, "TT", FONT_BOLD, 12),
+            (1, 0, 1, 5, "Tên LTTP-Chất đốt", FONT_BOLD, 11),
+            (2, 0, 1, 5, "ĐVT", FONT_BOLD, 10),
+            (3, 0, 1, 5, "Đơn giá", FONT_BOLD, 10),
+            (4, 0, 2, 1, "Ngày trước\nchuyển qua", FONT_BOLD, 12),
+            (6, 0, 5, 1, "Nhập trong ngày", FONT_BOLD, 12),
+            (4, 1, 1, 4, "Số\nlượng", FONT_BOLD, 10),
+            (5, 1, 1, 4, "Thành tiền", FONT_BOLD, 10),
+            (6, 1, 4, 1, "Số lượng", FONT_BOLD, 12),
+            (10, 1, 1, 4, "Thành\ntiền", FONT_BOLD, 10),
+            (6, 2, 2, 1, "Trên BĐ", FONT_BOLD, 10),
+            (8, 2, 2, 1, "Đơn vị BĐ", FONT_BOLD, 10),
+            (6, 3, 1, 2, "Mua\nTT", FONT_BOLD, 10),
+            (8, 3, 1, 2, "Mua\nTT", FONT_BOLD, 10),
+            (7, 3, 1, 1, "TG", FONT_BOLD, 10),
+            (9, 3, 1, 1, "TG", FONT_BOLD, 10),
+            (7, 4, 1, 1, "CB", FONT_BOLD, 10),
+            (9, 4, 1, 1, "CB", FONT_BOLD, 10),
+        ]
+    return [
+        (0, 0, 2, 1, "Cộng nhập", FONT_BOLD, 12),
+        (2, 0, 2, 1, "Xuất ăn\ntrong ngày", FONT_BOLD, 12),
+        (4, 0, 2, 1, "Xuất khác", FONT_BOLD, 12),
+        (6, 0, 2, 1, "Cộng xuất", FONT_BOLD, 12),
+        (8, 0, 2, 1, "CÔNG KHAI TÀI CHÍNH", FONT_BOLD, 12),
+        (0, 1, 1, 4, "Số\nlượng", FONT_BOLD, 10),
+        (1, 1, 1, 4, "Thành tiền", FONT_BOLD, 10),
+        (2, 1, 1, 4, "Số\nlượng", FONT_BOLD, 10),
+        (3, 1, 1, 4, "Thành tiền", FONT_BOLD, 10),
+        (4, 1, 1, 4, "Số\nlượng", FONT_BOLD, 10),
+        (5, 1, 1, 4, "Thành\ntiền", FONT_BOLD, 10),
+        (6, 1, 1, 4, "Số\nlượng", FONT_BOLD, 10),
+        (7, 1, 1, 4, "Thành tiền", FONT_BOLD, 10),
+        (8, 1, 2, 1, date_line or "", FONT_BOLD, 12),
+    ]
 
 
-def _header_rows(book) -> int:
-    count = _layout(book).get("headerRowCount")
-    return int(count) if count else HEADER_ROWS
+def _draw_header(c, page_h, table_top, xs, side, date_line) -> float:
+    bands = []
+    cursor = table_top
+    for height in HEADER_HS:
+        bands.append(cursor)
+        cursor += height
+    bottom = table_top + HEADER_H
+    x0, x1 = xs[0], xs[-1]
+    _hline(c, x0, x1, table_top, page_h, THIN)
+    _hline(c, x0, x1, bottom, page_h, THIN)
+    if side == "left":
+        _hline(c, xs[4], x1, bands[1], page_h, THIN)
+        _hline(c, xs[6], xs[10], bands[2], page_h, THIN)
+        _hline(c, xs[6], xs[10], bands[3], page_h, THIN)
+    else:
+        _hline(c, x0, xs[8], bands[1], page_h, THIN)
+    for col, band, span, rows, text, font, nominal in _header_texts(side, date_line):
+        x, width = _span(xs, col, span)
+        height = sum(HEADER_HS[band:band + rows])
+        _text(c, x, bands[band], width, height, text, font, nominal, "center", page_h)
+    return bottom
 
 
-def _font_data(book) -> float:
-    size = _layout(book).get("fontData")
-    return float(size) if size else FONT_DATA
+def _parts(row):
+    parts = row.get("parts") if isinstance(row, dict) else None
+    if isinstance(parts, dict) and parts.get("count"):
+        return parts
+    value = str((row or {}).get("value") or "")
+    if " x " in value and " = " in value:
+        left, rest = value.split(" x ", 1)
+        mid, amount = rest.split(" = ", 1)
+        return {"count": left.strip(), "price": mid.strip(), "amount": amount.strip()}
+    return None
 
 
-def _side_header(book, side, date_line):
-    layout = _layout(book)
-    key = "leftHeader" if side == "left" else "rightHeader"
-    cells = layout.get(key)
-    if not cells:
-        if side == "left":
-            return LEFT_HEADER
-        return list(RIGHT_HEADER) + [(8, 1, 2, 1, date_line or "Ngày")]
-    header = [tuple(cell) for cell in cells]
-    if side == "right":
-        slot = layout.get("dateCell") or [8, 1, 2, 1]
-        header.append((int(slot[0]), int(slot[1]), int(slot[2]), int(slot[3]), date_line or "Ngày"))
-    return header
+def _finance_kind(row) -> str:
+    tone = (row or {}).get("tone") or (row or {}).get("kind") or ""
+    if tone:
+        return tone
+    label = str((row or {}).get("label") or "")
+    if label in ("Thu", "Ăn thêm", "Chi", "So sánh"):
+        return "heading"
+    if label.startswith("Cộng"):
+        return "total"
+    return "line"
 
 
-def _draw_header(c, origin_x, y_top, widths, cells, header_rows=HEADER_ROWS) -> float:
-    band = HEADER_H / header_rows
-    for col, row, span, rows, text in cells:
-        x, w = _span_box(widths, col, span)
-        _draw_cell(
-            c, origin_x + x, y_top - row * band, w, band * rows,
-            text, FONT_BOLD, FONT_HEAD,
+def _draw_finance(c, page_h, top, height, xs, row) -> None:
+    if not row:
+        return
+    x_t, w_t = _span(xs, 8, 1)
+    _, w_u = _span(xs, 9, 1)
+    kind = _finance_kind(row)
+    label = str(row.get("label") or "")
+    if kind == "heading":
+        _text(c, x_t, top, w_t + w_u, height, label, FONT_BOLD, 12, "center", page_h)
+        return
+    font = FONT_BOLD if kind == "total" else FONT_REGULAR
+    _text(c, x_t, top, w_t, height, label, font, 12, "left", page_h)
+    parts = _parts(row)
+    if parts and kind != "total":
+        size = _size(12)
+        c.setFillColor(black)
+        c.setFont(FONT_REGULAR, size)
+        base = _baseline(top, height, size, page_h)
+        x_u = x_t + w_t
+        c.drawRightString(x_u + U_COUNT_RIGHT, base, parts["count"])
+        c.drawString(x_u + U_X, base, "x")
+        c.drawString(x_u + U_PRICE, base, parts["price"])
+        c.drawString(x_u + U_EQ, base, "=")
+        c.drawRightString(x_u + U_AMOUNT_RIGHT, base, parts["amount"])
+        return
+    align = "center" if row.get("align") == "center" or label.startswith("- Mức") else "right"
+    _text(c, x_t + w_t, top, w_u, height, row.get("value") or "", font, 12, align, page_h)
+
+
+def _draw_values(c, page_h, top, xs, spec, values, font_for, nominal_for) -> None:
+    for index, (key, align, nominal) in enumerate(spec):
+        x, width = _span(xs, index, 1)
+        _text(
+            c, x, top, width, ROW_H,
+            (values or {}).get(key, ""),
+            font_for(index, nominal),
+            nominal_for(index, nominal),
+            align,
+            page_h,
         )
-    return y_top - HEADER_H
 
 
-def _draw_data_row(c, origin_x, y_top, widths, keys, aligns, values, font, font_size=FONT_DATA) -> float:
-    x = origin_x
-    for key, width in zip(keys, widths):
-        align = aligns.get(key, "center")
-        if key == "name":
-            align = "left"
-        _draw_cell(c, x, y_top, width, ROW_H, values.get(key, ""), font, font_size, align)
-        x += width
-    return y_top - ROW_H
-
-
-def _money_row(c, origin_x, y_top, widths, keys, money_map, label, values, label_index) -> float:
-    x = origin_x
-    for index, (_key, width) in enumerate(zip(keys, widths)):
-        field = money_map.get(index)
-        if field:
-            _draw_cell(
-                c, x, y_top, width, ROW_H, values.get(field, ""),
-                FONT_BOLD_ITALIC, FONT_DATA, "right",
-            )
-        elif index == label_index:
-            _draw_cell(c, x, y_top, width, ROW_H, label, FONT_BOLD_ITALIC, 6.5, "left")
-        else:
-            _draw_cell(c, x, y_top, width, ROW_H, "", FONT_REGULAR, FONT_DATA)
-        x += width
-    return y_top - ROW_H
+def _money_values(values, indexes, spec):
+    out = {}
+    for index in indexes:
+        key = spec[index][0]
+        out[key] = (values or {}).get(key, "")
+    return out
 
 
 def _watermark(c, page_w, page_h) -> None:
     c.saveState()
-    c.setFillColor(Color(0.72, 0.72, 0.72))
+    c.setFillColor(Color(0.75, 0.75, 0.75))
     c.setFont(FONT_BOLD, 64)
     c.translate(page_w / 2, page_h / 2)
     c.rotate(35)
     c.drawCentredString(0, 0, "NHÁP")
     c.restoreState()
     c.setFillColor(black)
-    c.setFont(FONT_BOLD, 9)
-    c.drawString(PAGE.margin_left, page_h - 14, "NHÁP")
 
 
-def _slots(pairs: list[tuple[str, str]]) -> SignatureBlockConfig:
-    return SignatureBlockConfig(
-        slots=[
-            SignatureSlot(key=key, label=label, col=index, col_span=1)
-            for index, (key, label) in enumerate(pairs)
-        ],
-        columns=len(pairs),
-        gap_pt=46,
-    )
+def _draw_signatures(c, page_h, top, xs, side, book) -> None:
+    title_top = top + 15.1
+    name_top = title_top + 17.4 + 15.1 * 3
+    sigs = book.get("signatures") or {}
+    if side == "left":
+        slots = [
+            (0, 4, "QUẢN LÝ ĐƠN VỊ", sigs.get("quan_ly") or ""),
+            (6, 11, "TRỰC BAN", sigs.get("truc_ban") or ""),
+        ]
+    else:
+        slots = [(8, 10, "CHỈ HUY ĐƠN VỊ", sigs.get("chi_huy") or "")]
+    for start, end, title, name in slots:
+        x, width = xs[start], xs[end] - xs[start]
+        _text(c, x, title_top, width, 17.4, title, FONT_BOLD, 14, "center", page_h)
+        if str(name).strip():
+            _text(c, x, name_top, width, 17.4, name, FONT_BOLD, 14, "center", page_h)
 
 
-def _draw_signatures(c, anchor_y, pairs, book) -> None:
-    if anchor_y < PAGE.margin_bottom + 70:
-        anchor_y = PAGE.margin_bottom + 96
-    draw_signature_block(
-        c,
-        _slots(pairs),
-        book.get("signatures") or {},
-        {},
-        anchor_y,
-        PAGE,
-        body_font_size=8,
-        signature_images=book.get("signatureImages") or {},
-        signature_image_layout=book.get("signatureImageLayout"),
-    )
-
-
-def _wrap(text: str, font: str, size: float, width: float) -> list[str]:
-    words = str(text).split()
-    lines: list[str] = []
-    current = ""
-    for word in words:
-        trial = word if not current else f"{current} {word}"
-        if stringWidth(trial, font, size) <= width:
-            current = trial
+def _draw_side(c, book, day, sheet, side, page_w, page_h, first) -> None:
+    if day.get("draft"):
+        _watermark(c, page_w, page_h)
+    left = side == "left"
+    widths = LEFT_WIDTHS if left else RIGHT_WIDTHS
+    spec = LEFT_SPEC if left else RIGHT_SPEC
+    xs = _xs(widths)
+    table_top = FIRST_TOP if first else NEXT_TOP
+    if first and not left:
+        _text(
+            c, xs[0], table_top - 15.1, xs[-1] - xs[0], 15.1,
+            "ĐVT: Đồng", FONT_ITALIC, 12, "right", page_h,
+        )
+    header_bottom = _draw_header(c, page_h, table_top, xs, side, day.get("dateLine") or "")
+    rows = [dict(row) for row in (sheet.get("rows") or [])]
+    if first and len(rows) < MIN_FIRST_ROWS:
+        rows.extend({} for _ in range(MIN_FIRST_ROWS - len(rows)))
+    sequence = []
+    if sheet.get("carryIn"):
+        sequence.append(("carry", "Mang sang", sheet["carryIn"]))
+    for index, row in enumerate(rows):
+        sequence.append(("data", index, row))
+    if sheet.get("carryOut"):
+        sequence.append(("carry", "Cộng sang trang", sheet["carryOut"]))
+    if sheet.get("showTotal"):
+        sequence.append(("total", "Cộng", sheet.get("totals") or {}))
+    skip = () if left else (9,)
+    body_bottom = header_bottom + ROW_H * len(sequence)
+    _vlines(c, xs, table_top, body_bottom, page_h, skip)
+    cursor = header_bottom
+    finance = day.get("financeLines") or []
+    for seq_index, item in enumerate(sequence):
+        kind = item[0]
+        nxt = sequence[seq_index + 1][0] if seq_index + 1 < len(sequence) else ""
+        edge = THIN if kind in ("carry", "total") or nxt in ("carry", "total") else HAIR
+        _hline(c, xs[0], xs[-1], cursor + ROW_H, page_h, edge)
+        if kind == "data":
+            index, row = item[1], item[2]
+            _draw_values(
+                c, page_h, cursor, xs, spec, row,
+                lambda _i, _n: FONT_REGULAR,
+                lambda _i, n: n,
+            )
+            if first and not left and index < len(finance):
+                _draw_finance(c, page_h, cursor, ROW_H, xs, finance[index])
         else:
-            if current:
-                lines.append(current)
-            current = word
+            label, values = item[1], item[2]
+            money = LEFT_MONEY if left else RIGHT_MONEY
+            shown = _money_values(values, money, spec)
+
+            def font_for(index, _nominal, shown=shown, spec=spec, kind=kind):
+                if not shown.get(spec[index][0]):
+                    return FONT_REGULAR
+                return FONT_BOLD if kind == "total" else FONT_BOLD_ITALIC
+
+            def nominal_for(index, nominal, shown=shown, spec=spec, kind=kind):
+                if kind == "total" and shown.get(spec[index][0]):
+                    return 10
+                return nominal
+
+            _draw_values(c, page_h, cursor, xs, spec, shown, font_for, nominal_for)
+            if left:
+                label_font = FONT_BOLD if kind == "total" else FONT_BOLD_ITALIC
+                label_size = 11 if kind == "total" else 12
+                label_align = "center" if kind == "total" else "left"
+                x, width = _span(xs, 1, 1)
+                _text(c, x, cursor, width, ROW_H, label, label_font, label_size, label_align, page_h)
+        cursor += ROW_H
+    if sheet.get("showSignature"):
+        _draw_signatures(c, page_h, cursor, xs, side, book)
+
+
+def _wrap_runs(runs, width, size) -> list[list[tuple[str, str]]]:
+    words = []
+    for text, font in runs:
+        for word in str(text).split():
+            words.append((word, font))
+    lines: list[list[tuple[str, str]]] = []
+    current: list[tuple[str, str]] = []
+    used = 0.0
+    for word, font in words:
+        piece = stringWidth(word, font, size)
+        gap = stringWidth(" ", font, size) if current else 0
+        if current and used + gap + piece > width:
+            lines.append(current)
+            current = [(word, font)]
+            used = piece
+        else:
+            current.append((word, font))
+            used += gap + piece
     if current:
         lines.append(current)
-    return lines or [""]
+    return lines or [[]]
+
+
+def _draw_justified(c, x, baseline, width, line, size, justify) -> None:
+    if not line:
+        return
+    if len(line) == 1 or not justify:
+        cursor = x
+        for index, (word, font) in enumerate(line):
+            c.setFont(font, size)
+            c.drawString(cursor, baseline, word)
+            cursor += stringWidth(word + (" " if index + 1 < len(line) else ""), font, size)
+        return
+    words_w = 0.0
+    for word, font in line:
+        words_w += stringWidth(word, font, size)
+    gap = (width - words_w) / (len(line) - 1)
+    cursor = x
+    for word, font in line:
+        c.setFont(font, size)
+        c.drawString(cursor, baseline, word)
+        cursor += stringWidth(word, font, size) + gap
 
 
 def _draw_cover(c, book, page_w, page_h) -> None:
     cover = book.get("cover") or {}
-    width = page_w - PAGE.margin_left - PAGE.margin_right
-    commander = cover.get("commander") or ""
+    left = 35 * 72 / 25.4
+    right = 15 * 72 / 25.4
+    width = page_w - left - right
+    size = 14
+    commander = cover.get("commanderRankName") or cover.get("commander") or ""
     keeper = cover.get("keeper") or ""
-    paragraphs = [
-        (FONT_REGULAR, 13, f"Chỉ huy đơn vị: {commander} chứng nhận".strip()),
-        (FONT_REGULAR, 13, (
-            f"Giao sổ này cho đồng chí: {keeper} – Nhân viên quản lý để làm sổ nhập – xuất "
-            "lương thực, thực phẩm, chất đốt, tiền ăn hằng ngày, hằng tháng của bộ đội "
-            "và công khai trước đơn vị"
-        )),
-        (FONT_REGULAR, 13, cover.get("dateLine") or ""),
+    para_runs = [
+        [("Chỉ huy đơn vị: ", FONT_REGULAR), (commander, FONT_BOLD), (" chứng nhận", FONT_REGULAR)],
+        [
+            ("Giao sổ này cho đồng chí: ", FONT_REGULAR),
+            (keeper, FONT_BOLD),
+            (
+                " – Nhân viên quản lý để làm sổ nhập – xuất lương thực, thực phẩm, "
+                "chất đốt, tiền ăn hằng ngày, hằng tháng của bộ đội và công khai trước đơn vị",
+                FONT_REGULAR,
+            ),
+        ],
     ]
-    wrapped = []
-    for font, size, text in paragraphs:
-        wrapped.append((font, size, _wrap(text, font, size, width - 36)))
+    paragraphs = [_wrap_runs(runs, width, size) for runs in para_runs]
+    line_h = 17.4
+    para_h = sum(len(lines) * line_h + 8 for lines in paragraphs)
+    block = para_h + 34 + 16 + 16 + 96
+    cursor = (page_h - block) / 2
+    c.setFillColor(black)
+    for lines in paragraphs:
+        for index, line in enumerate(lines):
+            baseline = page_h - (cursor + size * 0.8)
+            _draw_justified(c, left, baseline, width, line, size, index < len(lines) - 1)
+            cursor += line_h
+        cursor += 8
+    cursor += 26
+    col_left = left + 79.7 * 72 / 25.4
+    col_w = 80.3 * 72 / 25.4
+    _text(c, col_left, cursor, col_w, 16, cover.get("dateLine") or "", FONT_ITALIC, 14 / 0.97, "center", page_h)
+    cursor += 16
+    _text(c, col_left, cursor, col_w, 16, "CHỈ HUY ĐƠN VỊ", FONT_BOLD, 14 / 0.97, "center", page_h)
+    cursor += 96
+    _text(c, col_left, cursor, col_w, 16, commander, FONT_BOLD, 14 / 0.97, "center", page_h)
     draft_days = cover.get("draftDays") or []
-    warning = ""
     if draft_days:
         shown = ", ".join(day[8:10] + "/" + day[5:7] for day in draft_days if len(day) >= 10)
         warning = f"Chưa chốt, trang các ngày sau in NHÁP: {shown}"
-    line_h = 16
-    block = sum(len(lines) * line_h + 8 for _, _, lines in wrapped)
-    if warning:
-        block += 28
-    y = page_h / 2 + block / 2
-    if cover.get("unitName"):
-        c.setFont(FONT_BOLD, 12)
-        c.drawCentredString(page_w / 2, y + 28, str(cover["unitName"]))
-    for font, size, lines in wrapped:
-        c.setFont(font, size)
-        for line in lines:
-            c.drawCentredString(page_w / 2, y, line)
-            y -= line_h
-        y -= 8
-    _draw_signatures(c, y, [("chi_huy", "Chỉ huy đơn vị")], book)
-    if warning:
         c.setFillColor(Color(0.55, 0.1, 0.1))
         c.setFont(FONT_BOLD, 10)
-        warn_y = PAGE.margin_bottom + 40
-        for line in _wrap(warning, FONT_BOLD, 10, width - 20):
-            c.drawCentredString(page_w / 2, warn_y, line)
-            warn_y -= 12
+        c.drawCentredString(page_w / 2, 56, warning)
         c.setFillColor(black)
 
 
-def _draw_finance(c, x, y_top, width, lines) -> float:
-    if not lines:
-        return y_top
-    label_w = width * 0.48
-    value_w = width - label_w
-    y = y_top
-    for row in lines:
-        _draw_cell(c, x, y, label_w, ROW_H, row.get("label", ""), FONT_REGULAR, 6.2, "left")
-        _draw_cell(c, x + label_w, y, value_w, ROW_H, row.get("value", ""), FONT_REGULAR, 6.2, "right")
-        y -= ROW_H
-    return y
-
-
-def _draw_side(c, book, day, sheet, side, page_w, page_h) -> None:
-    if day.get("draft"):
-        _watermark(c, page_w, page_h)
-    content_w = page_w - PAGE.margin_left - PAGE.margin_right
-    left = side == "left"
-    widths = _fit_widths(LEFT_WIDTHS if left else RIGHT_WIDTHS, content_w if left else content_w)
-    y = page_h - PAGE.margin_top
-    c.setFillColor(black)
-    c.setFont(FONT_REGULAR, 8)
-    if left:
-        c.drawString(PAGE.margin_left, y, day.get("dateLine") or "")
-    else:
-        c.drawRightString(page_w - PAGE.margin_right, y, "ĐVT: Đồng")
-    y -= 12
-    header_rows = _header_rows(book)
-    font_size = _font_data(book)
-    if left:
-        y = _draw_header(c, PAGE.margin_left, y, widths, _side_header(book, "left", day.get("dateLine")), header_rows)
-    else:
-        y = _draw_header(c, PAGE.margin_left, y, widths, _side_header(book, "right", day.get("dateLine")), header_rows)
-    keys = LEFT_KEYS if left else RIGHT_KEYS
-    aligns = LEFT_ALIGN if left else RIGHT_ALIGN
-    money_map = LEFT_MONEY if left else RIGHT_MONEY
-    label_index = 1 if left else 0
-    if sheet.get("carryIn"):
-        y = _money_row(
-            c, PAGE.margin_left, y, widths, keys, money_map, "Mang sang", sheet["carryIn"], label_index,
-        )
-    for row in sheet.get("rows") or []:
-        y = _draw_data_row(c, PAGE.margin_left, y, widths, keys, aligns, row, FONT_REGULAR, font_size)
-    if day.get("note") and not sheet.get("rows"):
-        y = _draw_data_row(
-            c, PAGE.margin_left, y, widths, keys, aligns,
-            {"name": day["note"]} if left else {"totalInQty": day["note"]},
-            FONT_BOLD,
-        )
-    if sheet.get("carryOut"):
-        y = _money_row(
-            c, PAGE.margin_left, y, widths, keys, money_map, "Cộng sang trang", sheet["carryOut"], label_index,
-        )
-    if sheet.get("showTotal"):
-        y = _money_row(
-            c, PAGE.margin_left, y, widths, keys, money_map, "Cộng", sheet.get("totals") or {}, label_index,
-        )
-    finance_bottom = y
-    if not left:
-        finance_w = widths[-2] + widths[-1]
-        finance_x = PAGE.margin_left + sum(widths[:-2])
-        finance_top = y + ROW_H * (
-            (1 if sheet.get("carryIn") else 0)
-            + len(sheet.get("rows") or [])
-            + (1 if day.get("note") and not sheet.get("rows") else 0)
-            + (1 if sheet.get("carryOut") else 0)
-            + (1 if sheet.get("showTotal") else 0)
-        )
-        # Khối tài chính nằm cạnh các dòng hàng, không tính lại số.
-        finance_bottom = _draw_finance(c, finance_x, finance_top, finance_w, day.get("financeLines") or [])
-    if sheet.get("showSignature"):
-        bottom = min(y, finance_bottom)
-        pairs = [("quan_ly", "Quản lý đơn vị"), ("truc_ban", "Trực ban")] if left else [("chi_huy", "Chỉ huy đơn vị\n(đóng dấu)")]
-        _draw_signatures(c, bottom - 8, pairs, book)
-
-
 def _draw_tail(c, tail, page_w, page_h) -> None:
-    # ponytail: nội dung đuôi sổ chưa làm. Có payload là thêm một trang để móc sau.
+    # Đuôi sổ 9 trang (tịnh kho, công khai I–VII) chưa dựng. Có payload thì giữ một trang móc.
     c.setFont(FONT_BOLD, 14)
-    title = ""
-    if isinstance(tail, dict):
-        title = str(tail.get("title") or "")
+    title = str(tail.get("title") or "") if isinstance(tail, dict) else ""
     c.drawCentredString(page_w / 2, page_h / 2, title or "Đuôi sổ")
 
 
@@ -401,11 +466,12 @@ def render_kitchen_ledger_book(book: dict) -> bytes:
     page_w, page_h = A4
     _draw_cover(c, book, page_w, page_h)
     for day in book["days"]:
-        for sheet in day.get("sheets") or []:
+        sheets = day.get("sheets") or []
+        for index, sheet in enumerate(sheets):
             c.showPage()
-            _draw_side(c, book, day, sheet, "left", page_w, page_h)
+            _draw_side(c, book, day, sheet, "left", page_w, page_h, index == 0)
             c.showPage()
-            _draw_side(c, book, day, sheet, "right", page_w, page_h)
+            _draw_side(c, book, day, sheet, "right", page_w, page_h, index == 0)
     tail = book.get("tail")
     if tail:
         c.showPage()

@@ -6,12 +6,14 @@ import { percentsToAmounts, percentSum } from "./ledgerMealSplit.js";
 test("header trang trái + trang phải phủ kín 20 cột, không chồng", () => {
   const rows = ledgerHeaderRows("Ngày 01 tháng 10 năm 2026");
   const grid = headerCoverage(rows);
-  assert.equal(grid.length, 4);
+  assert.equal(grid.length, 5);
   assert.equal(grid[0].length, LEDGER_BODY_COLUMNS.length);
   assert.equal(grid[0][0], "tt");
   assert.equal(grid[0][1], "name");
   assert.equal(grid[3][6], "g");
-  assert.equal(grid[3][9], "j");
+  assert.equal(grid[3][7], "h-tg");
+  assert.equal(grid[4][7], "h-cb");
+  assert.equal(grid[3][9], "j-tg");
   assert.equal(grid[0][19], "cktc");
   assert.equal(rows[0].at(-1).dateLine, "Ngày 01 tháng 10 năm 2026");
 });

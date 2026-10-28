@@ -111,7 +111,7 @@ def _book(tail=None):
 
 def _text(pdf: bytes) -> tuple[PdfReader, str]:
     reader = PdfReader(BytesIO(pdf))
-    blob = "\n".join((page.extract_text() or "") for page in reader.pages)
+    blob = " ".join("\n".join((page.extract_text() or "") for page in reader.pages).split())
     return reader, blob
 
 

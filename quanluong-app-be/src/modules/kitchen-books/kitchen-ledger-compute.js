@@ -255,33 +255,83 @@ function sumField(lines, field) {
   return lines.reduce((acc, line) => add(acc, toScaled(line[field])), 0n);
 }
 
-function splitLedgerPages(lines, options = {}) {
-  const singlePageMax = options.singlePageMax ?? 28;
-  const pageCapacity = options.pageCapacity ?? 40;
-  const minTail = options.minTail ?? 2;
-  if (lines.length <= singlePageMax) {
-    return [{ lines, carry: null }];
+/** Chiều cao in, đã gồm tỉ lệ 97 %. Khớp docs/print-templates/print-spec.md mục 3.4. */
+const PRINT_ROW_H = 14.55;
+const PRINT_FIRST_BODY = 798.7 - 147.1;
+const PRINT_NEXT_BODY = 798.7 - 132.6;
+const PRINT_SIGNATURE = 95.2;
+const PRINT_NAME_INNER = 156;
+
+function nameUnits(name) {
+  const text = String(name || "").trim();
+  if (!text) return 1;
+  const words = text.split(/\s+/);
+  let lines = 1;
+  let used = 0;
+  for (const word of words) {
+    const width = Math.max(word.length, 1) * 4.9 + 3.2;
+    if (used > 0 && used + width > PRINT_NAME_INNER) {
+      lines += 1;
+      used = width;
+    } else {
+      used += width;
+    }
   }
+  return lines;
+}
+
+function rowPrintHeight(line, rowH) {
+  return (line?.printUnits || nameUnits(line?.name)) * rowH;
+}
+
+function splitLedgerPages(lines, options = {}) {
+  const rowH = options.rowHeight ?? PRINT_ROW_H;
+  const firstBody = options.firstBody ?? PRINT_FIRST_BODY;
+  const nextBody = options.nextBody ?? PRINT_NEXT_BODY;
+  const signature = options.signatureBlock ?? PRINT_SIGNATURE;
+  const minTail = options.minTail ?? 2;
+  const source = lines || [];
+  if (!source.length) return [{ lines: [], carry: null }];
+  const height = (line) => rowPrintHeight(line, rowH);
+  const sumH = (rows) => rows.reduce((sum, line) => sum + height(line), 0);
+  const fitCount = (rows, budget) => {
+    let used = 0;
+    let count = 0;
+    for (const line of rows) {
+      const next = height(line);
+      if (count > 0 && used + next > budget + 0.05) break;
+      used += next;
+      count += 1;
+      if (next > budget + 0.05) break;
+    }
+    return count;
+  };
+  const carryOf = (slice) => ({
+    openingAmount: scaledToString(sumField(slice, "openingAmount")),
+    inAmount: scaledToString(sumField(slice, "inAmount")),
+    totalInAmount: scaledToString(sumField(slice, "totalInAmount")),
+    mealAmount: scaledToString(sumField(slice, "mealAmount")),
+    otherAmount: scaledToString(sumField(slice, "otherAmount")),
+    totalOutAmount: scaledToString(sumField(slice, "totalOutAmount")),
+  });
   const pages = [];
   let index = 0;
-  while (index < lines.length) {
-    let take = Math.min(pageCapacity, lines.length - index);
-    const rest = lines.length - index - take;
-    if (rest > 0 && rest < minTail) take = lines.length - index - minTail;
-    if (take <= 0) take = lines.length - index;
-    const slice = lines.slice(index, index + take);
+  let first = true;
+  while (index < source.length) {
+    const rest = source.slice(index);
+    const body = first ? firstBody : nextBody;
+    if (sumH(rest) + rowH + signature <= body + 0.05) {
+      pages.push({ lines: rest, carry: null });
+      break;
+    }
+    let take = fitCount(rest, body - rowH);
+    if (take >= rest.length) take = rest.length - minTail;
+    if (rest.length - take < minTail) take = rest.length - minTail;
+    if (take < 1) take = 1;
+    const slice = rest.slice(0, take);
     index += take;
-    const carry = index < lines.length
-      ? {
-        openingAmount: scaledToString(sumField(slice, "openingAmount")),
-        inAmount: scaledToString(sumField(slice, "inAmount")),
-        totalInAmount: scaledToString(sumField(slice, "totalInAmount")),
-        mealAmount: scaledToString(sumField(slice, "mealAmount")),
-        otherAmount: scaledToString(sumField(slice, "otherAmount")),
-        totalOutAmount: scaledToString(sumField(slice, "totalOutAmount")),
-      }
-      : null;
-    pages.push({ lines: slice, carry });
+    pages.push({ lines: slice, carry: index < source.length ? carryOf(slice) : null });
+    first = false;
   }
   return pages;
 }
