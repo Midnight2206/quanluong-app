@@ -11,7 +11,7 @@ from openpyxl import load_workbook
 
 os.environ.setdefault("DOCUMENT_SERVICE_KEY", "test-key")
 
-from app.render.kitchen_ledger_book import render_kitchen_ledger_book
+from app.render.kitchen_ledger_book import header_merge_boxes, render_kitchen_ledger_book
 
 ROOT = Path("/workspace/docs/print-templates")
 MAU = ROOT / "mau"
@@ -172,6 +172,74 @@ def _horizontals(page):
             if abs(p1.y - p2.y) < 0.4 and abs(p1.x - p2.x) > 8:
                 ys.append(round(p1.y, 1))
     return sorted(set(ys))
+
+
+def _segments(page):
+    found = []
+    for drawing in page.get_drawings():
+        for item in drawing.get("items", []):
+            if item[0] != "l":
+                continue
+            p1, p2 = item[1], item[2]
+            found.append((p1.x, p1.y, p2.x, p2.y))
+    return found
+
+
+def _line_cuts_box(seg, box, eps=0.6):
+    x0, y0, x1, y1 = box
+    ax, ay, bx, by = seg
+    if abs(ax - bx) < 0.4:
+        x = (ax + bx) / 2
+        if not (x0 + eps < x < x1 - eps):
+            return False
+        top, bot = min(ay, by), max(ay, by)
+        return min(bot, y1 - eps) - max(top, y0 + eps) > 0.4
+    if abs(ay - by) < 0.4:
+        y = (ay + by) / 2
+        if not (y0 + eps < y < y1 - eps):
+            return False
+        left, right = min(ax, bx), max(ax, bx)
+        return min(right, x1 - eps) - max(left, x0 + eps) > 0.4
+    return False
+
+
+def test_merged_header_cells_have_no_inner_line():
+    pdf = render_kitchen_ledger_book(_book())
+    doc = pymupdf.open(stream=pdf, filetype="pdf")
+    # Tờ đầu ngày 01: trang trái rồi trang phải.
+    pages = {"left": doc[1], "right": doc[2]}
+    named = {
+        "left": [
+            "Ngày trước chuyển qua",
+            "Nhập trong ngày",
+            "Số lượng nhập",
+            "Trên BĐ",
+            "Đơn vị BĐ",
+            "Mua TT trên",
+            "TG CB trên",
+            "Mua TT đơn vị",
+            "TG CB đơn vị",
+            "TT",
+            "Tên LTTP-Chất đốt",
+        ],
+        "right": [
+            "Cộng nhập",
+            "Xuất ăn trong ngày",
+            "Xuất khác",
+            "Cộng xuất",
+            "CÔNG KHAI TÀI CHÍNH",
+            "Số lượng xuất ăn",
+            "Thành tiền xuất ăn",
+        ],
+    }
+    for side, page in pages.items():
+        segs = _segments(page)
+        boxes = {name: box for name, *box in header_merge_boxes(side)}
+        for name in named[side]:
+            box = boxes[name]
+            cut = [seg for seg in segs if _line_cuts_box(seg, box)]
+            assert not cut, (side, name, box, cut[:3])
+    doc.close()
 
 
 def test_sheet_breaks_match_sample_days():

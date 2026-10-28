@@ -158,27 +158,96 @@ def _header_texts(side, date_line):
     ]
 
 
+def _header_merges(side):
+    """Ô gộp tiêu đề: chỉ viền ngoài, không có đường kẻ bên trong."""
+    if side == "left":
+        return [
+            ("TT", 0, 0, 1, 5),
+            ("Tên LTTP-Chất đốt", 1, 0, 1, 5),
+            ("ĐVT", 2, 0, 1, 5),
+            ("Đơn giá", 3, 0, 1, 5),
+            ("Ngày trước chuyển qua", 4, 0, 2, 1),
+            ("Nhập trong ngày", 6, 0, 5, 1),
+            ("Số lượng tồn", 4, 1, 1, 4),
+            ("Thành tiền tồn", 5, 1, 1, 4),
+            ("Số lượng nhập", 6, 1, 4, 1),
+            ("Thành tiền nhập", 10, 1, 1, 4),
+            ("Trên BĐ", 6, 2, 2, 1),
+            ("Đơn vị BĐ", 8, 2, 2, 1),
+            ("Mua TT trên", 6, 3, 1, 2),
+            ("TG CB trên", 7, 3, 1, 2),
+            ("Mua TT đơn vị", 8, 3, 1, 2),
+            ("TG CB đơn vị", 9, 3, 1, 2),
+        ]
+    return [
+        ("Cộng nhập", 0, 0, 2, 1),
+        ("Xuất ăn trong ngày", 2, 0, 2, 1),
+        ("Xuất khác", 4, 0, 2, 1),
+        ("Cộng xuất", 6, 0, 2, 1),
+        ("CÔNG KHAI TÀI CHÍNH", 8, 0, 2, 5),
+        ("Số lượng cộng nhập", 0, 1, 1, 4),
+        ("Thành tiền cộng nhập", 1, 1, 1, 4),
+        ("Số lượng xuất ăn", 2, 1, 1, 4),
+        ("Thành tiền xuất ăn", 3, 1, 1, 4),
+        ("Số lượng xuất khác", 4, 1, 1, 4),
+        ("Thành tiền xuất khác", 5, 1, 1, 4),
+        ("Số lượng cộng xuất", 6, 1, 1, 4),
+        ("Thành tiền cộng xuất", 7, 1, 1, 4),
+    ]
+
+
+def header_merge_boxes(side, table_top=FIRST_TOP):
+    """(tên, x0, y0, x1, y1) theo mép trên trang. Dùng cho test ô gộp."""
+    xs = _xs(LEFT_WIDTHS if side == "left" else RIGHT_WIDTHS)
+    bands = []
+    cursor = table_top
+    for height in HEADER_HS:
+        bands.append(cursor)
+        cursor += height
+    boxes = []
+    for name, col, row, span, rows in _header_merges(side):
+        y0 = bands[row]
+        boxes.append((
+            name,
+            xs[col],
+            y0,
+            xs[col + span],
+            y0 + sum(HEADER_HS[row:row + rows]),
+        ))
+    return boxes
+
+
+def _draw_merge_borders(c, boxes, page_h) -> None:
+    seen = set()
+    c.setStrokeColor(black)
+    c.setLineWidth(THIN)
+    for _name, x0, y0, x1, y1 in boxes:
+        edges = (
+            (x0, y0, x1, y0),
+            (x0, y1, x1, y1),
+            (x0, y0, x0, y1),
+            (x1, y0, x1, y1),
+        )
+        for x_a, y_a, x_b, y_b in edges:
+            key = (round(x_a, 2), round(y_a, 2), round(x_b, 2), round(y_b, 2))
+            if key in seen:
+                continue
+            seen.add(key)
+            c.line(x_a, page_h - y_a, x_b, page_h - y_b)
+
+
 def _draw_header(c, page_h, table_top, xs, side, date_line) -> float:
     bands = []
     cursor = table_top
     for height in HEADER_HS:
         bands.append(cursor)
         cursor += height
-    bottom = table_top + HEADER_H
-    x0, x1 = xs[0], xs[-1]
-    _hline(c, x0, x1, table_top, page_h, THIN)
-    _hline(c, x0, x1, bottom, page_h, THIN)
-    if side == "left":
-        _hline(c, xs[4], x1, bands[1], page_h, THIN)
-        _hline(c, xs[6], xs[10], bands[2], page_h, THIN)
-        _hline(c, xs[6], xs[10], bands[3], page_h, THIN)
-    else:
-        _hline(c, x0, xs[8], bands[1], page_h, THIN)
+    _draw_merge_borders(c, header_merge_boxes(side, table_top), page_h)
     for col, band, span, rows, text, font, nominal in _header_texts(side, date_line):
         x, width = _span(xs, col, span)
         height = sum(HEADER_HS[band:band + rows])
         _text(c, x, bands[band], width, height, text, font, nominal, "center", page_h)
-    return bottom
+    return table_top + HEADER_H
 
 
 def _parts(row):
@@ -312,7 +381,8 @@ def _draw_side(c, book, day, sheet, side, page_w, page_h, first) -> None:
         sequence.append(("total", "Cộng", sheet.get("totals") or {}))
     skip = () if left else (9,)
     body_bottom = header_bottom + ROW_H * len(sequence)
-    _vlines(c, xs, table_top, body_bottom, page_h, skip)
+    # Cột chỉ kẻ từ dưới tiêu đề. Trong tiêu đề, đường dọc nằm trên viền ô gộp.
+    _vlines(c, xs, header_bottom, body_bottom, page_h, skip)
     cursor = header_bottom
     finance = day.get("financeLines") or []
     for seq_index, item in enumerate(sequence):
