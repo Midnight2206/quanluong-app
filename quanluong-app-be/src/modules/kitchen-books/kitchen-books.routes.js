@@ -45,6 +45,7 @@ import {
   lockLedgerController,
   saveLedgerController,
   saveLedgerSettingsController,
+  syncLedgerSlipController,
   unlockLedgerController,
 } from "./kitchen-ledger.controller.js";
 import {
@@ -93,6 +94,7 @@ import {
   lockLedgerBodySchema,
   saveLedgerBodySchema,
   saveLedgerSettingsBodySchema,
+  syncLedgerSlipBodySchema,
   unlockLedgerBodySchema,
 } from "./kitchen-ledger.validator.js";
 import {
@@ -465,6 +467,14 @@ kitchenBooksRouter.post(
   validateRequest({ body: balanceLedgerBodySchema }),
   permissionMiddleware([routePermissions.balanceKitchenLedger]),
   asyncHandler(balanceLedgerController),
+);
+
+kitchenBooksRouter.post(
+  "/ledger/slip-sync",
+  dataScopeMw,
+  validateRequest({ body: syncLedgerSlipBodySchema }),
+  permissionMiddleware([routePermissions.syncKitchenLedgerSlip]),
+  asyncHandler(syncLedgerSlipController),
 );
 
 export { kitchenBooksRouter };

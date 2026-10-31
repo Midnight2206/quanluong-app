@@ -1,3 +1,5 @@
+import { dateLine, financeLines } from "./kitchen-ledger-month-book.js";
+
 const MEALS = [
   { key: "sang", label: "Sáng" },
   { key: "trua", label: "Trưa" },
@@ -17,24 +19,29 @@ const DAY_COLUMNS = [
   { key: "name", label: "Tên LTTP", role: "identity" },
   { key: "uom", label: "ĐVT", role: "identity" },
   { key: "unitPrice", label: "Đơn giá", role: "price" },
-  { key: "openingQty", label: "Tồn SL", role: "carry" },
-  { key: "openingAmount", label: "Tồn tiền", role: "carry" },
-  { key: "inG", label: "BĐ mua", role: "slip" },
-  { key: "inH", label: "BĐ TG", role: "slip" },
-  { key: "inI", label: "ĐV mua", role: "manual" },
-  { key: "inJ", label: "ĐV TG", role: "manual" },
-  { key: "inAmount", label: "Tiền nhập", role: "computed" },
-  { key: "totalInQty", label: "Cộng SL", role: "computed" },
-  { key: "totalInAmount", label: "Cộng tiền", role: "computed" },
-  { key: "mealQty", label: "Ăn SL", role: "computed" },
-  { key: "mealAmount", label: "Ăn tiền", role: "computed" },
-  { key: "otherQty", label: "Khác SL", role: "manual" },
-  { key: "otherAmount", label: "Khác tiền", role: "computed" },
-  { key: "totalOutQty", label: "Xuất SL", role: "computed" },
-  { key: "totalOutAmount", label: "Xuất tiền", role: "computed" },
-  { key: "closingQty", label: "Còn SL", role: "computed" },
-  { key: "closingAmount", label: "Còn tiền", role: "computed" },
+  { key: "openingQty", label: "Số lượng", role: "carry" },
+  { key: "openingAmount", label: "Thành tiền", role: "carry" },
+  { key: "inG", label: "Mua TT", role: "slip" },
+  { key: "inH", label: "TG CB", role: "slip" },
+  { key: "inI", label: "Mua TT", role: "manual" },
+  { key: "inJ", label: "TG CB", role: "manual" },
+  { key: "inAmount", label: "Thành tiền", role: "computed" },
+  { key: "totalInQty", label: "Số lượng", role: "computed" },
+  { key: "totalInAmount", label: "Thành tiền", role: "computed" },
+  { key: "mealQty", label: "Số lượng", role: "manual" },
+  { key: "mealAmount", label: "Thành tiền", role: "computed" },
+  { key: "otherQty", label: "Số lượng", role: "manual" },
+  { key: "otherAmount", label: "Thành tiền", role: "computed" },
+  { key: "totalOutQty", label: "Số lượng", role: "computed" },
+  { key: "totalOutAmount", label: "Thành tiền", role: "computed" },
+  { key: "cktc", label: "Công khai tài chính", role: "finance" },
 ];
+
+function dateLineOf(iso) {
+  const [year, month, day] = String(iso || "").split("-").map(Number);
+  if (!year || !month || !day) return "";
+  return dateLine(year, month, day);
+}
 
 function rowsOf(kind, movements) {
   return (movements || []).filter((row) => row.kind === kind);
@@ -48,10 +55,10 @@ function buildDayStructure(view = {}) {
     status: view.status || "draft",
     locked: view.status === "locked",
     ledgerBlocked: blocked,
-    note: blocked
-      ? (view.blockers?.[0]?.message || "Chưa đủ phiếu hoặc bảng giá")
-      : "",
+    note: blocked ? (view.blockers?.[0]?.message || "") : "",
     columns: DAY_COLUMNS,
+    dateLine: dateLineOf(view.date),
+    financeLines: financeLines(view.finance),
     rows: (view.lines || []).map((line, index) => ({ ...line, tt: index + 1 })),
     totals: view.totals || null,
     finance: view.finance || null,
@@ -65,6 +72,7 @@ function buildDayStructure(view = {}) {
     manual: {
       selfSupply: rowsOf("self_supply", view.movements),
       rice: rowsOf("rice", view.movements),
+      mealOut: rowsOf("meal_out", view.movements),
       otherOut: rowsOf("other_out", view.movements),
       opening: rowsOf("opening", view.movements),
     },

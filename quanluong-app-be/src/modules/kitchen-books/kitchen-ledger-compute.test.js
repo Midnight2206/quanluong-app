@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assembleLedgerInput, fingerprintIssueSlips } from "./kitchen-ledger-assemble.js";
-import { computeFinance, computeLedger, planRations, splitLedgerPages } from "./kitchen-ledger-compute.js";
+import { computeFinance, computeLedger, splitLedgerPages } from "./kitchen-ledger-compute.js";
 import { sheetsFromLines } from "./kitchen-ledger-month-book.js";
 import { toScaled } from "./kitchen-ledger-decimal.js";
 import { DEFAULT_LEDGER_SETTINGS } from "./kitchen-ledger-settings.js";
@@ -71,13 +71,18 @@ const HEADCOUNT_17 = {
 function ledgerFromSheet(rows, headcount, finance) {
   const openingLots = [];
   const receipts = [];
-  for (const [name, uom, price, opening, g, h, i] of rows) {
+  const mealIssues = [];
+  for (const [name, uom, price, opening, g, h, i, mealMoney] of rows) {
     if (opening) {
       openingLots.push({ name, uom, unitPrice: price, qty: opening, receivedDate: "2026-10-16" });
     }
     if (g) receipts.push({ name, uom, unitPrice: price, qty: g, source: "G" });
     if (h) receipts.push({ name, uom, unitPrice: price, qty: h, source: "H" });
     if (i) receipts.push({ name, uom, unitPrice: price, qty: i, source: "I" });
+    if (mealMoney && Number(price)) {
+      const qty = Math.round((Number(mealMoney) / Number(price)) * 10000) / 10000;
+      mealIssues.push({ name, qty: String(qty), uom, unitPrice: price });
+    }
   }
   return computeLedger({
     date: "2026-10-17",
@@ -85,12 +90,13 @@ function ledgerFromSheet(rows, headcount, finance) {
     headcount,
     openingLots,
     receipts,
+    mealIssues,
     prevSurplus: finance.surplus,
     prevShortfall: finance.shortfall,
   });
 }
 
-test("13/10/2026: thu 9.953.780, chi 9.956.700, thiếu 2.920, gạo 72,97, chất đốt 234.080", () => {
+test("13/10/2026: thu 9.953.780, chi 9.956.700, thiếu 2.920. Quân số không đổi số xuất", () => {
   const headcount = {
     levels: [
       { dailyAmount: 72000, sang: 55, trua: 87, chieu: 64 },
@@ -98,12 +104,25 @@ test("13/10/2026: thu 9.953.780, chi 9.956.700, thiếu 2.920, gạo 72,97, ch�
     ],
     extras: { benhXa: 3, benhNhan: 2, omTrai: 5, leTet: 0 },
   };
-  const plan = planRations({ settings: DEFAULT_LEDGER_SETTINGS, headcount });
-  same(plan.riceKg, "72.97");
-  same(plan.fuelAmount, "234080");
-  same(plan.milkQty, "37");
-  same(plan.spices.find((row) => row.match === "nước mắm").qty, "5.3");
-  same(plan.spices.find((row) => row.match === "dầu ăn").qty, "4.3");
+  const mealIssues = [{ name: "Gạo tẻ thường", qty: "72.97", uom: "Kg", unitPrice: "16000" }];
+  const openingLots = [{ name: "Gạo tẻ thường", uom: "Kg", unitPrice: "16000", qty: "100", receivedDate: "2026-10-01" }];
+  const issued = computeLedger({
+    date: "2026-10-13",
+    settings: DEFAULT_LEDGER_SETTINGS,
+    headcount,
+    openingLots,
+    mealIssues,
+  });
+  const otherHead = computeLedger({
+    date: "2026-10-13",
+    settings: DEFAULT_LEDGER_SETTINGS,
+    headcount: { levels: [{ dailyAmount: 72000, sang: 1, trua: 1, chieu: 1 }], extras: {} },
+    openingLots,
+    mealIssues,
+  });
+  same(issued.lines[0].mealQty, "72.97");
+  same(otherHead.lines[0].mealQty, "72.97");
+  same(computeLedger({ date: "2026-10-13", settings: DEFAULT_LEDGER_SETTINGS, headcount, openingLots }).lines[0].mealQty, "0");
 
   const finance = computeFinance({
     settings: DEFAULT_LEDGER_SETTINGS,
@@ -152,6 +171,11 @@ test("cktc_17 khớp từng dòng và khối tài chính tới đồng", () => {
 
   const split = splitLedgerPages(result.lines);
   assert.equal(split[0].lines.length, 40);
+  const short = { name: "Gạo" };
+  const day01 = splitLedgerPages(Array.from({ length: 45 }, () => short));
+  const day03 = splitLedgerPages(Array.from({ length: 38 }, () => short));
+  assert.deepEqual(day01.map((page) => page.lines.length), [43, 2]);
+  assert.deepEqual(day03.map((page) => page.lines.length), [36, 2]);
   same(split[0].carry.openingAmount, "15702720");
   same(split[0].carry.inAmount, "5623000");
   same(split[0].carry.totalInAmount, "21325720");
@@ -205,6 +229,7 @@ test("FIFO: hết lô giá cũ rồi mới tới lô giá mới", () => {
     receipts: [
       { name: "Gạo tẻ thường", uom: "Kg", unitPrice: "16000", qty: "30", source: "G" },
     ],
+    mealIssues: [{ name: "Gạo tẻ thường", qty: "72.97" }],
   });
   const rice = result.lines.filter((line) => line.name === "Gạo tẻ thường");
   assert.equal(rice.length, 2);
@@ -217,47 +242,34 @@ test("FIFO: hết lô giá cũ rồi mới tới lô giá mới", () => {
   same(rice[1].mealAmount, "367520");
 });
 
-test("âm kho chỉ thành đề nghị; nhập bù khi đã có dòng balance", () => {
-  const headcount = {
-    levels: [{ dailyAmount: 72000, sang: 0, trua: 250, chieu: 0 }],
-    extras: { benhXa: 0, benhNhan: 0, omTrai: 0, leTet: 0 },
-  };
+test("tồn âm chỉ cảnh báo, không đề nghị số cân đối", () => {
   const before = computeLedger({
     date: "2026-10-15",
     settings: DEFAULT_LEDGER_SETTINGS,
-    headcount,
     openingLots: [
       { name: "Mỳ chính", uom: "Kg", unitPrice: "63000", qty: "0.1", receivedDate: "2026-10-01" },
     ],
+    mealIssues: [{ name: "Mỳ chính", qty: "0.4" }],
   });
-  const suggestion = before.suggestions.find((row) => row.name === "Mỳ chính");
-  same(before.plan.spices.find((row) => row.match === "mỳ chính").qty, "0.4");
-  same(suggestion.shortfall, "0.3");
-  same(suggestion.suggestQty, "1");
-  assert.equal(suggestion.source, "I");
+  const warning = before.warnings.find((row) => row.name === "Mỳ chính");
+  assert.equal(warning.code, "negative_stock");
+  same(warning.shortfall, "0.3");
+  assert.equal(before.suggestions.length, 0);
+  assert.equal(/Đề nghị nhập/.test(warning.message), false);
+  assert.equal(before.lines.find((row) => row.name === "Mỳ chính").negative, true);
 
   const after = computeLedger({
     date: "2026-10-15",
     settings: DEFAULT_LEDGER_SETTINGS,
-    headcount,
     openingLots: [
       { name: "Mỳ chính", uom: "Kg", unitPrice: "63000", qty: "0.1", receivedDate: "2026-10-01" },
     ],
-    receipts: [
-      {
-        name: "Mỳ chính",
-        uom: "Kg",
-        unitPrice: "63000",
-        qty: suggestion.suggestQty,
-        source: "I",
-        balance: true,
-      },
-    ],
+    receipts: [{ name: "Mỳ chính", uom: "Kg", unitPrice: "63000", qty: "1", source: "I" }],
+    mealIssues: [{ name: "Mỳ chính", qty: "0.4" }],
   });
   const line = after.lines.find((row) => row.name === "Mỳ chính");
   same(line.closingQty, "0.7");
   assert.equal(line.negative, false);
-  assert.equal(after.suggestions.some((row) => row.name === "Mỳ chính"), false);
 });
 
 test("tiền đã sử dụng theo cấu hình ΣS hoặc ΣO", () => {
@@ -279,7 +291,7 @@ test("tiền đã sử dụng theo cấu hình ΣS hoặc ΣO", () => {
   same(byMeal.finance.spent, "0");
 });
 
-test("assemble: G/H từ phiếu, gạo trên phiếu bị bỏ, thiếu phiếu thì chặn", () => {
+test("assemble: không phiếu vẫn lập sổ, gạo nhập tay không cộng đôi", () => {
   const slips = [
     {
       id: 15,
@@ -307,29 +319,42 @@ test("assemble: G/H từ phiếu, gạo trên phiếu bị bỏ, thiếu phiếu
     { commodityId: 1, name: "Gạo tẻ thường", measureUnit: "Kg", unitPrice: 16000, tgsxPrice: null },
     { commodityId: 2, name: "Đậu phụ", measureUnit: "Kg", unitPrice: 25000, tgsxPrice: 22000 },
   ];
-  const blocked = assembleLedgerInput({
+  const open = assembleLedgerInput({
     date: "2026-10-17",
     settings: DEFAULT_LEDGER_SETTINGS,
     slips: [],
     priceRows,
-    priceTablePresent: true,
+    movements: [
+      { kind: "self_supply", source: "I", itemName: "Hành tây", measureUnit: "Kg", qty: "0.8", unitPrice: "18000" },
+    ],
   });
-  assert.equal(blocked.blockers.some((row) => row.code === "missing_issue_slip"), true);
+  assert.equal(open.blockers.length, 0);
+  assert.equal(open.input.receipts.some((row) => row.source === "G" || row.source === "H"), false);
+  assert.equal(open.input.receipts[0].source, "I");
+
+  const fromSlip = assembleLedgerInput({
+    date: "2026-10-17",
+    settings: DEFAULT_LEDGER_SETTINGS,
+    slips,
+    priceRows,
+  });
+  const slipNames = fromSlip.input.receipts.map((row) => `${row.name}:${row.source}:${row.qty}`);
+  assert.ok(slipNames.includes("Gạo tẻ thường:G:1.8"));
+  assert.ok(slipNames.includes("Đậu phụ:H:11.9"));
 
   const built = assembleLedgerInput({
     date: "2026-10-17",
     settings: DEFAULT_LEDGER_SETTINGS,
     slips,
     priceRows,
-    priceTablePresent: true,
     movements: [
-      { kind: "rice", itemName: "Gạo tẻ thường", measureUnit: "Kg", qty: "5", unitPrice: "16000" },
+      { kind: "rice", source: "J", itemName: "Gạo tẻ thường", measureUnit: "Kg", qty: "5", unitPrice: "16000" },
     ],
   });
   assert.equal(built.blockers.length, 0);
-  assert.equal(built.warnings.some((row) => row.code === "rice_on_slip_ignored"), true);
+  assert.equal(built.warnings.some((row) => row.code === "rice_manual_kept"), true);
   const names = built.input.receipts.map((row) => `${row.name}:${row.source}:${row.qty}:${row.unitPrice}`);
-  assert.deepEqual(names, ["Đậu phụ:H:11.9:22000", "Gạo tẻ thường:G:5:16000"]);
+  assert.deepEqual(names, ["Đậu phụ:H:11.9:22000", "Gạo tẻ thường:J:5:16000"]);
 
   const changed = fingerprintIssueSlips([
     { ...slips[0], lines: [{ ...slips[0].lines[1], quantity: "12" }] },

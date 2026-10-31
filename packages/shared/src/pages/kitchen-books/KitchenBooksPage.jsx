@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TabPanel } from "@/components/common/TabPanel";
 import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlice";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
@@ -48,6 +48,8 @@ function sortUnitsByPath(units) {
 
 export function KitchenBooksPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const user = useCurrentUser();
   const { workingUnitId } = useTargetUnitScope();
   const canAccessMealRoster = useHasPermission(PERMISSIONS.MEAL_ROSTER_ACCESS);
@@ -129,6 +131,10 @@ export function KitchenBooksPage() {
     if (md == null) {
       md = readStoredKitchenMenuDate();
     }
+    const urlDate = searchParams.get("date");
+    if (typeof urlDate === "string" && YMD_RE.test(urlDate)) {
+      md = urlDate;
+    }
 
     try {
       writeStoredKitchenManualUnitId(null);
@@ -147,7 +153,7 @@ export function KitchenBooksPage() {
     }
 
     setYearMonthState(ym ?? localYearMonth());
-    setMenuDateState(md ?? localDateStr());
+    setMenuDate(md ?? localDateStr());
     shellPersistReadyRef.current = true;
   }, [shellPersistReady, canPickUnits, sortedUnits.length, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- shellDraft once when ready
 
@@ -174,15 +180,24 @@ export function KitchenBooksPage() {
 
   const selectedUnitId = manualUnitId ?? scopeUnitId;
   const [yearMonth, setYearMonthState] = useState(() => localYearMonth());
-  const [menuDate, setMenuDateState] = useState(() => localDateStr());
+  const [menuDate, setMenuDateState] = useState(() => {
+    const urlDate = searchParams.get("date");
+    return typeof urlDate === "string" && YMD_RE.test(urlDate) ? urlDate : localDateStr();
+  });
 
   const setYearMonth = useCallback((next) => {
     setYearMonthState(next);
   }, []);
 
   const setMenuDate = useCallback((next) => {
+    if (typeof next !== "string" || !YMD_RE.test(next)) return;
     setMenuDateState(next);
-  }, []);
+    const current = searchParams.get("date");
+    if (current === next) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("date", next);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [pathname, router, searchParams]);
 
   useEffect(() => {
     if (!shellPersistReadyRef.current || !shellPersistReady) {

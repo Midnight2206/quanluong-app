@@ -288,7 +288,7 @@ test("câu hàng ghi thêm vào dòng sẵn có", async () => {
   }, user, scope, null, dataScope, ctx(db, {
     configOverride: on,
     loadCommodities: async () => [
-      { id: 1, name: "Mực ống", measureUnit: "Kg" },
+      { id: 1, name: "Mực ống", measureUnit: "Kg", sourceKind: "market", grade: "loại 1" },
       { id: 2, name: "Sữa đặc", measureUnit: "Hộp" },
       { id: 3, name: "Sữa tươi", measureUnit: "Hộp" },
     ],
@@ -296,7 +296,7 @@ test("câu hàng ghi thêm vào dòng sẵn có", async () => {
       prompt = value;
       return {
         data: { records: [
-          { type: "outside_purchase", date: "2026-10-24", name: "mực", qty: 5, uom: "kg", unitPrice: "180k", confidence: 0.92, source: "mua ngoài 5kg mực 180k", column: "G" },
+          { type: "outside_purchase", date: "2026-10-24", name: "mực", qty: 5, uom: "kg", unitPrice: "180k", confidence: 0.92, source: "mua ngoài 5kg mực 180k" },
           { type: "outside_purchase", date: "2026-10-24", name: "sữa", qty: 40, uom: "hộp", confidence: 0.4, source: "sữa 40 hộp" },
         ] },
         model: "gpt-test",
@@ -459,7 +459,8 @@ test("cân đối không tự ghi sổ", async () => {
   }, user, scope, null, dataScope, ctx(db, {
     saveLedger: async () => { saved = true; },
   }));
-  assert.match(posted.message.content, /nút Cân đối/);
+  assert.match(posted.message.content, /không tự ghi/);
+  assert.match(posted.message.content, /Chưa chốt/);
   assert.equal(saved, false);
 });
 

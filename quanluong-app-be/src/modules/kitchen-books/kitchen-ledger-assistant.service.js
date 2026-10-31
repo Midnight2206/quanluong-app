@@ -8,6 +8,7 @@ import {
   assertKitchenWriteUnit,
 } from "./kitchen-books-scope.helpers.js";
 import { getLedger, saveLedger, saveLedgerSettings } from "./kitchen-ledger.service.js";
+import { withUnitMealLevels } from "./kitchen-ledger-meal-rates.js";
 import { mergeLedgerSettings, normalizeName } from "./kitchen-ledger-settings.js";
 import { diffHeadcount } from "./kitchen-ledger-ai-headcount.js";
 import {
@@ -68,9 +69,11 @@ function imageOf(payload) {
   return { mime: payload.imageMime, base64: b64, bytes };
 }
 
-async function loadSettings(db, unitId) {
+async function loadSettings(db, unitId, asOfYmd) {
   const row = await db.kitchenLedgerSettings.findUnique({ where: { unitId } });
-  return mergeLedgerSettings(row?.configJson);
+  const settings = mergeLedgerSettings(row?.configJson);
+  if (!asOfYmd) return settings;
+  return (await withUnitMealLevels(db, unitId, settings, asOfYmd)).settings;
 }
 
 async function conversationOf(db, userId, unitId) {
@@ -279,7 +282,7 @@ async function postTurn(payload, user, scope, effectiveUnitIds, dataScope, opts 
   });
   const ctx = { db, user, unitId, text, image, intent, payload, scope, effectiveUnitIds, dataScope, opts, conversation };
   if (!payload.intent && /can doi/.test(fold(text)) && intent === "question") {
-    return reply(ctx, "note", "Cân đối tồn âm chỉ chạy khi bấm nút Cân đối và xác nhận. Trợ lý không tự ghi dòng cân đối.");
+    return reply(ctx, "note", "Tồn âm vẫn hiện trên sổ. Chưa chốt ngày và chưa xuất sổ khi còn âm. Trợ lý không tự ghi dòng cân đối.");
   }
   if (intent === "rule") return turnRule(ctx);
   if (intent === "question") return turnQuestion(ctx);
@@ -346,15 +349,19 @@ function draftKind(mapped) {
   const head = mapped.headcountDays.length > 0;
   const lines = mapped.lines.length > 0;
   const rules = mapped.proposals.length > 0;
-  if (head && !lines && !rules) return "headcount_draft";
-  if (lines && !head && !rules) return "movement_draft";
-  if (rules && !head && !lines) return "rule_note";
+  const schedules = (mapped.schedules || []).length > 0;
+  const kinds = [head, lines, rules, schedules].filter(Boolean).length;
+  if (kinds > 1) return "records_draft";
+  if (head) return "headcount_draft";
+  if (lines) return "movement_draft";
+  if (rules) return "rule_note";
+  if (schedules) return "schedule_draft";
   return "records_draft";
 }
 
 async function turnRecords(ctx) {
   if (ctx.intent === "movement" && !ctx.text) throw fail("Nhập câu hàng. Ảnh hóa đơn để bước sau.", 400);
-  const settings = ctx.opts.settings ?? await loadSettings(ctx.db, ctx.unitId);
+  const settings = ctx.opts.settings ?? await loadSettings(ctx.db, ctx.unitId, ctx.payload?.date);
   const facts = await memoryLines(ctx.db, ctx.user.id, ctx.unitId);
   const profile = await profileOf(ctx.db, ctx.user.id, ctx.unitId);
   let commodities = [];
@@ -390,7 +397,8 @@ async function turnRecords(ctx) {
     throw err;
   }
   await markOk(ctx, meta);
-  const actionable = mapped.headcountDays.length || mapped.lines.length || mapped.proposals.length;
+  const schedules = mapped.schedules || [];
+  const actionable = mapped.headcountDays.length || mapped.lines.length || mapped.proposals.length || schedules.length;
   if (!actionable) {
     return answerRecords(ctx, mapped);
   }
@@ -399,15 +407,17 @@ async function turnRecords(ctx) {
   if (mapped.headcountDays.length) parts.push("quân số");
   if (mapped.lines.length) parts.push("dòng hàng");
   if (mapped.proposals.length) parts.push("cấu hình");
+  if (schedules.length) parts.push("lịch làm việc");
   const note = mapped.notes.map((row) => row.text).join(" ");
   const content = `Bản nháp ${parts.join(" và ")}. Sửa rồi bấm ghi. Số trên sổ chỉ đổi sau khi ghi.${note ? ` ${note}` : ""}`;
   return reply(ctx, kind, content, {
-    date: mapped.lines.length === 1 ? mapped.lines[0].date : ctx.payload.date,
+    date: mapped.lines.length === 1 ? mapped.lines[0].date : schedules[0]?.date || ctx.payload.date,
     days: mapped.headcountDays,
     warnings: mapped.headcountWarnings,
     lines: mapped.lines,
     proposals: mapped.proposals,
     notes: mapped.notes,
+    schedules,
   });
 }
 
@@ -495,7 +505,7 @@ async function turnQuestion(ctx) {
         const mapped = mapLedgerRecords(meta.extracted.data, { anchorDate: date });
         await markOk(ctx, meta);
         const question = mapped.questions[0];
-        if (question && !mapped.headcountDays.length && !mapped.lines.length && !mapped.proposals.length) {
+        if (question && !mapped.headcountDays.length && !mapped.lines.length && !mapped.proposals.length && !(mapped.schedules || []).length) {
           picked = { tool: question.tool, itemName: question.itemName || "" };
         }
       } catch (err) {
@@ -517,11 +527,15 @@ async function turnQuestion(ctx) {
 
 async function applyDraft(payload, user, scope, effectiveUnitIds, dataScope, opts = {}) {
   assertOwner(user);
+  opts.userId = user.id;
   const unitId = Number(payload.unitId);
   assertScope(unitId, scope, effectiveUnitIds, dataScope);
   const db = opts.prisma ?? defaultPrisma;
   const message = await ownedMessage(db, Number(payload.messageId), user.id, unitId);
   if (!message) throw fail("Không thấy bản nháp của tài khoản này.", 404, ERROR_CODES.NOT_FOUND);
+  if (message.kind === "schedule_draft") {
+    return applySchedule(message, payload, db, scope, effectiveUnitIds, dataScope, opts);
+  }
   if (message.kind === "records_draft") {
     return applyRecords(message, payload, user, unitId, db, scope, effectiveUnitIds, dataScope, opts);
   }
@@ -539,12 +553,45 @@ async function applyRecords(message, payload, user, unitId, db, scope, effective
   const hasHead = (payload.headcountDays || []).length > 0;
   const hasLines = (payload.movementLines || []).length > 0;
   const hasRules = Boolean(payload.acceptProposals);
-  if (!hasHead && !hasLines && !hasRules) throw fail("Chưa có bản ghi để ghi.", 400);
+  const hasSchedule = (payload.schedules || []).length > 0;
+  if (!hasHead && !hasLines && !hasRules && !hasSchedule) throw fail("Chưa có bản ghi để ghi.", 400);
   const out = { messageId: message.id };
   if (hasHead) Object.assign(out, await applyHeadcount(message, payload, db, scope, effectiveUnitIds, dataScope, opts));
   if (hasLines) Object.assign(out, await applyMovement(message, payload, unitId, db, scope, effectiveUnitIds, dataScope, opts));
   if (hasRules) Object.assign(out, await applyRule(message, payload, user, db, scope, effectiveUnitIds, dataScope, opts));
+  if (hasSchedule) Object.assign(out, await applySchedule(message, payload, db, scope, effectiveUnitIds, dataScope, opts));
   return out;
+}
+
+async function applySchedule(message, payload, db, scope, effectiveUnitIds, dataScope, opts) {
+  const rows = payload.schedules || [];
+  if (!rows.length) throw fail("Chưa có lịch để ghi.", 400);
+  const draft = new Map((message.payloadJson?.schedules || []).map((row) => [row.date, row]));
+  for (const row of rows) {
+    if (!draft.has(row.date)) throw fail(`Ngày ${row.date} không có lịch trong bản nháp.`, 400);
+  }
+  const save = opts.saveLedger ?? saveLedger;
+  const saved = [];
+  for (const row of rows) {
+    try {
+      await save(
+        { unitId: payload.unitId, date: row.date, schedule: { text: row.text } },
+        scope,
+        effectiveUnitIds,
+        dataScope,
+      );
+      saved.push({ date: row.date, ok: true });
+    } catch (err) {
+      saved.push({ date: row.date, ok: false, message: err?.message || "Không lưu được." });
+    }
+  }
+  const nextPayload = { ...message.payloadJson, confirmedSchedules: rows, saved };
+  message.payloadJson = nextPayload;
+  await db.ledgerAssistantMessage.update({
+    where: { id: message.id },
+    data: { payloadJson: nextPayload },
+  });
+  return { messageId: message.id, saved };
 }
 
 async function applyHeadcount(message, payload, db, scope, effectiveUnitIds, dataScope, opts) {
@@ -588,17 +635,28 @@ function existingLines(view, kind) {
         source: row.source === "J" ? "J" : "I",
         qty: Number(row.qty),
         issuePolicy: row.issuePolicy || "today",
+        sourceKind: row.sourceKind || undefined,
+        grade: row.grade || undefined,
       };
     }
     if (kind === "rice") {
       return {
         commodityId: row.commodityId || undefined,
         name: row.itemName,
+        source: row.source,
         qty: Number(row.qty),
         unitPrice: Number(row.unitPrice),
+        sourceKind: row.sourceKind || undefined,
+        grade: row.grade || undefined,
       };
     }
-    return { commodityId: row.commodityId || undefined, name: row.itemName, qty: Number(row.qty) };
+    return {
+      commodityId: row.commodityId || undefined,
+      name: row.itemName,
+      qty: Number(row.qty),
+      sourceKind: row.sourceKind || undefined,
+      grade: row.grade || undefined,
+    };
   });
 }
 
@@ -620,7 +678,7 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
   const readLedger = opts.getLedger ?? getLedger;
   const date = message.payloadJson?.date;
   const view = await readLedger({ unitId, date }, scope, effectiveUnitIds, dataScope);
-  const grouped = { self_supply: [], rice: [], other_out: [] };
+  const grouped = { self_supply: [], rice: [], other_out: [], meal_out: [] };
   for (const line of lines) {
     if (!grouped[line.kind]) throw fail("Dòng nháp không ghi được vào sổ.", 400);
     grouped[line.kind].push(line);
@@ -635,6 +693,8 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
           source: line.source,
           qty: line.qty,
           issuePolicy: line.issuePolicy || "today",
+          sourceKind: line.sourceKind || undefined,
+          grade: line.grade || undefined,
         })),
       ],
     };
@@ -646,8 +706,11 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
         ...grouped.rice.map((line) => ({
           commodityId: line.commodityId || undefined,
           name: line.name,
+          source: line.source,
           qty: line.qty,
           unitPrice: line.unitPrice ?? undefined,
+          sourceKind: line.sourceKind || undefined,
+          grade: line.grade || undefined,
         })),
       ],
     };
@@ -660,6 +723,23 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
           commodityId: line.commodityId || undefined,
           name: line.name,
           qty: line.qty,
+          sourceKind: line.sourceKind || undefined,
+          grade: line.grade || undefined,
+        })),
+      ],
+    };
+  }
+  if (grouped.meal_out.length) {
+    body.mealOut = {
+      lines: [
+        ...existingLines(view, "meal_out"),
+        ...grouped.meal_out.map((line) => ({
+          commodityId: line.commodityId || undefined,
+          name: line.name,
+          qty: line.qty,
+          unitPrice: line.unitPrice ?? undefined,
+          sourceKind: line.sourceKind || undefined,
+          grade: line.grade || undefined,
         })),
       ],
     };
@@ -667,7 +747,7 @@ async function applyMovement(message, payload, unitId, db, scope, effectiveUnitI
   const save = opts.saveLedger ?? saveLedger;
   let saved;
   try {
-    saved = await save(body, scope, effectiveUnitIds, dataScope);
+    saved = await save(body, scope, effectiveUnitIds, dataScope, { userId: opts.userId ?? null, source: "assistant" });
   } catch (err) {
     saved = { ok: false, message: err?.message || "Không lưu được." };
   }
