@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useHasPermission } from "@/features/auth/model/authSlice";
 import {
+  useGetKitchenLedgerAssistantQuery,
   useGetKitchenLedgerQuery,
   useLockKitchenLedgerMutation,
   useSaveKitchenLedgerMutation,
@@ -58,6 +59,30 @@ function addDays(value, days) {
   return ymd(date);
 }
 
+function LedgerModal({ title, open, onClose, children }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(event) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={title}>
+      <button type="button" className="absolute inset-0 bg-black/40" aria-label={`Đóng ${title}`} onClick={onClose} />
+      <div className="relative z-10 max-h-[min(40rem,calc(100dvh-2rem))] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-float" data-local-scroll="true">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <Button type="button" variant="ghost" className="h-8 px-2 text-xs" onClick={onClose}>Đóng</Button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function linesFrom(movements, kind) {
   return (movements || [])
     .filter((row) => row.kind === kind)
@@ -98,6 +123,7 @@ export function KitchenSoNhapXuatLttpTab({
   const [settingsForm, setSettingsForm] = useState(null);
   const [scheduleText, setScheduleText] = useState("");
   const [exportingMonth, setExportingMonth] = useState(false);
+  const [panel, setPanel] = useState(null);
 
   const skip = !canAccess || selectedUnitId == null || !menuDate;
   const { data: ledger, isLoading, error } = useGetKitchenLedgerQuery(
@@ -105,6 +131,10 @@ export function KitchenSoNhapXuatLttpTab({
     { skip },
   );
   const { data: commodities = [] } = useGetLttpCommoditiesQuery(selectedUnitId, { skip });
+  const { data: assistant } = useGetKitchenLedgerAssistantQuery(
+    { unitId: selectedUnitId, date: menuDate },
+    { skip },
+  );
   const [saveLedger, saveState] = useSaveKitchenLedgerMutation();
   const [lockLedger, lockState] = useLockKitchenLedgerMutation();
   const [unlockLedger, unlockState] = useUnlockKitchenLedgerMutation();
@@ -417,6 +447,15 @@ export function KitchenSoNhapXuatLttpTab({
   }
 
   const locked = ledger?.status === "locked";
+  const pendingDraft = (assistant?.messages || []).some((message) => {
+    const payload = message.payloadJson || {};
+    const kind = message.kind || "";
+    if (!kind.includes("draft") && kind !== "rule_note") return false;
+    return !(payload.confirmed || payload.savedOk || payload.accepted || payload.confirmedSchedules);
+  });
+  function closePanel() {
+    setPanel(null);
+  }
   const disabled = locked || !ledger?.canEdit;
   const today = ymd(new Date());
   const hour = new Date().getHours();
@@ -472,7 +511,12 @@ export function KitchenSoNhapXuatLttpTab({
         </div>
 
         {selectedUnitId != null && menuDate ? (
-          <KitchenLedgerAssistantBubble unitId={selectedUnitId} date={menuDate} />
+          <KitchenLedgerAssistantBubble
+            unitId={selectedUnitId}
+            date={menuDate}
+            open={panel === "assistant"}
+            onOpenChange={(next) => setPanel(next ? "assistant" : null)}
+          />
         ) : null}
 
         {isLoading ? <p className="text-sm text-muted-foreground">Đang tải sổ…</p> : null}
@@ -513,7 +557,10 @@ export function KitchenSoNhapXuatLttpTab({
             {(ledger.warnings || []).filter((row) => row.code !== "negative_stock").map((row) => (
               <Note key={row.code + row.message} tone={row.code === "balance_threshold" ? "warn" : "muted"}>{row.message}</Note>
             ))}
-            <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            {pendingDraft ? (
+              <Note tone="warn">Có bản nháp chưa chấp nhận. Mở Trợ lý để xem, chấp nhận hoặc bỏ. Sổ chưa đổi.</Note>
+            ) : null}
+            <div className="grid items-start gap-3">
               <section className="min-w-0 rounded-md border border-border bg-card p-3 shadow-sm">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => goDate(addDays(menuDate, -1))}>
@@ -537,6 +584,15 @@ export function KitchenSoNhapXuatLttpTab({
                     Ngày sau
                   </Button>
                 </div>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setPanel("meals")}>Cài đặt mức ăn</Button>
+                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setPanel("headcount")}>Nhập quân số</Button>
+                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setPanel("quantities")}>Nhập số lượng</Button>
+                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setPanel("assistant")}>Trợ lý</Button>
+                  {canSettings ? (
+                    <Button type="button" variant="ghost" className="h-8 px-3 text-xs" onClick={() => setPanel("settings")}>Cấu hình sổ</Button>
+                  ) : null}
+                </div>
                 <div key={menuDate} className="ledger-day-slide">
                   <KitchenLedgerGrid
                     lines={stock?.rows || ledger.structure?.rows || ledger.lines}
@@ -553,7 +609,19 @@ export function KitchenSoNhapXuatLttpTab({
                   . Sửa phiếu thì cột Trên BĐ và tồn chuyển sang cập nhật ngay, kể cả ngày đã chốt.
                 </p>
               </section>
+            </div>
+            <LedgerModal title="Cài đặt mức ăn" open={panel === "meals"} onClose={closePanel}>
               <KitchenLedgerDayAside
+                part="meals"
+                mealRates={ledger.mealRates}
+                disabled={disabled || !canSave}
+                busy={busy}
+                onSaveMeals={saveMeals}
+              />
+            </LedgerModal>
+            <LedgerModal title="Nhập quân số" open={panel === "headcount"} onClose={closePanel}>
+              <KitchenLedgerDayAside
+                part="headcount"
                 headcount={headcount}
                 finance={finance}
                 mealSlots={mealSlots}
@@ -564,12 +632,17 @@ export function KitchenSoNhapXuatLttpTab({
                 previousHeadcount={ledger.previousHeadcount}
                 onHeadcount={markEntry(setHeadcount)}
                 onIncome={markEntry(setIncome)}
-                mealRates={ledger.mealRates}
-                onSaveMeals={saveMeals}
                 onSaveHeadcount={saveHeadcount}
                 onCopyPrevious={() => markEntry(setHeadcount)(ledger.previousHeadcount)}
                 scheduleText={scheduleText}
                 onSchedule={markEntry(setScheduleText)}
+              />
+            </LedgerModal>
+            <LedgerModal title="Nhập số lượng" open={panel === "quantities"} onClose={closePanel}>
+              <KitchenLedgerDayAside
+                part="supply"
+                disabled={disabled || !canSave}
+                busy={busy}
                 selfLines={selfLines}
                 selfNone={selfNone}
                 commodities={commodities}
@@ -577,25 +650,6 @@ export function KitchenSoNhapXuatLttpTab({
                 onSaveSelf={saveSelf}
                 onSelfNone={() => saveSelf(true)}
               />
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {locked ? (
-                <Button type="button" variant="secondary" disabled={busy || !canUnlockDay} onClick={onUnlock}>Mở khóa</Button>
-              ) : (
-                <Button type="button" disabled={busy || !canLockDay || !ledger.canLock} onClick={onLock}>
-                  {negativeLines.length ? "Còn tồn âm, chưa chốt" : "Chốt ngày"}
-                </Button>
-              )}
-            </div>
-            {(ledger.changes || []).length ? (
-              <ul className="text-xs text-muted-foreground">
-                {ledger.changes.slice(0, 8).map((row) => (
-                  <li key={row.id}>{row.action} · {row.source}{row.reason ? ` · ${row.reason}` : ""}</li>
-                ))}
-              </ul>
-            ) : null}
-
             <LineTable
               title="Gạo nhập tay – tạm thời"
               hint="Gạo được ghi vào G, H, I hoặc J. Hàng khác ở cột Trên BĐ chỉ lấy từ phiếu xuất."
@@ -667,7 +721,8 @@ export function KitchenSoNhapXuatLttpTab({
                 </div>
               </section>
             ) : null}
-
+            </LedgerModal>
+            <LedgerModal title="Cấu hình sổ" open={panel === "settings"} onClose={closePanel}>
             <KitchenLedgerSettingsPanel
               settings={canSettings ? settingsForm : null}
               saving={settingsState.isLoading}
@@ -677,6 +732,24 @@ export function KitchenSoNhapXuatLttpTab({
               }}
               onSave={onSaveSettings}
             />
+            </LedgerModal>
+
+            <div className="flex flex-wrap gap-2">
+              {locked ? (
+                <Button type="button" variant="secondary" disabled={busy || !canUnlockDay} onClick={onUnlock}>Mở khóa</Button>
+              ) : (
+                <Button type="button" disabled={busy || !canLockDay || !ledger.canLock} onClick={onLock}>
+                  {negativeLines.length ? "Còn tồn âm, chưa chốt" : "Chốt ngày"}
+                </Button>
+              )}
+            </div>
+            {(ledger.changes || []).length ? (
+              <ul className="text-xs text-muted-foreground">
+                {ledger.changes.slice(0, 8).map((row) => (
+                  <li key={row.id}>{row.action} · {row.source}{row.reason ? ` · ${row.reason}` : ""}</li>
+                ))}
+              </ul>
+            ) : null}
           </>
         ) : null}
       </div>

@@ -125,9 +125,13 @@ async function loadMealRatePanel(db, unitId, asOfYmd, fallbackLevels) {
     return { selected: [], catalog: [] };
   }
   const day = asOfDate(asOfYmd);
-  const [catalogRows, links, splits] = await Promise.all([
+  const [catalogRows, extraRows, links, splits] = await Promise.all([
     db.mealAllowanceRate.findMany({
       where: { type: "an_tieu_chuan" },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    }),
+    db.mealAllowanceRate.findMany({
+      where: { type: "an_them" },
       orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     }),
     db.unitSelectedMealRate.findMany({
@@ -150,6 +154,14 @@ async function loadMealRatePanel(db, unitId, asOfYmd, fallbackLevels) {
       percents: amountsToPercents(row.mucTienAn, periodAmounts),
     };
   });
+  const extraCatalog = (extraRows || [])
+    .filter((row) => row.type === "an_them")
+    .map((row) => ({
+      id: row.id,
+      doiTuong: row.doiTuong,
+      mucTienAn: row.mucTienAn,
+      sortOrder: row.sortOrder,
+    }));
   const selected = links
     .map((link) => link.mealAllowanceRate)
     .filter(Boolean)
@@ -164,7 +176,7 @@ async function loadMealRatePanel(db, unitId, asOfYmd, fallbackLevels) {
         percents: amountsToPercents(rate.mucTienAn, periodAmounts),
       };
     });
-  return { selected, catalog };
+  return { selected, catalog, extraCatalog };
 }
 
 function applyMealLevels(settings, panel) {

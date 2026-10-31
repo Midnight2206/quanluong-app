@@ -15,12 +15,22 @@ import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 import { fieldClassSm } from "@/utils/fieldClass";
 import { Note } from "./KitchenLedgerEntry.jsx";
+import { reviewDraft } from "./ledgerDraftReview.js";
 
 const MEALS = [["sang", "Sáng"], ["trua", "Trưa"], ["chieu", "Chiều"]];
 const EXTRAS = [["benhXa", "Bệnh xá"], ["benhNhan", "Bệnh nhân"], ["omTrai", "Ốm"], ["leTet", "Lễ tết"]];
 const INTENTS = [["", "Tự nhận"], ["headcount", "Quân số"], ["movement", "Hàng"], ["rule", "Quy tắc"], ["question", "Hỏi sổ"]];
 
-function ScheduleDraft({ message, onApply, busy, showContent }) {
+function DraftActions({ busy, canApply, applyLabel, onApply, onReject }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button variant="primary" disabled={busy || !canApply} onClick={onApply}>{applyLabel}</Button>
+      <Button variant="secondary" disabled={busy} onClick={onReject}>Bỏ bản nháp</Button>
+    </div>
+  );
+}
+
+function ScheduleDraft({ message, onApply, onReject, busy, showContent }) {
   const rows = message.payloadJson?.schedules || [];
   return (
     <div className="flex flex-col gap-2">
@@ -28,7 +38,7 @@ function ScheduleDraft({ message, onApply, busy, showContent }) {
       {rows.map((row) => (
         <p key={row.date} className="text-xs">{row.date}: {row.text}</p>
       ))}
-      <Button variant="primary" disabled={busy || !rows.length} onClick={onApply}>Ghi lịch làm việc</Button>
+      <DraftActions busy={busy} canApply={rows.length > 0} applyLabel="Chấp nhận lịch" onApply={onApply} onReject={onReject} />
     </div>
   );
 }
@@ -45,7 +55,7 @@ function low(score) {
   return Number(score) < 0.8;
 }
 
-function HeadcountDraft({ message, days, onChange, onApply, busy }) {
+function HeadcountDraft({ message, days, onChange, onApply, onReject, busy }) {
   return (
     <div className="flex flex-col gap-2">
       <p>{message.content}</p>
@@ -85,13 +95,13 @@ function HeadcountDraft({ message, days, onChange, onApply, busy }) {
           </table>
         </div>
       ))}
-      <Button variant="primary" disabled={busy} onClick={onApply}>Ghi quân số</Button>
+      <DraftActions busy={busy} canApply={days.length > 0} applyLabel="Chấp nhận quân số" onApply={onApply} onReject={onReject} />
     </div>
   );
 }
 
-function MovementDraft({ message, lines, onChange, onApply, busy }) {
-  const savable = lines.some((line) => line.savable);
+function MovementDraft({ message, lines, onChange, onApply, onReject, busy }) {
+  const savable = reviewDraft("accept", lines).save;
   return (
     <div className="flex flex-col gap-2">
       {message.content ? <p>{message.content}</p> : null}
@@ -115,7 +125,7 @@ function MovementDraft({ message, lines, onChange, onApply, busy }) {
           ) : null}
         </div>
       ))}
-      <Button variant="primary" disabled={busy || !savable} onClick={onApply}>Ghi dòng đã khớp</Button>
+      <DraftActions busy={busy} canApply={savable} applyLabel="Chấp nhận dòng được phép" onApply={onApply} onReject={onReject} />
     </div>
   );
 }
@@ -134,6 +144,7 @@ export function KitchenLedgerAssistant({ unitId, date }) {
   const [ruleTitle, setRuleTitle] = useState("");
   const [openPrefs, setOpenPrefs] = useState(false);
   const [edits, setEdits] = useState({});
+  const [dismissed, setDismissed] = useState({});
   const [name, setName] = useState("Trợ lý làm sổ");
   const [tone, setTone] = useState("ngan_gon");
   const [preferred, setPreferred] = useState("either");
@@ -227,8 +238,17 @@ function linesOf(message) {
     }
   }
 
+  function rejectDraft(message) {
+    setDismissed((prev) => ({ ...prev, [message.id]: true }));
+  }
+
   async function applyMovement(message) {
-    const lines = linesOf(message).filter((line) => line.savable);
+    const decision = reviewDraft("accept", linesOf(message));
+    if (!decision.save) {
+      notifyError("Không có dòng được phép ghi. Cột Trên BĐ chỉ mở cho gạo.");
+      return;
+    }
+    const lines = decision.lines;
     try {
       const result = await applyDraft({
         unitId,
@@ -300,7 +320,7 @@ function linesOf(message) {
   }
 
   if (error) {
-    return <Note tone="bad">{errText(error)} Nhập tay ở bảng phía dưới vẫn dùng được.</Note>;
+    return <Note tone="bad">{errText(error)} Nhập tay ở nút Nhập số lượng vẫn dùng được.</Note>;
   }
 
   return (
@@ -311,6 +331,9 @@ function linesOf(message) {
           {openPrefs ? "Đóng tuỳ chọn" : "Tuỳ chọn"}
         </Button>
       </div>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Trợ lý đọc sổ ngày này và chỉ soạn bản nháp. Số do sổ tính. Chưa ghi gì cho đến khi bạn chấp nhận. Cột Trên BĐ không nhận hàng thường; gạo là ngoại lệ tạm thời.
+      </p>
       {isLoading ? <p className="text-sm text-muted-foreground">Đang tải trợ lý…</p> : null}
       {data && !data.enabled ? (
         <Note>AI đang tắt. Vẫn hỏi sổ, gửi quy tắc và nhập tay được.</Note>
@@ -388,16 +411,18 @@ function linesOf(message) {
       <div className="mb-2 flex max-h-80 flex-col gap-2 overflow-y-auto" data-local-scroll="true">
         {(data?.messages || []).map((message) => (
           <article key={message.id} className={cn("rounded-lg px-2 py-1 text-sm", message.role === "user" ? "bg-muted" : "bg-background")}>
-            {message.kind === "headcount_draft" || (message.kind === "records_draft" && daysOf(message).length) ? (
+            {dismissed[message.id] ? <p className="text-xs text-muted-foreground">Đã bỏ bản nháp. Sổ không đổi.</p> : null}
+            {!dismissed[message.id] && (message.kind === "headcount_draft" || (message.kind === "records_draft" && daysOf(message).length)) ? (
               <HeadcountDraft
                 message={message}
                 days={daysOf(message)}
                 busy={busy}
                 onChange={(dayDate, amount, meal, value) => changeMeal(message, dayDate, amount, meal, value)}
                 onApply={() => applyHeadcount(message)}
+                onReject={() => rejectDraft(message)}
               />
             ) : null}
-            {message.kind === "movement_draft" || (message.kind === "records_draft" && linesOf(message).length) ? (
+            {!dismissed[message.id] && (message.kind === "movement_draft" || (message.kind === "records_draft" && linesOf(message).length)) ? (
               <MovementDraft
                 message={message.kind === "records_draft" ? { ...message, content: "" } : message}
                 lines={linesOf(message)}
@@ -412,23 +437,29 @@ function linesOf(message) {
                   }));
                 }}
                 onApply={() => applyMovement(message)}
+                onReject={() => rejectDraft(message)}
               />
             ) : null}
-            {message.kind === "schedule_draft" || (message.kind === "records_draft" && (message.payloadJson?.schedules || []).length) ? (
+            {!dismissed[message.id] && (message.kind === "schedule_draft" || (message.kind === "records_draft" && (message.payloadJson?.schedules || []).length)) ? (
               <ScheduleDraft
                 message={message}
                 busy={busy}
                 showContent={message.kind === "schedule_draft"}
                 onApply={() => applySchedule(message)}
+                onReject={() => rejectDraft(message)}
               />
             ) : null}
             {message.kind === "rule_note" || (message.kind === "records_draft" && (message.payloadJson?.proposals || []).length) ? (
               <div className="flex flex-col gap-2">
                 {message.kind === "rule_note" ? <p>{message.content}</p> : null}
-                {(message.payloadJson?.proposals || []).length ? (
-                  <Button variant="primary" disabled={busy || message.payloadJson.accepted} onClick={() => applyRule(message)}>
-                    Áp dụng cấu hình
-                  </Button>
+                {(message.payloadJson?.proposals || []).length && !dismissed[message.id] ? (
+                  <DraftActions
+                    busy={busy}
+                    canApply={!message.payloadJson.accepted}
+                    applyLabel="Chấp nhận quy tắc"
+                    onApply={() => applyRule(message)}
+                    onReject={() => rejectDraft(message)}
+                  />
                 ) : null}
               </div>
             ) : null}
@@ -466,8 +497,14 @@ function linesOf(message) {
   );
 }
 
-export function KitchenLedgerAssistantBubble({ unitId, date }) {
-  const [open, setOpen] = useState(false);
+export function KitchenLedgerAssistantBubble({ unitId, date, open: openProp, onOpenChange }) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : localOpen;
+  function setOpen(next) {
+    if (onOpenChange) onOpenChange(next);
+    if (!controlled) setLocalOpen(next);
+  }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -494,7 +531,7 @@ export function KitchenLedgerAssistantBubble({ unitId, date }) {
           </div>
         </div>
       ) : null}
-      {open ? null : (
+      {open || controlled ? null : (
         <button
           type="button"
           className="ledger-assistant-bubble fixed bottom-6 right-6 z-50 flex h-14 items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg print:hidden"

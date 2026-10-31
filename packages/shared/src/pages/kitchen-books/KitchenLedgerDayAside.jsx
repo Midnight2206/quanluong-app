@@ -148,6 +148,21 @@ function MealRatePicker({ mealRates, disabled, busy, onSave }) {
           Thêm
         </Button>
       </div>
+      {(mealRates?.extraCatalog || []).length ? (
+        <div className="mt-3">
+          <p className="font-medium">Mức ăn thêm đã cấu hình</p>
+          <ul className="mt-1 text-muted-foreground">
+            {mealRates.extraCatalog.map((rate) => (
+              <li key={rate.id}>
+                {formatLedgerNumber(rate.mucTienAn, { blankZero: false })} — {shortRate(rate)}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1">Quân số ăn thêm nhập ở cửa sổ Quân số. Sổ không tự xuất theo mức này.</p>
+        </div>
+      ) : (
+        <p className="mt-3 text-muted-foreground">Ăn thêm dùng các khoản Bệnh xá, Bệnh nhân, Ốm tại trại, Lễ tết đã có của đơn vị.</p>
+      )}
       <Button
         type="button"
         className="mt-2 h-8 px-3 text-xs"
@@ -194,13 +209,18 @@ export function KitchenLedgerDayAside({
   onSelfChange,
   onSaveSelf,
   onSelfNone,
+  part = "all",
 }) {
+  const showMeals = part === "all" || part === "meals";
+  const showHeadcount = part === "all" || part === "headcount";
+  const showSupply = part === "all" || part === "supply";
   return (
     <aside className="rounded-lg border border-border bg-card p-3 text-xs">
-      <h3 className="mb-1 text-sm font-semibold">Công khai tài chính ngày</h3>
-      <MealRatePicker mealRates={mealRates} disabled={disabled} busy={busy} onSave={onSaveMeals} />
+      {showMeals ? <MealRatePicker mealRates={mealRates} disabled={disabled} busy={busy} onSave={onSaveMeals} /> : null}
+      {showHeadcount ? (
+        <>
       <p className="mb-2 text-muted-foreground">
-        Quân số, thu và mua ngoài nhập ở đây. Dòng thực phẩm trên trang sổ lấy từ phiếu xuất và tồn ngày trước.
+        Quân số mức ăn và ăn thêm. Đổi quân số không đổi số lượng xuất.
       </p>
       <p className="mb-2 text-muted-foreground">ĐVT: đồng</p>
       {headcount?.levels?.map((level, index) => (
@@ -328,6 +348,9 @@ export function KitchenLedgerDayAside({
           Lấy quân số hôm trước
         </Button>
       </div>
+        </>
+      ) : null}
+      {showSupply ? (
       <div className="mt-3 border-t border-border pt-3">
         <LineTable
           title="Mua ngoài"
@@ -346,6 +369,7 @@ export function KitchenLedgerDayAside({
           )}
         />
       </div>
+      ) : null}
     </aside>
   );
 }
