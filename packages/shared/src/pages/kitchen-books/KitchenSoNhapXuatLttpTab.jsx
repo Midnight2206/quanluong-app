@@ -497,7 +497,23 @@ export function KitchenSoNhapXuatLttpTab({
             setManualUnitId={setManualUnitId}
             user={user}
           />
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("meals")}>Cài đặt mức ăn</Button>
+            <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("headcount")}>Nhập quân số</Button>
+            <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("quantities")}>Nhập số lượng</Button>
+            <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("assistant")}>Trợ lý</Button>
+            {canSettings ? (
+              <Button type="button" variant="ghost" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("settings")}>Cấu hình sổ</Button>
+            ) : null}
+            {ledger ? (
+              locked ? (
+                <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={busy || !canUnlockDay} onClick={onUnlock}>Mở khóa</Button>
+              ) : (
+                <Button type="button" className="h-8 px-3 text-xs" disabled={busy || !canLockDay || !ledger.canLock} onClick={onLock}>
+                  {negativeLines.length ? "Còn tồn âm, chưa chốt" : "Chốt ngày"}
+                </Button>
+              )
+            ) : null}
             <Button
               type="button"
               variant="secondary"
@@ -560,56 +576,41 @@ export function KitchenSoNhapXuatLttpTab({
             {pendingDraft ? (
               <Note tone="warn">Có bản nháp chưa chấp nhận. Mở Trợ lý để xem, chấp nhận hoặc bỏ. Sổ chưa đổi.</Note>
             ) : null}
-            <div className="grid items-start gap-3">
-              <section className="min-w-0 rounded-md border border-border bg-card p-3 shadow-sm">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => goDate(addDays(menuDate, -1))}>
-                    Ngày trước
-                  </Button>
-                  <div className="text-center">
-                    <h2 className="text-sm font-semibold">Sổ nhập xuất LTTP</h2>
-                    <p className="text-xs text-muted-foreground">Công khai tài chính ngày</p>
-                    <input
-                      aria-label="Ngày sổ"
-                      type="date"
-                      className={cn(fieldClassSm, "mx-auto mt-1 w-40")}
-                      value={menuDate}
-                      onChange={(event) => goDate(event.target.value)}
-                    />
-                    <Button type="button" variant="ghost" className="mt-1 h-7 px-2 text-xs" onClick={() => goDate(today)}>
-                      Hôm nay
-                    </Button>
-                  </div>
-                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => goDate(addDays(menuDate, 1))}>
-                    Ngày sau
-                  </Button>
-                </div>
-                <div className="mb-3 flex flex-wrap gap-2">
-                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setPanel("meals")}>Cài đặt mức ăn</Button>
-                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setPanel("headcount")}>Nhập quân số</Button>
-                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setPanel("quantities")}>Nhập số lượng</Button>
-                  <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => setPanel("assistant")}>Trợ lý</Button>
-                  {canSettings ? (
-                    <Button type="button" variant="ghost" className="h-8 px-3 text-xs" onClick={() => setPanel("settings")}>Cấu hình sổ</Button>
-                  ) : null}
-                </div>
-                <div key={menuDate} className="ledger-day-slide">
-                  <KitchenLedgerGrid
-                    lines={stock?.rows || ledger.structure?.rows || ledger.lines}
-                    totals={stock?.totals ?? ledger.structure?.totals ?? ledger.totals}
-                    financeLines={ledger.structure?.financeLines || ledger.frame?.books?.financeLines}
-                    dateLine={ledger.structure?.dateLine || ledger.frame?.books?.dateLine}
-                    signatures={ledger.settings?.signatures}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Nhập trên bảo đảm lấy từ phiếu xuất của đơn vị trong ngày.
-                  {" "}
-                  <a className="underline" href="/lttp-nhap-xuat">Mở phiếu xuất kho</a>
-                  . Sửa phiếu thì cột Trên BĐ và tồn chuyển sang cập nhật ngay, kể cả ngày đã chốt.
-                </p>
-              </section>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => goDate(addDays(menuDate, -1))}>
+                Ngày trước
+              </Button>
+              <div className="text-center">
+                <input
+                  aria-label="Ngày sổ"
+                  type="date"
+                  className={cn(fieldClassSm, "mx-auto w-40")}
+                  value={menuDate}
+                  onChange={(event) => goDate(event.target.value)}
+                />
+                <Button type="button" variant="ghost" className="mt-1 h-7 px-2 text-xs" onClick={() => goDate(today)}>
+                  Hôm nay
+                </Button>
+              </div>
+              <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => goDate(addDays(menuDate, 1))}>
+                Ngày sau
+              </Button>
             </div>
+            <div key={menuDate} className="ledger-day-slide ledger-paper">
+              <KitchenLedgerGrid
+                lines={stock?.rows || ledger.structure?.rows || ledger.lines}
+                totals={stock?.totals ?? ledger.structure?.totals ?? ledger.totals}
+                financeLines={ledger.structure?.financeLines || ledger.frame?.books?.financeLines}
+                dateLine={ledger.structure?.dateLine || ledger.frame?.books?.dateLine}
+                signatures={ledger.settings?.signatures}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Nhập trên bảo đảm lấy từ phiếu xuất của đơn vị trong ngày.
+              {" "}
+              <a className="underline" href="/lttp-nhap-xuat">Mở phiếu xuất kho</a>
+              . Sửa phiếu thì cột Trên BĐ và tồn chuyển sang cập nhật ngay, kể cả ngày đã chốt.
+            </p>
             <LedgerModal title="Cài đặt mức ăn" open={panel === "meals"} onClose={closePanel}>
               <KitchenLedgerDayAside
                 part="meals"
@@ -734,15 +735,6 @@ export function KitchenSoNhapXuatLttpTab({
             />
             </LedgerModal>
 
-            <div className="flex flex-wrap gap-2">
-              {locked ? (
-                <Button type="button" variant="secondary" disabled={busy || !canUnlockDay} onClick={onUnlock}>Mở khóa</Button>
-              ) : (
-                <Button type="button" disabled={busy || !canLockDay || !ledger.canLock} onClick={onLock}>
-                  {negativeLines.length ? "Còn tồn âm, chưa chốt" : "Chốt ngày"}
-                </Button>
-              )}
-            </div>
             {(ledger.changes || []).length ? (
               <ul className="text-xs text-muted-foreground">
                 {ledger.changes.slice(0, 8).map((row) => (

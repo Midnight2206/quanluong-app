@@ -266,6 +266,40 @@
   animation: ledger-day-in 200ms ease-out;
 }
 
+/* Trang sổ là tờ giấy. Thanh nút và cửa sổ nằm ngoài, không co trang. */
+.ledger-paper {
+  background: #fffef8;
+  color: #161616;
+  font-family: "Times New Roman", Times, "Nimbus Roman", serif;
+  border: 1px solid #1a1a1a;
+  box-shadow: 0 10px 28px rgba(40, 30, 10, 0.12);
+  padding: 10px 8px 18px;
+}
+
+.ledger-paper .ledger-dvt {
+  margin: 0 2px 4px;
+  text-align: right;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.ledger-paper table {
+  background: transparent;
+  font-size: 12px;
+}
+
+.ledger-paper thead th,
+.ledger-paper tbody td,
+.ledger-paper tfoot td {
+  background: #fffef8;
+  border-color: #1a1a1a;
+  color: #161616;
+}
+
+.ledger-paper tbody td {
+  border-bottom-color: #8a8a8a;
+}
+
 @keyframes ledger-day-in {
   from { opacity: 0; transform: translateX(16px); }
   to { opacity: 1; transform: none; }

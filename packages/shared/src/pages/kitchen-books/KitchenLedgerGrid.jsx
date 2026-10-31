@@ -75,7 +75,7 @@ export function KitchenLedgerGrid({ lines, totals, financeLines, dateLine, signa
   const pinWidth = LEDGER_PIN_WIDTHS.reduce((sum, width) => sum + width, 0);
   return (
     <div>
-      <p className="mb-1 text-right text-[11px] text-muted-foreground">ĐVT: Đồng</p>
+      <p className="ledger-dvt">ĐVT: Đồng</p>
       <StickyResponsiveTable
         ariaLabel="Sổ nhập xuất LTTP"
         pinnedColumns={2}

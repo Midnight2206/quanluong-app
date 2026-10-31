@@ -34,6 +34,10 @@ test("màn sổ mở mức ăn, quân số và trợ lý bằng nút, bản nhá
   assert.match(tab, /onClick=\{\(\) => setPanel\("meals"\)\}/);
   assert.match(tab, /onClick=\{\(\) => setPanel\("headcount"\)\}/);
   assert.match(tab, /onClick=\{\(\) => setPanel\("assistant"\)\}/);
+  const paperAt = tab.indexOf("ledger-day-slide ledger-paper");
+  const mealsAt = tab.indexOf('setPanel("meals")');
+  assert.ok(paperAt > mealsAt && paperAt > 0);
+  assert.match(tab, /fixed inset-0 z-\[70\]/);
   assert.match(assistant, /Bỏ bản nháp/);
   assert.match(assistant, /reviewDraft\("accept"/);
   assert.doesNotMatch(assistant, /planRations/);
