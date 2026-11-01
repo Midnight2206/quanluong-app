@@ -1,5 +1,7 @@
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
+import { readAiEngine } from "../ai-gateway/ai-engine.js";
+import { completeViaDsh, DshUnavailable } from "../ai-gateway/dsh-client.js";
 
 function readMenuAiFromEnv() {
   const provider = String(process.env.MENU_AI_PROVIDER || "openai").trim().toLowerCase();
@@ -124,12 +126,57 @@ async function callGemini({ system, user, image, temperature }, cfg, fetchImpl) 
   return data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") ?? "";
 }
 
-async function completeOnce({ system, user, image, temperature }, cfg, fetchImpl) {
+async function completeDirect({ system, user, image, temperature }, cfg, fetchImpl) {
   const provider = String(cfg.provider || "openai").toLowerCase();
   if (provider === "gemini") {
     return callGemini({ system, user, image, temperature }, cfg, fetchImpl);
   }
   return callOpenAiCompatible({ system, user, image, temperature }, cfg, fetchImpl);
+}
+
+function logAiCall(entry) {
+  console.info(JSON.stringify({ msg: "ai.call", ...entry }));
+}
+
+async function completeText(prompt, cfg, fetchImpl) {
+  const started = Date.now();
+  const feature = cfg.dsh?.feature || "";
+  if ((cfg.engine || readAiEngine()) === "dsh") {
+    try {
+      const content = await completeViaDsh({
+        system: prompt.system,
+        user: prompt.user,
+        image: prompt.image,
+        temperature: prompt.temperature,
+        model: cfg.model,
+        accountId: cfg.dsh?.accountId,
+        unitId: cfg.dsh?.unitId,
+        surface: cfg.dsh?.surface,
+        feature,
+        grantId: cfg.dsh?.grantId,
+      }, {
+        fetchImpl: cfg.dshFetch,
+        timeoutMs: cfg.timeoutMs,
+        url: cfg.dshServiceUrl,
+        token: cfg.dshServiceToken,
+      });
+      logAiCall({ transport: "dsh", status: "ok", feature, model: cfg.model, ms: Date.now() - started });
+      return { content, provider: "dsh", model: cfg.model };
+    } catch (error) {
+      if (!(error instanceof DshUnavailable)) throw error;
+      logAiCall({
+        transport: "dsh",
+        status: "fallback",
+        feature,
+        model: cfg.model,
+        ms: Date.now() - started,
+        message: error.message,
+      });
+    }
+  }
+  const content = await completeDirect(prompt, cfg, fetchImpl);
+  logAiCall({ transport: "direct", status: "ok", feature, model: cfg.model, ms: Date.now() - started });
+  return { content, provider: cfg.provider, model: cfg.model };
 }
 
 function aiFailure(err) {
@@ -164,21 +211,28 @@ async function extractStructured(prompt, opts = {}) {
     });
   }
   const model = String(opts.model || "").trim();
-  const cfg = model ? { ...base, model } : base;
+  const cfg = {
+    ...(model ? { ...base, model } : base),
+    dsh: opts.dsh,
+    dshFetch: opts.dshFetch,
+    engine: opts.engine,
+    dshServiceUrl: opts.dshServiceUrl,
+    dshServiceToken: opts.dshServiceToken,
+  };
   const fetchImpl = opts.fetchImpl || globalThis.fetch;
   const temperature = prompt.temperature ?? 0;
-  let content;
+  let result;
   try {
-    content = await completeOnce({ ...prompt, temperature }, cfg, fetchImpl);
+    result = await completeText({ ...prompt, temperature }, cfg, fetchImpl);
   } catch (err) {
     throw aiFailure(err);
   }
   try {
-    return { data: extractJsonObject(content), model: cfg.model, provider: cfg.provider };
+    return { data: extractJsonObject(result.content), model: result.model, provider: result.provider };
   } catch (err) {
     if (!(err instanceof AppError)) throw aiFailure(err);
     try {
-      content = await completeOnce(
+      result = await completeText(
         {
           system: `${prompt.system}\nChi tra ve mot JSON object hop le, khong markdown, khong ten nguoi.`,
           user: `JSON truoc do khong dung. ${opts.retryUserHint || "Tra lai dung schema."}\n\n${prompt.user}`,
@@ -191,7 +245,7 @@ async function extractStructured(prompt, opts = {}) {
     } catch (retryErr) {
       throw aiFailure(retryErr);
     }
-    return { data: extractJsonObject(content), model: cfg.model, provider: cfg.provider };
+    return { data: extractJsonObject(result.content), model: result.model, provider: result.provider };
   }
 }
 
@@ -200,17 +254,24 @@ async function extractStructured(prompt, opts = {}) {
  * @param {{ fetchImpl?: typeof fetch, configOverride?: object }} [opts]
  */
 async function completeMenuJson({ system, user }, opts = {}) {
-  const cfg = getMenuAiConfig(opts.configOverride);
+  const cfg = {
+    ...getMenuAiConfig(opts.configOverride),
+    dsh: opts.dsh,
+    dshFetch: opts.dshFetch,
+    engine: opts.engine,
+    dshServiceUrl: opts.dshServiceUrl,
+    dshServiceToken: opts.dshServiceToken,
+  };
   assertMenuAiConfigured(cfg);
   const fetchImpl = opts.fetchImpl || globalThis.fetch;
-  let content = await completeOnce({ system, user }, cfg, fetchImpl);
+  let result = await completeText({ system, user }, cfg, fetchImpl);
   try {
-    return extractJsonObject(content);
+    return extractJsonObject(result.content);
   } catch {
     const retryHint =
       opts.retryUserHint ??
       "Hay tra lai dung schema periods.sang|trua|chieu.";
-    content = await completeOnce(
+    result = await completeText(
       {
         system: `${system}\nChi tra ve mot JSON object hop le, khong markdown.`,
         user: `JSON truoc do khong parse duoc. ${retryHint}\n\n${user}`,
@@ -218,7 +279,7 @@ async function completeMenuJson({ system, user }, opts = {}) {
       cfg,
       fetchImpl,
     );
-    return extractJsonObject(content);
+    return extractJsonObject(result.content);
   }
 }
 

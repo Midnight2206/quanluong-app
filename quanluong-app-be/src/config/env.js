@@ -183,6 +183,12 @@ const env = {
     const n = Number(process.env.DOCUMENT_SERVICE_TIMEOUT_MS || 15_000);
     return Number.isFinite(n) && n > 0 ? n : 15_000;
   })(),
+  /** Live reads of AI_ENGINE happen in the gateway so tests can toggle it. */
+  aiEngine: String(process.env.AI_ENGINE || process.env.LEDGER_AI_ENGINE || "direct").trim().toLowerCase() === "dsh"
+    ? "dsh"
+    : "direct",
+  dshServiceUrl: (process.env.DSH_SERVICE_URL || "").trim().replace(/\/+$/, ""),
+  dshServiceToken: (process.env.DSH_SERVICE_TOKEN || "").trim(),
 };
 
 export { env };

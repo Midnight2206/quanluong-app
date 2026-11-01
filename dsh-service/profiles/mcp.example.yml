@@ -1,0 +1,18 @@
+# Not loaded. The running client is written by src/profile-patch.js
+# at boot: stdio, serverName quanluong, command node src/mcp-server.js.
+# This file only shows the shape. Do not add a second server here.
+#
+# @deepseek-ai/dsh already depends on @deepseek-ai/dsh-mcp-client, so a profile
+# can consume an external MCP server. The config schema changes between
+# release candidates. Copy a working example from that package's README into
+# a --patch file after you have tried it against the pinned dsh version.
+#
+# Do not add @openma/dsh-agents-plugins-bridge or dsh-cordis-universal-adapter
+# until a stable release exists. Both were still developer preview when this
+# service was added.
+#
+# - insert:
+#     - id: mcp-client
+#       name: "@deepseek-ai/dsh-mcp-client"
+#       config:
+#         servers: []

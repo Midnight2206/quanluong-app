@@ -4,6 +4,7 @@ import { config } from "../../config/config.js";
 import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { formatLocalCatalogForPrompt } from "../kitchen-books/kitchen-books-menu-ai-history.js";
+import { dshCallFields } from "../ai-gateway/dsh-context.js";
 import { assertMenuAiConfigured, completeMenuJson } from "../kitchen-books/kitchen-books-menu-ai-llm.js";
 import { scopeSanitizeIssueSlipAiHeaderDraft } from "./lttp-issue-slip-ai-header-scope.js";
 import { formatMemoriesForPrompt } from "./lttp-issue-slip-ai-memory.js";
@@ -272,7 +273,20 @@ async function suggestIssueSlipAi(
     resolveLine: ({ commodityId, priceKind }) =>
       resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid),
     complete,
-    completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
+    completeOpts: {
+      configOverride: menuAiCfg,
+      fetchImpl: opts.fetchImpl,
+      dshFetch: opts.dshFetch,
+      dsh: dshCallFields({
+        accountId: actorUserId,
+        unitId,
+        surface: opts.surface || "web",
+        feature: "lttp-issue-slip",
+        scope,
+        effectiveUnitIds,
+        dataScope,
+      }),
+    },
     autoAcceptPercent,
     originalQtyOnConvert:
       opts.originalQtyOnConvert != null
@@ -392,7 +406,20 @@ async function chatIssueSlipAi(payload, scope, effectiveUnitIds, dataScope, call
     resolveLine: ({ commodityId, priceKind }) =>
       resolveIssueSlipAiSuggestLine({ commodityId, priceKind }, priceByCid, defaultSupplierByCid),
     complete,
-    completeOpts: { configOverride: menuAiCfg, fetchImpl: opts.fetchImpl },
+    completeOpts: {
+      configOverride: menuAiCfg,
+      fetchImpl: opts.fetchImpl,
+      dshFetch: opts.dshFetch,
+      dsh: dshCallFields({
+        accountId: opts.actorUserId,
+        unitId,
+        surface: opts.surface || "web",
+        feature: "lttp-issue-slip-chat",
+        scope,
+        effectiveUnitIds,
+        dataScope,
+      }),
+    },
     now: opts.now ? opts.now() : new Date(),
     autoAcceptPercent,
     originalQtyOnConvert:

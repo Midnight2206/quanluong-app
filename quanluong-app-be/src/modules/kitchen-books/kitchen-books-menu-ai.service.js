@@ -14,6 +14,7 @@ import {
   formatMenuHistoryForPrompt,
   selectHistoryDayIds,
 } from "./kitchen-books-menu-ai-history.js";
+import { dshCallFields } from "../ai-gateway/dsh-context.js";
 import { assertMenuAiConfigured, completeMenuJson } from "./kitchen-books-menu-ai-llm.js";
 import { filterMappedPeriods, mapLlmPeriodsToLocal } from "./kitchen-books-menu-ai-enrich.js";
 
@@ -145,6 +146,16 @@ async function suggestMenuDay(
   const llmJson = await complete(prompt, {
     configOverride: opts.configOverride ?? config.menuAi,
     fetchImpl: opts.fetchImpl,
+    dshFetch: opts.dshFetch,
+    dsh: dshCallFields({
+      accountId: opts.actorId,
+      unitId,
+      surface: opts.surface || "web",
+      feature: "kitchen-menu-suggest",
+      scope,
+      effectiveUnitIds,
+      dataScope,
+    }),
   });
 
   const { periods, warnings } = mapLlmPeriodsToLocal(llmJson.periods || llmJson, commodities);
