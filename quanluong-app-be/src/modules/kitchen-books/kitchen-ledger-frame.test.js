@@ -126,9 +126,9 @@ const otherOut = [{
   commodityId: 1,
 }];
 
-test("khung ngày gom quân số, phiếu trên bảo đảm và sổ đã tính", () => {
+test("khung ngày gom quân số và phiếu, xuất khác nhập tay không trừ tồn", () => {
   const slips = [slipOf(2)];
-  const { computed, frame } = run({ slips, movements: otherOut });
+  const { assembled, computed, frame } = run({ slips, movements: otherOut });
   const muc = named(computed.lines, "Mực");
   same(muc.inG, "2");
   assert.equal(frame.unitId, 7);
@@ -141,7 +141,9 @@ test("khung ngày gom quân số, phiếu trên bảo đảm và sổ đã tính
   assert.equal(frame.books.stock.columns.some((column) => column.key === "inG" && column.role === "slip"), true);
   assert.equal(frame.books.stock.rows.some((row) => row.name === "Mực"), true);
   assert.equal(frame.books.finance, computed.finance);
-  same(muc.closingQty, "-3");
+  same(muc.otherQty, "0");
+  same(muc.closingQty, "2");
+  assert.equal(assembled.manualEntryCounts.other_out, 1);
   assert.equal(frame.slipDraft.length, 0);
   assert.equal(computed.suggestions.length, 0);
 });
@@ -175,7 +177,7 @@ test("tồn cuối ngày trước là tồn đầu ngày sau", () => {
   assert.equal(day2.frame.pulled.carryFrom, "2026-10-13");
 });
 
-test("sửa phiếu đổi G/H, gạo nhập tay không bị phiếu ghi đè", () => {
+test("sửa phiếu đổi G/H, gạo nhập tay cũ không đè phiếu", () => {
   const rice = {
     id: 5,
     commodityId: 4,
@@ -215,8 +217,9 @@ test("sửa phiếu đổi G/H, gạo nhập tay không bị phiếu ghi đè", 
   });
   const riceLines = manual.input.receipts.filter((row) => row.name === "Gạo tẻ");
   assert.equal(riceLines.length, 1);
-  assert.equal(riceLines[0].source, "I");
-  same(riceLines[0].qty, "1");
+  assert.equal(riceLines[0].source, "G");
+  same(riceLines[0].qty, "3");
+  assert.equal(manual.manualEntryCounts.rice, 1);
 
   const edited = editSlipLines(normalizeSlipLines(slips), [{
     commodityId: 1,

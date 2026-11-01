@@ -16,16 +16,19 @@ import { cn } from "@/utils/cn";
 import { fieldClassSm } from "@/utils/fieldClass";
 import { Note } from "./KitchenLedgerEntry.jsx";
 import { reviewDraft } from "./ledgerDraftReview.js";
+import { useUpsertKitchenReceiptUnitSelfMutation, useGetKitchenReceiptSlipByDayQuery } from "@/features/kitchen-books/api/kitchenBooksApi";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/app/query/queryKeys";
 
 const MEALS = [["sang", "Sáng"], ["trua", "Trưa"], ["chieu", "Chiều"]];
 const EXTRAS = [["benhXa", "Bệnh xá"], ["benhNhan", "Bệnh nhân"], ["omTrai", "Ốm"], ["leTet", "Lễ tết"]];
 const INTENTS = [["", "Tự nhận"], ["headcount", "Quân số"], ["movement", "Hàng"], ["rule", "Quy tắc"], ["question", "Hỏi sổ"]];
 
-function DraftActions({ busy, canApply, applyLabel, onApply, onReject }) {
+function DraftActions({ busy, canApply, applyLabel, rejectLabel = "Bỏ đề xuất", onApply, onReject }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Button variant="primary" disabled={busy || !canApply} onClick={onApply}>{applyLabel}</Button>
-      <Button variant="secondary" disabled={busy} onClick={onReject}>Bỏ bản nháp</Button>
+      <Button variant="secondary" disabled={busy} onClick={onReject}>{rejectLabel}</Button>
     </div>
   );
 }
@@ -125,7 +128,7 @@ function MovementDraft({ message, lines, onChange, onApply, onReject, busy }) {
           ) : null}
         </div>
       ))}
-      <DraftActions busy={busy} canApply={savable} applyLabel="Chấp nhận dòng được phép" onApply={onApply} onReject={onReject} />
+      <DraftActions busy={busy} canApply={savable} applyLabel="Ghi vào phiếu nhập" onApply={onApply} onReject={onReject} />
     </div>
   );
 }
@@ -133,6 +136,9 @@ function MovementDraft({ message, lines, onChange, onApply, onReject, busy }) {
 export function KitchenLedgerAssistant({ unitId, date }) {
   const { data, error, isLoading } = useGetKitchenLedgerAssistantQuery({ unitId, date });
   const [turn, turnState] = useLedgerAssistantTurnMutation();
+  const [upsertSlip, slipState] = useUpsertKitchenReceiptUnitSelfMutation();
+  const { data: receiptSlip } = useGetKitchenReceiptSlipByDayQuery({ unitId, date });
+  const queryClient = useQueryClient();
   const [applyDraft, applyState] = useApplyLedgerAssistantMutation();
   const [saveProfile, profileState] = useSaveLedgerAssistantProfileMutation();
   const [addMemory, memoryState] = useAddLedgerAssistantMemoryMutation();
@@ -152,7 +158,7 @@ export function KitchenLedgerAssistant({ unitId, date }) {
   const [fact, setFact] = useState("");
   const imageRef = useRef(null);
   const ruleRef = useRef(null);
-  const busy = turnState.isLoading || applyState.isLoading;
+  const busy = turnState.isLoading || applyState.isLoading || slipState.isLoading;
 
   useEffect(() => {
     const profile = data?.profile;
@@ -245,19 +251,32 @@ function linesOf(message) {
   async function applyMovement(message) {
     const decision = reviewDraft("accept", linesOf(message));
     if (!decision.save) {
-      notifyError("Không có dòng được phép ghi. Cột Trên BĐ chỉ mở cho gạo.");
+      notifyError("Không có dòng phiếu nhập. Cột Trên BĐ lấy từ phiếu xuất cấp 1. Xuất ăn và xuất khác cần phiếu xuất của bếp.");
       return;
     }
-    const lines = decision.lines;
+    const slip = receiptSlip?.data ?? receiptSlip;
+    const existing = (slip?.lines || []).filter((line) => line.lineSource === "unit_self");
     try {
-      const result = await applyDraft({
-        unitId,
-        date,
-        messageId: message.id,
-        movementLines: lines.map((line) => ({ name: line.name, qty: Number(line.qty), unitPrice: line.unitPrice })),
-      }).unwrap();
-      if (result.saved?.ok === false) notifyError(result.saved.message);
-      else notifySuccess("Đã ghi dòng hàng");
+      for (const priceKind of ["market", "tgsx"]) {
+        const drafted = decision.slipLines.filter((line) => line.priceKind === priceKind);
+        if (!drafted.length) continue;
+        const prior = existing.filter((line) => (line.priceKind === "tgsx" ? "tgsx" : "market") === priceKind);
+        const byId = new Map(prior.map((line) => [line.commodityId, {
+          commodityId: line.commodityId,
+          quantity: Number(line.quantity),
+        }]));
+        for (const line of drafted) {
+          byId.set(line.commodityId, { commodityId: line.commodityId, quantity: Number(line.qty) });
+        }
+        await upsertSlip({
+          unitId,
+          receiptDate: date,
+          priceKind,
+          lines: [...byId.values()],
+        }).unwrap();
+      }
+      queryClient.invalidateQueries({ queryKey: qk.kitchenBooks.ledger(unitId, date) });
+      notifySuccess("Đã ghi phiếu nhập. Sổ đã tính lại.");
     } catch (err) {
       notifyError(errText(err));
     }
@@ -320,7 +339,7 @@ function linesOf(message) {
   }
 
   if (error) {
-    return <Note tone="bad">{errText(error)} Nhập tay ở nút Nhập số lượng vẫn dùng được.</Note>;
+    return <Note tone="bad">{errText(error)} Nhập quân số hoặc lập phiếu nhập vẫn dùng được.</Note>;
   }
 
   return (
@@ -332,11 +351,11 @@ function linesOf(message) {
         </Button>
       </div>
       <p className="mb-2 text-xs text-muted-foreground">
-        Trợ lý đọc sổ ngày này và chỉ soạn bản nháp. Số do sổ tính. Chưa ghi gì cho đến khi bạn chấp nhận. Cột Trên BĐ không nhận hàng thường; gạo là ngoại lệ tạm thời.
+        Trợ lý đưa đề xuất. Bấm ghi thì sửa phiếu nhập thật, sổ tính lại tồn và thừa thiếu ngay. Cột Trên BĐ vẫn lấy từ phiếu xuất của cấp 1.
       </p>
       {isLoading ? <p className="text-sm text-muted-foreground">Đang tải trợ lý…</p> : null}
       {data && !data.enabled ? (
-        <Note>AI đang tắt. Vẫn hỏi sổ, gửi quy tắc và nhập tay được.</Note>
+        <Note>AI đang tắt. Vẫn hỏi sổ, gửi quy tắc, nhập quân số và lập phiếu.</Note>
       ) : null}
       {(data?.brief || []).map((item) => <Note key={item.code + item.message} tone="warn">{item.message}</Note>)}
       {openPrefs && data ? (
@@ -411,7 +430,7 @@ function linesOf(message) {
       <div className="mb-2 flex max-h-80 flex-col gap-2 overflow-y-auto" data-local-scroll="true">
         {(data?.messages || []).map((message) => (
           <article key={message.id} className={cn("rounded-lg px-2 py-1 text-sm", message.role === "user" ? "bg-muted" : "bg-background")}>
-            {dismissed[message.id] ? <p className="text-xs text-muted-foreground">Đã bỏ bản nháp. Sổ không đổi.</p> : null}
+            {dismissed[message.id] ? <p className="text-xs text-muted-foreground">Đã bỏ đề xuất. Phiếu và sổ không đổi.</p> : null}
             {!dismissed[message.id] && (message.kind === "headcount_draft" || (message.kind === "records_draft" && daysOf(message).length)) ? (
               <HeadcountDraft
                 message={message}

@@ -34,7 +34,7 @@ function recordsPrompt({ settings, anchorDate, commodities = [], facts = [], que
     "type headcount: quan so sang, trua, chieu theo tung muc an. An them: benhXa, benhNhan, omTrai, leTet.",
     `Cac muc, dung thu tu: ${levels}. Mau 18/10: 91 97 97 · 0 0 0 la muc dau roi muc sau.`,
     "type outside_purchase: mua ngoai vao don vi bao dam. type stock_in: nhap kho, origin unit_purchase hoac unit_tgsx. type meal_out: so luong xuat an. type stock_out: xuat khac.",
-    "Hang da co tren phieu xuat thi khong tao ban ghi vao cot Tren BD. Gao nhap tay can column G, H, I hoac J.",
+    "Hang cua don vi thanh phieu nhap mua TT hoac TGSX. Khong tao ban ghi cho Tren BD. Xuat an va xuat khac chua co phieu xuat cua bep nen khong ghi.",
     "Moi hang can sourceKind market hoac tgsx va grade. Khong doan pham cap.",
     "type setting chi khi cau doi quy tac: field balanceWarnThreshold, spentBasis (meal_out hoac total_out), holidayLunchOnly.",
     "type schedule: lich lam viec trong ngay, chi la chu, khong doi so tren so.",
@@ -49,7 +49,7 @@ function recordsPrompt({ settings, anchorDate, commodities = [], facts = [], que
 
 function reject(message) {
   return new AppError({
-    message: message || "AI trả về bản ghi không đúng mẫu. Nhập tay ở bảng phía trên.",
+    message: message || "AI trả về bản ghi không đúng mẫu. Nhập quân số hoặc lập phiếu.",
     statusCode: 502,
     code: ERROR_CODES.INTERNAL_SERVER_ERROR,
   });
@@ -69,9 +69,8 @@ function isRice(name, pattern) {
 }
 
 /**
- * Đặt một bản ghi hàng vào khung ngày. Cột do máy chủ chọn.
- * Gạo nhập tay → Trên BĐ mua. Mua ngoài và nhập đơn vị mua → cột I.
- * Tự sản xuất đơn vị → cột J. Xuất khác → xuất khác, không phải xuất ăn.
+ * Bản nháp hàng thành dòng phiếu nhập của đơn vị (I mua TT, J TGSX).
+ * Trên BĐ không nhận bản nháp. Xuất ăn và xuất khác chưa có phiếu xuất của bếp.
  */
 function placeLine(record, { commodities, ricePattern }) {
   const hits = matchCommodity(record.name, commodities);
@@ -79,39 +78,32 @@ function placeLine(record, { commodities, ricePattern }) {
   const rice = isRice(record.name, ricePattern);
   let kind = "self_supply";
   let source = "I";
-  let place = "Đơn vị BĐ mua TT";
+  let place = "Phiếu nhập mua TT";
   let savable = true;
   let warning = "";
-  if (record.type === "stock_out") {
-    kind = "other_out";
-    source = "P";
-    place = "Xuất khác";
-  } else if (record.type === "meal_out") {
-    kind = "meal_out";
-    source = "N";
-    place = "Xuất ăn";
-  } else if (rice) {
-    kind = "rice";
-    if (!["G", "H", "I", "J"].includes(record.column)) {
-      savable = false;
-      warning = "Chọn cột G/H/I/J cho gạo.";
-      source = "";
-    } else {
-      source = record.column;
-    }
-    place = "Gạo nhập tay – tạm thời";
-  } else if (record.column === "G" || record.column === "H") {
+  const tgsx = record.origin === "unit_tgsx" || record.column === "J" || record.sourceKind === "tgsx";
+  if (record.type === "stock_out" || record.type === "meal_out") {
+    kind = record.type === "meal_out" ? "meal_out" : "other_out";
+    source = record.type === "meal_out" ? "N" : "P";
+    place = record.type === "meal_out" ? "Xuất ăn" : "Xuất khác";
     savable = false;
-    warning = "Cột Trên BĐ chỉ lấy từ phiếu xuất. Hàng này ghi vào đơn vị bảo đảm.";
-  } else if (record.type === "stock_in" && record.origin === "unit_tgsx") {
-    source = "J";
-    place = "Đơn vị BĐ TGSX";
+    warning = "Chưa có phiếu xuất của bếp. Bản nháp này chưa ghi được.";
+  } else if (record.column === "G" || record.column === "H") {
+    if (rice) kind = "rice";
+    source = record.column;
+    place = "Trên BĐ";
+    savable = false;
+    warning = "Cột Trên BĐ chỉ lấy từ phiếu xuất cấp 1. Hàng của đơn vị ghi vào phiếu nhập.";
+  } else {
+    if (rice) kind = "rice";
+    source = tgsx ? "J" : "I";
+    place = tgsx ? "Phiếu nhập TGSX" : "Phiếu nhập mua TT";
   }
   if (!rice && (kind === "self_supply" || kind === "meal_out") && !commodity) {
     savable = false;
     warning = warning || (hits.length > 1
-      ? "Nhiều mặt hàng trùng tên. Chọn ở bảng nhập."
-      : "Chưa khớp danh mục. Nhập ở bảng.");
+      ? "Nhiều mặt hàng trùng tên. Chọn đúng tên trong danh mục."
+      : "Chưa khớp danh mục.");
   }
   if (kind === "rice" && !commodity && record.unitPrice == null) {
     savable = false;

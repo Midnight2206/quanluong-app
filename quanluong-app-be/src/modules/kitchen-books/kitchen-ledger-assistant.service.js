@@ -324,7 +324,7 @@ async function callExtract(ctx, feature, prompt, { soft = false, model } = {}) {
       configOverride: ctx.opts.configOverride,
       model,
       fetchImpl: ctx.opts.fetchImpl,
-      disabledMessage: "AI đang tắt (chưa có MENU_AI_API_KEY). Nhập tay ở bảng phía trên.",
+      disabledMessage: "AI đang tắt (chưa có MENU_AI_API_KEY). Nhập quân số hoặc lập phiếu nhập.",
       retryUserHint: "Tra ve dung JSON records. Khong ten nguoi. Khong chon vi tri tren so.",
     });
     return { extracted, ...meta };
@@ -333,7 +333,7 @@ async function callExtract(ctx, feature, prompt, { soft = false, model } = {}) {
       await writeUsage(ctx.db, usageRow(ctx.user.id, ctx.unitId, feature, cfg, inputSha, inputBytes, "error"));
     }
     if (soft) return null;
-    await reply(ctx, "error", err?.message || "AI không đọc được. Nhập tay ở bảng phía trên.");
+    await reply(ctx, "error", err?.message || "AI không đọc được. Nhập quân số hoặc lập phiếu nhập.");
     throw err;
   }
 }
@@ -393,7 +393,7 @@ async function turnRecords(ctx) {
     await writeUsage(ctx.db, usageRow(
       ctx.user.id, ctx.unitId, meta.feature, meta.extracted, meta.inputSha, meta.inputBytes, "error",
     ));
-    await reply(ctx, "error", err?.message || "AI trả về bản ghi không đúng mẫu. Nhập tay ở bảng phía trên.");
+    await reply(ctx, "error", err?.message || "AI trả về bản ghi không đúng mẫu. Nhập quân số hoặc lập phiếu nhập.");
     throw err;
   }
   await markOk(ctx, meta);
@@ -671,94 +671,14 @@ function matchDraftLines(draftLines, confirmed) {
   });
 }
 
-async function applyMovement(message, payload, unitId, db, scope, effectiveUnitIds, dataScope, opts) {
-  const confirmed = payload.movementLines || [];
-  if (!confirmed.length) throw fail("Chưa có dòng để ghi.", 400);
-  const lines = matchDraftLines(message.payloadJson?.lines, confirmed);
-  const readLedger = opts.getLedger ?? getLedger;
-  const date = message.payloadJson?.date;
-  const view = await readLedger({ unitId, date }, scope, effectiveUnitIds, dataScope);
-  const grouped = { self_supply: [], rice: [], other_out: [], meal_out: [] };
-  for (const line of lines) {
-    if (!grouped[line.kind]) throw fail("Dòng nháp không ghi được vào sổ.", 400);
-    grouped[line.kind].push(line);
-  }
-  const body = { unitId, date };
-  if (grouped.self_supply.length) {
-    body.selfSupply = {
-      lines: [
-        ...existingLines(view, "self_supply"),
-        ...grouped.self_supply.map((line) => ({
-          commodityId: line.commodityId,
-          source: line.source,
-          qty: line.qty,
-          issuePolicy: line.issuePolicy || "today",
-          sourceKind: line.sourceKind || undefined,
-          grade: line.grade || undefined,
-        })),
-      ],
-    };
-  }
-  if (grouped.rice.length) {
-    body.rice = {
-      lines: [
-        ...existingLines(view, "rice"),
-        ...grouped.rice.map((line) => ({
-          commodityId: line.commodityId || undefined,
-          name: line.name,
-          source: line.source,
-          qty: line.qty,
-          unitPrice: line.unitPrice ?? undefined,
-          sourceKind: line.sourceKind || undefined,
-          grade: line.grade || undefined,
-        })),
-      ],
-    };
-  }
-  if (grouped.other_out.length) {
-    body.otherOut = {
-      lines: [
-        ...existingLines(view, "other_out"),
-        ...grouped.other_out.map((line) => ({
-          commodityId: line.commodityId || undefined,
-          name: line.name,
-          qty: line.qty,
-          sourceKind: line.sourceKind || undefined,
-          grade: line.grade || undefined,
-        })),
-      ],
-    };
-  }
-  if (grouped.meal_out.length) {
-    body.mealOut = {
-      lines: [
-        ...existingLines(view, "meal_out"),
-        ...grouped.meal_out.map((line) => ({
-          commodityId: line.commodityId || undefined,
-          name: line.name,
-          qty: line.qty,
-          unitPrice: line.unitPrice ?? undefined,
-          sourceKind: line.sourceKind || undefined,
-          grade: line.grade || undefined,
-        })),
-      ],
-    };
-  }
-  const save = opts.saveLedger ?? saveLedger;
-  let saved;
-  try {
-    saved = await save(body, scope, effectiveUnitIds, dataScope, { userId: opts.userId ?? null, source: "assistant" });
-  } catch (err) {
-    saved = { ok: false, message: err?.message || "Không lưu được." };
-  }
-  const nextPayload = { ...message.payloadJson, confirmed, savedOk: saved?.ok !== false };
-  message.payloadJson = nextPayload;
-  await db.ledgerAssistantMessage.update({
-    where: { id: message.id },
-    data: { payloadJson: nextPayload },
-  });
-  return { messageId: message.id, saved };
+async function applyMovement() {
+  throw fail(
+    "Số lượng không ghi vào ô sổ. Chấp nhận bản nháp ghi vào phiếu nhập của đơn vị.",
+    410,
+    "ledger_qty_closed",
+  );
 }
+
 
 async function applyRule(message, payload, user, db, scope, effectiveUnitIds, dataScope, opts) {
   if (!payload.acceptProposals) throw fail("Chưa xác nhận áp dụng cấu hình.", 400);

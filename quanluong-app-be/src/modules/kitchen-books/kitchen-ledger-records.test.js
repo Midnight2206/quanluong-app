@@ -120,15 +120,16 @@ test("mua ngoài vào đơn vị, gạo phải chọn cột, hàng thường kh�
   assert.equal(mapped.lines[0].name, "Mực ống");
   assert.equal(mapped.lines[0].source, "I");
   assert.equal(mapped.lines[0].kind, "self_supply");
-  assert.equal(mapped.lines[0].place, "Đơn vị BĐ mua TT");
+  assert.equal(mapped.lines[0].place, "Phiếu nhập mua TT");
   assert.equal(mapped.lines[0].unitPrice, 180000);
   assert.equal(mapped.lines[0].savable, true);
   assert.equal(mapped.lines[1].savable, false);
   assert.match(mapped.lines[1].warning, /Trên BĐ/);
   assert.equal(mapped.lines[2].savable, false);
   assert.match(mapped.lines[2].warning, /trùng tên/);
-  assert.equal(mapped.lines[3].savable, false);
-  assert.match(mapped.lines[3].warning, /cột/);
+  assert.equal(mapped.lines[3].kind, "rice");
+  assert.equal(mapped.lines[3].source, "J");
+  assert.equal(mapped.lines[3].savable, true);
   assert.equal(mapped.lines[4].kind, "rice");
   assert.equal(mapped.lines[4].source, "J");
   assert.equal(mapped.lines[4].commodityId, 4);
@@ -136,7 +137,8 @@ test("mua ngoài vào đơn vị, gạo phải chọn cột, hàng thường kh�
   assert.equal(mapped.lines[5].kind, "other_out");
   assert.equal(mapped.lines[5].source, "P");
   assert.equal(mapped.lines[5].place, "Xuất khác");
-  assert.equal(mapped.lines[5].savable, true);
+  assert.equal(mapped.lines[5].savable, false);
+  assert.match(mapped.lines[5].warning, /phiếu xuất/);
 });
 
 test("cấu hình sai thì cả lô bị từ chối", () => {

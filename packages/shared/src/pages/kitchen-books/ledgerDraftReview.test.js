@@ -12,18 +12,22 @@ test("bỏ bản nháp không tạo lệnh ghi", () => {
     { name: "Mực", savable: true, kind: "self_supply", source: "I", qty: 5 },
   ]);
   assert.equal(decision.save, false);
-  assert.deepEqual(decision.lines, []);
+  assert.deepEqual(decision.slipLines, []);
 });
 
-test("chấp nhận chỉ giữ cột đơn vị, gạo được vào mọi cột", () => {
+test("chấp nhận chỉ đưa hàng đơn vị vào phiếu nhập", () => {
   const decision = reviewDraft("accept", [
-    { name: "Mực", savable: true, kind: "self_supply", source: "I", qty: 5 },
-    { name: "Thịt", savable: true, kind: "self_supply", source: "G", qty: 1 },
-    { name: "Gạo", savable: true, kind: "rice", source: "H", qty: 2 },
-    { name: "Sữa", savable: false, kind: "self_supply", source: "J", qty: 3 },
+    { name: "Mực", savable: true, kind: "self_supply", source: "I", qty: 5, commodityId: 1 },
+    { name: "Thịt", savable: true, kind: "self_supply", source: "G", qty: 1, commodityId: 2 },
+    { name: "Gạo", savable: true, kind: "rice", source: "J", qty: 2, commodityId: 4 },
+    { name: "Xuất ăn", savable: true, kind: "meal_out", source: "N", qty: 1, commodityId: 5 },
+    { name: "Sữa", savable: false, kind: "self_supply", source: "J", qty: 3, commodityId: 3 },
   ]);
   assert.equal(decision.save, true);
-  assert.deepEqual(decision.lines.map((line) => line.name), ["Mực", "Gạo"]);
+  assert.deepEqual(decision.slipLines.map((line) => [line.name, line.priceKind]), [
+    ["Mực", "market"],
+    ["Gạo", "tgsx"],
+  ]);
 });
 
 test("màn sổ mở mức ăn, quân số và trợ lý bằng nút, bản nháp có nút bỏ", () => {
@@ -38,7 +42,16 @@ test("màn sổ mở mức ăn, quân số và trợ lý bằng nút, bản nhá
   const mealsAt = tab.indexOf('setPanel("meals")');
   assert.ok(paperAt > mealsAt && paperAt > 0);
   assert.match(tab, /fixed inset-0 z-\[70\]/);
-  assert.match(assistant, /Bỏ bản nháp/);
+  assert.match(assistant, /Bỏ đề xuất/);
   assert.match(assistant, /reviewDraft\("accept"/);
   assert.doesNotMatch(assistant, /planRations/);
+  assert.doesNotMatch(tab, /Nhập số lượng/);
+  assert.doesNotMatch(tab, /function linesFrom/);
+  assert.match(tab, /phieu-nhap-kho/);
+  assert.match(tab, /lttp-nhap-xuat/);
+  assert.match(tab, /Sửa phiếu nhập/);
+  assert.match(assistant, /Ghi vào phiếu nhập/);
+  assert.doesNotMatch(tab, /Sổ nháp/);
+  assert.doesNotMatch(assistant, /Sổ nháp/);
+  assert.doesNotMatch(assistant, /Nhập số lượng/);
 });

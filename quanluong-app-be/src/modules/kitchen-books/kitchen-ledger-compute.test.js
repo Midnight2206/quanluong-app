@@ -291,7 +291,7 @@ test("tiền đã sử dụng theo cấu hình ΣS hoặc ΣO", () => {
   same(byMeal.finance.spent, "0");
 });
 
-test("assemble: không phiếu vẫn lập sổ, gạo nhập tay không cộng đôi", () => {
+test("assemble: số lượng chỉ từ phiếu, dòng nhập tay chỉ được đếm", () => {
   const slips = [
     {
       id: 15,
@@ -329,8 +329,18 @@ test("assemble: không phiếu vẫn lập sổ, gạo nhập tay không cộng 
     ],
   });
   assert.equal(open.blockers.length, 0);
-  assert.equal(open.input.receipts.some((row) => row.source === "G" || row.source === "H"), false);
-  assert.equal(open.input.receipts[0].source, "I");
+  assert.equal(open.input.receipts.length, 0);
+  assert.equal(open.manualEntryCounts.self_supply, 1);
+  const fromUnitSlip = assembleLedgerInput({
+    date: "2026-10-17",
+    settings: DEFAULT_LEDGER_SETTINGS,
+    priceRows,
+    unitSlipLines: [
+      { source: "I", commodityId: 2, qty: "0.8", name: "Hành tây", uom: "Kg", unitPrice: "18000" },
+    ],
+  });
+  assert.equal(fromUnitSlip.input.receipts[0].source, "I");
+  assert.equal(fromUnitSlip.input.receipts[0].name, "Hành tây");
 
   const fromSlip = assembleLedgerInput({
     date: "2026-10-17",
@@ -352,9 +362,9 @@ test("assemble: không phiếu vẫn lập sổ, gạo nhập tay không cộng 
     ],
   });
   assert.equal(built.blockers.length, 0);
-  assert.equal(built.warnings.some((row) => row.code === "rice_manual_kept"), true);
+  assert.equal(built.manualEntryCounts.rice, 1);
   const names = built.input.receipts.map((row) => `${row.name}:${row.source}:${row.qty}:${row.unitPrice}`);
-  assert.deepEqual(names, ["Đậu phụ:H:11.9:22000", "Gạo tẻ thường:J:5:16000"]);
+  assert.deepEqual(names, ["Gạo tẻ thường:G:1.8:16000", "Đậu phụ:H:11.9:22000"]);
 
   const changed = fingerprintIssueSlips([
     { ...slips[0], lines: [{ ...slips[0].lines[1], quantity: "12" }] },

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
 import { fieldClassSm } from "@/utils/fieldClass";
-import { LineTable } from "./KitchenLedgerEntry.jsx";
 import { formatLedgerNumber } from "./ledgerNumberFormat.js";
 import { percentSum, percentsToAmounts } from "./ledgerMealSplit.js";
 
@@ -199,21 +198,17 @@ export function KitchenLedgerDayAside({
   previousHeadcount,
   onHeadcount,
   onIncome,
+  openingMoney,
+  openingEditable,
+  onOpening,
   onSaveHeadcount,
   onCopyPrevious,
   scheduleText,
   onSchedule,
-  selfLines,
-  selfNone,
-  commodities,
-  onSelfChange,
-  onSaveSelf,
-  onSelfNone,
   part = "all",
 }) {
   const showMeals = part === "all" || part === "meals";
   const showHeadcount = part === "all" || part === "headcount";
-  const showSupply = part === "all" || part === "supply";
   return (
     <aside className="rounded-lg border border-border bg-card p-3 text-xs">
       {showMeals ? <MealRatePicker mealRates={mealRates} disabled={disabled} busy={busy} onSave={onSaveMeals} /> : null}
@@ -275,7 +270,19 @@ export function KitchenLedgerDayAside({
       </div>
       <dl className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1">
         <dt>Cộng</dt><dd className="text-right tabular-nums">{finance ? moneyText(finance.subtotal) : "—"}</dd>
-        <dt>Thừa hôm trước</dt><dd className="text-right tabular-nums">{finance ? moneyText(finance.prevSurplus) : "—"}</dd>
+        <dt>Thừa hôm trước</dt>
+        <dd className="text-right tabular-nums">
+          {openingEditable ? (
+            <input
+              aria-label="Thừa hôm trước"
+              inputMode="decimal"
+              className={fieldClassSm}
+              disabled={disabled}
+              value={openingMoney?.surplus ?? ""}
+              onChange={(event) => onOpening({ ...openingMoney, surplus: event.target.value })}
+            />
+          ) : (finance ? moneyText(finance.prevSurplus) : "—")}
+        </dd>
         <dt>Bù giá gạo</dt>
         <dd>
           <input
@@ -311,7 +318,18 @@ export function KitchenLedgerDayAside({
         <dt>Tiền đã sử dụng</dt>
         <dd className="text-right tabular-nums">{finance ? moneyText(finance.spent) : "—"}</dd>
         <dt>Thiếu hôm trước</dt>
-        <dd className="text-right tabular-nums">{finance ? moneyText(finance.prevShortfall) : "—"}</dd>
+        <dd className="text-right tabular-nums">
+          {openingEditable ? (
+            <input
+              aria-label="Thiếu hôm trước"
+              inputMode="decimal"
+              className={fieldClassSm}
+              disabled={disabled}
+              value={openingMoney?.shortfall ?? ""}
+              onChange={(event) => onOpening({ ...openingMoney, shortfall: event.target.value })}
+            />
+          ) : (finance ? moneyText(finance.prevShortfall) : "—")}
+        </dd>
         <dt className="font-medium">Cộng chi</dt>
         <dd className="text-right font-medium tabular-nums">{finance ? moneyText(finance.totalSpent) : "—"}</dd>
         <dt>Thừa trong ngày</dt>
@@ -333,7 +351,10 @@ export function KitchenLedgerDayAside({
           onChange={(event) => onSchedule(event.target.value)}
         />
       </label>
-      <p className="mt-1 text-muted-foreground">Lịch lưu cùng nút Lưu quân số. Lịch không tự đổi số trên sổ.</p>
+      <p className="mt-1 text-muted-foreground">
+        Lịch lưu cùng nút Lưu quân số. Lịch không tự đổi số trên sổ.
+        {openingEditable ? " Thừa và thiếu hôm trước là tiền đầu kỳ, không phải hàng." : ""}
+      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" className="h-8 px-3 text-xs" disabled={disabled || busy} onClick={onSaveHeadcount}>
           Lưu quân số
@@ -349,26 +370,6 @@ export function KitchenLedgerDayAside({
         </Button>
       </div>
         </>
-      ) : null}
-      {showSupply ? (
-      <div className="mt-3 border-t border-border pt-3">
-        <LineTable
-          title="Mua ngoài"
-          hint={selfNone ? "Đã xác nhận không có nguồn đơn vị trong ngày." : "Đơn vị bảo đảm: cột mua và tự sản xuất. Không gõ dòng trên bảo đảm ở đây."}
-          lines={selfLines}
-          disabled={disabled}
-          commodities={commodities}
-          mode="self"
-          onChange={onSelfChange}
-          onSave={() => onSaveSelf(false)}
-          saving={busy}
-          extra={(
-            <Button type="button" variant="secondary" className="h-8 px-2 text-xs" disabled={disabled || busy} onClick={() => onSelfNone()}>
-              Không có
-            </Button>
-          )}
-        />
-      </div>
       ) : null}
     </aside>
   );

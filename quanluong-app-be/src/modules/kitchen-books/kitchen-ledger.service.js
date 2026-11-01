@@ -3,12 +3,10 @@ import { AppError } from "../../errors/app-error.js";
 import { ERROR_CODES } from "../../errors/error-codes.js";
 import { resolvePrivateStorageUnitId } from "../../shared/data-scope/unit-data-policy.service.js";
 import { assembleLedgerInput } from "./kitchen-ledger-assemble.js";
-import { classifyItem, computeLedger } from "./kitchen-ledger-compute.js";
+import { computeLedger } from "./kitchen-ledger-compute.js";
 import { buildDayStructure } from "./kitchen-ledger-day-structure.js";
 import { buildDayFrame } from "./kitchen-ledger-frame.js";
 import {
-  assertLineIdentity,
-  assertManualColumn,
   lockAfterSync,
   negativeItems,
   pdfStale,
@@ -201,6 +199,36 @@ function mapPrevLots(prev) {
   }));
 }
 
+async function loadUnitSelfLines(unitId, ledgerDate) {
+  if (typeof prisma.kitchenReceiptSlip?.findUnique !== "function") return [];
+  const slip = await prisma.kitchenReceiptSlip.findUnique({
+    where: { unitId_receiptDate: { unitId, receiptDate: ledgerDate } },
+    include: {
+      lines: {
+        where: { lineSource: "unit_self" },
+        include: { commodity: { include: { group: { select: { code: true, sortOrder: true } } } } },
+      },
+    },
+  });
+  return (slip?.lines || []).map((line) => ({
+    source: line.priceKind === "tgsx" ? "J" : "I",
+    commodityId: line.commodityId,
+    qty: dec(line.quantity),
+    unitPrice: dec(line.unitPrice),
+    commodity: line.commodity,
+  }));
+}
+
+async function countManualEntries(unitId) {
+  if (typeof prisma.kitchenLedgerMovement?.count !== "function") return null;
+  return prisma.kitchenLedgerMovement.count({
+    where: {
+      day: { unitId },
+      kind: { in: ["self_supply", "rice", "meal_out", "other_out", "opening"] },
+    },
+  });
+}
+
 async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
   const resolved = await loadEffectiveSettings(unitId, ledgerDate);
   const settings = resolved.settings;
@@ -218,10 +246,8 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
     include: { lots: { orderBy: { sortOrder: "asc" } } },
   });
   const movements = (day?.movements || []).filter((row) => !(opts.ignoreBalance && row.kind === "balance"));
-  const openingMovements = movements.filter((row) => row.kind === "opening");
   const isDay1 = ledgerDate.getUTCDate() === 1;
-  const useStockCount = openingMovements.length > 0 && (isDay1 || !prev);
-  const assembledMovements = (useStockCount ? movements : movements.filter((row) => row.kind !== "opening"))
+  const assembledMovements = movements
     .map((row) => ({
       kind: row.kind,
       source: row.source,
@@ -237,27 +263,28 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
 
   let prevSurplus = "0";
   let prevShortfall = "0";
-  if (day?.openingFinanceJson && (useStockCount || isDay1)) {
+  if (day?.openingFinanceJson && (isDay1 || !prev?.snapshotJson?.finance)) {
     prevSurplus = dec(day.openingFinanceJson.surplus);
     prevShortfall = dec(day.openingFinanceJson.shortfall);
   } else if (prev?.snapshotJson?.finance) {
     prevSurplus = dec(prev.snapshotJson.finance.surplus);
     prevShortfall = dec(prev.snapshotJson.finance.shortfall);
-  } else if (day?.openingFinanceJson) {
-    prevSurplus = dec(day.openingFinanceJson.surplus);
-    prevShortfall = dec(day.openingFinanceJson.shortfall);
   }
 
   const headcount = normalizeHeadcount(day?.headcountJson, settings);
+  const unitSlipLines = await loadUnitSelfLines(unitId, ledgerDate);
+  const commodityById = await loadCommodityMap(dataScope.storageUnitId);
+  const openingLots = mapPrevLots(prev);
   const assembled = assembleLedgerInput({
     date: ymd(ledgerDate),
     settings,
     slips,
     movements: assembledMovements,
+    unitSlipLines,
     priceRows: prices.priceRows,
     priceTablePresent: prices.priceTablePresent,
-    openingLots: useStockCount ? [] : mapPrevLots(prev),
-    commodityById: await loadCommodityMap(dataScope.storageUnitId),
+    openingLots,
+    commodityById,
   });
 
   const locked = day?.status === "locked";
@@ -283,8 +310,10 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
     movements: (day?.movements || []).map(movementDto),
     settings,
     mealRates,
-    carriedFrom: useStockCount ? "stock_count" : prev ? ymd(prev.ledgerDate) : null,
+    carriedFrom: prev ? ymd(prev.ledgerDate) : null,
     slipCount: assembled.slipCount,
+    manualEntryCounts: assembled.manualEntryCounts,
+    manualEntryCount: await countManualEntries(unitId),
     priceTable: prices.priceTable,
     blockers: assembled.blockers,
     warnings: assembled.warnings,
@@ -453,116 +482,6 @@ function assertDraft(day) {
   }
 }
 
-async function commodityOrThrow(storageUnitId, commodityId) {
-  const row = await prisma.lttpCommodity.findFirst({
-    where: { id: Number(commodityId), unitId: storageUnitId },
-  });
-  if (!row) {
-    throw new AppError({
-      message: "Mặt hàng không thuộc đơn vị.",
-      statusCode: 400,
-      code: ERROR_CODES.VALIDATION_ERROR,
-    });
-  }
-  return row;
-}
-
-async function rowsForKind(kind, lines, storageUnitId, settings) {
-  const rows = [];
-  for (const [index, line] of (lines || []).entries()) {
-    const commodity = line.commodityId ? await commodityOrThrow(storageUnitId, line.commodityId) : null;
-    const name = commodity?.name || line.name || line.itemName || "";
-    const measureUnit = commodity?.measureUnit || line.measureUnit || "";
-    let source = line.source || "I";
-    if (kind === "rice") {
-      source = line.source;
-      if (!["G", "H", "I", "J"].includes(source)) {
-        throw new AppError({
-          message: "Chọn cột G, H, I hoặc J cho gạo.",
-          statusCode: 400,
-          code: ERROR_CODES.VALIDATION_ERROR,
-        });
-      }
-      if (classifyItem(name, measureUnit || "Kg", settings) !== "rice") {
-        throw new AppError({
-          message: "Dòng gạo không phải gạo.",
-          statusCode: 400,
-          code: ERROR_CODES.VALIDATION_ERROR,
-        });
-      }
-      if (!commodity && (line.unitPrice == null || line.unitPrice === "")) {
-        throw new AppError({
-          message: "Dòng gạo chưa có trong danh mục thì cần đơn giá.",
-          statusCode: 400,
-          code: ERROR_CODES.VALIDATION_ERROR,
-        });
-      }
-    } else if (kind === "meal_out") {
-      source = "N";
-      if (!commodity && !line.name) {
-        throw new AppError({
-          message: "Xuất ăn thiếu mặt hàng.",
-          statusCode: 400,
-          code: ERROR_CODES.VALIDATION_ERROR,
-        });
-      }
-    } else if (kind === "other_out") {
-      source = "P";
-      if (!commodity && !line.name) {
-        throw new AppError({
-          message: "Xuất khác thiếu mặt hàng.",
-          statusCode: 400,
-          code: ERROR_CODES.VALIDATION_ERROR,
-        });
-      }
-    } else if (kind === "opening") {
-      source = "E";
-    } else {
-      source = source === "J" ? "J" : "I";
-    }
-    throwDenied(assertManualColumn({ name, measureUnit, source, settings }));
-    let sourceKind = null;
-    let grade = null;
-    if (kind !== "opening") {
-      sourceKind = line.sourceKind || commodity?.sourceKind || null;
-      grade = line.grade || commodity?.grade || null;
-      throwDenied(assertLineIdentity({ sourceKind, grade }));
-      grade = String(grade).trim();
-      if (commodity && (!commodity.sourceKind || !commodity.grade)) {
-        await prisma.lttpCommodity.update({
-          where: { id: commodity.id },
-          data: {
-            ...(commodity.sourceKind ? {} : { sourceKind }),
-            ...(commodity.grade ? {} : { grade }),
-          },
-        });
-      }
-    }
-    rows.push({
-      sortOrder: index,
-      kind,
-      source,
-      commodityId: commodity?.id ?? null,
-      itemName: name,
-      measureUnit,
-      unitPrice: line.unitPrice ?? 0,
-      qty: line.qty,
-      issuePolicy: line.issuePolicy || "today",
-      sourceKind,
-      grade,
-      manualTemporary: kind === "rice",
-    });
-  }
-  return rows;
-}
-
-async function replaceKind(tx, dayId, kind, rows) {
-  await tx.kitchenLedgerMovement.deleteMany({ where: { dayId, kind } });
-  if (!rows.length) return;
-  await tx.kitchenLedgerMovement.createMany({
-    data: rows.map((row) => ({ ...row, dayId })),
-  });
-}
 
 async function getLedger(query, scope, effectiveUnitIds, dataScope) {
   const unitId = Number(query.unitId);
@@ -585,22 +504,7 @@ async function saveLedger(payload, scope, effectiveUnitIds, dataScope, actor = {
   }
   const settings = (await loadEffectiveSettings(unitId, ledgerDate)).settings;
   const day = existing ?? await ensureDay(unitId, ledgerDate);
-  const storageUnitId = dataScope.storageUnitId;
-  const selfRows = payload.selfSupply
-    ? await rowsForKind("self_supply", payload.selfSupply.none ? [] : payload.selfSupply.lines || [], storageUnitId, settings)
-    : null;
-  const riceRows = payload.rice
-    ? await rowsForKind("rice", payload.rice.lines, storageUnitId, settings)
-    : null;
-  const mealRows = payload.mealOut
-    ? await rowsForKind("meal_out", payload.mealOut.lines, storageUnitId, settings)
-    : null;
-  const otherRows = payload.otherOut
-    ? await rowsForKind("other_out", payload.otherOut.lines, storageUnitId, settings)
-    : null;
-  const openingRows = payload.opening?.lines
-    ? await rowsForKind("opening", payload.opening.lines, storageUnitId, settings)
-    : null;
+  const quantityIgnored = Boolean(payload.selfSupply || payload.rice || payload.mealOut || payload.otherOut || payload.opening?.lines);
   const data = {};
   if (payload.headcount) data.headcountJson = normalizeHeadcount(payload.headcount, settings);
   if (payload.otherIncome) data.otherIncomeJson = incomeOf(payload.otherIncome);
@@ -616,11 +520,6 @@ async function saveLedger(payload, scope, effectiveUnitIds, dataScope, actor = {
     if (Object.keys(data).length) {
       await tx.kitchenLedgerDay.update({ where: { id: day.id }, data });
     }
-    if (selfRows) await replaceKind(tx, day.id, "self_supply", selfRows);
-    if (riceRows) await replaceKind(tx, day.id, "rice", riceRows);
-    if (mealRows) await replaceKind(tx, day.id, "meal_out", mealRows);
-    if (otherRows) await replaceKind(tx, day.id, "other_out", otherRows);
-    if (openingRows) await replaceKind(tx, day.id, "opening", openingRows);
   });
   const view = await buildView(unitId, ledgerDate, dataScope);
   if (view.dayId) {
@@ -634,7 +533,8 @@ async function saveLedger(payload, scope, effectiveUnitIds, dataScope, actor = {
       },
     });
   }
-  return buildView(unitId, ledgerDate, dataScope);
+  const savedView = await buildView(unitId, ledgerDate, dataScope);
+  return quantityIgnored ? { ...savedView, quantityIgnored: true } : savedView;
 }
 
 async function lockLedger(payload, userId, scope, effectiveUnitIds, dataScope) {

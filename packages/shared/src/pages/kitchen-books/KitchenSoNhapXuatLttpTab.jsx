@@ -12,7 +12,6 @@ import {
   useUnlockKitchenLedgerMutation,
 } from "@/features/kitchen-books/api/kitchenBooksApi";
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
-import { useGetLttpCommoditiesQuery } from "@/features/lttp/api/lttpApi";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { openKitchenLedgerMonthPdf } from "./kitchenLedgerMonthPdfOpen.js";
 import { cn } from "@/utils/cn";
@@ -22,8 +21,9 @@ import { KitchenLedgerDayAside } from "./KitchenLedgerDayAside.jsx";
 import { KitchenLedgerSettingsPanel } from "./KitchenLedgerSettingsPanel.jsx";
 import { KitchenBooksAccessGate } from "./KitchenBooksAccessGate.jsx";
 import { KitchenBooksUnitPicker } from "./KitchenBooksUnitPicker.jsx";
-import { blankLine, LineTable, Note, QtyInput } from "./KitchenLedgerEntry.jsx";
+import { Note } from "./KitchenLedgerEntry.jsx";
 import { KitchenLedgerGrid } from "./KitchenLedgerGrid.jsx";
+import { KitchenReceiptSlipWorkspace } from "./KitchenReceiptSlipWorkspace.jsx";
 import { formatLedgerInput, parseViNumber } from "./ledgerNumberFormat.js";
 
 const MEALS = [
@@ -59,7 +59,7 @@ function addDays(value, days) {
   return ymd(date);
 }
 
-function LedgerModal({ title, open, onClose, children }) {
+function LedgerModal({ title, open, onClose, wide, children }) {
   useEffect(() => {
     if (!open) return undefined;
     function onKey(event) {
@@ -72,7 +72,7 @@ function LedgerModal({ title, open, onClose, children }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center p-3 sm:items-center" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" className="absolute inset-0 bg-black/40" aria-label={`Đóng ${title}`} onClick={onClose} />
-      <div className="relative z-10 max-h-[min(40rem,calc(100dvh-2rem))] w-full max-w-xl overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-float" data-local-scroll="true">
+      <div className={cn("relative z-10 max-h-[min(40rem,calc(100dvh-2rem))] w-full overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-float", wide ? "max-w-5xl" : "max-w-xl")} data-local-scroll="true">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">{title}</h2>
           <Button type="button" variant="ghost" className="h-8 px-2 text-xs" onClick={onClose}>Đóng</Button>
@@ -81,22 +81,6 @@ function LedgerModal({ title, open, onClose, children }) {
       </div>
     </div>
   );
-}
-
-function linesFrom(movements, kind) {
-  return (movements || [])
-    .filter((row) => row.kind === kind)
-    .map((row) => blankLine({
-      commodityId: row.commodityId,
-      name: row.itemName || "",
-      measureUnit: row.measureUnit || "",
-      source: ["G", "H", "I", "J"].includes(row.source) ? row.source : "I",
-      qty: formatLedgerInput(row.qty),
-      unitPrice: formatLedgerInput(row.unitPrice),
-      sourceKind: row.sourceKind || "",
-      grade: row.grade || "",
-      issuePolicy: row.issuePolicy || "today",
-    }));
 }
 
 export function KitchenSoNhapXuatLttpTab({
@@ -111,14 +95,9 @@ export function KitchenSoNhapXuatLttpTab({
 }) {
   const entryDirty = useRef(false);
   const settingsDirty = useRef(false);
+  const openingDirty = useRef(false);
   const [headcount, setHeadcount] = useState(null);
   const [income, setIncome] = useState({ anThem: "0", truyLinh: "0", thuKhach: "0" });
-  const [selfLines, setSelfLines] = useState([]);
-  const [selfNone, setSelfNone] = useState(false);
-  const [riceLines, setRiceLines] = useState([]);
-  const [mealLines, setMealLines] = useState([]);
-  const [otherLines, setOtherLines] = useState([]);
-  const [openingLines, setOpeningLines] = useState([]);
   const [openingMoney, setOpeningMoney] = useState({ surplus: "0", shortfall: "0" });
   const [settingsForm, setSettingsForm] = useState(null);
   const [scheduleText, setScheduleText] = useState("");
@@ -130,7 +109,6 @@ export function KitchenSoNhapXuatLttpTab({
     { unitId: selectedUnitId, date: menuDate },
     { skip },
   );
-  const { data: commodities = [] } = useGetLttpCommoditiesQuery(selectedUnitId, { skip });
   const { data: assistant } = useGetKitchenLedgerAssistantQuery(
     { unitId: selectedUnitId, date: menuDate },
     { skip },
@@ -148,6 +126,7 @@ export function KitchenSoNhapXuatLttpTab({
   useEffect(() => {
     entryDirty.current = false;
     settingsDirty.current = false;
+    openingDirty.current = false;
   }, [selectedUnitId, menuDate]);
 
   useEffect(() => {
@@ -159,12 +138,6 @@ export function KitchenSoNhapXuatLttpTab({
       thuKhach: formatLedgerInput(ledger.otherIncome?.thuKhach),
       riceSubsidy: formatLedgerInput(ledger.otherIncome?.riceSubsidy),
     });
-    setSelfLines(linesFrom(ledger.movements, "self_supply"));
-    setSelfNone(Boolean(ledger.selfSupplyNone));
-    setRiceLines(linesFrom(ledger.movements, "rice"));
-    setMealLines(linesFrom(ledger.movements, "meal_out"));
-    setOtherLines(linesFrom(ledger.movements, "other_out"));
-    setOpeningLines(linesFrom(ledger.movements, "opening"));
     setOpeningMoney({
       surplus: formatLedgerInput(ledger.openingFinance?.surplus),
       shortfall: formatLedgerInput(ledger.openingFinance?.shortfall),
@@ -200,24 +173,6 @@ export function KitchenSoNhapXuatLttpTab({
     }
   }
 
-  function identityOf(line, label) {
-    const commodity = commodities.find((row) => row.id === line.commodityId);
-    const sourceKind = line.sourceKind || commodity?.sourceKind || "";
-    const grade = String(line.grade || commodity?.grade || "").trim();
-    if (sourceKind !== "market" && sourceKind !== "tgsx") {
-      throw new Error(`${label}: chọn nguồn Mua TT hoặc TGSX.`);
-    }
-    if (!grade) throw new Error(`${label}: chọn phẩm cấp.`);
-    return { sourceKind, grade };
-  }
-
-  function readQty(line, label) {
-    const qty = parseViNumber(line.qty);
-    if (qty == null || qty <= 0) {
-      throw new Error(`${label}: nhập số lượng lớn hơn 0.`);
-    }
-    return qty;
-  }
 
   async function saveHeadcount() {
     if (!headcount) return;
@@ -248,131 +203,15 @@ export function KitchenSoNhapXuatLttpTab({
           riceSubsidy: parseViNumber(income.riceSubsidy) ?? 0,
         },
         schedule: { text: scheduleText.trim() },
+        ...(openingEditable && openingDirty.current ? {
+          opening: {
+            surplus: parseViNumber(openingMoney.surplus) ?? 0,
+            shortfall: parseViNumber(openingMoney.shortfall) ?? 0,
+          },
+        } : {}),
       }).unwrap();
+      openingDirty.current = false;
     }, "Đã lưu quân số");
-  }
-
-  async function saveSelf(none) {
-    const source = none ? [] : selfLines.filter((line) => line.commodityId || line.qty);
-    await run(async () => {
-      const lines = source.map((line) => {
-        if (!line.commodityId) throw new Error("Nguồn đơn vị: chọn mặt hàng.");
-        return {
-          commodityId: line.commodityId,
-          source: line.source === "J" ? "J" : "I",
-          qty: readQty(line, "Nguồn đơn vị"),
-          ...identityOf(line, "Nguồn đơn vị"),
-        };
-      });
-      await saveLedger({
-        unitId: selectedUnitId,
-        date: menuDate,
-        ...(Number.isInteger(ledger?.version) ? { version: ledger.version } : {}),
-        selfSupply: { none, lines },
-      }).unwrap();
-      setSelfNone(none);
-    }, none ? "Đã ghi không có nguồn đơn vị" : "Đã lưu nguồn đơn vị");
-  }
-
-  async function saveRice() {
-    const source = riceLines.filter((line) => line.commodityId || line.name || line.qty);
-    await run(async () => {
-      const lines = source.map((line) => {
-        const qty = readQty(line, "Gạo");
-        if (!line.commodityId && !line.name.trim()) throw new Error("Dòng gạo cần tên hoặc mã hàng.");
-        const row = {
-          qty,
-          source: ["G", "H", "I", "J"].includes(line.source) ? line.source : "G",
-          name: line.name.trim() || undefined,
-          commodityId: line.commodityId || undefined,
-          ...identityOf(line, "Gạo"),
-        };
-        if (!line.commodityId) {
-          const unitPrice = parseViNumber(line.unitPrice);
-          if (unitPrice == null) throw new Error("Gạo chưa có mã thì cần đơn giá.");
-          row.unitPrice = unitPrice;
-        }
-        return row;
-      });
-      await saveLedger({
-        unitId: selectedUnitId,
-        date: menuDate,
-        ...(Number.isInteger(ledger?.version) ? { version: ledger.version } : {}),
-        rice: { lines },
-      }).unwrap();
-    }, "Đã lưu gạo");
-  }
-
-  async function saveMeal() {
-    const source = mealLines.filter((line) => line.commodityId || line.name || line.qty);
-    await run(async () => {
-      const lines = source.map((line) => {
-        if (!line.commodityId && !line.name.trim()) throw new Error("Xuất ăn: nhập tên mặt hàng.");
-        return {
-          commodityId: line.commodityId || undefined,
-          name: line.name.trim() || undefined,
-          qty: readQty(line, "Xuất ăn"),
-          ...identityOf(line, "Xuất ăn"),
-        };
-      });
-      await saveLedger({
-        unitId: selectedUnitId,
-        date: menuDate,
-        ...(Number.isInteger(ledger?.version) ? { version: ledger.version } : {}),
-        mealOut: { lines },
-      }).unwrap();
-    }, "Đã lưu xuất ăn");
-  }
-
-  async function saveOther() {
-    const source = otherLines.filter((line) => line.commodityId || line.name || line.qty);
-    await run(async () => {
-      const lines = source.map((line) => {
-        if (!line.commodityId && !line.name.trim()) throw new Error("Xuất khác: nhập tên mặt hàng.");
-        return {
-          commodityId: line.commodityId || undefined,
-          name: line.name.trim() || undefined,
-          qty: readQty(line, "Xuất khác"),
-          ...identityOf(line, "Xuất khác"),
-        };
-      });
-      await saveLedger({
-        unitId: selectedUnitId,
-        date: menuDate,
-        ...(Number.isInteger(ledger?.version) ? { version: ledger.version } : {}),
-        otherOut: { lines },
-      }).unwrap();
-    }, "Đã lưu xuất khác");
-  }
-
-  async function saveOpening() {
-    const source = openingLines.filter((line) => line.name || line.qty || line.commodityId);
-    await run(async () => {
-      const lines = source.map((line) => {
-        const qty = parseViNumber(line.qty);
-        const unitPrice = parseViNumber(line.unitPrice);
-        if (!line.name.trim() || !line.measureUnit.trim() || qty == null || unitPrice == null) {
-          throw new Error("Tồn đầu: cần tên, đơn vị tính, số lượng và đơn giá.");
-        }
-        return {
-          commodityId: line.commodityId || undefined,
-          name: line.name.trim(),
-          measureUnit: line.measureUnit.trim(),
-          unitPrice,
-          qty,
-        };
-      });
-      await saveLedger({
-        unitId: selectedUnitId,
-        date: menuDate,
-        ...(Number.isInteger(ledger?.version) ? { version: ledger.version } : {}),
-        opening: {
-          surplus: parseViNumber(openingMoney.surplus) ?? 0,
-          shortfall: parseViNumber(openingMoney.shortfall) ?? 0,
-          lines,
-        },
-      }).unwrap();
-    }, "Đã lưu tồn đầu");
   }
 
   async function onLock() {
@@ -459,7 +298,7 @@ export function KitchenSoNhapXuatLttpTab({
   const disabled = locked || !ledger?.canEdit;
   const today = ymd(new Date());
   const hour = new Date().getHours();
-  const showOpening = ledger && (ledger.carriedFrom == null || ledger.carriedFrom === "stock_count" || menuDate.endsWith("-01"));
+  const openingEditable = Boolean(ledger) && (menuDate.endsWith("-01") || ledger.carriedFrom == null);
   const finance = ledger?.structure?.finance ?? ledger?.finance;
   const mealSlots = ledger?.structure?.headcount?.meals?.map((row) => [row.key, row.label]) || MEALS;
   const extraSlots = ledger?.structure?.headcount?.extras?.map((row) => [row.key, row.label]) || EXTRAS;
@@ -500,7 +339,7 @@ export function KitchenSoNhapXuatLttpTab({
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("meals")}>Cài đặt mức ăn</Button>
             <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("headcount")}>Nhập quân số</Button>
-            <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("quantities")}>Nhập số lượng</Button>
+            <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger || selectedUnitId == null} onClick={() => setPanel("slip")}>Sửa phiếu nhập</Button>
             <Button type="button" variant="secondary" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("assistant")}>Trợ lý</Button>
             {canSettings ? (
               <Button type="button" variant="ghost" className="h-8 px-3 text-xs" disabled={!ledger} onClick={() => setPanel("settings")}>Cấu hình sổ</Button>
@@ -567,14 +406,17 @@ export function KitchenSoNhapXuatLttpTab({
             {menuDate === addDays(today, 1) && hour >= 18 && !ledger.headcountSaved ? (
               <Note tone="warn">Sau 18:00, nhập quân số ngày mai.</Note>
             ) : null}
-            {menuDate === today && hour >= 8 && !ledger.selfSupplyNone && !ledger.movements?.some((row) => row.kind === "self_supply") ? (
-              <Note>Sau 08:00, xác nhận nguồn Đơn vị BĐ hoặc bấm Không có.</Note>
+            {ledger.manualEntryCount > 0 ? (
+              <Note tone="warn">
+                Đơn vị còn {ledger.manualEntryCount} dòng số lượng nhập tay cũ. Chúng không còn cộng vào sổ và chưa bị xóa.
+                Hàng cột đơn vị chuyển thành phiếu nhập. Xuất ăn và xuất khác chờ phiếu xuất của bếp. Hàng Trên BĐ nằm ở phiếu xuất cấp 1.
+              </Note>
             ) : null}
             {(ledger.warnings || []).filter((row) => row.code !== "negative_stock").map((row) => (
               <Note key={row.code + row.message} tone={row.code === "balance_threshold" ? "warn" : "muted"}>{row.message}</Note>
             ))}
             {pendingDraft ? (
-              <Note tone="warn">Có bản nháp chưa chấp nhận. Mở Trợ lý để xem, chấp nhận hoặc bỏ. Sổ chưa đổi.</Note>
+              <Note tone="warn">Có đề xuất chưa ghi vào phiếu. Mở Trợ lý để ghi hoặc bỏ. Sổ chưa đổi cho đến khi ghi phiếu.</Note>
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={() => goDate(addDays(menuDate, -1))}>
@@ -606,11 +448,29 @@ export function KitchenSoNhapXuatLttpTab({
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Nhập trên bảo đảm lấy từ phiếu xuất của đơn vị trong ngày.
+              Một sổ. Số lượng lấy từ phiếu và ghi thẳng vào phiếu.
+              Sửa phiếu nhập ở nút trên trang này (cùng phiếu với
               {" "}
-              <a className="underline" href="/lttp-nhap-xuat">Mở phiếu xuất kho</a>
-              . Sửa phiếu thì cột Trên BĐ và tồn chuyển sang cập nhật ngay, kể cả ngày đã chốt.
+              <a className="underline" href={`/so-sach-bep-an?tab=phieu-nhap-kho&date=${menuDate}`}>tab phiếu nhập kho</a>
+              ), sổ tính lại tồn và thừa thiếu ngay khi lưu.
+              Cột Trên BĐ lấy từ
+              {" "}
+              <a className="underline" href="/lttp-nhap-xuat">phiếu xuất kho cấp 1</a>
+              . Xuất ăn và xuất khác chờ
+              {" "}
+              <a className="underline" href="/so-sach-bep-an?tab=phieu-xuat-kho">phiếu xuất của bếp</a>
+              , tab đó chưa lập được phiếu.
             </p>
+            <LedgerModal title="Phiếu nhập của đơn vị" wide open={panel === "slip"} onClose={closePanel}>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Lưu phiếu là ghi thật. Sổ tính lại tồn và thừa thiếu ngay sau khi lưu.
+              </p>
+              <KitchenReceiptSlipWorkspace
+                selectedUnitId={selectedUnitId}
+                canWrite={Boolean(canSave) && !disabled}
+                fixedDate={menuDate}
+              />
+            </LedgerModal>
             <LedgerModal title="Cài đặt mức ăn" open={panel === "meals"} onClose={closePanel}>
               <KitchenLedgerDayAside
                 part="meals"
@@ -633,95 +493,17 @@ export function KitchenSoNhapXuatLttpTab({
                 previousHeadcount={ledger.previousHeadcount}
                 onHeadcount={markEntry(setHeadcount)}
                 onIncome={markEntry(setIncome)}
+                openingMoney={openingMoney}
+                openingEditable={openingEditable}
+                onOpening={(next) => {
+                  openingDirty.current = true;
+                  markEntry(setOpeningMoney)(next);
+                }}
                 onSaveHeadcount={saveHeadcount}
                 onCopyPrevious={() => markEntry(setHeadcount)(ledger.previousHeadcount)}
                 scheduleText={scheduleText}
                 onSchedule={markEntry(setScheduleText)}
               />
-            </LedgerModal>
-            <LedgerModal title="Nhập số lượng" open={panel === "quantities"} onClose={closePanel}>
-              <KitchenLedgerDayAside
-                part="supply"
-                disabled={disabled || !canSave}
-                busy={busy}
-                selfLines={selfLines}
-                selfNone={selfNone}
-                commodities={commodities}
-                onSelfChange={markEntry(setSelfLines)}
-                onSaveSelf={saveSelf}
-                onSelfNone={() => saveSelf(true)}
-              />
-            <LineTable
-              title="Gạo nhập tay – tạm thời"
-              hint="Gạo được ghi vào G, H, I hoặc J. Hàng khác ở cột Trên BĐ chỉ lấy từ phiếu xuất."
-              lines={riceLines}
-              disabled={disabled || !canSave}
-              commodities={commodities}
-              mode="rice"
-              onChange={markEntry(setRiceLines)}
-              onSave={saveRice}
-              saving={busy}
-            />
-            <LineTable
-              title="Xuất ăn"
-              hint="Số lượng xuất ăn trong ngày. Đổi quân số không đổi số này."
-              lines={mealLines}
-              disabled={disabled || !canSave}
-              commodities={commodities}
-              mode="meal"
-              onChange={markEntry(setMealLines)}
-              onSave={saveMeal}
-              saving={busy}
-            />
-            <LineTable
-              title="Xuất khác"
-              hint="Cột P. Không gồm xuất ăn."
-              lines={otherLines}
-              disabled={disabled || !canSave}
-              commodities={commodities}
-              mode="other"
-              onChange={markEntry(setOtherLines)}
-              onSave={saveOther}
-              saving={busy}
-            />
-
-            {showOpening ? (
-              <section className="rounded-lg border border-border bg-card p-3">
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold">Tồn đầu và thừa thiếu đầu kỳ</h3>
-                  <Button type="button" className="h-8 px-3 text-xs" disabled={disabled || busy} onClick={saveOpening}>Lưu tồn đầu</Button>
-                </div>
-                <p className="mb-2 text-xs text-muted-foreground">
-                  Ngày 01 hoặc khi chưa có ngày trước. Dòng tồn đầu thay tồn chuyển sang.
-                </p>
-                <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                  <label className="grid gap-1 text-xs">
-                    Thừa đầu kỳ
-                    <QtyInput label="Thừa đầu kỳ" value={openingMoney.surplus} disabled={disabled} onChange={(surplus) => markEntry(setOpeningMoney)({ ...openingMoney, surplus })} />
-                  </label>
-                  <label className="grid gap-1 text-xs">
-                    Thiếu đầu kỳ
-                    <QtyInput label="Thiếu đầu kỳ" value={openingMoney.shortfall} disabled={disabled} onChange={(shortfall) => markEntry(setOpeningMoney)({ ...openingMoney, shortfall })} />
-                  </label>
-                </div>
-                <div className="mb-2 flex justify-end">
-                  <Button type="button" variant="ghost" className="h-8 px-2 text-xs" disabled={disabled} onClick={() => markEntry(setOpeningLines)([...openingLines, blankLine()])}>
-                    Thêm dòng
-                  </Button>
-                </div>
-                <div className="grid gap-2">
-                  {openingLines.map((line) => (
-                    <div key={line.key} className="grid gap-2 sm:grid-cols-5">
-                      <input aria-label="Tên tồn" className={fieldClassSm} placeholder="Tên" value={line.name} disabled={disabled} onChange={(event) => markEntry(setOpeningLines)(openingLines.map((row) => row.key === line.key ? { ...row, name: event.target.value } : row))} />
-                      <input aria-label="ĐVT tồn" className={fieldClassSm} placeholder="ĐVT" value={line.measureUnit} disabled={disabled} onChange={(event) => markEntry(setOpeningLines)(openingLines.map((row) => row.key === line.key ? { ...row, measureUnit: event.target.value } : row))} />
-                      <QtyInput label="Số lượng tồn" value={line.qty} disabled={disabled} onChange={(qty) => markEntry(setOpeningLines)(openingLines.map((row) => row.key === line.key ? { ...row, qty } : row))} />
-                      <QtyInput label="Đơn giá tồn" value={line.unitPrice} disabled={disabled} onChange={(unitPrice) => markEntry(setOpeningLines)(openingLines.map((row) => row.key === line.key ? { ...row, unitPrice } : row))} />
-                      <Button type="button" variant="ghost" className="h-8 px-2 text-xs" disabled={disabled} onClick={() => markEntry(setOpeningLines)(openingLines.filter((row) => row.key !== line.key))}>Xóa</Button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : null}
             </LedgerModal>
             <LedgerModal title="Cấu hình sổ" open={panel === "settings"} onClose={closePanel}>
             <KitchenLedgerSettingsPanel

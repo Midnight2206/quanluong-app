@@ -1,18 +1,22 @@
-/** Bản nháp trợ lý. Bỏ thì không ghi. Chấp nhận chỉ giữ dòng được phép, cùng lối nhập tay. */
+/**
+ * Bản nháp số lượng thành dòng phiếu nhập của đơn vị (cột I/J).
+ * Bỏ thì không ghi. Không ghi số vào ô sổ. Cột Trên BĐ không nhận bản nháp này.
+ */
 
-const RICE_COLUMNS = new Set(["G", "H", "I", "J"]);
-
-function allowedColumn(line) {
-  const source = line?.source || "";
-  if (line?.kind === "rice") return RICE_COLUMNS.has(source);
-  if (source === "G" || source === "H") return false;
-  return Boolean(line?.savable);
+function isUnitSlipLine(line) {
+  if (!line?.savable || !line.commodityId) return false;
+  if (line.kind === "meal_out" || line.kind === "other_out") return false;
+  if (line.source === "G" || line.source === "H") return false;
+  return line.source === "J" || line.source === "I" || line.kind === "self_supply" || line.kind === "rice";
 }
 
 function reviewDraft(action, lines) {
-  if (action !== "accept") return { save: false, lines: [] };
-  const accepted = (lines || []).filter((line) => line?.savable && allowedColumn(line));
-  return { save: accepted.length > 0, lines: accepted };
+  if (action !== "accept") return { save: false, slipLines: [] };
+  const slipLines = (lines || []).filter(isUnitSlipLine).map((line) => ({
+    ...line,
+    priceKind: line.source === "J" ? "tgsx" : "market",
+  }));
+  return { save: slipLines.length > 0, slipLines };
 }
 
-export { reviewDraft, allowedColumn };
+export { reviewDraft, isUnitSlipLine };
