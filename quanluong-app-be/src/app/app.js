@@ -54,7 +54,7 @@ function createApp(options = {}) {
       legacyHeaders: false,
       skip: (req) => {
         const p = req.path ?? "";
-        return p.startsWith("/socket.io");
+        return p.startsWith("/socket.io") || p.startsWith("/api/internal/dsh");
       },
     }),
   );

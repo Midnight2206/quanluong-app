@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-plugin-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Copy this folder to start a new DSH plugin. See dsh-service/CONTRIBUTING.md."
+}

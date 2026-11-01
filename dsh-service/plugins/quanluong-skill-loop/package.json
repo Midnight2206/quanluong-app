@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-skill-loop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Draft and revise unit-scoped skills. Activation waits for user confirmation."
+}
