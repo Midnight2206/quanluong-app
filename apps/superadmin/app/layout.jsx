@@ -1,4 +1,10 @@
 import "./globals.css";
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 import { AppProviders } from "@/app/providers/AppProviders";
 import { LttpSupplierRedirect } from "@/hocs/LttpSupplierRedirect";
 import { QUANLUONG_SITE_NAME } from "@/lib/quanLuongPageMeta";
