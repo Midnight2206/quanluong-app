@@ -8,7 +8,7 @@
 # =============================================================================
 # Backend (app | migrate | worker-email)
 # =============================================================================
-FROM node:22-bookworm-slim AS backend-builder
+FROM node:22.23.4-bookworm-slim AS backend-builder
 WORKDIR /app
 # Prisma cần OpenSSL; bookworm-slim thiếu → cảnh báo "failed to detect libssl" nếu không cài.
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -35,7 +35,7 @@ FROM backend-builder AS backend-dev
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
-FROM node:22-bookworm-slim AS backend
+FROM node:22.23.4-bookworm-slim AS backend
 WORKDIR /app
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
@@ -60,7 +60,7 @@ CMD ["node", "src/server.js"]
 # =============================================================================
 # Next.js (workspace) — cài dependency
 # =============================================================================
-FROM node:22-bookworm-slim AS next-deps
+FROM node:22.23.4-bookworm-slim AS next-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
@@ -122,7 +122,7 @@ RUN npm run build --workspace=@quanluong/supplier
 # =============================================================================
 # UI chính → Nginx :80 + Next :3000 (target: ui)
 # =============================================================================
-FROM node:22-bookworm-slim AS ui
+FROM node:22.23.4-bookworm-slim AS ui
 RUN apt-get update -y && apt-get install -y --no-install-recommends nginx \
   && rm -rf /var/lib/apt/lists/* \
   && rm -f /etc/nginx/conf.d/default.conf \
@@ -148,7 +148,7 @@ ENTRYPOINT ["/entrypoint.sh"]
 # =============================================================================
 # UI superadmin (target: ui-superadmin)
 # =============================================================================
-FROM node:22-bookworm-slim AS ui-superadmin
+FROM node:22.23.4-bookworm-slim AS ui-superadmin
 RUN apt-get update -y && apt-get install -y --no-install-recommends nginx \
   && rm -rf /var/lib/apt/lists/* \
   && rm -f /etc/nginx/conf.d/default.conf \
@@ -173,7 +173,7 @@ ENTRYPOINT ["/entrypoint.sh"]
 # =============================================================================
 # UI supplier (target: ui-supplier)
 # =============================================================================
-FROM node:22-bookworm-slim AS ui-supplier
+FROM node:22.23.4-bookworm-slim AS ui-supplier
 RUN apt-get update -y && apt-get install -y --no-install-recommends nginx \
   && rm -rf /var/lib/apt/lists/* \
   && rm -f /etc/nginx/conf.d/default.conf \
