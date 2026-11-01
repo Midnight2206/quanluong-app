@@ -20,6 +20,11 @@ dsh --profile sdk-minimal
         +-- plugins/quanluong-skills   business rules
         +-- plugins/quanluong-audit    llm/stream and tools/result hooks
         +-- plugins/quanluong-policy   block shell, filesystem, and commits
+        +-- plugins/quanluong-skill-loop   draft skills from finished tasks
+        +-- plugins/quanluong-memory       unit- and user-scoped notes
+        +-- plugins/quanluong-subagents    role-limited child reports
+        +-- plugins/quanluong-schedule     cron reports, no business writes
+        +-- plugins/quanluong-sandbox      tool permissions and code review
 ```
 
 The tools call back to `http://app:3000/api/internal/dsh/...` with the same `DSH_SERVICE_TOKEN`. A tool grant lasts 10 minutes. Grants are created by the API for one user and one unit. Tools never save the ledger, the menu, or an issue slip.
@@ -119,6 +124,22 @@ Node 22.19 or newer. The service tests do not download DSH and do not call OpenR
 cd dsh-service && node --test test/*.js
 cd quanluong-app-be && node --test src/modules/ai-gateway/tools.service.test.js src/modules/kitchen-books/kitchen-books-menu-ai-llm.test.js src/modules/kitchen-books/kitchen-ledger-assistant.service.test.js
 ```
+
+## Optional plugins
+
+Each plugin is on unless its env var is `0`, `false`, `off`, or `no`. `GET /health` lists them. A turned-off plugin is omitted from the DSH profile and its HTTP routes return `PLUGIN_DISABLED`.
+
+| Plugin | Env | What it does |
+| --- | --- | --- |
+| `quanluong-skill-loop` | `DSH_PLUGIN_SKILL_LOOP` | Draft a skill from a finished task. A later use can file an improvement draft. A person accepts it with `POST /v1/plugins/skill-loop/skills/:id/accept`. |
+| `quanluong-memory` | `DSH_PLUGIN_MEMORY` | Bounded notes. `unit` is shared inside one unit. `user` is only that account. Another unit's file partition is never returned. |
+| `quanluong-subagents` | `DSH_PLUGIN_SUBAGENTS` | `delegate_task` runs one role with its own tool list. `DSH_SUBAGENT_MAX` defaults to 3. The child report is not saved to the app database. |
+| `quanluong-schedule` | `DSH_PLUGIN_SCHEDULE` | 5-field UTC cron. Ticks every `DSH_SCHEDULE_INTERVAL_MS` (default 60000). Logs a report. Scheduled turns cannot draft or write. |
+| `quanluong-sandbox` | `DSH_PLUGIN_SANDBOX` | Allow-list of read and draft tools. Blocks dangerous command text. `review_code` does not execute. `DSH_SANDBOX_STRICT=0` allows unknown tool names that are not on the deny list. |
+
+These ideas follow Hermes Agent (MIT, Nous Research): skill drafts, bounded memory, delegated roles, cron ticks, and command blocks. No Hermes source is copied.
+
+Learned state is JSON under `$DSH_HOME/plugins/`. It is not a business table, so there is no database migration. The model cannot pass another unit id: tools use the session unit. Accept, tick, and subagent HTTP routes are for the API, which already holds `DSH_SERVICE_TOKEN`.
 
 ## Add a plugin
 

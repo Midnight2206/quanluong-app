@@ -1,5 +1,6 @@
 import path from "node:path";
 import { SURFACE_FEATURES } from "../profiles/surfaces.js";
+import { pluginEnabled } from "./plugin-flags.js";
 
 function quote(value) {
   return `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
@@ -42,6 +43,17 @@ export function renderProfilePatch(pluginsDir, surface, options = {}) {
     mcpPlugin(pluginsDir, options),
   ];
   if (features.length) rows.splice(1, 0, plugin("quanluong-tools", file("quanluong-tools")));
+  const optional = [
+    ["skill-loop", "quanluong-skill-loop"],
+    ["memory", "quanluong-memory"],
+    ["subagents", "quanluong-subagents"],
+    ["schedule", "quanluong-schedule"],
+    ["sandbox", "quanluong-sandbox"],
+  ];
+  const env = options.env || process.env;
+  for (const [id, folder] of optional) {
+    if (pluginEnabled(id, env)) rows.splice(rows.length - 1, 0, plugin(id, file(folder)));
+  }
   return `- insert:\n${rows.join("\n")}\n`;
 }
 

@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-subagents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Delegate a task to a role with its own tool list. The child only reports."
+}

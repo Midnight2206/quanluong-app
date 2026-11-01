@@ -11,6 +11,10 @@ Words used below:
 - **Profile**: the set of plugins started together. This service writes a profile patch at boot.
 - **Surface**: `web`, `superadmin`, or `supplier`.
 
+## Turn a plugin off
+
+`quanluong-skill-loop`, `quanluong-memory`, `quanluong-subagents`, `quanluong-schedule`, and `quanluong-sandbox` load by default. Set `DSH_PLUGIN_SKILL_LOOP=0` (or `MEMORY`, `SUBAGENTS`, `SCHEDULE`, `SANDBOX`) and restart `dsh`. The profile patch skips that plugin. See the service README for the HTTP routes.
+
 ## Copy the template
 
 ```sh

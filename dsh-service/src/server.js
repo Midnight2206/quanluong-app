@@ -3,6 +3,9 @@ import { bearerOk } from "./auth.js";
 import { createAuditLog } from "./audit.js";
 import path from "node:path";
 import { SessionStore } from "./sessions.js";
+import { listPluginFlags } from "./plugin-flags.js";
+import { handlePluginRoute } from "./plugin-routes.js";
+import { requestContext } from "./request-context.js";
 
 const BODY_LIMIT = 8_000_000;
 
@@ -50,6 +53,7 @@ function systemText(body) {
     lines.push(`Tool grant id: ${body.grantId}. Pass this exact grantId to every Quan Luong tool. Do not invent another id.`);
   }
   lines.push("Before a ledger draft, call load_quanluong_skill with name ledger-extract. Before a question about ledger figures, call it with explore-data and then validate-data. Quote checks from read_ledger_day. Do not invent totals. Finish with the JSON object the user asked for when they asked for records.");
+  lines.push("Learned skills, memory, subagents, and schedules stay inside this unit. They report or draft. They do not save business records and they do not compute figures.");
   return lines.filter(Boolean).join("\n\n");
 }
 
@@ -75,7 +79,7 @@ export function createServer({ config, runtime, sessions = new SessionStore(), a
     try {
       if (req.method === "GET" && url.pathname === "/health") {
         const status = await runtime.status();
-        send(res, 200, { status: "ok", ...status });
+        send(res, 200, { status: "ok", plugins: listPluginFlags(), ...status });
         return;
       }
       if (!bearerOk(req.headers.authorization, config.token)) {
@@ -108,7 +112,13 @@ export function createServer({ config, runtime, sessions = new SessionStore(), a
           return;
         }
         const started = Date.now();
-        const result = await runtime.complete({
+        const actor = {
+          accountId: row.accountId,
+          unitId: row.unitId,
+          surface: row.surface,
+          grantId: body.grantId || "",
+        };
+        const result = await requestContext.run(actor, () => runtime.complete({
           sessionId: row.id,
           accountId: row.accountId,
           unitId: row.unitId,
@@ -121,7 +131,7 @@ export function createServer({ config, runtime, sessions = new SessionStore(), a
           feature: body.feature || "",
           grantId: body.grantId || "",
           mockContent: body.mockContent,
-        });
+        }));
         const payload = {
           messageId: `msg-${Date.now()}`,
           role: "assistant",
@@ -145,6 +155,19 @@ export function createServer({ config, runtime, sessions = new SessionStore(), a
         });
         if (wantsSse(req)) sendSse(res, payload);
         else send(res, 200, payload);
+        return;
+      }
+      if (url.pathname.startsWith("/v1/plugins")) {
+        const body = req.method === "GET" || req.method === "HEAD" ? {} : await readBody(req);
+        const result = await handlePluginRoute({
+          method: req.method,
+          pathname: url.pathname,
+          searchParams: url.searchParams,
+          body,
+          config,
+          runtime,
+        });
+        send(res, result.status, result.body);
         return;
       }
       send(res, 404, { ok: false, error: "Not found" });
