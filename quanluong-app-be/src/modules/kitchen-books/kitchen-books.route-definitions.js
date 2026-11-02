@@ -530,6 +530,66 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
       description: "Lưu cấu hình sổ nhập xuất LTTP theo đơn vị.",
     },
   },
+  {
+    key: "getKitchenPaperReceipt",
+    method: "GET",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/paper/receipt",
+    pathRoute: "/api/kitchen-books/paper/receipt",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Xem trang phiếu nhập kho theo ngày hoặc cả tháng.",
+    },
+  },
+  {
+    key: "putKitchenPaperReceipt",
+    method: "PUT",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/paper/receipt",
+    pathRoute: "/api/kitchen-books/paper/receipt",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Ghi phiếu nhập kho từ trang sổ. Số lượng ghi thẳng vào phiếu, không lưu thu chi.",
+    },
+  },
+  {
+    key: "getKitchenPaperIssue",
+    method: "GET",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/paper/issue",
+    pathRoute: "/api/kitchen-books/paper/issue",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Xem trang phiếu xuất kho của bếp theo ngày hoặc cả tháng.",
+    },
+  },
+  {
+    key: "putKitchenPaperIssue",
+    method: "PUT",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/paper/issue",
+    pathRoute: "/api/kitchen-books/paper/issue",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Ghi phiếu xuất kho của bếp. Không lưu số thu chi trên phiếu.",
+    },
+  },
+  {
+    key: "getKitchenPaperStock",
+    method: "GET",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/paper/stock",
+    pathRoute: "/api/kitchen-books/paper/stock",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Xem sổ theo dõi LTTP một tháng, tồn tính từ phiếu nhập và phiếu xuất.",
+    },
+  },
 ];
 
 export { KITCHEN_BOOKS_ROUTE_DEFINITIONS };

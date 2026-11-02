@@ -6,7 +6,7 @@ function sameMoney(a, b) {
   return scaledToString(toScaled(a)) === scaledToString(toScaled(b));
 }
 
-function fingerprintIssueSlips(slips) {
+function fingerprintIssueSlips(slips, mealSlipLines = []) {
   const parts = [];
   for (const slip of slips || []) {
     const updated = slip.updatedAt instanceof Date ? slip.updatedAt.toISOString() : String(slip.updatedAt ?? "");
@@ -24,8 +24,29 @@ function fingerprintIssueSlips(slips) {
       );
     }
   }
+  for (const line of mealSlipLines || []) {
+    const qty = Number(line.qty);
+    if (!Number.isFinite(qty) || qty === 0) continue;
+    parts.push(["meal", line.commodityId ?? "", String(line.qty), String(line.unitPrice ?? "")].join("|"));
+  }
   parts.sort();
   return createHash("sha256").update(parts.join("\n")).digest("hex");
+}
+
+function mealIssuesFromLines(lines) {
+  const out = [];
+  for (const line of lines || []) {
+    const qty = Number(line.qty);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    out.push({
+      name: line.name || "",
+      uom: line.uom || "",
+      unitPrice: line.unitPrice,
+      qty,
+      commodityId: line.commodityId ?? null,
+    });
+  }
+  return out;
 }
 
 function groupMeta(commodity) {
@@ -57,6 +78,7 @@ function assembleLedgerInput({
   priceRows = [],
   openingLots = [],
   commodityById = new Map(),
+  mealSlipLines = [],
 }) {
   const s = mergeLedgerSettings(settings);
   const warnings = [];
@@ -70,7 +92,6 @@ function assembleLedgerInput({
 
   const receipts = [];
   const otherIssues = [];
-  const mealIssues = [];
   const resolvedOpening = openingLots.map((lot) => {
     const group = groupMeta(lot.commodityId ? commodityById.get(Number(lot.commodityId)) : null);
     return {
@@ -147,7 +168,7 @@ function assembleLedgerInput({
   return {
     blockers: [],
     warnings,
-    fingerprint: fingerprintIssueSlips(slips),
+    fingerprint: fingerprintIssueSlips(slips, mealSlipLines),
     slipCount: slips.length,
     manualEntryCounts,
     input: {
@@ -155,7 +176,7 @@ function assembleLedgerInput({
       settings: s,
       receipts,
       otherIssues,
-      mealIssues,
+      mealIssues: mealIssuesFromLines(mealSlipLines),
       openingLots: resolvedOpening,
     },
   };

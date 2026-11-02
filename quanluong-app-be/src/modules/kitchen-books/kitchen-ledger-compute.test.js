@@ -370,4 +370,19 @@ test("assemble: số lượng chỉ từ phiếu, dòng nhập tay chỉ đượ
     { ...slips[0], lines: [{ ...slips[0].lines[1], quantity: "12" }] },
   ]);
   assert.notEqual(changed, built.fingerprint);
+
+  const withMeal = assembleLedgerInput({
+    date: "2026-10-17",
+    settings: DEFAULT_LEDGER_SETTINGS,
+    slips,
+    priceRows,
+    mealSlipLines: [
+      { commodityId: 1, name: "Gạo tẻ thường", uom: "Kg", qty: "21.9", unitPrice: "16000" },
+    ],
+  });
+  assert.equal(withMeal.input.mealIssues.length, 1);
+  assert.equal(withMeal.input.mealIssues[0].qty, 21.9);
+  assert.notEqual(withMeal.fingerprint, fromSlip.fingerprint);
+  const same = fingerprintIssueSlips(slips, []);
+  assert.equal(same, fromSlip.fingerprint);
 });

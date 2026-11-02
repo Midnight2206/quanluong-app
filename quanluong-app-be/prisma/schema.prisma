@@ -175,6 +175,7 @@ model User {
   lttpIssueSlipSignatureSettingsUpdated  LttpIssueSlipSignatureSettings[] @relation("LttpIssueSlipSignatureSettingsUpdatedBy")
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
+  kitchenIssueSlipsCreated               KitchenIssueSlip[] @relation("KitchenIssueSlipCreatedBy")
   kitchenMenuSamplesCreated              KitchenMenuSample[] @relation("KitchenMenuSampleCreatedBy")
   kitchenLedgerDaysLocked                KitchenLedgerDay[] @relation("KitchenLedgerDayLockedBy")
   kitchenLedgerChanges                   KitchenLedgerChange[]
@@ -693,6 +694,7 @@ model Unit {
   kitchenMenuDays           KitchenMenuDay[]
   kitchenReceiptSlips       KitchenReceiptSlip[]
   kitchenReceiptSlipSerials KitchenReceiptSlipSerial[]
+  kitchenIssueSlips         KitchenIssueSlip[]
   kitchenMenuSamples        KitchenMenuSample[]
   kitchenLedgerDays              KitchenLedgerDay[]
   kitchenLedgerSettings          KitchenLedgerSettings?
@@ -846,6 +848,7 @@ model LttpCommodity {
   kitchenDishCatalogLines        KitchenDishCatalogLine[]
   kitchenMenuDishLines           KitchenMenuDishLine[]
   kitchenReceiptSlipLines        KitchenReceiptSlipLine[]
+  kitchenIssueSlipLines          KitchenIssueSlipLine[]
   lttpCommodityDefaultSupplier  LttpCommodityDefaultSupplier?
   lttpAiCommodityHabits         LttpAiCommodityHabit[]
   lttpAiUomRules                LttpAiUomRule[]
@@ -1404,6 +1407,12 @@ model KitchenReceiptSlip {
   unitId        Int
   receiptDate   DateTime @db.Date
   note          String?  @db.VarChar(500)
+  /// Họ tên người giao hàng in trên phiếu. Không phải số thu chi.
+  supplierName  String?  @db.VarChar(191)
+  signerLap     String?  @db.VarChar(191)
+  signerGiao    String?  @db.VarChar(191)
+  signerNhan    String?  @db.VarChar(191)
+  signerDuyet   String?  @db.VarChar(191)
   createdById   Int
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -1445,6 +1454,50 @@ model KitchenReceiptSlipLine {
   @@index([slipId])
   @@index([commodityId])
   @@index([slipId, lineSource, priceKind])
+}
+
+/// Phiếu xuất kho của bếp (ăn theo buổi). Số lượng xuất của sổ lấy từ đây.
+/// Không lưu thu, chi, hay chênh lệch — cân đối thu chi chỉ đọc công khai tài chính khi xem.
+model KitchenIssueSlip {
+  id              Int      @id @default(autoincrement())
+  unitId          Int
+  issueDate       DateTime @db.Date
+  note            String?  @db.VarChar(500)
+  recipientName   String?  @db.VarChar(191)
+  departmentName  String?  @db.VarChar(191)
+  reason          String?  @db.VarChar(255)
+  receivePlace    String?  @db.VarChar(191)
+  signerWriter    String?  @db.VarChar(191)
+  signerRecipient String?  @db.VarChar(191)
+  signerStorekeeper String? @db.VarChar(191)
+  signerApprover  String?  @db.VarChar(191)
+  createdById     Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  bookMmyy        String   @db.Char(4)
+  slipNo          Int
+  unit            Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy       User     @relation("KitchenIssueSlipCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  lines           KitchenIssueSlipLine[]
+
+  @@unique([unitId, issueDate])
+  @@index([createdById])
+}
+
+model KitchenIssueSlipLine {
+  id          Int              @id @default(autoincrement())
+  slipId      Int
+  commodityId Int
+  sang        Decimal          @default(0) @db.Decimal(18, 4)
+  trua        Decimal          @default(0) @db.Decimal(18, 4)
+  chieu       Decimal          @default(0) @db.Decimal(18, 4)
+  unitPrice   Decimal          @db.Decimal(18, 2)
+  lineNote    String?          @db.VarChar(500)
+  slip        KitchenIssueSlip @relation(fields: [slipId], references: [id], onDelete: Cascade)
+  commodity   LttpCommodity    @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+
+  @@index([slipId])
+  @@index([commodityId])
 }
 
 /// Cấu hình sổ nhập xuất theo đơn vị (ngưỡng thừa/thiếu, ΣS hay ΣO, mức ăn, gia vị).

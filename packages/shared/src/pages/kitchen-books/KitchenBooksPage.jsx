@@ -36,6 +36,14 @@ function localDateStr(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
+function dateFromSearch(params) {
+  const ngay = params.get("ngay");
+  const date = params.get("date");
+  if (typeof ngay === "string" && YMD_RE.test(ngay)) return ngay;
+  if (typeof date === "string" && YMD_RE.test(date)) return date;
+  return null;
+}
+
 function localYearMonth(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -131,8 +139,8 @@ export function KitchenBooksPage() {
     if (md == null) {
       md = readStoredKitchenMenuDate();
     }
-    const urlDate = searchParams.get("date");
-    if (typeof urlDate === "string" && YMD_RE.test(urlDate)) {
+    const urlDate = dateFromSearch(searchParams);
+    if (urlDate) {
       md = urlDate;
     }
 
@@ -180,10 +188,7 @@ export function KitchenBooksPage() {
 
   const selectedUnitId = manualUnitId ?? scopeUnitId;
   const [yearMonth, setYearMonthState] = useState(() => localYearMonth());
-  const [menuDate, setMenuDateState] = useState(() => {
-    const urlDate = searchParams.get("date");
-    return typeof urlDate === "string" && YMD_RE.test(urlDate) ? urlDate : localDateStr();
-  });
+  const [menuDate, setMenuDateState] = useState(() => dateFromSearch(searchParams) || localDateStr());
 
   const setYearMonth = useCallback((next) => {
     setYearMonthState(next);
@@ -196,6 +201,7 @@ export function KitchenBooksPage() {
     if (current === next) return;
     const params = new URLSearchParams(searchParams.toString());
     params.set("date", next);
+    params.set("ngay", next);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [pathname, router, searchParams]);
 
@@ -231,6 +237,19 @@ export function KitchenBooksPage() {
     ...unitShellProps,
     canAccess: canAccessKitchenBooks,
   };
+
+  const paperTabProps = {
+    ...catalogTabProps,
+    menuDate,
+    setMenuDate,
+    focusCommodityId: searchParams.get("mathang") || "",
+    topUp: searchParams.get("bu") || "",
+  };
+
+  useEffect(() => {
+    const fromUrl = dateFromSearch(searchParams);
+    if (fromUrl && fromUrl !== menuDate) setMenuDateState(fromUrl);
+  }, [searchParams, menuDate]);
 
   const menuTabProps = {
     ...unitShellProps,
@@ -271,13 +290,13 @@ export function KitchenBooksPage() {
         id: "phieu-nhap-kho",
         label: "Phiếu nhập kho",
         panel: (
-          <KitchenPhieuNhapKhoTab {...catalogTabProps} />
+          <KitchenPhieuNhapKhoTab {...paperTabProps} />
         ),
       },
       {
         id: "phieu-xuat-kho",
         label: "Phiếu xuất kho",
-        panel: <KitchenPhieuXuatKhoTab />,
+        panel: <KitchenPhieuXuatKhoTab {...paperTabProps} />,
       },
       {
         id: "so-nhap-xuat-lttp",
@@ -292,7 +311,7 @@ export function KitchenBooksPage() {
       {
         id: "so-theo-doi-lttp",
         label: "Sổ theo dõi LTTP tại kho",
-        panel: <KitchenSoTheoDoiLttpTab />,
+        panel: <KitchenSoTheoDoiLttpTab {...paperTabProps} />,
       },
     );
   }

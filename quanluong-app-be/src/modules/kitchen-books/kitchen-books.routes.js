@@ -38,6 +38,13 @@ import {
   guaranteeFromIssueController,
 } from "./kitchen-books.controller.js";
 import {
+  getPaperIssueController,
+  getPaperReceiptController,
+  getPaperStockController,
+  putPaperIssueController,
+  putPaperReceiptController,
+} from "./kitchen-paper.controller.js";
+import {
   balanceLedgerController,
   exportLedgerMonthPdfController,
   getLedgerController,
@@ -85,6 +92,10 @@ import {
   createReceiptSlipBodySchema,
   updateReceiptSlipBodySchema,
   upsertReceiptSlipUnitSelfBodySchema,
+  paperDayQuerySchema,
+  paperStockQuerySchema,
+  paperReceiptBodySchema,
+  paperIssueBodySchema,
 } from "./kitchen-books.validator.js";
 import {
   balanceLedgerBodySchema,
@@ -467,6 +478,46 @@ kitchenBooksRouter.post(
   validateRequest({ body: balanceLedgerBodySchema }),
   permissionMiddleware([routePermissions.balanceKitchenLedger]),
   asyncHandler(balanceLedgerController),
+);
+
+kitchenBooksRouter.get(
+  "/paper/receipt",
+  dataScopeMw,
+  validateRequest({ query: paperDayQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenPaperReceipt]),
+  asyncHandler(getPaperReceiptController),
+);
+
+kitchenBooksRouter.put(
+  "/paper/receipt",
+  dataScopeMw,
+  validateRequest({ body: paperReceiptBodySchema }),
+  permissionMiddleware([routePermissions.putKitchenPaperReceipt]),
+  asyncHandler(putPaperReceiptController),
+);
+
+kitchenBooksRouter.get(
+  "/paper/issue",
+  dataScopeMw,
+  validateRequest({ query: paperDayQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenPaperIssue]),
+  asyncHandler(getPaperIssueController),
+);
+
+kitchenBooksRouter.put(
+  "/paper/issue",
+  dataScopeMw,
+  validateRequest({ body: paperIssueBodySchema }),
+  permissionMiddleware([routePermissions.putKitchenPaperIssue]),
+  asyncHandler(putPaperIssueController),
+);
+
+kitchenBooksRouter.get(
+  "/paper/stock",
+  dataScopeMw,
+  validateRequest({ query: paperStockQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenPaperStock]),
+  asyncHandler(getPaperStockController),
 );
 
 kitchenBooksRouter.post(

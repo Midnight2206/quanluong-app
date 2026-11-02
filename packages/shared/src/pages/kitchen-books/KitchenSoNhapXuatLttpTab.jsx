@@ -397,6 +397,8 @@ export function KitchenSoNhapXuatLttpTab({
             {negativeLines.length ? (
               <Note tone="bad">
                 Còn tồn âm ({negativeLines.map((line) => line.name).join(", ")}). Chưa chốt ngày và chưa xuất sổ.
+                {" "}
+                <a className="underline" href={`/so-sach-bep-an?tab=so-theo-doi-lttp&date=${menuDate}&ngay=${menuDate}`}>Mở sổ theo dõi để về phiếu nhập ngày bắt đầu âm</a>
               </Note>
             ) : null}
             {ledger.needsResignature ? <Note tone="warn">Ngày này cần ký lại.</Note> : null}
@@ -456,10 +458,10 @@ export function KitchenSoNhapXuatLttpTab({
               Cột Trên BĐ lấy từ
               {" "}
               <a className="underline" href="/lttp-nhap-xuat">phiếu xuất kho cấp 1</a>
-              . Xuất ăn và xuất khác chờ
+              . Xuất ăn lấy từ
               {" "}
-              <a className="underline" href="/so-sach-bep-an?tab=phieu-xuat-kho">phiếu xuất của bếp</a>
-              , tab đó chưa lập được phiếu.
+              <a className="underline" href={`/so-sach-bep-an?tab=phieu-xuat-kho&date=${menuDate}&ngay=${menuDate}`}>phiếu xuất của bếp</a>
+              .
             </p>
             <LedgerModal title="Phiếu nhập của đơn vị" wide open={panel === "slip"} onClose={closePanel}>
               <p className="mb-2 text-xs text-muted-foreground">

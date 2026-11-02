@@ -2,7 +2,7 @@
 
 import { KitchenBooksAccessGate } from "./KitchenBooksAccessGate.jsx";
 import { KitchenBooksUnitPicker } from "./KitchenBooksUnitPicker.jsx";
-import { KitchenReceiptSlipWorkspace } from "./KitchenReceiptSlipWorkspace.jsx";
+import { KitchenReceiptPaper } from "./KitchenReceiptPaper.jsx";
 
 export function KitchenPhieuNhapKhoTab({
   selectedUnitId,
@@ -11,6 +11,10 @@ export function KitchenPhieuNhapKhoTab({
   setManualUnitId,
   user,
   canAccess,
+  menuDate,
+  setMenuDate,
+  focusCommodityId,
+  topUp,
 }) {
   return (
     <KitchenBooksAccessGate permissionLabel="kitchenBooks.access" allowed={canAccess}>
@@ -22,11 +26,18 @@ export function KitchenPhieuNhapKhoTab({
           setManualUnitId={setManualUnitId}
           user={user}
         />
-
-        <KitchenReceiptSlipWorkspace
-          selectedUnitId={selectedUnitId}
-          canWrite={canAccess}
-        />
+        {selectedUnitId != null && menuDate ? (
+          <KitchenReceiptPaper
+            unitId={selectedUnitId}
+            date={menuDate}
+            onDate={setMenuDate}
+            canWrite={canAccess}
+            focusCommodityId={focusCommodityId}
+            topUp={topUp}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">Chọn đơn vị để mở phiếu nhập.</p>
+        )}
       </div>
     </KitchenBooksAccessGate>
   );

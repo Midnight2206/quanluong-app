@@ -222,6 +222,61 @@ const updateReceiptSlipBodySchema = z.object({
   lines: z.array(receiptSlipLineSchema),
 });
 
+const paperMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "month dạng YYYY-MM");
+const paperQtySchema = z.coerce.number().min(0).max(1_000_000_000);
+const paperSignerSchema = z.array(z.string().max(191)).max(4).optional();
+
+const paperDayQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema.optional(),
+  month: paperMonthSchema.optional(),
+}).refine((query) => Boolean(query.date) || Boolean(query.month), {
+  message: "Cần date hoặc month",
+});
+
+const paperStockQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  month: paperMonthSchema,
+});
+
+const paperReceiptLineSchema = z.object({
+  commodityId: z.coerce.number().int().positive(),
+  trenMuaTt: paperQtySchema.optional(),
+  trenTgcb: paperQtySchema.optional(),
+  dvMuaTt: paperQtySchema.optional(),
+  dvTgcb: paperQtySchema.optional(),
+  price: paperQtySchema,
+  lineNote: z.string().max(500).optional().nullable(),
+});
+
+const paperReceiptBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema,
+  supplierName: z.string().max(191).optional().nullable(),
+  signers: paperSignerSchema,
+  lines: z.array(paperReceiptLineSchema).max(400),
+});
+
+const paperIssueLineSchema = z.object({
+  commodityId: z.coerce.number().int().positive(),
+  sang: paperQtySchema.optional(),
+  trua: paperQtySchema.optional(),
+  chieu: paperQtySchema.optional(),
+  price: paperQtySchema,
+  lineNote: z.string().max(500).optional().nullable(),
+});
+
+const paperIssueBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  date: dateSchema,
+  recipientName: z.string().max(191).optional().nullable(),
+  departmentName: z.string().max(191).optional().nullable(),
+  reason: z.string().max(255).optional().nullable(),
+  receivePlace: z.string().max(191).optional().nullable(),
+  signers: paperSignerSchema,
+  lines: z.array(paperIssueLineSchema).max(400),
+});
+
 export {
   catalogListQuerySchema,
   catalogIdParamsSchema,
@@ -249,4 +304,8 @@ export {
   createReceiptSlipBodySchema,
   updateReceiptSlipBodySchema,
   upsertReceiptSlipUnitSelfBodySchema,
+  paperDayQuerySchema,
+  paperStockQuerySchema,
+  paperReceiptBodySchema,
+  paperIssueBodySchema,
 };

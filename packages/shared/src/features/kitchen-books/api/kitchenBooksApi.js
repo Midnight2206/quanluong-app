@@ -382,6 +382,15 @@ export function useDeleteKitchenReceiptSlipMutation() {
   });
 }
 
+function invalidatePaper(qc, unitId, date) {
+  if (unitId == null) return;
+  qc.invalidateQueries({ queryKey: qk.kitchenBooks.paperReceipt(unitId, date) });
+  qc.invalidateQueries({ queryKey: qk.kitchenBooks.paperIssue(unitId, date) });
+  qc.invalidateQueries({ queryKey: ["kitchenBooks", "paperStock", String(unitId)] });
+  qc.invalidateQueries({ queryKey: ["kitchenBooks", "ledger", String(unitId)] });
+  qc.invalidateQueries({ queryKey: qk.kitchenBooks.receiptSlipByDay(unitId, date) });
+}
+
 function invalidateLedger(qc, unitId, date) {
   if (unitId == null) return;
   const ledgerKey = date
@@ -542,5 +551,66 @@ export function useDeleteLedgerAssistantRuleMutation() {
         params: { unitId, id },
       }).then((data) => ({ ...data, unitId, date })),
     onSuccess: (data) => invalidateAssistant(qc, data?.unitId, data?.date),
+  });
+}
+
+export function useGetPaperReceiptQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.paperReceipt(unitId, date),
+    queryFn: () => apiRequest({
+      url: "/kitchen-books/paper/receipt",
+      method: "get",
+      params: { unitId, date },
+    }),
+    enabled: skip !== true && unitId != null && Boolean(date),
+    ...rest,
+  });
+}
+
+export function useGetPaperIssueQuery(arg, options = {}) {
+  const { unitId, date } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.paperIssue(unitId, date),
+    queryFn: () => apiRequest({
+      url: "/kitchen-books/paper/issue",
+      method: "get",
+      params: { unitId, date },
+    }),
+    enabled: skip !== true && unitId != null && Boolean(date),
+    ...rest,
+  });
+}
+
+export function useGetPaperStockQuery(arg, options = {}) {
+  const { unitId, month } = arg || {};
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: qk.kitchenBooks.paperStock(unitId, month),
+    queryFn: () => apiRequest({
+      url: "/kitchen-books/paper/stock",
+      method: "get",
+      params: { unitId, month },
+    }),
+    enabled: skip !== true && unitId != null && Boolean(month),
+    ...rest,
+  });
+}
+
+export function useSavePaperReceiptMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) => apiRequest({ url: "/kitchen-books/paper/receipt", method: "put", data: body }),
+    onSuccess: (_data, vars) => invalidatePaper(qc, vars?.unitId, vars?.date),
+  });
+}
+
+export function useSavePaperIssueMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) => apiRequest({ url: "/kitchen-books/paper/issue", method: "put", data: body }),
+    onSuccess: (_data, vars) => invalidatePaper(qc, vars?.unitId, vars?.date),
   });
 }

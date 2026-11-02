@@ -19,6 +19,7 @@ import {
 } from "./kitchen-books-scope.helpers.js";
 import { alignHeadcount, withUnitMealLevels, writeStandardMealSelection } from "./kitchen-ledger-meal-rates.js";
 import { mergeLedgerSettings } from "./kitchen-ledger-settings.js";
+import { loadMealSlipLines } from "./kitchen-paper.service.js";
 
 function ymd(date) {
   const d = parseDateOnly(date);
@@ -273,6 +274,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
 
   const headcount = normalizeHeadcount(day?.headcountJson, settings);
   const unitSlipLines = await loadUnitSelfLines(unitId, ledgerDate);
+  const mealSlipLines = await loadMealSlipLines(unitId, ledgerDate);
   const commodityById = await loadCommodityMap(dataScope.storageUnitId);
   const openingLots = mapPrevLots(prev);
   const assembled = assembleLedgerInput({
@@ -285,6 +287,7 @@ async function buildView(unitId, ledgerDate, dataScope, opts = {}) {
     priceTablePresent: prices.priceTablePresent,
     openingLots,
     commodityById,
+    mealSlipLines,
   });
 
   const locked = day?.status === "locked";
