@@ -16,7 +16,14 @@
     "build:superadmin": "npm run build --workspace=@quanluong/superadmin",
     "build:supplier": "npm run build --workspace=@quanluong/supplier",
     "audit:unified-scroll": "node scripts/audit-unified-page-scroll.mjs",
+    "test:mobile-shell": "node packages/shared/src/mobile-shell.check.mjs",
+    "test:mobile-visual": "node tests/mobile-visual/run.mjs",
     "docker:prod": "docker compose -f docker-compose.yml -f docker-compose.prod-ui.yml --env-file quanluong-app-be/.env.docker up --build",
     "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file quanluong-app-be/.env.docker up --build"
+  },
+  "devDependencies": {
+    "pixelmatch": "^8.0.0",
+    "playwright": "^1.64.1",
+    "pngjs": "^7.0.0"
   }
 }

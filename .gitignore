@@ -10,6 +10,9 @@ dist/
 .worktrees/
 ops/backup/secrets/
 
+# Ảnh Playwright mobile (bản lưu xem /opt/cursor/artifacts khi chạy agent)
+tests/mobile-visual/output/
+
 # Serwist build output (@quanluong/web)
 apps/web/public/sw*
 apps/web/public/swe-worker*

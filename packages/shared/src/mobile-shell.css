@@ -1,0 +1,134 @@
+/*
+ * Lớp vỏ mobile/tablet. Mọi rule nằm trong max-width: 1023px (dưới Tailwind lg)
+ * hoặc trong @media print để gỡ lại khi in.
+ * Desktop ≥1024px không đọc các rule này.
+ * Trang sổ (.ledger-paper) giữ bố cục bảng; chỉ cuộn trong khung tờ giấy.
+ */
+
+@media (max-width: 1023px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  [data-page-scroll-owner="true"] {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Đoạn văn bẻ dòng. Ô bảng giữ nguyên để không đổi lưới sổ. */
+  [data-page-scroll-owner="true"] :is(p, h1, h2, h3, li, label, figcaption):not(.ledger-paper *) {
+    overflow-wrap: anywhere;
+  }
+
+  pre,
+  code {
+    max-width: 100%;
+  }
+
+  /* Bảng thường: cuộn trong khung cha trực tiếp, không đổi cột. */
+  [data-page-scroll-owner="true"] div:has(> table):not(.ledger-paper):not(.ledger-paper *):not([class~="overflow-x-auto"]):not([class~="overflow-hidden"]):not([class~="overflow-x-hidden"]) {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tờ sổ giữ hình dạng; phần rộng trượt trong mép giấy. */
+  .ledger-paper {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+
+  button:not(.ledger-paper *):not(.sr-only),
+  [role="button"]:not(.ledger-paper *):not(.sr-only),
+  [role="tab"]:not(.ledger-paper *):not(.sr-only),
+  [role="menuitem"]:not(.ledger-paper *):not(.sr-only),
+  summary:not(.ledger-paper *):not(.sr-only) {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+
+  header a,
+  nav a {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+
+  input[type="checkbox"]:not(.ledger-paper *):not(.sr-only),
+  input[type="radio"]:not(.ledger-paper *):not(.sr-only) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  input[type="file"]:not(.ledger-paper *):not(.sr-only) {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="file"]):not(.ledger-paper *),
+  select:not(.ledger-paper *),
+  textarea:not(.ledger-paper *) {
+    font-size: 16px;
+  }
+
+  .ledger-paper :is(input, select, textarea),
+  .bkmh-print-root :is(input, select, textarea),
+  .bkmh-a4-print-host :is(input, select, textarea) {
+    font-size: revert-layer;
+  }
+
+  .page-shell > div > header {
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+
+  .fixed.inset-0:has(> [role="dialog"]),
+  .fixed.inset-0[role="dialog"] {
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+
+  .fixed.inset-0 > [role="dialog"],
+  .fixed.inset-0[role="dialog"] > div {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@media print {
+  .ledger-paper,
+  .ledger-paper * {
+    min-height: unset !important;
+    min-width: unset !important;
+    max-width: none !important;
+    overflow: visible !important;
+    font-size: revert-layer !important;
+  }
+
+  button,
+  [role="button"],
+  [role="tab"],
+  input,
+  select,
+  textarea {
+    min-height: unset !important;
+    min-width: unset !important;
+    font-size: revert-layer !important;
+  }
+}
