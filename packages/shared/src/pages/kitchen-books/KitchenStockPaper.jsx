@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { useGetPaperStockQuery } from "@/features/kitchen-books/api/kitchenBooksApi";
+import { useGetLttpCommoditiesQuery } from "@/features/lttp/api/lttpApi";
+import { KitchenOpeningDialog } from "./KitchenOpeningDialog.jsx";
 import { apiRequest } from "@/services/apiRequest";
 import { notifyError } from "@/services/notify";
 import {
@@ -22,8 +24,14 @@ function errText(error) {
 export function KitchenStockPaper({ unitId, date, onDate }) {
   const router = useRouter();
   const [choice, setChoice] = useState("");
+  const [openingOpen, setOpeningOpen] = useState(false);
   const skip = unitId == null || !date;
   const stock = useGetPaperStockQuery({ unitId, month: date ? monthOf(date) : "" }, { skip });
+  const commoditiesQuery = useGetLttpCommoditiesQuery(unitId, { skip });
+  const commodities = Array.isArray(commoditiesQuery.data) ? commoditiesQuery.data : [];
+  useEffect(() => {
+    if (stock.data?.canDeclareOpening) setOpeningOpen(true);
+  }, [stock.data?.canDeclareOpening, unitId]);
   const day = stock.data?.days?.find((row) => row.date === date);
   const runs = useMemo(
     () => negativesOnDate(stock.data?.negatives || [], date),
@@ -86,6 +94,16 @@ export function KitchenStockPaper({ unitId, date, onDate }) {
       onPrintMonth={printMonth}
     >
       {stock.isError ? <p className="text-sm text-destructive">{errText(stock.error)}</p> : null}
+      {stock.data?.canDeclareOpening ? (
+        <Button type="button" variant="secondary" className="no-print h-11 px-3" onClick={() => setOpeningOpen(true)}>Khai báo tồn đầu</Button>
+      ) : null}
+      <KitchenOpeningDialog
+        unitId={unitId}
+        commodities={commodities}
+        lines={stock.data?.openingLines}
+        open={Boolean(stock.data?.canDeclareOpening) && openingOpen}
+        onClose={() => setOpeningOpen(false)}
+      />
       {runs.length ? (
         <div className="no-print rounded border border-destructive/40 bg-destructive/10 p-2 text-sm">
           <p>Ngày này có {runs.length} mặt hàng âm kho.</p>

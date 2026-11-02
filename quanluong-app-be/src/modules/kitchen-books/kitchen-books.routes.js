@@ -41,7 +41,9 @@ import {
   getPaperIssueController,
   getPaperReceiptController,
   getPaperStockController,
+  getPaperOpeningController,
   putPaperIssueController,
+  putPaperOpeningController,
   putPaperReceiptController,
 } from "./kitchen-paper.controller.js";
 import {
@@ -96,6 +98,8 @@ import {
   paperStockQuerySchema,
   paperReceiptBodySchema,
   paperIssueBodySchema,
+  paperOpeningQuerySchema,
+  paperOpeningBodySchema,
 } from "./kitchen-books.validator.js";
 import {
   balanceLedgerBodySchema,
@@ -510,6 +514,22 @@ kitchenBooksRouter.put(
   validateRequest({ body: paperIssueBodySchema }),
   permissionMiddleware([routePermissions.putKitchenPaperIssue]),
   asyncHandler(putPaperIssueController),
+);
+
+kitchenBooksRouter.get(
+  "/paper/opening",
+  dataScopeMw,
+  validateRequest({ query: paperOpeningQuerySchema }),
+  permissionMiddleware([routePermissions.getKitchenPaperOpening]),
+  asyncHandler(getPaperOpeningController),
+);
+
+kitchenBooksRouter.put(
+  "/paper/opening",
+  dataScopeMw,
+  validateRequest({ body: paperOpeningBodySchema }),
+  permissionMiddleware([routePermissions.putKitchenPaperOpening]),
+  asyncHandler(putPaperOpeningController),
 );
 
 kitchenBooksRouter.get(

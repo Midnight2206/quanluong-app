@@ -607,6 +607,14 @@ export function useSavePaperReceiptMutation() {
   });
 }
 
+export function useSavePaperOpeningMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) => apiRequest({ url: "/kitchen-books/paper/opening", method: "put", data: body }),
+    onSuccess: (_data, vars) => invalidatePaper(qc, vars?.unitId, null),
+  });
+}
+
 export function useSavePaperIssueMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({

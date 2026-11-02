@@ -14,11 +14,13 @@ import { bookMmyyFromYmd } from "./kitchen-books-receipt-sync.service.js";
 import { mergeLedgerSettings } from "./kitchen-ledger-settings.js";
 import {
   addDaysYmd,
+  canDeclareOpeningStock,
   daysOfMonth,
   expandReceiptRow,
   groupIssueLines,
   groupReceiptLines,
   issueQty,
+  level2GuaranteeRejected,
   monthOf,
   negativeStarts,
   presentIssue,
@@ -68,7 +70,7 @@ function slotName(signatures, book, key) {
 async function loadContext(unitId) {
   const unit = await prisma.unit.findUnique({
     where: { id: Number(unitId) },
-    select: { id: true, name: true, parent: { select: { name: true } } },
+    select: { id: true, name: true, depth: true, parent: { select: { name: true } } },
   });
   const profile = typeof prisma.chungTuUnitProfile?.findUnique === "function"
     ? await prisma.chungTuUnitProfile.findUnique({ where: { unitId: Number(unitId) } })
@@ -86,6 +88,7 @@ async function loadContext(unitId) {
     warehouseName: defaults?.warehouseFrom || profile?.boPhan || "",
     formCode: defaults?.formMauSo || FORM_CODE,
     signatures,
+    canEditGuarantee: Number(unit?.depth) === 0,
   };
 }
 
@@ -128,6 +131,7 @@ function receiptDto(date, slip, ctx) {
     itemCount: summary.itemCount,
     total: summary.total,
     words: summary.words,
+    canEditGuarantee: ctx.canEditGuarantee === true,
   };
 }
 
@@ -227,8 +231,25 @@ async function putPaperReceipt(body, userId, scope, effectiveUnitIds, dataScope)
   const unitId = Number(body.unitId);
   assertDay(unitId, scope, effectiveUnitIds, dataScope);
   const ownerUnitId = dataScope.logicalUnitId;
+  const unit = await prisma.unit.findUnique({
+    where: { id: ownerUnitId },
+    select: { depth: true },
+  });
+  const existing = await prisma.kitchenReceiptSlip.findUnique({
+    where: { unitId_receiptDate: { unitId: ownerUnitId, receiptDate: parseDateOnly(body.date) } },
+    include: { lines: true },
+  });
+  if (level2GuaranteeRejected(unit?.depth, body.lines, existing?.lines || [])) {
+    throw new AppError({
+      message: "Đơn vị cấp 2 không được ghi cột Trên bảo đảm. Cột này chỉ lấy từ phiếu xuất cấp trên.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
   const expanded = (body.lines || []).flatMap((line) => expandReceiptRow(line));
-  await assertCommodities(expanded.map((line) => line.commodityId), dataScope.storageUnitId);
+  const level2 = Number(unit?.depth) !== 0;
+  const writeLines = level2 ? expanded.filter((line) => line.lineSource === "unit_self") : expanded;
+  await assertCommodities(writeLines.map((line) => line.commodityId), dataScope.storageUnitId);
   await prisma.$transaction(async (tx) => {
     const header = await ensureReceiptHeader(tx, ownerUnitId, body.date, userId);
     await tx.kitchenReceiptSlip.update({
@@ -241,10 +262,12 @@ async function putPaperReceipt(body, userId, scope, effectiveUnitIds, dataScope)
         signerDuyet: text(body.signers?.[3]),
       },
     });
-    await tx.kitchenReceiptSlipLine.deleteMany({ where: { slipId: header.id } });
-    if (expanded.length) {
+    await tx.kitchenReceiptSlipLine.deleteMany({
+      where: level2 ? { slipId: header.id, lineSource: "unit_self" } : { slipId: header.id },
+    });
+    if (writeLines.length) {
       await tx.kitchenReceiptSlipLine.createMany({
-        data: expanded.map((line) => ({
+        data: writeLines.map((line) => ({
           slipId: header.id,
           commodityId: line.commodityId,
           quantity: String(line.quantity),
@@ -416,19 +439,114 @@ async function getPaperStock(query, scope, effectiveUnitIds, dataScope) {
   for (let cursor = firstDate; cursor <= chainEnd; cursor = addDaysYmd(cursor, 1)) {
     dates.push(cursor);
   }
-  const propagated = propagateStock({ dates, movements, catalog });
+  const opening = await loadOpening(unitId, catalog);
+  const propagated = propagateStock({
+    dates,
+    movements,
+    catalog,
+    openingById: opening.byId,
+  });
   const runs = negativeStarts(propagated.days);
   const monthDays = propagated.days.filter((day) => monthOf(day.date) === month);
   const markers = {};
   for (const day of monthDays) {
     markers[day.date] = { hasData: day.hasData, negative: day.negativeCount > 0 };
   }
+  const slipCount = await countKitchenSlips(unitId);
   return {
     month,
     days: monthDays,
     markers,
     negatives: runs.filter((run) => run.dates.some((date) => monthOf(date) === month)),
+    canDeclareOpening: canDeclareOpeningStock(slipCount),
+    openingLines: opening.lines,
   };
+}
+
+async function countKitchenSlips(unitId) {
+  const receipts = await prisma.kitchenReceiptSlip.count({ where: { unitId } });
+  const issues = typeof prisma.kitchenIssueSlip?.count === "function"
+    ? await prisma.kitchenIssueSlip.count({ where: { unitId } })
+    : 0;
+  return receipts + issues;
+}
+
+async function loadOpening(unitId, catalog) {
+  if (typeof prisma.kitchenOpeningBalance?.findUnique !== "function") {
+    return { byId: {}, lines: [] };
+  }
+  const row = await prisma.kitchenOpeningBalance.findUnique({
+    where: { unitId },
+    include: {
+      lines: { include: { commodity: { include: { group: true } } } },
+    },
+  });
+  const byId = {};
+  const lines = [];
+  for (const line of row?.lines || []) {
+    const id = String(line.commodityId);
+    byId[id] = Number(line.quantity);
+    if (catalog && !catalog[id]) catalog[id] = catalogFromLine(line, 0);
+    lines.push({
+      commodityId: line.commodityId,
+      name: line.commodity?.name || "",
+      uom: line.commodity?.measureUnit || "",
+      quantity: Number(line.quantity),
+      price: Number(line.unitPrice),
+    });
+  }
+  return { byId, lines };
+}
+
+async function getPaperOpening(query, scope, effectiveUnitIds, dataScope) {
+  const unitId = Number(query.unitId);
+  assertDay(unitId, scope, effectiveUnitIds, dataScope);
+  const slipCount = await countKitchenSlips(unitId);
+  const opening = await loadOpening(unitId);
+  return {
+    canDeclare: canDeclareOpeningStock(slipCount),
+    lines: opening.lines,
+  };
+}
+
+async function putPaperOpening(body, userId, scope, effectiveUnitIds, dataScope) {
+  const unitId = Number(body.unitId);
+  assertDay(unitId, scope, effectiveUnitIds, dataScope);
+  const ownerUnitId = dataScope.logicalUnitId;
+  if (!canDeclareOpeningStock(await countKitchenSlips(ownerUnitId))) {
+    throw new AppError({
+      message: "Đã có phiếu. Tồn đầu kỳ đã khóa, không sửa tay.",
+      statusCode: 400,
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
+  }
+  const lines = (body.lines || [])
+    .map((line) => ({
+      commodityId: Number(line.commodityId),
+      quantity: Number(line.quantity) || 0,
+      unitPrice: Number(line.price) || 0,
+    }))
+    .filter((line) => line.quantity > 0);
+  await assertCommodities(lines.map((line) => line.commodityId), dataScope.storageUnitId);
+  await prisma.$transaction(async (tx) => {
+    await tx.kitchenOpeningBalance.upsert({
+      where: { unitId: ownerUnitId },
+      create: { unitId: ownerUnitId, createdById: userId },
+      update: { createdById: userId },
+    });
+    await tx.kitchenOpeningBalanceLine.deleteMany({ where: { unitId: ownerUnitId } });
+    if (lines.length) {
+      await tx.kitchenOpeningBalanceLine.createMany({
+        data: lines.map((line) => ({
+          unitId: ownerUnitId,
+          commodityId: line.commodityId,
+          quantity: String(line.quantity),
+          unitPrice: String(line.unitPrice),
+        })),
+      });
+    }
+  });
+  return getPaperOpening({ unitId: ownerUnitId }, scope, effectiveUnitIds, dataScope);
 }
 
 /** Dòng xuất ăn đưa vào sổ nhập xuất hiện có. Thiếu bảng thì trả mảng rỗng. */
@@ -449,9 +567,11 @@ async function loadMealSlipLines(unitId, ledgerDate) {
 
 export {
   getPaperIssue,
+  getPaperOpening,
   getPaperReceipt,
   getPaperStock,
   loadMealSlipLines,
   putPaperIssue,
+  putPaperOpening,
   putPaperReceipt,
 };

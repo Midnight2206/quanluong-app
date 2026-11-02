@@ -590,6 +590,30 @@ const KITCHEN_BOOKS_ROUTE_DEFINITIONS = [
       description: "Xem sổ theo dõi LTTP một tháng, tồn tính từ phiếu nhập và phiếu xuất.",
     },
   },
+  {
+    key: "getKitchenPaperOpening",
+    method: "GET",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/paper/opening",
+    pathRoute: "/api/kitchen-books/paper/opening",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Xem tồn đầu kỳ đã khai khi đơn vị chưa có phiếu.",
+    },
+  },
+  {
+    key: "putKitchenPaperOpening",
+    method: "PUT",
+    module: KITCHEN_BOOKS_MODULE_NAME,
+    path: "/paper/opening",
+    pathRoute: "/api/kitchen-books/paper/opening",
+    permission: {
+      code: PERMISSIONS.KITCHEN_BOOKS_ACCESS,
+      name: "Kitchen books",
+      description: "Khai báo tồn đầu kỳ một lần, chỉ khi đơn vị chưa có phiếu nhập hoặc phiếu xuất.",
+    },
+  },
 ];
 
 export { KITCHEN_BOOKS_ROUTE_DEFINITIONS };

@@ -176,6 +176,7 @@ model User {
   chungTuTemplateFillConfigsUpdated      ChungTuTemplateFillConfig[] @relation("ChungTuTemplateFillConfigUpdatedBy")
   kitchenReceiptSlipsCreated             KitchenReceiptSlip[] @relation("KitchenReceiptSlipCreatedBy")
   kitchenIssueSlipsCreated               KitchenIssueSlip[] @relation("KitchenIssueSlipCreatedBy")
+  kitchenOpeningBalancesCreated          KitchenOpeningBalance[] @relation("KitchenOpeningBalanceCreatedBy")
   kitchenMenuSamplesCreated              KitchenMenuSample[] @relation("KitchenMenuSampleCreatedBy")
   kitchenLedgerDaysLocked                KitchenLedgerDay[] @relation("KitchenLedgerDayLockedBy")
   kitchenLedgerChanges                   KitchenLedgerChange[]
@@ -695,6 +696,7 @@ model Unit {
   kitchenReceiptSlips       KitchenReceiptSlip[]
   kitchenReceiptSlipSerials KitchenReceiptSlipSerial[]
   kitchenIssueSlips         KitchenIssueSlip[]
+  kitchenOpeningBalance     KitchenOpeningBalance?
   kitchenMenuSamples        KitchenMenuSample[]
   kitchenLedgerDays              KitchenLedgerDay[]
   kitchenLedgerSettings          KitchenLedgerSettings?
@@ -849,6 +851,7 @@ model LttpCommodity {
   kitchenMenuDishLines           KitchenMenuDishLine[]
   kitchenReceiptSlipLines        KitchenReceiptSlipLine[]
   kitchenIssueSlipLines          KitchenIssueSlipLine[]
+  kitchenOpeningBalanceLines     KitchenOpeningBalanceLine[]
   lttpCommodityDefaultSupplier  LttpCommodityDefaultSupplier?
   lttpAiCommodityHabits         LttpAiCommodityHabit[]
   lttpAiUomRules                LttpAiUomRule[]
@@ -1454,6 +1457,30 @@ model KitchenReceiptSlipLine {
   @@index([slipId])
   @@index([commodityId])
   @@index([slipId, lineSource, priceKind])
+}
+
+/// Tồn đầu kỳ, khai một lần khi đơn vị chưa có phiếu. Sau phiếu đầu tiên thì khóa.
+model KitchenOpeningBalance {
+  unitId      Int      @id
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("KitchenOpeningBalanceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  lines       KitchenOpeningBalanceLine[]
+}
+
+model KitchenOpeningBalanceLine {
+  id          Int                    @id @default(autoincrement())
+  unitId      Int
+  commodityId Int
+  quantity    Decimal                @db.Decimal(18, 4)
+  unitPrice   Decimal                @db.Decimal(18, 2)
+  balance     KitchenOpeningBalance  @relation(fields: [unitId], references: [unitId], onDelete: Cascade)
+  commodity   LttpCommodity          @relation(fields: [commodityId], references: [id], onDelete: Restrict)
+
+  @@unique([unitId, commodityId])
+  @@index([commodityId])
 }
 
 /// Phiếu xuất kho của bếp (ăn theo buổi). Số lượng xuất của sổ lấy từ đây.

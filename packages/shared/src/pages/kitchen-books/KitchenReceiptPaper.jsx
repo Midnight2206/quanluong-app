@@ -13,11 +13,13 @@ import { apiRequest } from "@/services/apiRequest";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { monthOf } from "./kitchenPaperBook.js";
 import {
+  applyReceiptTopUp,
   formatMoneyCell,
   formatQtyCell,
   presentReceipt,
   receiptQty,
 } from "./kitchenPaperBook.js";
+import { KitchenOpeningDialog } from "./KitchenOpeningDialog.jsx";
 import {
   blankReceiptRow,
   focusPaperCell,
@@ -53,6 +55,7 @@ export function KitchenReceiptPaper({
   const [signers, setSigners] = useState(["", "", "", ""]);
   const [dirty, setDirty] = useState(false);
   const [sideOpen, setSideOpen] = useState(false);
+  const [openingOpen, setOpeningOpen] = useState(false);
   const seeded = useRef("");
   const topped = useRef("");
   const skip = unitId == null || !date;
@@ -110,7 +113,7 @@ export function KitchenReceiptPaper({
       }
       return prev.map((row) => (
         String(row.commodityId) === String(focusCommodityId)
-          ? { ...row, dvMuaTt: String(num(row.dvMuaTt) + amount) }
+          ? { ...row, dvMuaTt: String(applyReceiptTopUp(row, amount).dvMuaTt) }
           : row
       ));
     });
@@ -179,7 +182,7 @@ export function KitchenReceiptPaper({
     setDirty(true);
     setRows((prev) => prev.map((row) => (
       String(row.commodityId) === String(commodityId)
-        ? { ...row, dvMuaTt: String(num(row.dvMuaTt) + amount) }
+        ? { ...row, dvMuaTt: String(applyReceiptTopUp(row, amount).dvMuaTt) }
         : row
     )));
   }
@@ -255,6 +258,7 @@ export function KitchenReceiptPaper({
   }
 
   const header = receipt.data?.header || {};
+  const lockGuarantee = receipt.data?.canEditGuarantee !== true;
   const parts = date ? date.split("-") : ["", "", ""];
 
   return (
@@ -267,6 +271,9 @@ export function KitchenReceiptPaper({
       busy={saveState.isPending}
       extra={(
         <>
+          {stock.data?.canDeclareOpening ? (
+            <Button type="button" variant="secondary" className="h-11 px-3" onClick={() => setOpeningOpen(true)}>Khai báo tồn đầu</Button>
+          ) : null}
           <Button type="button" className="paper-balance-toggle" onClick={() => setSideOpen(true)}>Tồn chuyển hôm sau</Button>
           <Button type="button" className="h-11 px-3" disabled={!canWrite || saveState.isPending || unitId == null} onClick={onSave}>
             {saveState.isPending ? "Đang ghi…" : "Lưu phiếu"}
@@ -277,6 +284,14 @@ export function KitchenReceiptPaper({
       {receipt.isLoading ? <p className="text-sm text-muted-foreground">Đang tải phiếu nhập…</p> : null}
       {receipt.error ? <p className="text-sm text-destructive">{errText(receipt.error)}</p> : null}
       {dirty ? <p className="no-print text-xs text-muted-foreground">Sửa này chưa ghi. Bấm Lưu phiếu để ghi thẳng vào cơ sở dữ liệu.</p> : null}
+      {lockGuarantee ? <p className="no-print text-xs text-muted-foreground">Cột Trên bảo đảm khóa. Số liệu lấy từ phiếu xuất cấp trên.</p> : null}
+      <KitchenOpeningDialog
+        unitId={unitId}
+        commodities={commodities}
+        lines={stock.data?.openingLines}
+        open={Boolean(stock.data?.canDeclareOpening) && openingOpen}
+        onClose={() => setOpeningOpen(false)}
+      />
       <div className="paper-stage">
         <div className="kitchen-paper-scroll">
           <article className="ledger-paper kitchen-paper paper-page" data-paper-page="1">
@@ -335,11 +350,22 @@ export function KitchenReceiptPaper({
                         />
                       </td>
                       <td className="num">{row.uom}</td>
-                      {QTY_FIELDS.slice(0, 4).map((field, col) => (
-                        <td key={field} className="num" data-cell={`${index}-${col + 1}`} data-cols="6">
-                          <input aria-label={field} inputMode="decimal" value={row[field]} disabled={!canWrite} onChange={(event) => patch(row.key, field, event.target.value)} />
-                        </td>
-                      ))}
+                      {QTY_FIELDS.slice(0, 4).map((field, col) => {
+                        const locked = lockGuarantee && (field === "trenMuaTt" || field === "trenTgcb");
+                        return (
+                          <td key={field} className="num" data-cell={`${index}-${col + 1}`} data-cols="6">
+                            <input
+                              aria-label={field}
+                              inputMode="decimal"
+                              value={row[field]}
+                              disabled={!canWrite || locked}
+                              readOnly={locked}
+                              title={locked ? "Cột Trên bảo đảm chỉ lấy từ phiếu xuất cấp trên" : undefined}
+                              onChange={(event) => patch(row.key, field, event.target.value)}
+                            />
+                          </td>
+                        );
+                      })}
                       <td className="num">{formatQtyCell(calc.qty)}</td>
                       <td className="num" data-cell={`${index}-5`} data-cols="6">
                         <input aria-label="Giá lẻ" inputMode="decimal" value={row.price} disabled={!canWrite} onChange={(event) => patch(row.key, "price", event.target.value)} />

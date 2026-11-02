@@ -1,9 +1,11 @@
 import { respondSuccess } from "../../shared/utils/responders.js";
 import {
   getPaperIssue,
+  getPaperOpening,
   getPaperReceipt,
   getPaperStock,
   putPaperIssue,
+  putPaperOpening,
   putPaperReceipt,
 } from "./kitchen-paper.service.js";
 
@@ -59,10 +61,33 @@ async function getPaperStockController(req, res) {
   return respondSuccess(res, { message: "Đã tải sổ theo dõi", data });
 }
 
+async function getPaperOpeningController(req, res) {
+  const data = await getPaperOpening(
+    req.validatedQuery,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã tải tồn đầu kỳ", data });
+}
+
+async function putPaperOpeningController(req, res) {
+  const data = await putPaperOpening(
+    req.validatedBody,
+    req.user.id,
+    req.unitScope,
+    req.effectiveUnitIds,
+    req.dataScope,
+  );
+  return respondSuccess(res, { message: "Đã ghi tồn đầu kỳ", data });
+}
+
 export {
   getPaperIssueController,
+  getPaperOpeningController,
   getPaperReceiptController,
   getPaperStockController,
   putPaperIssueController,
+  putPaperOpeningController,
   putPaperReceiptController,
 };

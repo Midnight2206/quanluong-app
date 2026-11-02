@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
+  applyReceiptTopUp,
+  canDeclareOpeningStock,
   cktcBalanceView,
   expandReceiptRow,
   issueQty,
+  level2GuaranteeRejected,
   negativeStarts,
   negativesOnDate,
   presentIssue,
@@ -167,6 +170,49 @@ test("HTML in phiếu không chứa cân đối thu chi", () => {
   assert.match(doc, /PHIẾU NHẬP KHO/);
   assert.match(page, /9\.870\.700/);
   assert.match(issue, /3\.401\.800/);
+});
+
+test("cấp 2 không được đổi cột Trên bảo đảm", () => {
+  const stored = [
+    { commodityId: 7, lineSource: "on_guarantee", priceKind: "market", quantity: 0.4 },
+    { commodityId: 7, lineSource: "unit_self", priceKind: "market", quantity: 1 },
+  ];
+  const same = [{ commodityId: 7, trenMuaTt: 0.4, trenTgcb: 0, dvMuaTt: 3 }];
+  const changed = [{ commodityId: 7, trenMuaTt: 1.4, trenTgcb: 0 }];
+  const invented = [{ commodityId: 8, trenMuaTt: 0.2, trenTgcb: 0 }];
+  assert.equal(level2GuaranteeRejected(1, same, stored), false);
+  assert.equal(level2GuaranteeRejected(1, changed, stored), true);
+  assert.equal(level2GuaranteeRejected(1, invented, stored), true);
+  assert.equal(level2GuaranteeRejected(0, changed, stored), false);
+});
+
+test("nhập bù chỉ cộng vào cột Đơn vị bảo đảm", () => {
+  const next = applyReceiptTopUp({ trenMuaTt: 0.4, trenTgcb: 0.1, dvMuaTt: 1, dvTgcb: 0.2 }, 0.5);
+  assert.equal(next.trenMuaTt, 0.4);
+  assert.equal(next.trenTgcb, 0.1);
+  assert.equal(next.dvMuaTt, 1.5);
+  assert.equal(next.dvTgcb, 0.2);
+});
+
+test("tồn đầu chỉ khai khi chưa có phiếu, rồi chuyển liên tục sang tháng sau", () => {
+  assert.equal(canDeclareOpeningStock(0), true);
+  assert.equal(canDeclareOpeningStock(1), false);
+  const { days } = propagateStock({
+    dates: ["2026-09-30", "2026-10-01", "2026-10-31", "2026-11-01"],
+    openingById: { "1": 33.1 },
+    movements: {
+      "2026-10-01": { out: { "1": 21.9 } },
+    },
+    catalog: { "1": { name: "Gạo tẻ thường", uom: "Kg", sort: 1, price: 16000 } },
+  });
+  const byDate = Object.fromEntries(days.map((day) => [day.date, day.lines[0]]));
+  assert.equal(byDate["2026-09-30"].opening, 33.1);
+  assert.equal(byDate["2026-09-30"].close, 33.1);
+  assert.equal(byDate["2026-10-01"].opening, 33.1);
+  assert.equal(byDate["2026-10-01"].close, 11.2);
+  assert.equal(byDate["2026-10-31"].opening, 11.2);
+  assert.equal(byDate["2026-11-01"].opening, 11.2);
+  assert.equal(byDate["2026-11-01"].close, 11.2);
 });
 
 test("bản tính trên backend trùng file giao diện", () => {

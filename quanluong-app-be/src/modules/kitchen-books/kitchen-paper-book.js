@@ -337,6 +337,66 @@ function groupReceiptLines(dbLines) {
   return [...buckets.values()];
 }
 
+/** Cấp 2 là depth ≥ 1. Chỉ cấp 1 (depth 0) được gửi cột Trên bảo đảm. */
+function isKitchenLevel2(depth) {
+  return Number(depth) !== 0;
+}
+
+function addQty(map, key, qty) {
+  map.set(key, (map.get(key) || 0) + toQty(qty));
+}
+
+function guaranteeMapFromRows(rows) {
+  const map = new Map();
+  for (const row of rows || []) {
+    const id = String(row.commodityId ?? "");
+    if (!id) continue;
+    addQty(map, `${id}:market`, row.trenMuaTt);
+    addQty(map, `${id}:tgsx`, row.trenTgcb);
+  }
+  return map;
+}
+
+function guaranteeMapFromStored(lines) {
+  const map = new Map();
+  for (const line of lines || []) {
+    if (line.lineSource !== "on_guarantee") continue;
+    const kind = String(line.priceKind || "").toLowerCase() === "tgsx" ? "tgsx" : "market";
+    addQty(map, `${line.commodityId}:${kind}`, line.quantity);
+  }
+  return map;
+}
+
+function sameQtyMap(left, right) {
+  const keys = new Set([...left.keys(), ...right.keys()]);
+  for (const key of keys) {
+    if ((left.get(key) || 0) !== (right.get(key) || 0)) return false;
+  }
+  return true;
+}
+
+/**
+ * Cấp 2 không được đổi cột Trên bảo đảm. Giá trị gửi lên phải trùng dòng đồng bộ đang lưu.
+ * @returns {boolean} true khi phải từ chối cả phiếu
+ */
+function level2GuaranteeRejected(depth, submittedRows, storedLines) {
+  if (!isKitchenLevel2(depth)) return false;
+  return !sameQtyMap(guaranteeMapFromRows(submittedRows), guaranteeMapFromStored(storedLines));
+}
+
+/** Nhập bù chỉ cộng vào Đơn vị bảo đảm — Mua TT. */
+function applyReceiptTopUp(row, amount) {
+  return {
+    ...row,
+    dvMuaTt: fromQty(toQty(row?.dvMuaTt) + toQty(amount)),
+  };
+}
+
+/** Khai báo tồn đầu chỉ khi chưa có phiếu nhập hoặc phiếu xuất nào. */
+function canDeclareOpeningStock(slipCount) {
+  return Number(slipCount) === 0;
+}
+
 function expandReceiptRow(row) {
   const price = Number(row.price || 0);
   const specs = [
@@ -432,7 +492,11 @@ export {
   daysOfMonth,
   eachDate,
   escHtml,
+  applyReceiptTopUp,
+  canDeclareOpeningStock,
   expandReceiptRow,
+  isKitchenLevel2,
+  level2GuaranteeRejected,
   formatMoneyCell,
   formatQtyCell,
   fromQty,

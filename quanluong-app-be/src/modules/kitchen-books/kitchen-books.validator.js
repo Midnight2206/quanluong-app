@@ -266,6 +266,21 @@ const paperIssueLineSchema = z.object({
   lineNote: z.string().max(500).optional().nullable(),
 });
 
+const paperOpeningQuerySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+});
+
+const paperOpeningLineSchema = z.object({
+  commodityId: z.coerce.number().int().positive(),
+  quantity: paperQtySchema,
+  price: paperQtySchema,
+});
+
+const paperOpeningBodySchema = z.object({
+  unitId: z.coerce.number().int().positive(),
+  lines: z.array(paperOpeningLineSchema).max(400),
+});
+
 const paperIssueBodySchema = z.object({
   unitId: z.coerce.number().int().positive(),
   date: dateSchema,
@@ -308,4 +323,6 @@ export {
   paperStockQuerySchema,
   paperReceiptBodySchema,
   paperIssueBodySchema,
+  paperOpeningQuerySchema,
+  paperOpeningBodySchema,
 };
