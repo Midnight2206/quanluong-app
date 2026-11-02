@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-audit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Logs each DSH model call and tool result to the backend audit endpoint."
+}

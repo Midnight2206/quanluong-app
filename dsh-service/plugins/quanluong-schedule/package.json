@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-schedule",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Unit-scoped cron jobs that log a report and do not write business data."
+}

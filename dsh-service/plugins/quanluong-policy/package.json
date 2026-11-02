@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-policy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Denies host shell and filesystem tools, and any tool call that tries to commit."
+}

@@ -1,0 +1,7 @@
+{
+  "name": "quanluong-sandbox",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Per-tool permissions, dangerous-command blocks, and a no-execute code review."
+}

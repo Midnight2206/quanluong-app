@@ -1,0 +1,25 @@
+Adapted instruction skills in this folder come from the Apache-2.0
+"data" plugin at
+https://github.com/anthropics/knowledge-work-plugins/tree/main/data
+
+Adapted files:
+- skills/explore-data/SKILL.md
+  from data/skills/explore-data/SKILL.md
+- skills/validate-data/SKILL.md
+  from data/skills/validate-data/SKILL.md
+
+What changed: warehouse SQL, file loaders, chart review, and Python
+snippets were removed. DSH can follow instruction text only. The new
+text tells the ledger assistant to quote server checks from
+computeLedger and not to write. The license text is Apache-2.0-LICENSE
+in this folder.
+
+Not adapted, on purpose:
+- data/skills/data-visualization/SKILL.md
+  Python chart code. This assistant answers in text.
+- data/skills/statistical-analysis/SKILL.md
+  Hypothesis tests and Python rolling averages. Official ledger
+  figures already come from the server.
+
+Original Quan Luong skills, not from that repository:
+ledger-rules, ledger-extract, menu-rules, issue-slip-rules.
