@@ -235,7 +235,7 @@ export function KitchenIssuePaper({ unitId, date, onDate, canWrite, focusCommodi
               </thead>
               <tbody>
                 {rows.map((row, index) => {
-                  const calc = presentIssue([issueCalc(row)]).rows[0];
+                  const calc = view.rows.find((item) => item.key === row.key) || { tt: 0, qty: 0, amount: 0 };
                   const saved = stockById.get(String(row.commodityId));
                   const available = Number(saved?.opening || 0) + Number(saved?.inQty || 0);
                   const short = calc.qty > available + 1e-9;

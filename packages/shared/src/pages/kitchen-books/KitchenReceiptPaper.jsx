@@ -328,7 +328,7 @@ export function KitchenReceiptPaper({
               </thead>
               <tbody>
                 {rows.map((row, index) => {
-                  const calc = presentReceipt([receiptCalc(row)]).rows[0];
+                  const calc = view.rows.find((item) => item.key === row.key) || { tt: 0, qty: 0, amount: 0 };
                   const focused = focusCommodityId && String(row.commodityId) === String(focusCommodityId);
                   return (
                     <tr key={row.key} id={row.commodityId ? `paper-row-${row.commodityId}` : undefined} className={focused ? "is-focus" : undefined}>

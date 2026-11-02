@@ -23,7 +23,7 @@ export function KitchenPaperChrome({
   const cells = calendarCells(month);
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="relative flex min-w-0 flex-col gap-3">
       <style>{PAPER_CSS}</style>
       <div className="no-print flex flex-wrap items-center gap-2">
         <Button type="button" variant="secondary" className="h-11 min-w-11 px-3" onClick={() => onDate(addDaysYmd(date, -1))} aria-label="Ngày trước">◀</Button>
@@ -41,6 +41,7 @@ export function KitchenPaperChrome({
             <Button type="button" variant="ghost" className="h-11 min-w-11" onClick={() => onDate(`${addDaysYmd(`${month}-01`, -1).slice(0, 7)}-01`)}>◀</Button>
             <strong>Tháng {month.slice(5)}/{month.slice(0, 4)}</strong>
             <Button type="button" variant="ghost" className="h-11 min-w-11" onClick={() => onDate(`${addDaysYmd(`${month}-28`, 10).slice(0, 7)}-01`)}>▶</Button>
+            <Button type="button" variant="ghost" className="h-11 px-3" onClick={() => setOpenCal(false)}>Đóng</Button>
           </div>
           <div className="grid grid-cols-7 gap-1 text-center text-xs">
             {WEEK.map((label) => <span key={label}>{label}</span>)}

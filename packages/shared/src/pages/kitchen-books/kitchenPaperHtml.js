@@ -43,9 +43,9 @@ html, body { margin: 0; padding: 0; background: #fff; }
 .kpp-sign span { display: block; margin-top: 28px; }
 .kpp-meta { display: flex; justify-content: space-between; margin-top: 8px; }
 .kpp-date { text-align: right; font-style: italic; margin: 0 0 6px; }
-.kitchen-paper-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
-.paper-stage { display: flex; align-items: flex-start; gap: 12px; }
-.kitchen-paper { width: 210mm; min-height: 297mm; box-sizing: border-box; margin: 0 auto; background: #fffef8; }
+.kitchen-paper-scroll { max-width: 100%; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
+.paper-stage { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; min-width: 0; }
+.kitchen-paper { width: 210mm; box-sizing: border-box; margin: 0 auto; background: #fffef8; }
 .kitchen-paper .kpp input, .kitchen-paper .kpp .kpp-name input {
   width: 100%; border: 0; border-radius: 0; background: transparent; font: inherit;
   text-align: center; padding: 0; min-width: 0; box-shadow: none;
@@ -59,15 +59,23 @@ html, body { margin: 0; padding: 0; background: #fff; }
 .paper-sidebar .minus { color: #b91c1c; font-weight: 700; }
 .paper-balance-toggle { display: none; }
 .paper-cal { position: absolute; z-index: 30; background: #fff; border: 1px solid #d6d3d1; padding: 8px; }
-.paper-cal button { min-width: 1.8rem; }
 @media (max-width: 1023px) {
+  .paper-stage { display: block; }
+  .kitchen-paper-scroll { max-width: 100%; min-width: 0; }
   .paper-sidebar { display: none; }
   .paper-sidebar.is-open {
-    display: block; position: fixed; inset: 0; z-index: 80; width: auto; overflow: auto;
+    display: block; position: fixed; inset: 0; z-index: 80; width: auto; height: auto; overflow: auto;
     padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
   }
-  .paper-balance-toggle { display: inline-flex; }
+  .paper-balance-toggle { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; }
+  .paper-sidebar button { min-height: 44px; min-width: 44px; }
   .kitchen-paper-scroll > .kitchen-paper { max-width: none; width: 210mm; }
+  .paper-cal {
+    position: fixed; inset: 0; z-index: 90; width: auto; height: auto; max-height: none;
+    overflow: auto; border-radius: 0;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+  .paper-cal button { min-width: 44px; min-height: 44px; }
 }
 @media print {
   .no-print { display: none !important; }

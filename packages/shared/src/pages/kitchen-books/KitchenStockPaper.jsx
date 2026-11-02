@@ -108,15 +108,18 @@ export function KitchenStockPaper({ unitId, date, onDate }) {
         <div className="no-print rounded border border-destructive/40 bg-destructive/10 p-2 text-sm">
           <p>Ngày này có {runs.length} mặt hàng âm kho.</p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <label>
+            <label className="min-w-0 max-lg:w-full">
               Mặt hàng
-              <select className="ml-2 h-11" value={selected ? String(selected.commodityId) : ""} onChange={(event) => setChoice(event.target.value)}>
+              <select className="ml-2 h-11 max-w-full max-lg:mt-1 max-lg:ml-0 max-lg:block max-lg:w-full" value={selected ? String(selected.commodityId) : ""} onChange={(event) => setChoice(event.target.value)}>
                 {runs.map((run) => (
                   <option key={run.commodityId} value={run.commodityId}>
                     {run.name} — bắt đầu {run.startDate.split("-").reverse().join("/")} — nhập bù {run.suggestQty} {run.uom}
                   </option>
                 ))}
               </select>
+              {selected ? (
+                <span className="mt-1 block">Bắt đầu âm {selected.startDate.split("-").reverse().join("/")}, nhập bù {selected.suggestQty} {selected.uom}.</span>
+              ) : null}
             </label>
             <Button type="button" className="h-11 px-3" onClick={() => openReceipt(selected)}>
               Về phiếu nhập ngày bắt đầu âm
