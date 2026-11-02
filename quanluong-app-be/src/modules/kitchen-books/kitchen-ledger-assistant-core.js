@@ -23,6 +23,7 @@ function routeIntent(text, hasImage = false) {
   }
   if (/nhu\s*\d{1,2}\s*[/.]\s*\d{1,2}/.test(n) && nums.length < 5) return "headcount";
   if (/(mua|kg|hop|lit|xuat them)/.test(n)) return "movement";
+  if (/lich lam viec|lich truc|lich bep/.test(n)) return "movement";
   return "question";
 }
 
@@ -79,19 +80,13 @@ function proposeSettings(text) {
   } else if (/le tet/.test(n) && /ca ngay/.test(n)) {
     proposals.push({ field: "holidayLunchOnly", value: false, label: "Lễ tết tính cả ngày" });
   }
-  if (/sua/.test(n) && /ngay bay|mua/.test(n)) {
-    proposals.push({ field: "milk.mode", value: "purchase", label: "Sữa: mua theo ngày" });
-  } else if (/sua/.test(n) && /benh nhan/.test(n)) {
-    proposals.push({ field: "milk.mode", value: "patient_plus_levels", label: "Sữa: bệnh nhân + mức cấu hình" });
-  }
   return proposals;
 }
 
 function settingsPatch(proposals) {
   const patch = {};
   for (const row of proposals) {
-    if (row.field === "milk.mode") patch.milk = { mode: row.value };
-    else patch[row.field] = row.value;
+    patch[row.field] = row.value;
   }
   return patch;
 }

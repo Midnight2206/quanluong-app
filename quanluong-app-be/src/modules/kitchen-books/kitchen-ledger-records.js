@@ -33,9 +33,11 @@ function recordsPrompt({ settings, anchorDate, commodities = [], facts = [], que
     "Doi cau hoac anh thanh mang ban ghi. Khong chon vi tri tren so, khong tinh tien, khong ke ten nguoi.",
     "type headcount: quan so sang, trua, chieu theo tung muc an. An them: benhXa, benhNhan, omTrai, leTet.",
     `Cac muc, dung thu tu: ${levels}. Mau 18/10: 91 97 97 · 0 0 0 la muc dau roi muc sau.`,
-    "type outside_purchase: mua ngoai. type stock_in: nhap kho, origin unit_purchase hoac unit_tgsx. type stock_out: xuat khac, khong phai xuat an.",
-    "Hang da co tren phieu xuat thi khong tao ban ghi. Gao nhap tay van la outside_purchase hoac stock_in.",
-    "type setting chi khi cau doi quy tac: field balanceWarnThreshold, spentBasis (meal_out hoac total_out), holidayLunchOnly, milk.mode (purchase hoac patient_plus_levels).",
+    "type outside_purchase: mua ngoai vao don vi bao dam. type stock_in: nhap kho, origin unit_purchase hoac unit_tgsx. type meal_out: so luong xuat an. type stock_out: xuat khac.",
+    "Hang cua don vi thanh phieu nhap mua TT hoac TGSX. Khong tao ban ghi cho Tren BD. Xuat an va xuat khac chua co phieu xuat cua bep nen khong ghi.",
+    "Moi hang can sourceKind market hoac tgsx va grade. Khong doan pham cap.",
+    "type setting chi khi cau doi quy tac: field balanceWarnThreshold, spentBasis (meal_out hoac total_out), holidayLunchOnly.",
+    "type schedule: lich lam viec trong ngay, chi la chu, khong doi so tren so.",
     "type note: ghi chu, khong phai so lieu.",
     "Moi ban ghi co confidence 0 den 1 va source la doan trich ngan. Don gia la dong, 180k = 180000.",
     `Nam neo ${open.slice(0, 4)}. Ngay dang mo ${open}.`,
@@ -47,7 +49,7 @@ function recordsPrompt({ settings, anchorDate, commodities = [], facts = [], que
 
 function reject(message) {
   return new AppError({
-    message: message || "AI trả về bản ghi không đúng mẫu. Nhập tay ở bảng phía trên.",
+    message: message || "AI trả về bản ghi không đúng mẫu. Nhập quân số hoặc lập phiếu.",
     statusCode: 502,
     code: ERROR_CODES.INTERNAL_SERVER_ERROR,
   });
@@ -67,9 +69,8 @@ function isRice(name, pattern) {
 }
 
 /**
- * Đặt một bản ghi hàng vào khung ngày. Cột do máy chủ chọn.
- * Gạo nhập tay → Trên BĐ mua. Mua ngoài và nhập đơn vị mua → cột I.
- * Tự sản xuất đơn vị → cột J. Xuất khác → xuất khác, không phải xuất ăn.
+ * Bản nháp hàng thành dòng phiếu nhập của đơn vị (I mua TT, J TGSX).
+ * Trên BĐ không nhận bản nháp. Xuất ăn và xuất khác chưa có phiếu xuất của bếp.
  */
 function placeLine(record, { commodities, ricePattern }) {
   const hits = matchCommodity(record.name, commodities);
@@ -77,30 +78,42 @@ function placeLine(record, { commodities, ricePattern }) {
   const rice = isRice(record.name, ricePattern);
   let kind = "self_supply";
   let source = "I";
-  let place = "Đơn vị BĐ mua TT";
+  let place = "Phiếu nhập mua TT";
   let savable = true;
   let warning = "";
-  if (record.type === "stock_out") {
-    kind = "other_out";
-    source = "P";
-    place = "Xuất khác";
-  } else if (rice) {
-    kind = "rice";
-    source = "G";
-    place = "Gạo, nhập tay trên bảo đảm";
-  } else if (record.type === "stock_in" && record.origin === "unit_tgsx") {
-    source = "J";
-    place = "Đơn vị BĐ TGSX";
-  }
-  if (!rice && kind === "self_supply" && !commodity) {
+  const tgsx = record.origin === "unit_tgsx" || record.column === "J" || record.sourceKind === "tgsx";
+  if (record.type === "stock_out" || record.type === "meal_out") {
+    kind = record.type === "meal_out" ? "meal_out" : "other_out";
+    source = record.type === "meal_out" ? "N" : "P";
+    place = record.type === "meal_out" ? "Xuất ăn" : "Xuất khác";
     savable = false;
-    warning = hits.length > 1
-      ? "Nhiều mặt hàng trùng tên. Chọn ở bảng nhập."
-      : "Chưa khớp danh mục. Nhập ở bảng Đơn vị bảo đảm.";
+    warning = "Chưa có phiếu xuất của bếp. Bản nháp này chưa ghi được.";
+  } else if (record.column === "G" || record.column === "H") {
+    if (rice) kind = "rice";
+    source = record.column;
+    place = "Trên BĐ";
+    savable = false;
+    warning = "Cột Trên BĐ chỉ lấy từ phiếu xuất cấp 1. Hàng của đơn vị ghi vào phiếu nhập.";
+  } else {
+    if (rice) kind = "rice";
+    source = tgsx ? "J" : "I";
+    place = tgsx ? "Phiếu nhập TGSX" : "Phiếu nhập mua TT";
+  }
+  if (!rice && (kind === "self_supply" || kind === "meal_out") && !commodity) {
+    savable = false;
+    warning = warning || (hits.length > 1
+      ? "Nhiều mặt hàng trùng tên. Chọn đúng tên trong danh mục."
+      : "Chưa khớp danh mục.");
   }
   if (kind === "rice" && !commodity && record.unitPrice == null) {
     savable = false;
     warning = warning || "Gạo chưa có trong danh mục thì cần đơn giá.";
+  }
+  const sourceKind = record.sourceKind || commodity?.sourceKind || "";
+  const grade = record.grade || commodity?.grade || "";
+  if (!sourceKind || !grade) {
+    savable = false;
+    warning = warning || "Chưa có nguồn Mua TT/TGSX hoặc phẩm cấp.";
   }
   return {
     name: commodity?.name || record.name,
@@ -110,6 +123,8 @@ function placeLine(record, { commodities, ricePattern }) {
     unitPrice: record.unitPrice ?? null,
     kind,
     source,
+    sourceKind: sourceKind || null,
+    grade: grade || null,
     place,
     issuePolicy: "today",
     confidence: record.confidence,
@@ -149,16 +164,7 @@ function placeSetting(record) {
       source: record.source,
     };
   }
-  if (value !== "purchase" && value !== "patient_plus_levels") {
-    throw reject("Chế độ sữa không đúng mẫu.");
-  }
-  return {
-    field,
-    value,
-    label: value === "purchase" ? "Sữa: mua theo ngày" : "Sữa: bệnh nhân + mức cấu hình",
-    confidence: record.confidence,
-    source: record.source,
-  };
+  throw reject("Cấu hình này không còn trong sổ.");
 }
 
 function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePattern } = {}) {
@@ -169,6 +175,7 @@ function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePat
   const proposals = [];
   const questions = [];
   const notes = [];
+  const schedules = [];
   const headcountInputs = [];
   const sourceByDate = new Map();
   for (const record of parsed.data.records) {
@@ -180,7 +187,7 @@ function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePat
         levels: record.levels.map((level) => ({ ...level, confidence: record.confidence })),
         extras: record.extras ? { ...record.extras, confidence: record.confidence } : null,
       });
-    } else if (record.type === "outside_purchase" || record.type === "stock_in" || record.type === "stock_out") {
+    } else if (record.type === "outside_purchase" || record.type === "stock_in" || record.type === "stock_out" || record.type === "meal_out") {
       lines.push({
         ...placeLine(record, { commodities, ricePattern: pattern }),
         date: resolveDate(record.date, anchorDate) || anchorDate || "",
@@ -192,6 +199,13 @@ function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePat
         tool: QUESTION_TOPIC[record.topic],
         itemName: record.itemName || "",
         date: record.date || anchorDate,
+        confidence: record.confidence,
+        source: record.source,
+      });
+    } else if (record.type === "schedule") {
+      schedules.push({
+        date: resolveDate(record.date, anchorDate) || anchorDate || "",
+        text: record.text,
         confidence: record.confidence,
         source: record.source,
       });
@@ -212,6 +226,7 @@ function mapLedgerRecords(raw, { settings, anchorDate, commodities = [], ricePat
     proposals,
     questions,
     notes,
+    schedules,
   };
 }
 

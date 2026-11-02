@@ -179,6 +179,31 @@ const PERMISSION_CATALOG_VI = {
     description:
       "Danh mục món và thực đơn ngày theo buổi; tính số lượng LTTP từ quân số chấm cơm; dữ liệu theo kho LTTP của đơn vị.",
   },
+  "kitchenBooks.view": {
+    name: "Xem sổ nhập xuất LTTP",
+    description: "Xem sổ nhập xuất từng ngày, cấu hình và hội thoại trợ lý trong phạm vi đơn vị.",
+  },
+  "kitchenBooks.save": {
+    name: "Ghi sổ nhập xuất LTTP",
+    description:
+      "Nhập quân số, hàng đơn vị bảo đảm, xuất ăn và xuất khác. Cấp 2 chỉ ghi cột đơn vị bảo đảm, không sửa cột Trên BĐ.",
+  },
+  "kitchenBooks.lock": {
+    name: "Chốt ngày sổ nhập xuất",
+    description: "Chốt một ngày sổ khi đã có quân số và không còn tồn âm.",
+  },
+  "kitchenBooks.unlock": {
+    name: "Mở khóa ngày sổ nhập xuất",
+    description: "Mở một ngày đã chốt về nháp. Cần ghi lý do.",
+  },
+  "kitchenBooks.settings": {
+    name: "Cấu hình sổ nhập xuất",
+    description: "Sửa ngưỡng thừa thiếu, cách tính tiền đã sử dụng, lễ tết và chữ ký của sổ theo đơn vị.",
+  },
+  "kitchenBooks.export": {
+    name: "Xuất PDF sổ nhập xuất",
+    description: "Xuất PDF sổ nhập xuất cả tháng khi không còn ngày tồn âm.",
+  },
   "midnight.prices.read": {
     name: "Xem giá đối tác (báo cáo nội bộ)",
     description:

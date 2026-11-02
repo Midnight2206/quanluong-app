@@ -94,7 +94,7 @@ def _book(tail=None):
                 "date": "2026-10-02",
                 "dateLine": "Ngày 02 tháng 10 năm 2026",
                 "draft": True,
-                "note": "Chưa đủ phiếu hoặc bảng giá",
+                "note": "",
                 "financeLines": [],
                 "sheets": [{
                     "rows": [],
@@ -111,7 +111,7 @@ def _book(tail=None):
 
 def _text(pdf: bytes) -> tuple[PdfReader, str]:
     reader = PdfReader(BytesIO(pdf))
-    blob = "\n".join((page.extract_text() or "") for page in reader.pages)
+    blob = " ".join("\n".join((page.extract_text() or "") for page in reader.pages).split())
     return reader, blob
 
 

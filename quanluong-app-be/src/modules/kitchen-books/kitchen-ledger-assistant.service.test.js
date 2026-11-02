@@ -288,7 +288,7 @@ test("câu hàng ghi thêm vào dòng sẵn có", async () => {
   }, user, scope, null, dataScope, ctx(db, {
     configOverride: on,
     loadCommodities: async () => [
-      { id: 1, name: "Mực ống", measureUnit: "Kg" },
+      { id: 1, name: "Mực ống", measureUnit: "Kg", sourceKind: "market", grade: "loại 1" },
       { id: 2, name: "Sữa đặc", measureUnit: "Hộp" },
       { id: 3, name: "Sữa tươi", measureUnit: "Hộp" },
     ],
@@ -296,7 +296,7 @@ test("câu hàng ghi thêm vào dòng sẵn có", async () => {
       prompt = value;
       return {
         data: { records: [
-          { type: "outside_purchase", date: "2026-10-24", name: "mực", qty: 5, uom: "kg", unitPrice: "180k", confidence: 0.92, source: "mua ngoài 5kg mực 180k", column: "G" },
+          { type: "outside_purchase", date: "2026-10-24", name: "mực", qty: 5, uom: "kg", unitPrice: "180k", confidence: 0.92, source: "mua ngoài 5kg mực 180k" },
           { type: "outside_purchase", date: "2026-10-24", name: "sữa", qty: 40, uom: "hộp", confidence: 0.4, source: "sữa 40 hộp" },
         ] },
         model: "gpt-test",
@@ -307,24 +307,19 @@ test("câu hàng ghi thêm vào dòng sẵn có", async () => {
   assert.equal(/cột|cot [GHIJP]\b/i.test(prompt.system), false);
   assert.equal(posted.message.payloadJson.lines[0].savable, true);
   assert.equal(posted.message.payloadJson.lines[0].source, "I");
-  assert.equal(posted.message.payloadJson.lines[0].place, "Đơn vị BĐ mua TT");
+  assert.equal(posted.message.payloadJson.lines[0].place, "Phiếu nhập mua TT");
   assert.equal(posted.message.payloadJson.lines[1].savable, false);
-  await applyDraft({
-    unitId: 7,
-    messageId: posted.message.id,
-    movementLines: [{ name: "Mực ống", qty: 6, unitPrice: 180000 }],
-  }, user, scope, null, dataScope, ctx(db, {
-    getLedger: async () => ({
-      movements: [{ kind: "self_supply", source: "I", commodityId: 8, itemName: "Trứng", qty: "10", issuePolicy: "today" }],
-    }),
-    saveLedger: async (body) => { saved.push(body); return { date: body.date }; },
-  }));
-  assert.equal(saved[0].selfSupply.lines.length, 2);
-  assert.equal(saved[0].selfSupply.lines[0].commodityId, 8);
-  assert.equal(saved[0].selfSupply.lines[1].commodityId, 1);
-  assert.equal(saved[0].selfSupply.lines[1].qty, 6);
-  assert.equal(saved[0].selfSupply.lines[1].source, "I");
-  assert.equal(saved[0].rice, undefined);
+  await assert.rejects(
+    () => applyDraft({
+      unitId: 7,
+      messageId: posted.message.id,
+      movementLines: [{ name: "Mực ống", qty: 6, unitPrice: 180000 }],
+    }, user, scope, null, dataScope, ctx(db, {
+      saveLedger: async (body) => { saved.push(body); return { date: body.date }; },
+    })),
+    (err) => err.statusCode === 410 && err.code === "ledger_qty_closed",
+  );
+  assert.equal(saved.length, 0);
   assertUsagePrivate(db, "mua ngoài 5kg mực");
 });
 
@@ -459,7 +454,8 @@ test("cân đối không tự ghi sổ", async () => {
   }, user, scope, null, dataScope, ctx(db, {
     saveLedger: async () => { saved = true; },
   }));
-  assert.match(posted.message.content, /nút Cân đối/);
+  assert.match(posted.message.content, /không tự ghi/);
+  assert.match(posted.message.content, /Chưa chốt/);
   assert.equal(saved, false);
 });
 

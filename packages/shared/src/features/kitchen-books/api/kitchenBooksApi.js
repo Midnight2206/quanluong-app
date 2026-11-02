@@ -443,6 +443,15 @@ export function useBalanceKitchenLedgerMutation() {
   });
 }
 
+export function useSyncKitchenLedgerSlipMutation() {
+  const qc = useQueryClient();
+  return useWrappedMutation({
+    mutationFn: (body) =>
+      apiRequest({ url: "/kitchen-books/ledger/slip-sync", method: "post", data: body }),
+    onSuccess: (_data, vars) => invalidateLedger(qc, vars?.unitId, vars?.date),
+  });
+}
+
 export function useSaveKitchenLedgerSettingsMutation() {
   const qc = useQueryClient();
   return useWrappedMutation({

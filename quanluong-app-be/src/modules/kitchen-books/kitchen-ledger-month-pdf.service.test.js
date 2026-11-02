@@ -140,6 +140,29 @@ test("lỗi phạm vi của một ngày không bị bọc, và không ghi nhật
   assert.equal(audits.length, 0);
 });
 
+test("tháng còn tồn âm thì không xuất PDF", async () => {
+  await assert.rejects(
+    () => exportLedgerMonthPdf(
+      { unitId: 3, month: "2026-02" },
+      { id: 1 },
+      {},
+      [],
+      {},
+      {
+        getLedger: async ({ date }) => ({
+          ...view(date, "draft"),
+          lines: date.endsWith("-02") ? [{ name: "Mực", negative: true, closingQty: "-1", uom: "Kg" }] : [],
+        }),
+        getSignatureSettings: async () => ({}),
+        prisma: { unit: { findUnique: async () => ({ name: "" }) }, dataChangeLog: { create: async () => {} } },
+        render: async () => Buffer.from("%PDF"),
+      },
+    ),
+    (error) => error instanceof AppError && error.statusCode === 409 && error.code === "negative_stock"
+      && error.details.items.some((row) => row.name === "Mực" && row.date.endsWith("-02")),
+  );
+});
+
 test("ngày nổ lỗi khác thì báo đúng ngày", async () => {
   await assert.rejects(
     () => exportLedgerMonthPdf(

@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
-import { classifyItem } from "./kitchen-ledger-compute.js";
 import { scaledToString, toScaled } from "./kitchen-ledger-decimal.js";
-import { mergeLedgerSettings, normalizeName } from "./kitchen-ledger-settings.js";
+import { mergeLedgerSettings } from "./kitchen-ledger-settings.js";
 
 function sameMoney(a, b) {
   return scaledToString(toScaled(a)) === scaledToString(toScaled(b));
@@ -29,6 +28,16 @@ function fingerprintIssueSlips(slips) {
   return createHash("sha256").update(parts.join("\n")).digest("hex");
 }
 
+function groupMeta(commodity) {
+  if (!commodity) return { groupCode: "", groupSort: null };
+  const group = commodity.group;
+  const sort = commodity.groupSort ?? group?.sortOrder;
+  return {
+    groupCode: commodity.groupCode || group?.code || "",
+    groupSort: Number.isFinite(sort) ? sort : null,
+  };
+}
+
 function priceOf(row, source) {
   if (!row) return null;
   if (source === "H" || source === "J") return row.tgsxPrice ?? null;
@@ -36,41 +45,40 @@ function priceOf(row, source) {
 }
 
 /**
- * Ghép phiếu xuất, bảng giá và dòng người dùng thành đầu vào của computeLedger.
- * Cột Trên BĐ chỉ lấy từ phiếu. Gạo trên phiếu bị bỏ (nhập tay).
+ * Số lượng chỉ từ phiếu. G/H từ phiếu xuất cấp 1. I/J từ phiếu nhập của đơn vị (unitSlipLines).
+ * Dòng nhập tay cũ trên sổ được đếm, không cộng vào số và không bị xóa.
  */
 function assembleLedgerInput({
   date,
   settings,
   slips = [],
   movements = [],
+  unitSlipLines = [],
   priceRows = [],
-  priceTablePresent = false,
   openingLots = [],
   commodityById = new Map(),
 }) {
   const s = mergeLedgerSettings(settings);
-  const blockers = [];
   const warnings = [];
   const priceById = new Map(priceRows.map((row) => [Number(row.commodityId), row]));
-
-  if (s.requireIssueSlip && slips.length === 0) {
-    blockers.push({
-      code: "missing_issue_slip",
-      message: "Chưa có phiếu xuất LTTP (Trên BĐ) cho ngày này. Chưa lập sổ.",
-    });
-  }
-  if (s.requirePriceTable && !priceTablePresent) {
-    blockers.push({
-      code: "missing_price_table",
-      message: "Chưa có bảng giá hiệu lực cho ngày này. Chưa lập sổ.",
-    });
+  const manualEntryCounts = { self_supply: 0, rice: 0, meal_out: 0, other_out: 0, opening: 0 };
+  for (const movement of movements || []) {
+    if (Object.prototype.hasOwnProperty.call(manualEntryCounts, movement.kind)) {
+      manualEntryCounts[movement.kind] += 1;
+    }
   }
 
   const receipts = [];
   const otherIssues = [];
-  const issuePolicies = {};
-  const resolvedOpening = openingLots.map((lot) => ({ ...lot }));
+  const mealIssues = [];
+  const resolvedOpening = openingLots.map((lot) => {
+    const group = groupMeta(lot.commodityId ? commodityById.get(Number(lot.commodityId)) : null);
+    return {
+      ...lot,
+      groupCode: lot.groupCode || group.groupCode,
+      groupSort: lot.groupSort ?? group.groupSort,
+    };
+  });
 
   for (const slip of slips) {
     for (const line of slip.lines || []) {
@@ -79,20 +87,13 @@ function assembleLedgerInput({
       const commodity = line.commodity || commodityById.get(Number(line.commodityId));
       const name = commodity?.name || line.itemName || "";
       const uom = commodity?.measureUnit || line.measureUnit || "";
-      const role = classifyItem(name, uom, s);
-      if (role === "rice" && s.riceManualOnGuarantee) {
-        warnings.push({
-          code: "rice_on_slip_ignored",
-          message: `Gạo trên phiếu xuất (${name}) không ghi vào Trên BĐ. Nhập dòng gạo bằng tay.`,
-        });
-        continue;
-      }
       const source = String(line.priceKind || "").toLowerCase() === "tgsx" ? "H" : "G";
       const listPrice = priceOf(priceById.get(Number(line.commodityId)), source);
       if (listPrice == null) {
-        blockers.push({
+        warnings.push({
           code: "missing_price",
-          message: `Chưa có giá ${source === "H" ? "TGSX" : "mua TT"} cho ${name}.`,
+          name,
+          message: `Chưa có giá ${source === "H" ? "TGSX" : "mua TT"} cho ${name}. Dòng này chưa vào sổ.`,
         });
         continue;
       }
@@ -110,106 +111,53 @@ function assembleLedgerInput({
         unitPrice: listPrice,
         qty,
         commodityId: line.commodityId,
-        balance: false,
-        issuePolicy: "today",
+        ...groupMeta(commodity),
       });
     }
   }
 
-  for (const movement of movements) {
-    if (movement.kind === "opening") {
-      resolvedOpening.push(movementToOpening(movement, commodityById));
-      continue;
-    }
-    if (movement.kind === "other_out") {
-      const named = resolveCommodity(movement, commodityById);
-      if (!named.name) {
-        blockers.push({ code: "other_out_name", message: "Xuất khác thiếu tên mặt hàng." });
-        continue;
-      }
-      otherIssues.push({ name: named.name, qty: movement.qty });
-      continue;
-    }
-    if (!["self_supply", "balance", "rice"].includes(movement.kind)) continue;
-    const named = resolveCommodity(movement, commodityById);
-    const source = movement.kind === "rice" ? "G" : movement.source === "J" ? "J" : "I";
-    const role = classifyItem(named.name, named.uom, s);
-    if (movement.kind === "rice" && role !== "rice") {
-      blockers.push({
-        code: "rice_only",
-        message: "Chỉ gạo được nhập tay vào Trên BĐ mua TT.",
-      });
-      continue;
-    }
-    const listPrice = named.commodityId ? priceOf(priceById.get(Number(named.commodityId)), source) : null;
-    const unitPrice = movement.kind === "balance"
-      ? (movement.unitPrice ?? listPrice)
-      : (listPrice ?? movement.unitPrice);
-    if (unitPrice == null) {
-      blockers.push({
+  for (const line of unitSlipLines || []) {
+    const source = line.source === "J" ? "J" : "I";
+    const commodity = line.commodity || commodityById.get(Number(line.commodityId));
+    const name = commodity?.name || line.name || "";
+    const uom = commodity?.measureUnit || line.uom || "";
+    const qty = Number(line.qty ?? line.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    const listPrice = priceOf(priceById.get(Number(line.commodityId)), source);
+    const unitPrice = listPrice ?? line.unitPrice;
+    if (unitPrice == null || unitPrice === "") {
+      warnings.push({
         code: "missing_price",
-        message: `Chưa có giá cho ${named.name || "dòng nhập"}.`,
+        name,
+        message: `Chưa có giá cho ${name || "dòng phiếu nhập"}. Dòng này chưa vào sổ.`,
       });
       continue;
     }
-    if (movement.issuePolicy) issuePolicies[named.name] = movement.issuePolicy;
     receipts.push({
       source,
-      name: named.name,
-      uom: named.uom,
+      name,
+      uom,
       unitPrice,
-      qty: movement.qty,
-      commodityId: named.commodityId,
-      balance: movement.kind === "balance",
-      issuePolicy: movement.issuePolicy || (movement.kind === "balance" ? "keep" : "today"),
+      qty,
+      commodityId: line.commodityId,
+      ...groupMeta(commodity),
     });
   }
 
-  const priceHints = priceRows
-    .filter((row) => ["rice", "spice", "milk", "fuel"].includes(classifyItem(row.name, row.measureUnit, s)))
-    .map((row) => ({
-      name: row.name,
-      uom: row.measureUnit,
-      unitPrice: row.unitPrice,
-      commodityId: row.commodityId,
-      role: classifyItem(row.name, row.measureUnit, s),
-    }));
-
   return {
-    blockers,
+    blockers: [],
     warnings,
     fingerprint: fingerprintIssueSlips(slips),
     slipCount: slips.length,
+    manualEntryCounts,
     input: {
       date,
       settings: s,
       receipts,
       otherIssues,
+      mealIssues,
       openingLots: resolvedOpening,
-      issuePolicies,
-      priceHints,
     },
-  };
-}
-
-function resolveCommodity(movement, commodityById) {
-  const commodity = movement.commodityId ? commodityById.get(Number(movement.commodityId)) : null;
-  return {
-    name: commodity?.name || movement.itemName || "",
-    uom: commodity?.measureUnit || movement.measureUnit || "",
-    commodityId: movement.commodityId ?? null,
-  };
-}
-
-function movementToOpening(movement, commodityById) {
-  const named = resolveCommodity(movement, commodityById);
-  return {
-    name: named.name,
-    uom: named.uom,
-    unitPrice: movement.unitPrice,
-    qty: movement.qty,
-    commodityId: named.commodityId,
-    receivedDate: "1970-01-01",
   };
 }
 

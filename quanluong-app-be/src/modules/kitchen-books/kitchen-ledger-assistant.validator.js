@@ -36,6 +36,10 @@ const assistantApplyBodySchema = z.object({
     unitPrice: z.coerce.number().nonnegative().max(1_000_000_000_000).nullable().optional(),
   })).max(40).optional(),
   acceptProposals: z.boolean().optional(),
+  schedules: z.array(z.object({
+    date: dateSchema,
+    text: z.string().trim().min(1).max(2000),
+  })).max(31).optional(),
 });
 
 const assistantProfileBodySchema = z.object({

@@ -107,8 +107,9 @@ export function KitchenReceiptSlipWorkspace({
   selectedUnitId,
   canWrite,
   onSaved,
+  fixedDate,
 }) {
-  const [receiptDate, setReceiptDateState] = useState(() => localYmd());
+  const [receiptDate, setReceiptDateState] = useState(() => fixedDate || localYmd());
   const [slipNote, setSlipNote] = useState("");
   const [rows, setRows] = useState(() => [newReceiptSlipEmptyRow()]);
   const [activeSubTab, setActiveSubTab] = useState("mua-tt");
@@ -119,6 +120,13 @@ export function KitchenReceiptSlipWorkspace({
   const receiptHydrateKeyRef = useRef(null);
   const receiptPersistReadyRef = useRef(false);
   const isTongHopTab = activeSubTab === "tong-hop";
+
+  useEffect(() => {
+    if (!fixedDate || fixedDate === receiptDate) return;
+    seededDayKeyRef.current = "";
+    setReceiptDirty(false);
+    setReceiptDateState(fixedDate);
+  }, [fixedDate, receiptDate]);
 
   const {
     draft: receiptDraft,
@@ -189,14 +197,15 @@ export function KitchenReceiptSlipWorkspace({
     receiptHydrateKeyRef.current = k;
 
     const draft = receiptDraft;
-    let ymd = localYmd();
+    let ymd = fixedDate || localYmd();
     if (
+      !fixedDate &&
       draft &&
       typeof draft.receiptDate === "string" &&
       /^\d{4}-\d{2}-\d{2}/.test(draft.receiptDate)
     ) {
       ymd = draft.receiptDate;
-    } else {
+    } else if (!fixedDate) {
       const migrated = readStoredKitchenReceiptDate();
       if (migrated) {
         ymd = migrated;
@@ -906,7 +915,7 @@ export function KitchenReceiptSlipWorkspace({
             type="date"
             className={inputClass}
             value={receiptDate}
-            disabled={!canWrite}
+            disabled={!canWrite || Boolean(fixedDate)}
             onChange={(e) => {
               seededDayKeyRef.current = "";
               setReceiptDirty(false);

@@ -1,5 +1,6 @@
 import { splitLedgerPages } from "./kitchen-ledger-compute.js";
 import { toScaled } from "./kitchen-ledger-decimal.js";
+import { LEDGER_PRINT_LAYOUT } from "./kitchen-ledger-layout.js";
 
 const DASH = "\u2013";
 const MEAL_LABEL = { sang: "Sáng", trua: "Trưa", chieu: "Chiều" };
@@ -90,51 +91,61 @@ function sheetsFromLines(lines, totals) {
 }
 
 function expr(count, price, amount) {
-  if (!hasMoney(count) && !hasMoney(amount)) return "";
+  if (!hasMoney(count) && !hasMoney(amount)) return { text: "", parts: null };
   const left = formatLedgerNumber(count, { blankZero: false });
   const mid = formatLedgerNumber(price, { blankZero: false });
   const right = formatLedgerNumber(amount, { blankZero: false });
-  return `${left} x ${mid} = ${right}`;
+  return {
+    text: `${left} x ${mid} = ${right}`,
+    parts: { count: left, price: mid, amount: right },
+  };
+}
+
+function financeRow(label, value, tone, extra = {}) {
+  return { label, value, tone, ...extra };
 }
 
 function financeLines(finance) {
   if (!finance) return [];
-  const lines = [{ label: "Thu", value: "" }];
+  const lines = [financeRow("Thu", "", "heading")];
   for (const level of finance.levels || []) {
-    lines.push({
-      label: "- Mức:",
-      value: formatLedgerNumber(level.dailyAmount, { blankZero: false }),
-    });
+    lines.push(financeRow("- Mức:", formatLedgerNumber(level.dailyAmount, { blankZero: false }), "line", { align: "center" }));
     for (const meal of level.meals || []) {
-      lines.push({
-        label: `+ ${MEAL_LABEL[meal.meal] || meal.meal}:`,
-        value: expr(meal.headcount, meal.price, meal.amount),
-      });
+      const shown = expr(meal.headcount, meal.price, meal.amount);
+      lines.push(financeRow(
+        `+ ${MEAL_LABEL[meal.meal] || meal.meal}:`,
+        shown.text,
+        "line",
+        { parts: shown.parts },
+      ));
     }
   }
-  lines.push({ label: "Ăn thêm", value: "" });
+  lines.push(financeRow("Ăn thêm", "", "heading"));
   for (const extra of finance.extras || []) {
-    lines.push({
-      label: `+ ${EXTRA_LABEL[extra.key] || extra.key}`,
-      value: expr(extra.count, extra.rate, extra.amount),
-    });
+    const shown = expr(extra.count, extra.rate, extra.amount);
+    lines.push(financeRow(
+      `+ ${EXTRA_LABEL[extra.key] || extra.key}`,
+      shown.text,
+      "line",
+      { parts: shown.parts },
+    ));
   }
   const other = finance.otherIncome || {};
   lines.push(
-    { label: "Cộng:", value: formatLedgerNumber(finance.subtotal) },
-    { label: "- Thừa hôm trước", value: formatLedgerNumber(finance.prevSurplus) },
-    { label: "- Bù giá gạo:", value: formatLedgerNumber(finance.riceSubsidy) },
-    { label: "- Ăn thêm:", value: formatLedgerNumber(other.anThem) },
-    { label: "- Truy lĩnh:", value: formatLedgerNumber(other.truyLinh) },
-    { label: "- Thu của khách:", value: formatLedgerNumber(other.thuKhach) },
-    { label: "Cộng thu:", value: formatLedgerNumber(finance.totalIncome) },
-    { label: "Chi", value: "" },
-    { label: "- Tiền đã sử dụng:", value: formatLedgerNumber(finance.spent) },
-    { label: "- Thiếu hôm trước:", value: formatLedgerNumber(finance.prevShortfall) },
-    { label: "Cộng chi:", value: formatLedgerNumber(finance.totalSpent) },
-    { label: "So sánh", value: "" },
-    { label: "Thừa trong ngày:", value: formatLedgerNumber(finance.surplus) },
-    { label: "Thiếu trong ngày:", value: formatLedgerNumber(finance.shortfall) },
+    financeRow("Cộng:", formatLedgerNumber(finance.subtotal), "total"),
+    financeRow("- Thừa hôm trước", formatLedgerNumber(finance.prevSurplus), "line"),
+    financeRow("- Bù giá gạo:", formatLedgerNumber(finance.riceSubsidy), "line"),
+    financeRow("- Ăn thêm:", formatLedgerNumber(other.anThem), "line"),
+    financeRow("- Truy lĩnh:", formatLedgerNumber(other.truyLinh), "line"),
+    financeRow("- Thu của khách:", formatLedgerNumber(other.thuKhach), "line"),
+    financeRow("Cộng thu:", formatLedgerNumber(finance.totalIncome), "total"),
+    financeRow("Chi", "", "heading"),
+    financeRow("- Tiền đã sử dụng:", formatLedgerNumber(finance.spent), "line"),
+    financeRow("- Thiếu hôm trước:", formatLedgerNumber(finance.prevShortfall), "line"),
+    financeRow("Cộng chi:", formatLedgerNumber(finance.totalSpent), "total"),
+    financeRow("So sánh", "", "heading"),
+    financeRow("Thừa trong ngày:", formatLedgerNumber(finance.surplus), "line"),
+    financeRow("Thiếu trong ngày:", formatLedgerNumber(finance.shortfall), "line"),
   );
   return lines;
 }
@@ -162,16 +173,16 @@ function emptySheet() {
 
 function buildMonthBook({ year, month, unitName, dayViews, cover = {}, signatures = {}, signatureImages = {}, signatureImageLayout = null }) {
   const days = (dayViews || []).map((view) => {
-    const blocked = Boolean(view.ledgerBlocked) || !view.lines;
+    const notLoaded = view.lines == null;
     const draft = view.status !== "locked";
     const parts = String(view.date || "").split("-").map(Number);
     return {
       date: view.date,
       dateLine: parts.length === 3 ? dateLine(parts[0], parts[1], parts[2]) : "",
       draft,
-      blocked,
-      note: blocked ? "Chưa đủ phiếu hoặc bảng giá" : "",
-      sheets: blocked ? [emptySheet()] : sheetsFromLines(view.lines, view.totals),
+      blocked: notLoaded,
+      note: "",
+      sheets: notLoaded ? [emptySheet()] : sheetsFromLines(view.lines, view.totals),
       financeLines: financeLines(view.finance),
     };
   });
@@ -182,6 +193,7 @@ function buildMonthBook({ year, month, unitName, dayViews, cover = {}, signature
     cover: {
       unitName: unitName || "",
       commander: cover.commander || "",
+      commanderRankName: cover.commanderRankName || cover.commander || "",
       keeper: cover.keeper || "",
       dateLine: dateLine(year, month, 1),
       draftDays: days.filter((day) => day.draft).map((day) => day.date),
@@ -193,6 +205,7 @@ function buildMonthBook({ year, month, unitName, dayViews, cover = {}, signature
     },
     signatureImages: signatureImages || {},
     signatureImageLayout,
+    layout: LEDGER_PRINT_LAYOUT,
     days,
     // ponytail: đuôi sổ (biên bản tịnh kho + báo cáo công khai I–VII) gắn sau qua `tail`.
     tail: null,

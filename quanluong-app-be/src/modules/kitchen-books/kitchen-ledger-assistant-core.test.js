@@ -22,7 +22,6 @@ test("quy tắc chữ ra đề nghị cấu hình, phần còn lại chỉ là g
     balanceWarnThreshold: 10000,
     spentBasis: "meal_out",
     holidayLunchOnly: true,
-    milk: { mode: "purchase" },
   });
   assert.deepEqual(proposeSettings("Bếp này không chiên dầu vào thứ hai."), []);
 });
@@ -89,6 +88,10 @@ test("tồn một mặt hàng kèm lô FIFO", () => {
 
 test("cân đối không bị hiểu là câu tính sổ", () => {
   assert.equal(routeIntent("cân đối âm kho giúp"), "question");
+});
+
+test("lịch làm việc đi vào trợ lý sổ, không thành câu hỏi", () => {
+  assert.equal(routeIntent("Lịch làm việc 14/10: trực bếp sáng"), "movement");
 });
 
 test("như 17/10 trỏ ngày trên sổ", () => {
