@@ -18,7 +18,7 @@ export function KitchenPhieuNhapKhoTab({
 }) {
   return (
     <KitchenBooksAccessGate permissionLabel="kitchenBooks.access" allowed={canAccess}>
-      <div className="flex min-h-0 flex-col gap-4 p-1 sm:p-0">
+      <div className="flex min-h-0 flex-col gap-4 p-1 sm:p-0 lg:gap-2">
         <KitchenBooksUnitPicker
           canPickUnits={canPickUnits}
           sortedUnits={sortedUnits}

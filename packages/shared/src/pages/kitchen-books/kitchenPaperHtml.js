@@ -77,8 +77,41 @@ html, body { margin: 0; padding: 0; background: #fff; }
   }
   .paper-cal button { min-width: 44px; min-height: 44px; }
 }
+@media screen and (min-width: 1024px) {
+  .kitchen-paper-shell { gap: 0.5rem; }
+  .paper-stage { flex-wrap: nowrap; align-items: flex-start; gap: 6px; width: 100%; }
+  .paper-stage > .kitchen-paper-scroll { flex: 1 1 0; width: auto; min-width: 0; }
+  .kitchen-paper-scroll { container-type: inline-size; }
+  .kitchen-paper {
+    width: 100%;
+    min-width: min(100%, 210mm);
+    max-width: none;
+    margin: 0;
+    font-size: clamp(12px, 1.15cqi, 18px);
+  }
+  .kitchen-paper .kpp-title { font-size: clamp(18px, 2cqi, 26px); }
+  .kitchen-paper table,
+  .kitchen-paper .kpp { font-size: clamp(12px, 1.1cqi, 17px); }
+  .kitchen-paper .kpp th,
+  .kitchen-paper .kpp td { padding: clamp(1px, 0.2cqi, 4px) clamp(2px, 0.35cqi, 6px); }
+  .paper-sidebar { width: 16rem; flex: 0 0 16rem; }
+}
 @media print {
   .no-print { display: none !important; }
+  .paper-sidebar { display: none !important; }
+  .paper-stage { display: block; }
+  .kitchen-paper {
+    width: 210mm !important;
+    min-width: 0 !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    font-size: 11px !important;
+  }
+  .kitchen-paper .kpp-title { font-size: 16px !important; }
+  .kitchen-paper table,
+  .kitchen-paper .kpp { font-size: 11px !important; }
+  .kitchen-paper .kpp th,
+  .kitchen-paper .kpp td { padding: 1px 2px !important; }
 }
 `;
 

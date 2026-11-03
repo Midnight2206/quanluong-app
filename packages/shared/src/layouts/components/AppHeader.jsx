@@ -57,7 +57,7 @@ export function AppHeader() {
   };
 
   return (
-    <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b bg-card px-4 print:hidden sm:px-5 lg:px-6">
+    <header className="relative z-40 flex h-16 shrink-0 items-center gap-3 border-b bg-card px-4 print:hidden sm:px-5 lg:px-3">
       <div className="flex items-center min-w-0 gap-3">
         <AppBrand compact />
       </div>

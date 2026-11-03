@@ -16,7 +16,7 @@ import {
   readMoneyInWords,
   receiptQty,
 } from "./kitchenPaperBook.js";
-import { renderIssuePage, renderPaperDocument, renderReceiptPage } from "./kitchenPaperHtml.js";
+import { PAPER_CSS, renderIssuePage, renderPaperDocument, renderReceiptPage } from "./kitchenPaperHtml.js";
 
 const fixture = JSON.parse(
   readFileSync(new URL("./fixtures/paper-t10-d01-d02.json", import.meta.url), "utf8"),
@@ -170,6 +170,12 @@ test("HTML in phiếu không chứa cân đối thu chi", () => {
   assert.match(doc, /PHIẾU NHẬP KHO/);
   assert.match(page, /9\.870\.700/);
   assert.match(issue, /3\.401\.800/);
+  assert.match(doc, /@page \{ size: A4 portrait/);
+  assert.match(PAPER_CSS, /\.paper-page \{\s*width: 100%/);
+  assert.match(PAPER_CSS, /@media screen and \(min-width: 1024px\)/);
+  const printCss = PAPER_CSS.split("@media print")[1] || "";
+  assert.match(printCss, /\.kitchen-paper \{[^}]*width: 210mm/);
+  assert.doesNotMatch(printCss, /\.paper-page[^{]*\{[^}]*width:\s*210mm/);
 });
 
 test("cấp 2 không được đổi cột Trên bảo đảm", () => {

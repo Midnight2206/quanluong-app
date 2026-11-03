@@ -13,7 +13,9 @@ import { useGetLttpCommoditiesQuery, useGetLttpEffectivePricesQuery } from "@/fe
 import { apiRequest } from "@/services/apiRequest";
 import { notifyError, notifySuccess } from "@/services/notify";
 import {
+  ISSUE_COL_WIDTHS,
   cktcBalanceView,
+  columnPercents,
   formatMoneyCell,
   formatQtyCell,
   issueQty,
@@ -223,6 +225,11 @@ export function KitchenIssuePaper({ unitId, date, onDate, canWrite, focusCommodi
             <p className="kpp-sub">Lý do sử dụng: <input aria-label="Lý do sử dụng" value={party.reason} disabled={!canWrite} onChange={(event) => { setDirty(true); setParty({ ...party, reason: event.target.value }); }} /></p>
             <p className="kpp-sub">Nhận tại kho: <input aria-label="Nhận tại kho" value={party.receivePlace} disabled={!canWrite} onChange={(event) => { setDirty(true); setParty({ ...party, receivePlace: event.target.value }); }} /></p>
             <table className="kpp" onKeyDown={(event) => focusPaperCell(event, rows.length)}>
+              <colgroup>
+                {columnPercents(ISSUE_COL_WIDTHS).map((width, index) => (
+                  <col key={index} style={{ width }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   <th rowSpan={2}>TT</th><th rowSpan={2}>MA</th>

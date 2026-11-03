@@ -465,7 +465,7 @@ export function ProfilePage() {
     pwdLockoutUntil != null ? Math.max(0, Math.ceil((pwdLockoutUntil - nowTick) / 1000)) : 0;
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-5xl lg:max-w-none">
       <header
         data-sticky-level="0"
         className="unified-sticky-surface mb-6 border-b border-border/80 pb-5"
