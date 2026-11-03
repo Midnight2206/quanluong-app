@@ -11,11 +11,13 @@ import {
 import { useGetLttpCommoditiesQuery, useGetLttpEffectivePricesQuery } from "@/features/lttp/api/lttpApi";
 import { apiRequest } from "@/services/apiRequest";
 import { notifyError, notifySuccess } from "@/services/notify";
-import { monthOf } from "./kitchenPaperBook.js";
 import {
+  RECEIPT_COL_WIDTHS,
   applyReceiptTopUp,
+  columnPercents,
   formatMoneyCell,
   formatQtyCell,
+  monthOf,
   presentReceipt,
   receiptQty,
 } from "./kitchenPaperBook.js";
@@ -315,6 +317,11 @@ export function KitchenReceiptPaper({
             </p>
             <p className="kpp-sub">Hàng do bộ phận tiếp phẩm của Trung đoàn vận chuyển</p>
             <table className="kpp" onKeyDown={(event) => focusPaperCell(event, rows.length)}>
+              <colgroup>
+                {columnPercents(RECEIPT_COL_WIDTHS).map((width, index) => (
+                  <col key={index} style={{ width }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr>
                   <th rowSpan={2}>TT</th><th rowSpan={2}>MA</th>

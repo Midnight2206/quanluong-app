@@ -213,7 +213,7 @@ export function HomePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8 pb-2">
+    <div className="mx-auto w-full max-w-6xl space-y-8 pb-2 lg:max-w-none">
       <section className="space-y-4">
         <div className="space-y-4">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">

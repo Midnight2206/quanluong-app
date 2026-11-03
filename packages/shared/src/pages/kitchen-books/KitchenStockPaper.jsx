@@ -9,6 +9,8 @@ import { KitchenOpeningDialog } from "./KitchenOpeningDialog.jsx";
 import { apiRequest } from "@/services/apiRequest";
 import { notifyError } from "@/services/notify";
 import {
+  STOCK_COL_WIDTHS,
+  columnPercents,
   daysOfMonth,
   formatQtyCell,
   monthOf,
@@ -131,6 +133,11 @@ export function KitchenStockPaper({ unitId, date, onDate }) {
         <article className="ledger-paper kitchen-paper paper-page" data-paper-page="1">
           <p className="kpp-date">Ngày {parts[2]} tháng {parts[1]} năm {parts[0]}</p>
           <table className="kpp" aria-label="Sổ theo dõi LTTP">
+            <colgroup>
+              {columnPercents(STOCK_COL_WIDTHS).map((width, index) => (
+                <col key={index} style={{ width }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
                 <th colSpan={2}>SỐ PHIẾU</th>

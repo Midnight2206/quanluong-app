@@ -16,7 +16,7 @@ export function MidnightShell({ grants }) {
     >
       <UnifiedPageScrollRoot>
         <header data-sticky-level="0" className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-3 py-3 sm:px-6">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-3 py-3 sm:px-6 lg:max-w-none lg:px-4">
             <div>
               <h1 className="text-sm font-semibold text-slate-800">Báo cáo giá đối tác (nội bộ)</h1>
               <p className="text-xs text-slate-500">Đường dẫn: /midnight-secret</p>
@@ -30,7 +30,7 @@ export function MidnightShell({ grants }) {
             </button>
           </div>
         </header>
-        <div className="mx-auto max-w-6xl pb-12">
+        <div className="mx-auto max-w-6xl pb-12 lg:max-w-none lg:px-4">
           <MidnightMainPanel grants={grants} />
         </div>
       </UnifiedPageScrollRoot>

@@ -23,7 +23,7 @@ export function KitchenPaperChrome({
   const cells = calendarCells(month);
 
   return (
-    <div className="relative flex min-w-0 flex-col gap-3">
+    <div className="kitchen-paper-shell relative flex min-w-0 flex-col gap-3">
       <style>{PAPER_CSS}</style>
       <div className="no-print flex flex-wrap items-center gap-2">
         <Button type="button" variant="secondary" className="h-11 min-w-11 px-3" onClick={() => onDate(addDaysYmd(date, -1))} aria-label="Ngày trước">◀</Button>
