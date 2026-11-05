@@ -16,6 +16,8 @@ Ngày lập: 28/10/2026 (giờ Việt Nam, UTC+7). Người lập: Grok Bot (ch�
 
 Quy tắc liên quan của trợ lý: `Quy tắc/04_dien_so.md` (in sổ), `02_soan_thao_dinh_dang.md` (giữ nguyên font, cỡ chữ, lề của mẫu), `06_file_dat_ten.md` (thứ tự ghép PDF), `08_cac_so_khac.md` dòng 256–266 (đuôi sổ).
 
+Bộ rule phụ lục cuối sổ (tịnh kho, I–VII) dùng chung cho trợ lý làm sổ: [`10_phu_luc_cuoi_so.md`](../so-sach-bep-an/quy-tac/10_phu_luc_cuoi_so.md) (nguồn 05/11/2026). Mục 13 là cấu hình ví dụ một bếp; chỗ «(cần xác nhận)» chưa chốt.
+
 Ảnh so sánh (110 dpi):
 - Mẫu ở `ref/`. Sổ: `snx-001` là bìa, `snx-002..005` là ngày 01, `snx-day03-*` là ngày 03 (trang PDF 10–13). Đuôi sổ: `mau_duoi_so-*` và `duoi_so_t10-*`.
 - Bản app in ra ở `app/app-1..7.png`. Đây là kết quả chạy thật `buildMonthBook` (Node) và `render_kitchen_ledger_book` (ReportLab), dùng số liệu ngày 01 và 03 của chính sổ mẫu.
