@@ -95,6 +95,7 @@ Khi có phiên bản mới:
 - `huong-dan` đổi: đọc lại trang `{{BASE_URL}}/api/ba/start` rồi làm theo bản mới.
 - `nghiep-vu-chung` đổi: thêm các CHUNG-xx mới vào hồ sơ với trạng thái `CHUA_RO`, bỏ mã đã bị xoá, đối chiếu lại các mã bị sửa. Ghi phiên bản bộ chung vào mục 0 của hồ sơ.
 - `mau-ho-so` hoặc `bo-cau-hoi` đổi: chuyển hồ sơ sang mẫu mới, cập nhật câu hỏi còn mở.
+- `quy-tac-phu-luc` (và các `quy-tac-*` thêm sau): quy tắc sổ dùng chung cho **trợ lý làm sổ**, không phải hồ sơ đơn vị. Khi đổi phiên bản, bảo trợ lý làm sổ đọc lại `bo-chung/quy-tac-phu-luc.md`.
 
 Lỗi 401, 403: báo chủ (xem A3). Lỗi 5xx hoặc hết giờ: dùng bản trong `bo-chung/` đã có, thử lại lần sau.
 

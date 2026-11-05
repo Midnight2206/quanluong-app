@@ -32,7 +32,7 @@ Gửi kèm mỗi request: `Authorization: Bearer $QLBA_TOKEN`.
 
 `GET /api/ba/start` → `text/markdown`: bản `huong-dan` mới nhất (00) đã thay `{{BASE_URL}}` bằng địa chỉ gốc, kèm phụ lục liệt kê các docKey còn lại (phiên bản, tiêu đề, cách lấy bằng token). `?format=json` → `{success, data:{baseUrl, guide:{version,title}, docs:[{docKey,version,title,url,auth}], contentMarkdown}}`.
 
-- Chỉ `huong-dan` công khai. `nghiep-vu-chung`, `mau-ho-so`, `bo-cau-hoi` vẫn cần token (`GET /api/ba/baseline`).
+- Chỉ `huong-dan` công khai. `nghiep-vu-chung`, `mau-ho-so`, `bo-cau-hoi` và mọi `quy-tac-*` vẫn cần token (`GET /api/ba/baseline`). Phụ lục `/start` chỉ liệt kê docKey, phiên bản, tiêu đề và URL — không dán nội dung quy tắc sổ.
 - Hướng dẫn **không được** chứa bí mật: server chạy bộ dò bí mật trước khi trả; có dấu hiệu thì trả `503`. Chưa đăng `huong-dan` cũng trả `503`.
 - Địa chỉ gốc lấy từ env `BA_PUBLIC_BASE_URL`, nếu không có thì `PUBLIC_WEB_URL` (không lấy từ header Host).
 - Giới hạn 60 lần / 15 phút / IP (`429`), `Cache-Control: public, max-age=60`.
@@ -40,7 +40,13 @@ Gửi kèm mỗi request: `Authorization: Bearer $QLBA_TOKEN`.
 
 ## Bộ nghiệp vụ chung (mọi token)
 
-`docKey`: `huong-dan` (00), `nghiep-vu-chung` (01), `mau-ho-so` (02), `bo-cau-hoi` (03).
+`docKey`: `huong-dan` (00), `nghiep-vu-chung` (01), `mau-ho-so` (02), `bo-cau-hoi` (03), và quy tắc sổ dùng chung cho **trợ lý làm sổ** (không cần hồ sơ đơn vị):
+
+| docKey | Nguồn trong repo | Ai dùng |
+|---|---|---|
+| `quy-tac-phu-luc` | `docs/so-sach-bep-an/quy-tac/10_phu_luc_cuoi_so.md` | Trợ lý làm sổ — phụ lục cuối sổ (kể cả quy tắc in cột nhiệt lượng) |
+
+Thêm quy tắc sau: đặt file markdown trong `docs/so-sach-bep-an/quy-tac/`, thêm docKey kebab-case (≤ 40 ký tự) vào `BA_DOC_KEYS` và một dòng `QUY_TAC_FILES` trong `scripts/ba-seed-baseline.js`. Cột `docKey` đã là chuỗi, không cần migration. `ruleIds` chỉ trích từ `nghiep-vu-chung`.
 
 | Request | Token | Kết quả |
 |---|---|---|
@@ -53,18 +59,34 @@ Gửi kèm mỗi request: `Authorization: Bearer $QLBA_TOKEN`.
 
 Nguồn bộ kit nằm trong repo: `docs/ba-kit/` (`00-huong-dan-tro-ly-ba.md`, `01-nghiep-vu-chung.md`, `02-mau-ho-so-don-vi.md`, `03-bo-cau-hoi.md`). Bản 00 dùng chỗ giữ `{{BASE_URL}}`, `/api/ba/start` thay bằng địa chỉ gốc khi trả.
 
-- Image backend chép `docs/ba-kit` vào `/app/ba-kit` (Dockerfile + ngoại lệ `!docs/ba-kit/*.md` trong `.dockerignore`). Dev (`docker-compose.dev.yml`) gắn `./docs/ba-kit:/app/ba-kit:ro`.
-- Production, sau `git pull` + build lại Docker:
+Quy tắc sổ nằm riêng: `docs/so-sach-bep-an/quy-tac/` (hiện `10_phu_luc_cuoi_so.md` → `quy-tac-phu-luc`). Không copy vào `docs/ba-kit/` để tránh hai bản.
+
+- Image backend chép `docs/ba-kit` vào `/app/ba-kit` và `docs/so-sach-bep-an/quy-tac` vào `/app/quy-tac` (Dockerfile + ngoại lệ markdown trong `.dockerignore`). Dev (`docker-compose.dev.yml`) gắn cả hai thư mục read-only.
+- Production, sau `git pull` + build lại Docker (một lệnh nạp kit và quy tắc sổ):
 
 ```bash
 docker exec -w /app quanluong-app-be node scripts/ba-seed-baseline.js
 ```
 
 - Script chỉ đăng phiên bản mới cho tài liệu có nội dung đổi, chạy lại an toàn.
-- Thư mục mặc định: tham số dòng lệnh > env `BA_KIT_DIR` > `/app/ba-kit` (trong container) > `<repo>/docs/ba-kit` (chạy từ `quanluong-app-be/` trên máy).
+- Kit: tham số dòng lệnh > env `BA_KIT_DIR` > `/app/ba-kit` (trong container) > `<repo>/docs/ba-kit` (chạy từ `quanluong-app-be/` trên máy).
+- Quy tắc sổ: env `BA_QUY_TAC_DIR` > `/app/quy-tac` > `<repo>/docs/so-sach-bep-an/quy-tac`. Tham số dòng lệnh chỉ đổi thư mục kit.
 
 ```bash
+# Kéo cả bộ (mọi token: UNIT_PUSH, GLOBAL_READ, GLOBAL_WRITE) — có contentMarkdown
 curl -sS "https://<domain>/api/ba/baseline" -H "Authorization: Bearer $QLBA_TOKEN"
+
+# Kéo một quy tắc sổ
+curl -sS "https://<domain>/api/ba/baseline/quy-tac-phu-luc" -H "Authorization: Bearer $QLBA_TOKEN"
+
+# Đăng phiên bản mới (chỉ GLOBAL_WRITE hoặc superadmin), chạy từ thư mục gốc repo.
+# Seed ở trên làm cùng việc sau khi image đã có file.
+jq -n --rawfile md docs/so-sach-bep-an/quy-tac/10_phu_luc_cuoi_so.md \
+  '{title:"Phụ lục cuối Sổ nhập xuất LTTP", contentMarkdown:$md}' \
+| curl -sS -X POST "https://<domain>/api/ba/baseline/quy-tac-phu-luc" \
+    -H "Authorization: Bearer $QLBA_TOKEN" \
+    -H "Content-Type: application/json" \
+    --data-binary @-
 ```
 
 ## Đẩy hồ sơ (UNIT_PUSH)

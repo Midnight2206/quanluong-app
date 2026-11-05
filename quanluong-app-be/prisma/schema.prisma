@@ -1888,7 +1888,7 @@ model BaUnitProfile {
   @@index([pushedByTokenId])
 }
 
-/// Bộ nghiệp vụ chung (kit BA) có phiên bản theo docKey: huong-dan | nghiep-vu-chung | mau-ho-so | bo-cau-hoi.
+/// Baseline có phiên bản theo docKey (VarChar, không enum): huong-dan | nghiep-vu-chung | mau-ho-so | bo-cau-hoi | quy-tac-* (vd quy-tac-phu-luc).
 model BaBaselineDoc {
   id              Int      @id @default(autoincrement())
   docKey          String   @db.VarChar(40)

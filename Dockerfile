@@ -21,6 +21,8 @@ RUN npm ci
 COPY quanluong-app-be/ ./
 # Bộ kit BA (docs/ba-kit) cho scripts/ba-seed-baseline.js — mặc định đọc /app/ba-kit
 COPY docs/ba-kit ./ba-kit
+# Quy tắc sổ (docs/so-sach-bep-an/quy-tac) — cùng script, mặc định /app/quy-tac
+COPY docs/so-sach-bep-an/quy-tac ./quy-tac
 RUN npx prisma generate
 
 # Gỡ devDependencies khỏi tree đã `npm ci` đầy đủ — image runtime copy `node_modules` này,
@@ -52,6 +54,7 @@ COPY --from=backend-builder /app/src ./src
 COPY --from=backend-builder /app/scripts ./scripts
 COPY --from=backend-builder /app/assets ./assets
 COPY --from=backend-builder /app/ba-kit ./ba-kit
+COPY --from=backend-builder /app/quy-tac ./quy-tac
 RUN chmod +x scripts/prisma-migrate-deploy-recover.sh
 RUN npx prisma generate
 EXPOSE 3000
