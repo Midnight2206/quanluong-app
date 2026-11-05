@@ -48,7 +48,7 @@
 
 ## 5. II. Báo cáo lương thực (chỉ gạo)
 - Tiêu đề "II. TIẾP NHẬN VÀ BẢO ĐẢM LƯƠNG THỰC" + dòng tháng; không phụ đề.
-- **A. Phần có:** chỉ loại gạo có trong sổ (vd "Gạo tẻ thường"), không ghi ngày. Tồn tháng trước (SL, giá ngày 01); Nhận của trên ← cột Trên BĐ Mua TT; Tự khai thác ← Đơn vị BĐ Mua TT; TGSX ← cột TG-CB. Giá bình quân gia quyền.
+- **A. Phần có:** dưới Nhận của trên / Tự khai thác / TGSX: mỗi lần tiếp nhận một dòng con "+ Ngày dd/mm/yyyy" kèm số lượng kg, đơn giá, giá BQ (lấy từ phiếu nhập trong cktc từng ngày); KHÔNG chia theo loại gạo nữa (chủ sổ sửa 05/11/2026). Phần không phát sinh (vd TGSX) để dòng con trống. Tồn tháng trước (SL, giá ngày 01); Nhận của trên ← cột Trên BĐ Mua TT; Tự khai thác ← Đơn vị BĐ Mua TT; TGSX ← cột TG-CB. Giá bình quân gia quyền.
 - **B1. Bảo đảm ăn:** 1 dòng/mức gạo.
   - Tiêu chuẩn: quân số **chủ cung cấp** (trống đến khi có); ngày ăn = QS × số ngày tháng; thành gạo = ngày ăn × mức/1000.
   - Sử dụng tại bếp: QS = **max** trong tháng của mức đó; ngày ăn = Σ ngày (S×g_s + T×g_t + C×g_c)/mức_g, làm tròn 1 số lẻ; thành gạo = ngày ăn × mức/1000, **làm tròn xuống** 1 số lẻ. Thanh toán bằng tiền: trống.

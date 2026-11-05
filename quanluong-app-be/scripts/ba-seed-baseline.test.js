@@ -21,6 +21,9 @@ test("seed quy-tac-phu-luc: docKey trong allow-list, file là bản kcal in gầ
   assert.match(titleOf(md, "x"), /Phụ lục cuối Sổ nhập xuất LTTP/);
   assert.match(md, /Cột Nhiệt lượng IN trên V\.n/);
   assert.match(md, /printed = std \+ min\(80/);
+  assert.match(md, /mỗi lần tiếp nhận một dòng con "\+ Ngày dd\/mm\/yyyy"/);
+  assert.match(md, /KHÔNG chia theo loại gạo nữa/);
+  assert.equal(md.includes("không ghi ngày"), false);
   assert.equal(md.includes("khi thực tế vượt chuẩn"), false);
   assert.deepEqual(detectSecrets(md), []);
 });
