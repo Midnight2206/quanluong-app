@@ -1,5 +1,4 @@
 # 10 – Phụ lục cuối Sổ nhập xuất LTTP (bộ rule chung)
-> Nguồn 05/11/2026 — bộ rule phụ lục cuối sổ dùng chung cho mọi trợ lý làm sổ.
 > Tổng hợp từ buổi làm việc 05/11/2026 với chủ sổ (sổ tháng 10/2026). Viết chung cho MỌI trợ lý làm sổ bếp ăn. Các giá trị riêng của một đơn vị nằm ở mục **12. Cấu hình đơn vị (ví dụ)**. Mục ghi **(cần xác nhận)** là chủ chưa chốt, phải hỏi.
 
 ## 0. Nguyên tắc chung

@@ -8,8 +8,12 @@ const BA_SCOPES = Object.freeze({
 });
 const GLOBAL_SCOPES = [BA_SCOPES.GLOBAL_READ, BA_SCOPES.GLOBAL_WRITE];
 const ALL_SCOPES = [BA_SCOPES.UNIT_PUSH, ...GLOBAL_SCOPES];
-/** Tài liệu bộ nghiệp vụ chung; thứ tự = thứ tự hiển thị. */
-const BA_DOC_KEYS = ["huong-dan", "nghiep-vu-chung", "mau-ho-so", "bo-cau-hoi"];
+/**
+ * Tài liệu baseline; thứ tự = thứ tự hiển thị.
+ * `quy-tac-*` là quy tắc sổ dùng chung (trợ lý làm sổ), không gắn hồ sơ đơn vị.
+ * Thêm docKey mới: nối vào mảng này (kebab-case, ≤ 40 ký tự — cột đã là VarChar, không migration).
+ */
+const BA_DOC_KEYS = ["huong-dan", "nghiep-vu-chung", "mau-ho-so", "bo-cau-hoi", "quy-tac-phu-luc"];
 const BA_RULE_DOC_KEY = "nghiep-vu-chung";
 const BA_RULE_STATUSES = ["GIONG", "KHAC", "NA", "CHUA_RO"];
 const BA_EVIDENCE = ["QS", "CHAT", "SUY", "CHU"];

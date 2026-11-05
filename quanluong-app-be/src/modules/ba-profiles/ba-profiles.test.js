@@ -222,6 +222,43 @@ test("publish baseline: version tăng theo docKey, ruleIds chỉ cho nghiep-vu-c
   assert.deepEqual((await svc.listLatestBaseline(db)).map((d) => [d.docKey, d.version]), [["huong-dan", 1], ["nghiep-vu-chung", 2]]);
 });
 
+test("quy-tac-phu-luc: đăng/đọc như baseline, không trích CHUNG, /start chỉ siêu dữ liệu", async () => {
+  assert.equal(validator.docKeyParamsSchema.safeParse({ docKey: "quy-tac-phu-luc" }).success, true);
+  assert.equal(validator.docKeyParamsSchema.safeParse({ docKey: "quy-tac-khac" }).success, false);
+  const db = memDb();
+  const row = await svc.publishBaselineDoc(
+    {
+      docKey: "quy-tac-phu-luc",
+      title: "Phụ lục cuối sổ",
+      contentMarkdown: "CHUNG-01 không phải ruleIds\nprinted kcal",
+      actor: "user:1",
+    },
+    db,
+  );
+  assert.equal(row.version, 1);
+  assert.equal(row.ruleIds, null);
+  assert.equal((await svc.getBaselineDoc("quy-tac-phu-luc", undefined, db)).title, "Phụ lục cuối sổ");
+  const again = await svc.publishBaselineDoc(
+    { docKey: "quy-tac-phu-luc", title: "v2", contentMarkdown: "bản mới", actor: "token:qlba_x" },
+    db,
+  );
+  assert.equal(again.version, 2);
+  const { docs } = await svc.getStartGuideData(db);
+  assert.ok(docs.some((d) => d.docKey === "quy-tac-phu-luc" && d.version === 2));
+  const guide = utils.buildStartGuide({
+    baseUrl: "https://e.t/",
+    guide: { version: 1, title: "HD", contentMarkdown: "# HD" },
+    docs,
+  });
+  assert.ok(guide.docs.some((d) => d.docKey === "quy-tac-phu-luc" && d.url === "https://e.t/api/ba/baseline/quy-tac-phu-luc"));
+  assert.equal(guide.markdown.includes("bản mới"), false);
+  assert.equal(guide.markdown.includes("`quy-tac-phu-luc`"), true);
+  assert.deepEqual(
+    (await svc.listLatestBaseline(db)).filter((d) => d.docKey === "quy-tac-phu-luc").map((d) => d.version),
+    [2],
+  );
+});
+
 test("validator: docKey ngoài danh sách, rule sai dạng / trùng / sai status bị từ chối", () => {
   assert.equal(validator.docKeyParamsSchema.safeParse({ docKey: "khac" }).success, false);
   const ok = validator.pushProfileBodySchema.safeParse({
