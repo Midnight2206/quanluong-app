@@ -7,17 +7,17 @@ export function AppBrand({ compact = false }) {
       <img
         src={QUANLUONG_BRAND_LOGO_SRC}
         alt={QUANLUONG_SITE_NAME}
-        width={44}
-        height={44}
+        width={48}
+        height={48}
         decoding="async"
         className={cn(
           "shrink-0 object-contain",
-          compact ? "h-9 w-9 lg:h-11 lg:w-11" : "h-11 w-11",
+          compact ? "h-10 w-10 lg:h-12 lg:w-12" : "h-12 w-12",
         )}
       />
       <p
         className={cn(
-          "text-xs font-semibold uppercase tracking-[0.18em] text-foreground",
+          "bg-gradient-to-r from-[#1a007c] via-[#5d00be] to-[#b400fe] bg-clip-text text-xs font-semibold uppercase tracking-[0.18em] text-transparent print:bg-none print:text-foreground",
           compact && "hidden sm:block",
         )}
       >
