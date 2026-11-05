@@ -128,3 +128,7 @@
 ## Nhật ký
 - 05/11/2026: tạo file từ buổi làm việc tháng 10/2026.
 - 05/11/2026 (bổ sung): cột Nhiệt lượng V.n in gần chuẩn (≥3200/≥3500); mức khác hỏi chủ; không đổi ĐL.
+
+- Báo cáo lương thực (chủ sổ sửa 05/11/2026): chiều cao hàng bảng = gốc ×1,3 (nội dung ~27pt, header ×1,3; tiêu đề và spacer 14pt giữ nguyên). Dòng nhãn "2) Các khoản sử dụng khác" / "3) Tổng hợp lương thực đã sử dụng" là dòng chữ đứng riêng, KHÔNG kẻ khung. Bảng 2 và 3 luôn có hàng "Cộng (kg)" cuối bảng, cùng một hàng (chèn hàng trống bên ngắn hơn); Cộng = tổng các khoản có số, trống nếu không có số liệu.
+- Hàng Cộng bảng 2 và 3: gộp ô nhãn + ô số thành 1 ô, in đậm, căn trái, ghi "Cộng: <số> kg" (vd "Cộng: 2.233,1 kg"); không có số liệu thì "Cộng: - kg" (chủ sổ 05/11/2026).
+- Cập nhật: hàng Cộng (ô gộp) bảng 2 và 3 căn GIỮA; không có số liệu ghi "Cộng: 0 kg" (thay cho "-") (chủ sổ 05/11/2026).
