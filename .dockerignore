@@ -8,5 +8,7 @@
 **/*.md
 # Bộ kit BA: seed script nạp vào BaBaselineDoc (image backend: /app/ba-kit)
 !docs/ba-kit/*.md
+# Quy tắc sổ: cùng script seed (image backend: /app/quy-tac). Nội dung không public — chỉ huong-dan.
+!docs/so-sach-bep-an/quy-tac/*.md
 THÔNG TƯ*.pdf
 **/.cursor
