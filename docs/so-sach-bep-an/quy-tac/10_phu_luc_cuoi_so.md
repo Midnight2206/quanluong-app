@@ -86,7 +86,8 @@
 - Gạo, chất đốt: ghi đúng ĐL quy định. Sữa: theo đối tượng được cấp (đơn vị mẫu: chỉ mức cao, (hộp − bệnh nhân)×180/QS). Thịt vai ½ nạc ½ xô lọc (khớp IV).
 - **BQ** = Σ ĐL các ngày có QS ÷ **số ngày có quân số** (không ÷ số ngày tháng).
 - **Đường:** ghi theo xuất thực (không có ĐL quy định).
-- **Nhiệt lượng (kcal):** Σ(ĐL_g × kcal/100g)/100 theo Bảng thành phần thực phẩm VN 2007; dùng rau N1+N2, không tính chất đốt. Chủ muốn kcal "cộng sao cho gần bằng kcal trong định lượng tổng", nhưng không được sửa lượng LTTP để khớp → báo chênh. (cần xác nhận: khi thực tế vượt chuẩn có ghi theo chuẩn không.)
+- **Nhiệt lượng chuẩn (đã biết):** mức **72.000 = 3200** kcal; mức **130.000 = 3500** kcal. **Mức ăn khác → hỏi chủ** trước, không tự suy (cũng ghi ở `07_dinh_luong_muc_an.md`).
+- **Cột Nhiệt lượng IN trên V.n (chủ 05/11/2026):** mỗi ngày có QS ghi số **≥ chuẩn** và **gần chuẩn** (chuẩn hoặc hơi trên một chút); **không** hiện thừa lớn; **không đổi ĐL LTTP**. Công thức in: `actual = Σ(ĐL_g × kcal/100g)/100` (FCT VN 2007; N1+N2; không chất đốt); `printed = std` nếu actual < std, else `printed = std + min(80, round((actual−std)×0.05))`. BQ = trung bình các ngày có QS của số *printed*. Kcal thực (actual) chỉ lưu nội bộ/JSON đối chiếu.
 - **Việc hằng ngày:** sau mỗi ngày tính lại ĐL ngày + BQ lũy kế, **báo chủ các loại chưa đạt** (tên, BQ hiện tại / chuẩn, từng mức) để chủ cân đối.
 - Bố cục: dựng workbook sạch (không copy style/shape ODS), header đủ cao cho chữ dọc, hàng dữ liệu đã tăng gấp đôi theo chủ, vẫn 1 trang/mức.
 
@@ -127,3 +128,4 @@
 
 ## Nhật ký
 - 05/11/2026: tạo file từ buổi làm việc tháng 10/2026.
+- 05/11/2026 (bổ sung): cột Nhiệt lượng V.n in gần chuẩn (≥3200/≥3500); mức khác hỏi chủ; không đổi ĐL.
