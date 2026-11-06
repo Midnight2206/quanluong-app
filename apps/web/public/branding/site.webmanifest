@@ -1,12 +1,15 @@
 {
   "name": "Quân lương",
   "short_name": "Quân lương",
+  "description": "Hiện đại hoá công tác quản lý quân nhu",
   "lang": "vi",
   "start_url": "/",
   "scope": "/",
   "icons": [
     { "src": "/branding/favicon-16x16.png", "sizes": "16x16", "type": "image/png" },
     { "src": "/branding/favicon-32x32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/branding/favicon-48x48.png", "sizes": "48x48", "type": "image/png" },
+    { "src": "/branding/favicon-64x64.png", "sizes": "64x64", "type": "image/png" },
     { "src": "/branding/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
     { "src": "/branding/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
   ],

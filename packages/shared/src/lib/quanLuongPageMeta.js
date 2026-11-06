@@ -1,13 +1,21 @@
 /** Tên thương hiệu thống nhất cho `<title>`, OG và Twitter. */
 export const QUANLUONG_SITE_NAME = "Quân lương";
 
-/** Logo trong suốt trên header / màn hình đăng nhập. Mỗi app phục vụ file này từ `public/branding/`. */
+/** Slogan dưới tên thương hiệu trên header / màn hình đăng nhập. */
+export const QUANLUONG_SITE_SLOGAN = "Hiện đại hoá công tác quản lý quân nhu";
+
+/** Logo đầy đủ (có padding). Mỗi app phục vụ file này từ `public/branding/`. */
 export const QUANLUONG_BRAND_LOGO_SRC = "/branding/logo.png";
+
+/** Logo crop chặt cho vòng Midnight trên header / auth. */
+export const QUANLUONG_BRAND_LOGO_MARK_SRC = "/branding/logo-mark.png";
 
 /** Web app manifest (tên sản phẩm + icon Midnight). */
 export const QUANLUONG_MANIFEST_PATH = "/branding/site.webmanifest";
 
 const BRAND_ICON_ICO = "/branding/favicon.ico";
+const BRAND_ICON_64 = "/branding/favicon-64x64.png";
+const BRAND_ICON_48 = "/branding/favicon-48x48.png";
 const BRAND_ICON_32 = "/branding/favicon-32x32.png";
 const BRAND_ICON_16 = "/branding/favicon-16x16.png";
 const BRAND_ICON_APPLE = "/branding/apple-touch-icon.png";
@@ -38,10 +46,13 @@ export function quanLuongIcons() {
     };
   }
   return {
+    // Ưu tiên PNG lớn hơn trước — tab/bookmark hiện đại chọn kích thước khớp denser DPR.
     icon: [
-      { url: BRAND_ICON_ICO, sizes: "any", type: "image/x-icon" },
+      { url: BRAND_ICON_64, sizes: "64x64", type: "image/png" },
+      { url: BRAND_ICON_48, sizes: "48x48", type: "image/png" },
       { url: BRAND_ICON_32, sizes: "32x32", type: "image/png" },
       { url: BRAND_ICON_16, sizes: "16x16", type: "image/png" },
+      { url: BRAND_ICON_ICO, sizes: "any", type: "image/x-icon" },
     ],
     shortcut: BRAND_ICON_ICO,
     apple: [{ url: BRAND_ICON_APPLE, sizes: "180x180", type: "image/png" }],

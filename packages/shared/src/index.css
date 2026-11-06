@@ -34,6 +34,10 @@
     --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
     --shadow-md: 0 1px 3px 0 rgb(15 23 42 / 0.07), 0 1px 2px -1px rgb(15 23 42 / 0.05);
     --shadow-lg: 0 12px 28px -10px rgb(15 23 42 / 0.2), 0 2px 6px -2px rgb(15 23 42 / 0.08);
+    /* Midnight brand gradient — light (deep indigo → magenta) */
+    --ql-brand-from: #1a007c;
+    --ql-brand-via: #5d00be;
+    --ql-brand-to: #b400fe;
   }
 
   html.dark {
@@ -60,6 +64,10 @@
     --shadow-sm: 0 1px 2px 0 rgb(2 6 23 / 0.45);
     --shadow-md: 0 1px 3px 0 rgb(2 6 23 / 0.5), 0 1px 2px -1px rgb(2 6 23 / 0.4);
     --shadow-lg: 0 16px 36px -12px rgb(2 6 23 / 0.7), 0 2px 6px -2px rgb(2 6 23 / 0.5);
+    /* Midnight brand — dark: lift indigo→magenta so it reads on dark card/header */
+    --ql-brand-from: #8eb6ff;
+    --ql-brand-via: #c4a8ff;
+    --ql-brand-to: #f0abfc;
   }
 
   /* Accent palettes: html[data-accent]. Default (no attribute / teal) = :root values above. */
@@ -329,6 +337,25 @@
 @layer components {
   .page-shell {
     @apply min-h-0 max-h-dvh h-dvh bg-background;
+  }
+
+  /* Brand gradient text (title + slogan) — follows --ql-brand-* (light/dark). */
+  .ql-brand-text {
+    background-image: linear-gradient(
+      to right,
+      var(--ql-brand-from),
+      var(--ql-brand-via),
+      var(--ql-brand-to)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* PNG mark: lift + soft glow on dark so deep indigo mark still reads. */
+  html.dark .ql-brand-mark {
+    filter: brightness(1.35) saturate(1.15)
+      drop-shadow(0 0 6px color-mix(in srgb, var(--ql-brand-via) 55%, transparent));
   }
 
   [data-sticky-level] {
