@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Bot,
-  Cloud,
-  ExternalLink,
-  FileSpreadsheet,
-  Package,
-  UtensilsCrossed,
-} from "lucide-react";
-import Link from "next/link";
+import { Cloud, ExternalLink } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -23,56 +15,19 @@ import { useCurrentUser, useIsAuthenticated } from "@/features/auth/model/authSl
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
 import { getApiBaseUrl } from "@/utils/runtimeEnv";
+import { HomeLanding } from "./HomeLanding.jsx";
+import {
+  applyLandingDocumentLocale,
+  getLandingCopy,
+  readExplicitStoredLandingLocale,
+  resolveLandingLocale,
+  writeLandingLocale,
+} from "./landingCopy.js";
 
-const GOOGLE_DRIVE_ERROR_MESSAGES = {
-  denied: "Bạn đã hủy cấp quyền hoặc Google từ chối liên kết.",
-  missing: "Thiếu mã xác nhận từ Google. Hãy bắt đầu lại từ nút «Liên kết Google Drive».",
-  state: "Phiên liên kết không khớp hoặc đã hết hạn. Mở lại từ trang chủ (đã đăng nhập) và thử liên kết lại.",
-  no_refresh:
-    "Google không cấp refresh token. Vào Tài khoản Google → Bảo mật → Quyền truy cập của bên thứ ba, gỡ ứng dụng này rồi liên kết lại.",
-  config: "Google OAuth chưa được cấu hình đúng trên máy chủ (CLIENT_ID / SECRET / REDIRECT_URI).",
-  folder: "Không tạo hoặc tìm được thư mục «midnight-app» trên Drive. Thử lại sau vài phút.",
-  scope: "Google chưa cấp đủ quyền Drive/Sheets. Gỡ quyền ứng dụng trong Tài khoản Google rồi liên kết lại.",
-  token: "Google không trả về access token hợp lệ. Thử liên kết lại.",
-  unknown: "Liên kết Google Drive thất bại. Thử lại hoặc kiểm tra cấu hình OAuth.",
-};
-
-const features = [
-  {
-    icon: Package,
-    title: "Nhập xuất thực phẩm thông minh",
-  },
-  {
-    icon: FileSpreadsheet,
-    title: "Google Workspace cho sổ sách",
-  },
-  {
-    icon: UtensilsCrossed,
-    title: "AI gợi ý thực đơn",
-  },
-  {
-    icon: Bot,
-    title: "Báo cáo tự động qua Telegram",
-  },
-];
-
-function CtaLink({ href, variant = "primary", title, children }) {
-  const base =
-    "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-  const variants = {
-    primary:
-      "border border-primary bg-primary text-primary-foreground shadow-soft hover:bg-primary/90 active:bg-primary/85",
-    secondary:
-      "border border-input bg-card text-foreground shadow-soft hover:bg-muted hover:border-primary/40",
-  };
-  return (
-    <Link href={href} title={title} className={cn(base, variants[variant])}>
-      {children}
-    </Link>
-  );
-}
-
-export function HomePage() {
+/**
+ * @param {{ initialLocale?: string }} props
+ */
+export function HomePage({ initialLocale = "vi" }) {
   const user = useCurrentUser();
   const isAuthenticated = useIsAuthenticated();
   const displayName = user?.profile?.fullName || user?.username;
@@ -87,9 +42,43 @@ export function HomePage() {
   const [checkDriveLink] = useCheckGoogleDriveLinkMutation();
   const checkedDriveFolderRef = useRef(null);
   const handledGoogleResultRef = useRef(null);
+  const localeSyncRef = useRef(false);
+  const localeRef = useRef(resolveLandingLocale(initialLocale));
   const { confirm } = useConfirm();
   const [driveLinkBusy, setDriveLinkBusy] = useState(false);
+  const [locale, setLocale] = useState(() => resolveLandingLocale(initialLocale));
   const apiBase = getApiBaseUrl();
+  const copy = getLandingCopy(locale);
+  localeRef.current = locale;
+
+  useEffect(() => {
+    setLocale(resolveLandingLocale(initialLocale));
+  }, [initialLocale]);
+
+  useEffect(() => {
+    applyLandingDocumentLocale(locale);
+  }, [locale]);
+
+  useEffect(() => {
+    return () => {
+      document.documentElement.lang = "vi";
+    };
+  }, []);
+
+  useEffect(() => {
+    if (localeSyncRef.current) return;
+    localeSyncRef.current = true;
+    const stored = readExplicitStoredLandingLocale();
+    if (stored == null) {
+      writeLandingLocale(initialLocale);
+      return;
+    }
+    if (stored !== resolveLandingLocale(initialLocale)) {
+      writeLandingLocale(stored);
+      setLocale(stored);
+      router.refresh();
+    }
+  }, [initialLocale, router]);
 
   useEffect(() => {
     const g = googleParam;
@@ -98,9 +87,10 @@ export function HomePage() {
     if ((g === "linked" || g === "error") && handledGoogleResultRef.current === resultKey) {
       return;
     }
+    const text = getLandingCopy(localeRef.current);
     if (g === "linked") {
       handledGoogleResultRef.current = resultKey;
-      notifySuccess("Đã liên kết Google Drive. Thư mục «midnight-app» sẵn sàng cho sổ sách.");
+      notifySuccess(text.drive.linkedToast);
       void refetchUser();
       const next = new URLSearchParams(searchParams.toString());
       next.delete("google");
@@ -112,8 +102,8 @@ export function HomePage() {
       handledGoogleResultRef.current = resultKey;
       const msg =
         (googleMsgParam && googleMsgParam.trim()) ||
-        (reason && GOOGLE_DRIVE_ERROR_MESSAGES[reason]) ||
-        GOOGLE_DRIVE_ERROR_MESSAGES.unknown;
+        (reason && text.driveErrors[reason]) ||
+        text.driveErrors.unknown;
       notifyError(msg);
       const next = new URLSearchParams(searchParams.toString());
       next.delete("google");
@@ -136,7 +126,7 @@ export function HomePage() {
       try {
         const nextUser = await checkDriveLink().unwrap();
         if (!cancelled && !nextUser?.googleDriveFolderId) {
-          notifyError("Folder làm việc trên Google Drive không còn tồn tại. Hệ thống đã huỷ liên kết cũ.");
+          notifyError(getLandingCopy(localeRef.current).drive.folderMissing);
         }
       } catch {
         // Không chặn trang chủ nếu Google tạm thời không phản hồi.
@@ -162,7 +152,16 @@ export function HomePage() {
     return `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`;
   }, [user?.googleDriveFolderId]);
 
+  function changeLocale(next) {
+    const resolved = writeLandingLocale(next);
+    if (resolved === locale) return;
+    setLocale(resolved);
+    applyLandingDocumentLocale(resolved);
+    router.refresh();
+  }
+
   async function startGoogleDriveLink() {
+    const text = getLandingCopy(locale);
     setDriveLinkBusy(true);
     try {
       const res = await fetch(`${apiBase}/auth/google/drive/authorize-url`, {
@@ -171,160 +170,114 @@ export function HomePage() {
       });
       const body = await res.json().catch(() => ({}));
       if (res.status === 401) {
-        notifyError(
-          body?.message ||
-            "Phiên đăng nhập không hợp lệ. Đăng xuất, đăng nhập lại trên cùng địa chỉ (localhost hoặc 127.0.0.1, không trộn), rồi thử lại.",
-        );
+        notifyError(body?.message || text.drive.sessionFallback);
         return;
       }
       if (!res.ok) {
-        notifyError(body?.message || "Không bắt đầu được liên kết Google Drive.");
+        notifyError(body?.message || text.drive.startFail);
         return;
       }
       const url = body?.data?.url;
       if (typeof url !== "string" || !url.startsWith("https://")) {
-        notifyError("Máy chủ không trả về URL Google hợp lệ.");
+        notifyError(text.drive.badUrl);
         return;
       }
       window.location.assign(url);
     } catch {
-      notifyError("Lỗi mạng. Kiểm tra kết nối rồi thử lại.");
+      notifyError(text.drive.network);
     } finally {
       setDriveLinkBusy(false);
     }
   }
 
   async function handleUnlinkDrive() {
+    const text = getLandingCopy(locale);
     const ok = await confirm({
-      title: "Huỷ liên kết Google Drive",
-      message:
-        "Hệ thống sẽ xóa token và folder ID đã lưu. Thư mục trên Drive của bạn không bị xóa. Bạn có thể liên kết lại sau.",
-      confirmLabel: "Huỷ liên kết",
+      title: text.drive.unlinkTitle,
+      message: text.drive.unlinkMessage,
+      confirmLabel: text.drive.unlinkConfirm,
     });
     if (!ok) {
       return;
     }
     try {
       await unlinkDrive().unwrap();
-      notifySuccess("Đã huỷ liên kết Google Drive.");
+      notifySuccess(text.drive.unlinkedToast);
     } catch (e) {
-      notifyError(e?.data?.message || "Không gỡ được liên kết.");
+      notifyError(e?.data?.message || text.drive.unlinkFail);
     }
   }
 
-  return (
-    <div className="mx-auto w-full max-w-6xl space-y-8 pb-2 lg:max-w-none">
-      <section className="space-y-4">
-        <div className="space-y-4">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-            QUẢN LÝ QUÂN LƯƠNG HIỆU QUẢ, HIỆN ĐẠI
-          </h1>
-        </div>
-
-        {!isAuthenticated ? (
-          <div className="flex flex-wrap gap-3">
-            <CtaLink href="/login" variant="primary" title="Mở trang đăng nhập">
-              Đăng nhập
-            </CtaLink>
-            <CtaLink href="/register" variant="secondary" title="Mở trang đăng ký tài khoản">
-              Đăng ký tài khoản
-            </CtaLink>
+  const driveSlot = canLinkDrive ? (
+    <Card>
+      <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
+            <Cloud className="size-5" aria-hidden />
           </div>
-        ) : (
-          <div className="space-y-4">
-            <Card className="border-l-4 border-l-primary">
-              <CardContent className="space-y-4">
-                <p className="text-sm font-medium text-foreground">
-                  Xin chào, {displayName || "bạn"}
-                </p>
-                <CtaLink href="/dashboard" variant="primary" title="Mở bảng điều khiển theo quyền">
-                  Vào bảng điều khiển
-                </CtaLink>
-              </CardContent>
-            </Card>
-
-            {canLinkDrive ? (
-              <Card>
-                <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 flex-1 gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                      <Cloud className="size-5" aria-hidden />
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                      <p className="text-sm font-medium text-foreground">Google Drive — sổ sách</p>
-                      {user?.googleDriveFolderId ? (
-                        <p className="text-[11px] leading-relaxed text-muted-foreground">
-                          <span className="font-medium text-foreground">Đã liên kết.</span> Folder ID:{" "}
-                          <span className="break-all font-mono">{user.googleDriveFolderId}</span>
-                        </p>
-                      ) : !mayUseDriveLink ? (
-                        <p className="text-[11px] text-warning">
-                          Hoàn tất xác minh email trước khi liên kết Drive (trừ tài khoản quản trị hệ thống).
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-                    {mayUseDriveLink && user?.googleDriveFolderId && driveFolderUrl ? (
-                      <>
-                        <a
-                          href={driveFolderUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={cn(
-                            "inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground shadow-soft transition-colors duration-150 hover:bg-primary/90",
-                          )}
-                        >
-                          <ExternalLink className="size-4 shrink-0" aria-hidden />
-                          Mở thư mục làm việc
-                        </a>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs text-muted-foreground hover:text-destructive sm:self-end"
-                          disabled={unlinkingDrive}
-                          onClick={() => void handleUnlinkDrive()}
-                        >
-                          {unlinkingDrive ? "Đang huỷ…" : "Huỷ liên kết"}
-                        </Button>
-                      </>
-                    ) : null}
-                    {mayUseDriveLink && !user?.googleDriveFolderId ? (
-                      <button
-                        type="button"
-                        disabled={driveLinkBusy}
-                        onClick={() => void startGoogleDriveLink()}
-                        className={cn(
-                          "inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground shadow-soft transition-colors duration-150 hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50",
-                        )}
-                      >
-                        {driveLinkBusy ? "Đang mở Google…" : "Liên kết Google Drive"}
-                      </button>
-                    ) : null}
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-medium text-foreground">{copy.drive.title}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{copy.drive.body}</p>
+            {user?.googleDriveFolderId ? (
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground">{copy.drive.linked}</span> {copy.drive.folderId}:{" "}
+                <span className="break-all font-mono">{user.googleDriveFolderId}</span>
+              </p>
+            ) : !mayUseDriveLink ? (
+              <p className="text-sm text-warning">{copy.drive.unverified}</p>
             ) : null}
           </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">Tính năng nổi bật</h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {features.map(({ icon: Icon, title }) => (
-            <Card key={title} className="h-full">
-              <CardContent className="flex h-full items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                  <Icon className="size-[18px]" aria-hidden />
-                </div>
-                <h3 className="text-sm font-semibold leading-snug">{title}</h3>
-              </CardContent>
-            </Card>
-          ))}
         </div>
-      </section>
-    </div>
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          {mayUseDriveLink && user?.googleDriveFolderId && driveFolderUrl ? (
+            <>
+              <a
+                href={driveFolderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground shadow-soft transition-colors duration-150 hover:bg-primary/90 max-lg:min-h-11",
+                )}
+              >
+                <ExternalLink className="size-4 shrink-0" aria-hidden />
+                {copy.drive.open}
+              </a>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-xs text-muted-foreground hover:text-destructive max-lg:min-h-11 sm:self-end"
+                disabled={unlinkingDrive}
+                onClick={() => void handleUnlinkDrive()}
+              >
+                {unlinkingDrive ? copy.drive.unlinking : copy.drive.unlink}
+              </Button>
+            </>
+          ) : null}
+          {mayUseDriveLink && !user?.googleDriveFolderId ? (
+            <button
+              type="button"
+              disabled={driveLinkBusy}
+              onClick={() => void startGoogleDriveLink()}
+              className={cn(
+                "inline-flex items-center justify-center gap-2 rounded-lg border border-primary bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground shadow-soft transition-colors duration-150 hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50 max-lg:min-h-11",
+              )}
+            >
+              {driveLinkBusy ? copy.drive.linking : copy.drive.link}
+            </button>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  ) : null;
+
+  return (
+    <HomeLanding
+      copy={copy}
+      locale={locale}
+      onLocaleChange={changeLocale}
+      isAuthenticated={isAuthenticated}
+      displayName={displayName}
+      driveSlot={driveSlot}
+    />
   );
 }

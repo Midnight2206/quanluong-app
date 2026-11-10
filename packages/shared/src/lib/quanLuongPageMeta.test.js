@@ -7,6 +7,7 @@ import {
   QUANLUONG_SITE_NAME,
   QUANLUONG_SITE_SLOGAN,
   quanLuongIcons,
+  quanLuongPageMeta,
 } from "./quanLuongPageMeta.js";
 
 const originalIcon = process.env.NEXT_PUBLIC_SITE_ICON;
@@ -37,6 +38,19 @@ test("default icons point at the Midnight branding set", () => {
   assert.equal(icons.shortcut, "/branding/favicon.ico");
   assert.equal(icons.apple[0].url, "/branding/apple-touch-icon.png");
   assert.equal(icons.apple[0].sizes, "180x180");
+});
+
+test("ogLocale overrides Open Graph locale and the default stays vi_VN", () => {
+  const fallback = quanLuongPageMeta({ title: "Trang chủ", description: "Mô tả" });
+  assert.equal(fallback.openGraph.locale, "vi_VN");
+  assert.equal(fallback.openGraph.title, "Quân lương - Trang chủ");
+  const english = quanLuongPageMeta({
+    title: "Home",
+    description: "English home",
+    ogLocale: "en_US",
+  });
+  assert.equal(english.openGraph.locale, "en_US");
+  assert.equal(english.description, "English home");
 });
 
 test("NEXT_PUBLIC_SITE_ICON overrides the icon set with one URL", () => {
