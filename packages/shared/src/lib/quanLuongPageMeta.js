@@ -63,7 +63,7 @@ export function quanLuongIcons() {
  * Metadata chuẩn cho một trang: segment `title` khớp template root `Quân lương - %s`;
  * OG/Twitter nhận title đầy đủ.
  *
- * @param {{ title: string; description: string; robots?: import("next").Metadata["robots"] }} opts
+ * @param {{ title: string; description: string; robots?: import("next").Metadata["robots"]; ogLocale?: string }} opts
  * @returns {import("next").Metadata}
  */
 export function quanLuongPageMeta(opts) {
@@ -75,7 +75,7 @@ export function quanLuongPageMeta(opts) {
     openGraph: {
       title: docTitle,
       description: opts.description,
-      locale: "vi_VN",
+      locale: opts.ogLocale || "vi_VN",
       type: "website",
     },
     twitter: {
