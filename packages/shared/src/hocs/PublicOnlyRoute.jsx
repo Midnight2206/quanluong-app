@@ -12,7 +12,7 @@ export function PublicOnlyRoute({ children }) {
   }
 
   if (isAuthenticated) {
-    return <ClientRedirect href="/" replace />;
+    return <ClientRedirect href="/dashboard" replace />;
   }
 
   return children;

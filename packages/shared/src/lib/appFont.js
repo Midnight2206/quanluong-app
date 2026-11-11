@@ -1,4 +1,4 @@
-import { Be_Vietnam_Pro } from "next/font/google";
+import { Be_Vietnam_Pro, Syne } from "next/font/google";
 
 /** UI font (full Vietnamese diacritics). Self-hosted by next/font at build time; exposes `--font-sans`. */
 export const appFont = Be_Vietnam_Pro({
@@ -6,4 +6,12 @@ export const appFont = Be_Vietnam_Pro({
   weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-sans",
+});
+
+/** Display face for Midnight wordmark / landing headlines (Latin). */
+export const displayFont = Syne({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  display: "swap",
+  variable: "--font-display",
 });
