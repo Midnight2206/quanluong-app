@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { LayoutDashboard } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
@@ -11,15 +11,7 @@ import { ScrollableHorizontalStrip } from "@/components/common/ScrollableHorizon
 import { writePersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { DASHBOARD_TAB_META } from "@/pages/dashboard/dashboardTabMeta";
 import { cn } from "@/utils/cn";
-import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
-
-function RedirectToSuperadminPortal() {
-  useLayoutEffect(() => {
-    const o = getSuperadminAppOrigin();
-    window.location.replace(`${o}${window.location.pathname}${window.location.search}`);
-  }, []);
-  return <p className="text-xs text-muted-foreground">Đang chuyển sang cổng quản trị hệ thống…</p>;
-}
+import { SUPERADMIN_PORTAL_CHOOSER_PATH } from "@/utils/postLoginPath";
 
 export function DashboardLayout({ children }) {
   const user = useCurrentUser();
@@ -52,7 +44,9 @@ export function DashboardLayout({ children }) {
   }
 
   if (user.type?.name === "superadmin") {
-    return <RedirectToSuperadminPortal />;
+    // Cùng host. Không `location.replace` sang origin admin: cookie host-only (Tailscale)
+    // không đi theo, cổng kia đá về /login, login lại đẩy /dashboard → vòng lặp.
+    return <ClientRedirect href={SUPERADMIN_PORTAL_CHOOSER_PATH} replace />;
   }
 
   return (

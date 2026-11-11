@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   navigateAfterLogin,
-  isSuperadminUser,
   resolvePostLoginPath,
   safeInternalPath,
   SUPERADMIN_PORTAL_CHOOSER_PATH,
@@ -140,11 +139,6 @@ export function LoginPage() {
     try {
       const user = await login(values).unwrap();
       notifySuccess("Đăng nhập thành công");
-      // Từ cổng admin (không có session / cookie domain) → về thẳng dashboard admin.
-      if (isSuperadminUser(user) && searchParams.get("portal") === "admin") {
-        window.location.assign(`${getSuperadminAppOrigin()}/dashboard`);
-        return;
-      }
       const next = resolvePostLoginPath(user, searchParams.get("from"), {
         supplierOrigin: getSupplierAppOrigin(),
       });

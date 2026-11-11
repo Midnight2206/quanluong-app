@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
 import { writePersistedNavTab } from "@/hooks/usePersistedNavTab";
+import { isSuperadminUser } from "@/utils/postLoginPath";
+import { getMainAppOrigin } from "@/utils/superadminPortal";
 
 /**
  * Bảng điều khiển chỉ dành cho superadmin — dùng trên cổng superadmin.
@@ -25,8 +27,23 @@ export function SuperadminDashboardLayout({ children }) {
     return <ClientRedirect href="/login" replace />;
   }
 
-  if (user.type?.name !== "superadmin") {
-    return <ClientRedirect href="/" replace />;
+  if (!isSuperadminUser(user)) {
+    // Không `ClientRedirect` về `/`: HomePage của shell đang đăng nhập lại đẩy mọi
+    // user đã đăng nhập sang `/dashboard` → vòng lặp.
+    return (
+      <div className="mx-auto flex max-w-md flex-col gap-4 p-6 text-center">
+        <h1 className="text-xl font-semibold text-foreground">Bảng điều khiển hệ thống</h1>
+        <p className="text-sm text-muted-foreground">
+          Chỉ tài khoản superadmin dùng bảng này. Tài khoản đơn vị mở ứng dụng chính.
+        </p>
+        <a
+          href={`${getMainAppOrigin()}/dashboard`}
+          className="inline-flex justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+        >
+          Mở ứng dụng chính
+        </a>
+      </div>
+    );
   }
 
   return (

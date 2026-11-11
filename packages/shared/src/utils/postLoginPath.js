@@ -38,6 +38,39 @@ export function navigateAfterLogin(next, { assign, replace }) {
   replace(next);
 }
 
+/**
+ * Host đang mở cổng superadmin (subdomain `admin-` hoặc cổng dev 3001/8081).
+ * Cookie phiên là host-only trừ khi COOKIE_DOMAIN phủ cả hai host — Tailscale `*.ts.net`
+ * là public suffix nên không share được. Đẩy superadmin sang host kia rồi bị đá về
+ * sẽ thành vòng lặp.
+ * @param {{ hostname?: string, port?: string } | null | undefined} loc
+ */
+export function isSuperadminBrowserHost(loc) {
+  if (!loc) {
+    return false;
+  }
+  const hostname = String(loc.hostname || "");
+  const port = String(loc.port || "");
+  if (hostname.startsWith("admin-")) {
+    return true;
+  }
+  return port === "8081" || port === "3001";
+}
+
+/**
+ * Đích khi user đã đăng nhập mà đang đứng trên trang public (login).
+ * Superadmin trên app chính vào trang chọn, không vào `/dashboard` (app chính đá sang cổng kia).
+ * Trên chính cổng superadmin thì `/dashboard` là đúng và cùng host.
+ * @param {object | null | undefined} user
+ * @param {{ hostname?: string, port?: string } | null | undefined} [loc]
+ */
+export function publicOnlyRedirectPath(user, loc) {
+  if (isSuperadminUser(user)) {
+    return isSuperadminBrowserHost(loc) ? DEFAULT_APP_HOME : SUPERADMIN_PORTAL_CHOOSER_PATH;
+  }
+  return DEFAULT_APP_HOME;
+}
+
 export function supplierChooserHandoff(user, supplierOrigin) {
   if (isLttpSupplierUser(user)) {
     return {

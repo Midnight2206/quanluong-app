@@ -51,7 +51,7 @@ export function PortalChooserPage() {
         <Button
           type="button"
           className="h-11 w-full justify-start gap-2"
-          onClick={() => router.replace("/")}
+          onClick={() => router.replace("/profile")}
         >
           <Building2 className="size-4" aria-hidden />
           Làm việc

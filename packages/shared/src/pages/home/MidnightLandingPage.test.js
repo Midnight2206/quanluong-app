@@ -39,7 +39,9 @@ test("landing is Midnight studio (services + tech + contact footer) with auth re
   assert.match(landing, /item\.contact\.title/);
   assert.doesNotMatch(landing, /Case study|CraftOrbit|quan-luong/);
   assert.doesNotMatch(landing, /có nhịp|chuẩn craft|không chỉ trên slide/);
-  assert.match(landing, /ClientRedirect href=\{driveCallback \? `\/profile\?\$\{qs\}` : "\/dashboard"\}/);
+  assert.match(landing, /publicOnlyRedirectPath\(user, loc\)/);
+  assert.match(landing, /driveCallback \? `\/profile\?\$\{qs\}`/);
+  assert.doesNotMatch(landing, /window\.location\.replace/);
   assert.doesNotMatch(landing, /googleDriveFolderId|startGoogleDriveLink/);
 });
 
@@ -137,11 +139,15 @@ test("marketing metadata and html lang follow the locale cookie", () => {
   assert.match(MIDNIGHT_LANG_INIT_SCRIPT, /pathname/);
 });
 
-test("app HomePage redirects signed-in users to dashboard", () => {
+test("workspace HomePage sends only superadmin to dashboard and does not bounce others", () => {
+  assert.match(home, /isSuperadminUser\(user\)/);
   assert.match(home, /ClientRedirect href="\/dashboard"/);
+  assert.match(home, /Trang làm việc/);
+  assert.doesNotMatch(home, /if \(isAuthenticated\) \{\s*return <ClientRedirect href="\/dashboard"/);
 });
 
-test("PublicOnlyRoute sends signed-in users to dashboard not marketing home", () => {
-  assert.match(publicOnly, /href="\/dashboard"/);
+test("PublicOnlyRoute sends signed-in users through publicOnlyRedirectPath not marketing home", () => {
+  assert.match(publicOnly, /publicOnlyRedirectPath\(user, loc\)/);
   assert.doesNotMatch(publicOnly, /href="\/"/);
+  assert.doesNotMatch(publicOnly, /window\.location\.replace/);
 });
