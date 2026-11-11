@@ -6,7 +6,7 @@ import { ClientRedirect } from "@/hocs/ClientRedirect";
 import { useAuthInitialized, useIsAuthenticated } from "@/features/auth/model/authSlice";
 import { MIDNIGHT_CONTACT } from "@/lib/midnightContact";
 import { QUANLUONG_BRAND_LOGO_MARK_SRC } from "@/lib/quanLuongPageMeta";
-import { useMidnightLocale } from "@/lib/midnightLocale.jsx";
+import { LocaleText, useMidnightLocale } from "@/lib/midnightLocale.jsx";
 import { cn } from "@/utils/cn";
 import { ComponentMarquee } from "./landing/ComponentMarquee";
 import { Reveal } from "./landing/Reveal";
@@ -91,32 +91,36 @@ export function MidnightLandingPage() {
             <span className="ql-brand-text">Midnight</span>
           </h1>
           <p
-            className="ql-hero-item max-w-xl text-balance text-base leading-relaxed text-muted-foreground sm:text-lg"
+            data-control="hero-lead"
+            className="ql-hero-item w-full max-w-xl text-balance text-base leading-relaxed text-muted-foreground sm:text-lg"
             style={{ "--ql-hero-i": 2 }}
           >
-            {copy.hero.lead}
+            <LocaleText block pick={(item) => item.hero.lead} />
           </p>
           <p
-            className="ql-hero-item max-w-2xl text-balance text-sm leading-relaxed text-muted-foreground/90 sm:text-[0.95rem]"
+            data-control="hero-support"
+            className="ql-hero-item w-full max-w-2xl text-balance text-sm leading-relaxed text-muted-foreground/90 sm:text-[0.95rem]"
             style={{ "--ql-hero-i": 3 }}
           >
-            {copy.hero.support}
+            <LocaleText block pick={(item) => item.hero.support} />
           </p>
-          <div className="ql-hero-item flex flex-wrap items-center justify-center gap-3" style={{ "--ql-hero-i": 4 }}>
+          <div className="ql-hero-item flex w-full flex-wrap items-center justify-center gap-3" style={{ "--ql-hero-i": 4 }}>
             <Link
               href="/login"
-              className={cn(btnBase, "border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90")}
+              data-control="hero-login"
+              className={cn(btnBase, "max-w-full border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90")}
             >
-              {copy.hero.login}
+              <LocaleText pick={(item) => item.hero.login} />
             </Link>
             <a
               href="#mau-giao-dien"
+              data-control="hero-samples"
               className={cn(
                 btnBase,
-                "border border-input bg-card text-foreground shadow-soft hover:border-primary/40 hover:bg-muted",
+                "max-w-full border border-input bg-card text-foreground shadow-soft hover:border-primary/40 hover:bg-muted",
               )}
             >
-              {copy.hero.samples}
+              <LocaleText pick={(item) => item.hero.samples} />
             </a>
           </div>
         </div>
@@ -126,10 +130,10 @@ export function MidnightLandingPage() {
         <div className={cn(sectionWrap, "px-4 pb-2 pt-12 text-center sm:px-6 sm:pt-14 lg:px-10")}>
           <Reveal>
             <h2 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {copy.strip.title}
+              <LocaleText block pick={(item) => item.strip.title} />
             </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              {copy.strip.intro}
+            <p className="mx-auto mt-3 w-full max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              <LocaleText block pick={(item) => item.strip.intro} />
             </p>
           </Reveal>
         </div>
@@ -140,9 +144,11 @@ export function MidnightLandingPage() {
         <div className={sectionWrap}>
           <Reveal>
             <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              {copy.tech.title}
+              <LocaleText block pick={(item) => item.tech.title} />
             </h2>
-            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">{copy.tech.intro}</p>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              <LocaleText block pick={(item) => item.tech.intro} />
+            </p>
           </Reveal>
           <div className="mt-14 space-y-12">
             {copy.tech.blocks.map((block, i) => (
@@ -150,35 +156,37 @@ export function MidnightLandingPage() {
                 <article className="border-t border-border pt-8 lg:grid lg:grid-cols-12 lg:gap-8">
                   <div className="lg:col-span-4">
                     <h3 className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground sm:text-2xl">
-                      {block.title}
+                      <LocaleText pick={(item) => item.tech.blocks[i].title} />
                     </h3>
                     <ul className="mt-4 flex flex-wrap gap-2" aria-label={`${copy.tech.listAria} ${block.title}`}>
-                      {block.tags.map((tag) => (
+                      {block.tags.map((tag, tagIndex) => (
                         <li
                           key={tag}
                           className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium tracking-wide text-foreground/90 shadow-soft"
                         >
-                          {tag}
+                          <LocaleText pick={(item) => item.tech.blocks[i].tags[tagIndex]} />
                         </li>
                       ))}
                     </ul>
                   </div>
                   <p className="mt-4 text-sm leading-relaxed text-muted-foreground lg:col-span-8 lg:mt-0 lg:text-[0.95rem] lg:leading-7">
-                    {block.body}
+                    <LocaleText block pick={(item) => item.tech.blocks[i].body} />
                   </p>
                 </article>
               </Reveal>
             ))}
           </div>
           <div className="mt-12 border-t border-border pt-8">
-            <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{copy.tech.studioLead}</p>
+            <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+              <LocaleText block pick={(item) => item.tech.studioLead} />
+            </p>
             <ul className="mt-4 flex flex-wrap gap-2" aria-label={copy.tech.studioAria}>
-              {copy.tech.studioTags.map((tag) => (
+              {copy.tech.studioTags.map((tag, tagIndex) => (
                 <li
                   key={tag}
                   className="rounded-md border border-dashed border-border bg-card px-2.5 py-1 text-[11px] font-medium tracking-wide text-foreground/90 shadow-soft"
                 >
-                  {tag}
+                  <LocaleText pick={(item) => item.tech.studioTags[tagIndex]} />
                 </li>
               ))}
             </ul>
@@ -190,9 +198,11 @@ export function MidnightLandingPage() {
         <div className={sectionWrap}>
           <Reveal>
             <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              {copy.services.title}
+              <LocaleText block pick={(item) => item.services.title} />
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">{copy.services.intro}</p>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              <LocaleText block pick={(item) => item.services.intro} />
+            </p>
           </Reveal>
           <div className="mt-12 grid gap-10 lg:grid-cols-12 lg:gap-6">
             {copy.services.items.map((s, i) => (
@@ -203,10 +213,14 @@ export function MidnightLandingPage() {
               >
                 <article className="h-full border-t border-border pt-5">
                   <p className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground sm:text-2xl">
-                    {s.title}
+                    <LocaleText pick={(item) => item.services.items[i].title} />
                   </p>
-                  <p className="mt-3 text-sm font-medium text-foreground/90">{s.lead}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.detail}</p>
+                  <p className="mt-3 text-sm font-medium text-foreground/90">
+                    <LocaleText block pick={(item) => item.services.items[i].lead} />
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    <LocaleText block pick={(item) => item.services.items[i].detail} />
+                  </p>
                 </article>
               </Reveal>
             ))}
@@ -221,31 +235,45 @@ export function MidnightLandingPage() {
               <span className="ql-brand-text">Midnight</span>
             </p>
             <h2 className="mt-4 font-[family-name:var(--font-display)] text-xl font-semibold text-foreground">
-              {copy.about.title}
+              <LocaleText pick={(item) => item.about.title} />
             </h2>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{copy.about.body}</p>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
+              <LocaleText block pick={(item) => item.about.body} />
+            </p>
             <div className="mt-6 flex flex-wrap gap-3 text-sm">
-              <Link href="/login" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-                {copy.nav.login}
+              <Link
+                href="/login"
+                data-control="footer-login"
+                className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                <LocaleText pick={(item) => item.nav.login} />
               </Link>
-              <Link href="/register" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-                {copy.nav.register}
+              <Link
+                href="/register"
+                data-control="footer-register"
+                className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                <LocaleText pick={(item) => item.nav.register} />
               </Link>
             </div>
           </div>
 
           <div className="md:col-span-7">
-            <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground">{copy.contact.title}</h2>
-            <p className="mt-2 text-sm text-muted-foreground">{copy.contact.hint}</p>
+            <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground">
+              <LocaleText pick={(item) => item.contact.title} />
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              <LocaleText block pick={(item) => item.contact.hint} />
+            </p>
             <ul className="mt-6 grid gap-3 sm:grid-cols-2">
               {Object.entries(MIDNIGHT_CONTACT).map(([key, item]) => {
                 const Icon = item.Icon;
                 const external = item.href?.startsWith("http");
-                const label = copy.contact.labels[key];
                 return (
                   <li key={key}>
                     <a
                       href={item.href}
+                      data-control={`contact-${key}`}
                       target={external ? "_blank" : undefined}
                       rel={external ? "noopener noreferrer" : undefined}
                       className="flex items-center gap-3 rounded-xl border border-border bg-background/60 px-3.5 py-3 transition hover:border-primary/40 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -255,7 +283,7 @@ export function MidnightLandingPage() {
                       </span>
                       <span className="min-w-0 text-left">
                         <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                          {label}
+                          <LocaleText block pick={(item) => item.contact.labels[key]} />
                         </span>
                         <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{item.value}</span>
                       </span>

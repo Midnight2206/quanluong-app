@@ -96,7 +96,7 @@ function ThemePanel({ labels }) {
  * Single theme picker (light/dark, accent, high contrast), persisted in localStorage.
  * `variant="inline"` renders the panel directly; `variant="popover"` renders an icon trigger.
  */
-export function ThemePicker({ variant = "inline", className, labels }) {
+export function ThemePicker({ variant = "inline", className, labels, controlId }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -133,6 +133,7 @@ export function ThemePicker({ variant = "inline", className, labels }) {
         className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition hover:bg-secondary"
         title={triggerLabel}
         aria-label={triggerLabel}
+        data-control={controlId}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
