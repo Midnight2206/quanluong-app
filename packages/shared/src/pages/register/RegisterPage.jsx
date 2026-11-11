@@ -76,7 +76,7 @@ export function RegisterPage({ initialUnits, initialUnitsError = false } = {}) {
       }
 
       notifySuccess("Đăng ký thành công");
-      router.replace("/");
+      router.replace("/dashboard");
     } catch (error) {
       notifyError(error?.data?.message || "Đăng ký thất bại.");
     }

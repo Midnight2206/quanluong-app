@@ -3,13 +3,19 @@
  * @param {string | null | undefined} raw
  * @returns {string}
  */
+const DEFAULT_APP_HOME = "/dashboard";
+
 export function safeInternalPath(raw) {
   if (raw == null || typeof raw !== "string") {
-    return "/";
+    return DEFAULT_APP_HOME;
   }
   const t = raw.trim();
   if (!t.startsWith("/") || t.startsWith("//")) {
-    return "/";
+    return DEFAULT_APP_HOME;
+  }
+  // Trang marketing `/` không còn là đích sau login.
+  if (t === "/") {
+    return DEFAULT_APP_HOME;
   }
   return t;
 }
@@ -41,7 +47,7 @@ export function supplierChooserHandoff(user, supplierOrigin) {
   if (isSuperadminUser(user)) {
     return { stay: true };
   }
-  return { internal: "/" };
+  return { internal: "/dashboard" };
 }
 
 /**

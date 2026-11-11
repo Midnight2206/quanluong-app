@@ -521,3 +521,112 @@
     border-bottom: 1pt solid #000 !important;
   }
 }
+
+/* —— Midnight marketing landing —— */
+/* Brand gradient follows :root / html.dark --ql-brand-* (theme + accent stay on design tokens). */
+
+.ql-landing-aurora {
+  animation: ql-aurora-drift 18s ease-in-out infinite alternate;
+  filter: blur(40px);
+}
+
+.ql-landing-aurora-2 {
+  animation-duration: 22s;
+  animation-direction: alternate-reverse;
+}
+
+@keyframes ql-aurora-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(4%, 6%, 0) scale(1.08);
+  }
+}
+
+.ql-hero-item {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  animation: ql-hero-in 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: calc(var(--ql-hero-i, 0) * 110ms + 80ms);
+}
+
+@keyframes ql-hero-in {
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.ql-reveal {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition:
+    opacity 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ql-reveal-in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Dual-row infinite component banner (50% track = one copy). */
+.ql-marquee-track {
+  animation: ql-marquee-x 64s linear infinite;
+  will-change: transform;
+}
+
+.ql-marquee-track-reverse {
+  animation-name: ql-marquee-x-rev;
+  animation-duration: 72s;
+}
+
+@keyframes ql-marquee-x {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes ql-marquee-x-rev {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ql-landing-aurora,
+  .ql-landing-aurora-2 {
+    animation: none !important;
+  }
+
+  .ql-hero-item {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
+  }
+
+  .ql-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .ql-marquee-live {
+    display: none !important;
+  }
+
+  .ql-marquee-static {
+    display: flex !important;
+  }
+
+  .ql-marquee-track {
+    animation: none !important;
+  }
+}

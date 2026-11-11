@@ -98,7 +98,7 @@ function googleDriveErrorRedirect(returnOrigin, reason, message) {
     q.set("msg", message.trim().slice(0, 240));
   }
   const base = String(returnOrigin || config.publicWebUrl).replace(/\/+$/, "");
-  return `${base}/?${q.toString()}`;
+  return `${base}/profile?${q.toString()}`;
 }
 
 function mapGoogleDriveLinkErrorReason(error) {
@@ -480,7 +480,7 @@ async function googleDriveCallbackController(req, res) {
     return res.redirect(302, googleDriveErrorRedirect(returnOrigin, reason, message));
   }
 
-  return res.redirect(302, `${returnOrigin}/?google=linked`);
+  return res.redirect(302, `${returnOrigin}/profile?google=linked`);
 }
 
 async function googleDriveUnlinkController(req, res) {

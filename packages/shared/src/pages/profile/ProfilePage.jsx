@@ -13,7 +13,7 @@ import {
   Trash2,
   UserRound,
 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
 import Cropper from "react-easy-crop";
 import { useForm } from "react-hook-form";
@@ -38,6 +38,7 @@ import { notifyError, notifySuccess, notifyWarning } from "@/services/notify";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { cn } from "@/utils/cn";
 import { BaTokenManager } from "@/features/ba-profiles/components/BaTokenManager";
+import { GoogleDriveLinkCard } from "@/features/auth/components/GoogleDriveLinkCard";
 import { getApiBaseUrl, resolveMediaUrl } from "@/utils/runtimeEnv";
 import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 import {
@@ -807,6 +808,9 @@ export function ProfilePage() {
               </form>
             </CardContent>
           </Card>
+          <Suspense fallback={null}>
+            <GoogleDriveLinkCard />
+          </Suspense>
           {user?.type?.name === "admin" && (user?.unitId ?? user?.unit?.id) ? (
             <Card className="shadow-soft">
               <CardContent className="space-y-2">

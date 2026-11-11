@@ -57,7 +57,7 @@ function MidnightLogoRing({ className }) {
   );
 }
 
-export function AppBrand({ compact = false }) {
+export function AppBrand({ compact = false, logoOnly = false }) {
   return (
     <div className={cn("flex min-w-0 items-center", compact ? "gap-2.5 lg:gap-3" : "gap-3")}>
       <div
@@ -77,19 +77,21 @@ export function AppBrand({ compact = false }) {
           className="ql-brand-mark absolute left-1/2 top-1/2 size-[48%] -translate-x-1/2 -translate-y-1/2 rounded-full object-contain"
         />
       </div>
-      <div className={cn("min-w-0", compact && "hidden sm:block")}>
-        <p className="ql-brand-text text-xs font-semibold uppercase tracking-[0.18em] print:bg-none print:text-foreground">
-          {QUANLUONG_SITE_NAME}
-        </p>
-        <p
-          className={cn(
-            "ql-brand-text mt-0.5 text-[10px] leading-snug print:bg-none print:text-foreground",
-            compact ? "max-w-[14rem] lg:max-w-[18rem]" : "max-w-[16rem]",
-          )}
-        >
-          {QUANLUONG_SITE_SLOGAN}
-        </p>
-      </div>
+      {logoOnly ? null : (
+        <div className={cn("min-w-0", compact && "hidden sm:block")}>
+          <p className="ql-brand-text text-xs font-semibold uppercase tracking-[0.18em] print:bg-none print:text-foreground">
+            {QUANLUONG_SITE_NAME}
+          </p>
+          <p
+            className={cn(
+              "ql-brand-text mt-0.5 text-[10px] leading-snug print:bg-none print:text-foreground",
+              compact ? "max-w-[14rem] lg:max-w-[18rem]" : "max-w-[16rem]",
+            )}
+          >
+            {QUANLUONG_SITE_SLOGAN}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

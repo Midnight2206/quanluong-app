@@ -39,7 +39,7 @@ export function ResendVerificationEmailPage() {
   }
 
   if (isAuthenticated && user?.emailVerified !== false) {
-    return <ClientRedirect href="/" replace />;
+    return <ClientRedirect href="/dashboard" replace />;
   }
 
   async function sendAsLoggedIn() {

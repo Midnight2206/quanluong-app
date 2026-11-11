@@ -9,12 +9,12 @@ import { AppProviders } from "@/app/providers/AppProviders";
 import { LttpSupplierRedirect } from "@/hocs/LttpSupplierRedirect";
 import { QUANLUONG_MANIFEST_PATH, QUANLUONG_SITE_NAME, quanLuongIcons } from "@/lib/quanLuongPageMeta";
 import { THEME_INIT_SCRIPT } from "@/utils/theme";
-import { appFont } from "@/lib/appFont";
+import { appFont, displayFont } from "@/lib/appFont";
 
 const siteName = QUANLUONG_SITE_NAME;
 const defaultDescription =
-  "Cổng làm việc đơn vị — lương và nhân sự, LTTP nhập–xuất, đặt hàng, báo cáo và phân quyền.";
-const defaultOgTitle = `${siteName} - Trang chủ`;
+  "Midnight — web app, website và firmware. Quân lương: quản lý quân nhu, LTTP, sổ sách và phân quyền trên production.";
+const defaultOgTitle = `${siteName} - Midnight`;
 
 export function generateMetadata() {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
@@ -53,7 +53,7 @@ export function generateMetadata() {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="vi" className={appFont.variable} suppressHydrationWarning>
+    <html lang="vi" className={`${appFont.variable} ${displayFont.variable}`} suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <AppProviders>

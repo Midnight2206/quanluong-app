@@ -10,9 +10,10 @@ import {
   supplierChooserHandoff,
 } from "./postLoginPath.js";
 
-test("safeInternalPath rejects open redirects", () => {
-  assert.equal(safeInternalPath("https://evil.example"), "/");
-  assert.equal(safeInternalPath("//evil"), "/");
+test("safeInternalPath rejects open redirects and maps / to dashboard", () => {
+  assert.equal(safeInternalPath("https://evil.example"), "/dashboard");
+  assert.equal(safeInternalPath("//evil"), "/dashboard");
+  assert.equal(safeInternalPath("/"), "/dashboard");
   assert.equal(safeInternalPath("/dashboard"), "/dashboard");
 });
 
@@ -35,7 +36,7 @@ test("resolvePostLoginPath keeps safe from for others", () => {
     resolvePostLoginPath({ type: { name: "user" } }, "/profile"),
     "/profile",
   );
-  assert.equal(resolvePostLoginPath({ type: { name: "user" } }, null), "/");
+  assert.equal(resolvePostLoginPath({ type: { name: "user" } }, null), "/dashboard");
 });
 
 test("resolvePostLoginPath sends supplier to the supplier app and ignores from", () => {
@@ -88,7 +89,7 @@ test("supplierChooserHandoff sends supplier users to one external url", () => {
 
 test("supplierChooserHandoff sends admin users home with no external url", () => {
   const result = supplierChooserHandoff({ type: { name: "admin" } }, "http://localhost:8082");
-  assert.deepEqual(result, { internal: "/" });
+  assert.deepEqual(result, { internal: "/dashboard" });
   assert.equal("external" in result, false);
 });
 
