@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { UserRound } from "lucide-react";
 import { AppBrand } from "@/components/common/AppBrand";
 import { ThemePicker } from "@/components/common/ThemeToggle";
+import { useAuthInitialized, useCurrentUser, useIsAuthenticated } from "@/features/auth/model/authSlice";
 import { UnifiedPageScrollRoot } from "@/hocs/withUnifiedPageScroll";
 import { MIDNIGHT_LOCALES } from "@/lib/midnightLocale";
 import { LocaleText, MidnightLocaleProvider, useMidnightLocale } from "@/lib/midnightLocale.jsx";
+import { publicOnlyRedirectPath } from "@/utils/postLoginPath";
+import { resolveMediaUrl } from "@/utils/runtimeEnv";
 import { cn } from "@/utils/cn";
 
 const btnBase =
@@ -59,6 +63,16 @@ function LanguageSwitcher() {
 
 function MarketingShell({ children }) {
   const { copy } = useMidnightLocale();
+  const user = useCurrentUser();
+  const isAuthenticated = useIsAuthenticated();
+  const initialized = useAuthInitialized();
+  const signedIn = initialized && isAuthenticated;
+  const enterHref = publicOnlyRedirectPath(
+    user,
+    typeof window !== "undefined" ? window.location : null,
+  );
+  const rawAvatar = user?.profile?.avatarUrl ? resolveMediaUrl(user.profile.avatarUrl) : "";
+  const avatarUrl = /^(https?:\/\/|\/)[^\s"'()\\]+$/.test(String(rawAvatar || "")) ? String(rawAvatar) : "";
   return (
     <div className="ql-landing page-shell flex min-h-0 flex-col overflow-hidden bg-background text-foreground">
       <header className="relative z-40 flex min-h-[4.25rem] shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background/95 px-3 py-2 shadow-sm backdrop-blur-md sm:h-[4.5rem] sm:flex-nowrap sm:gap-3 sm:px-6 sm:py-0 lg:px-8">
@@ -73,26 +87,59 @@ function MarketingShell({ children }) {
         >
           <LanguageSwitcher />
           <ThemePicker variant="popover" labels={copy.theme} controlId="theme" />
-          <Link
-            href="/login"
-            data-control="header-login"
-            className={cn(
-              btnBase,
-              "max-w-full border border-input bg-card text-foreground shadow-soft hover:border-primary/40 hover:bg-muted",
-            )}
-          >
-            <LocaleText pick={(item) => item.nav.login} />
-          </Link>
-          <Link
-            href="/register"
-            data-control="header-register"
-            className={cn(
-              btnBase,
-              "max-w-full border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90",
-            )}
-          >
-            <LocaleText pick={(item) => item.nav.register} />
-          </Link>
+          {signedIn ? (
+            <>
+              <Link
+                href={enterHref}
+                data-control="header-enter"
+                className={cn(
+                  btnBase,
+                  "max-w-full border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90",
+                )}
+              >
+                <LocaleText pick={(item) => item.nav.enterApp} />
+              </Link>
+              <Link
+                href="/profile"
+                data-control="header-account"
+                aria-label={copy.nav.account}
+                className="inline-flex size-10 items-center justify-center overflow-hidden rounded-full border border-border bg-card text-foreground shadow-soft max-lg:size-11"
+              >
+                {avatarUrl ? (
+                  <span
+                    aria-hidden
+                    className="size-full bg-cover bg-center"
+                    style={{ backgroundImage: `url("${avatarUrl.replace(/"/g, "")}")` }}
+                  />
+                ) : (
+                  <UserRound className="size-5" aria-hidden />
+                )}
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                data-control="header-login"
+                className={cn(
+                  btnBase,
+                  "max-w-full border border-input bg-card text-foreground shadow-soft hover:border-primary/40 hover:bg-muted",
+                )}
+              >
+                <LocaleText pick={(item) => item.nav.login} />
+              </Link>
+              <Link
+                href="/register"
+                data-control="header-register"
+                className={cn(
+                  btnBase,
+                  "max-w-full border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90",
+                )}
+              >
+                <LocaleText pick={(item) => item.nav.register} />
+              </Link>
+            </>
+          )}
         </nav>
       </header>
       <div

@@ -26,7 +26,7 @@ function userPayload(typeName) {
   };
 }
 
-async function runCase({ typeName, cookie, startPath, urlOk, forbid }) {
+async function runCase({ typeName, cookie, startPath, urlOk, forbid, text }) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   if (cookie) {
@@ -77,6 +77,9 @@ async function runCase({ typeName, cookie, startPath, urlOk, forbid }) {
 
   await page.goto(`${base}${startPath}`, { waitUntil: "networkidle" });
   await page.waitForURL(urlOk, { timeout: 20000 });
+  if (text) {
+    await page.getByRole("heading", { name: text }).first().waitFor({ timeout: 20000 });
+  }
   const unique = [...new Set(urls.map((url) => url.replace(base, "") || "/"))];
   const bounced = unique.filter((path) => forbid.some((item) => path.startsWith(item)));
   const final = page.url();
@@ -123,6 +126,18 @@ if (unitReturnedToLogin || unitLogin.bounced.length || unitLogin.unique.length >
   failures.push(`unit /login ${unitLogin.unique.join(" -> ")} final ${unitLogin.final}`);
 }
 
+const signedInHome = await runCase({
+  typeName: "superadmin",
+  cookie: true,
+  startPath: "/",
+  urlOk: /\/$/,
+  forbid: ["/dashboard", "/chon-cong", "/login"],
+  text: "Midnight",
+});
+if (!signedInHome.final.endsWith("/") || signedInHome.unique.some((path) => path.startsWith("/dashboard"))) {
+  failures.push(`signed-in / ${signedInHome.unique.join(" -> ")} final ${signedInHome.final}`);
+}
+
 const guest = await runCase({
   typeName: null,
   cookie: false,
@@ -144,3 +159,4 @@ console.log("superadmin login", superadminLogin.unique.join(" -> "));
 console.log("superadmin dashboard", superadminDash.unique.join(" -> "));
 console.log("unit login", unitLogin.unique.join(" -> "));
 console.log("guest dashboard", guest.unique.join(" -> "));
+console.log("signed-in home", signedInHome.unique.join(" -> "));

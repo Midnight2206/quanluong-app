@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
-import { useAuthInitialized, useCurrentUser, useIsAuthenticated } from "@/features/auth/model/authSlice";
+import { useAuthInitialized } from "@/features/auth/model/authSlice";
 import { MIDNIGHT_CONTACT } from "@/lib/midnightContact";
 import { QUANLUONG_BRAND_LOGO_MARK_SRC } from "@/lib/quanLuongPageMeta";
 import { LocaleText, useMidnightLocale } from "@/lib/midnightLocale.jsx";
-import { publicOnlyRedirectPath } from "@/utils/postLoginPath";
 import { cn } from "@/utils/cn";
 import { ComponentMarquee } from "./landing/ComponentMarquee";
 import { Reveal } from "./landing/Reveal";
@@ -56,8 +55,6 @@ function MidnightSeal({ className }) {
 }
 
 export function MidnightLandingPage() {
-  const isAuthenticated = useIsAuthenticated();
-  const user = useCurrentUser();
   const initialized = useAuthInitialized();
   const searchParams = useSearchParams();
   const { copy } = useMidnightLocale();
@@ -68,12 +65,8 @@ export function MidnightLandingPage() {
     );
   }
 
-  if (isAuthenticated) {
-    const driveCallback = searchParams.has("google");
-    const qs = searchParams.toString();
-    const loc = typeof window !== "undefined" ? window.location : null;
-    const href = driveCallback ? `/profile?${qs}` : publicOnlyRedirectPath(user, loc);
-    return <ClientRedirect href={href} replace />;
+  if (searchParams.has("google")) {
+    return <ClientRedirect href={`/profile?${searchParams.toString()}`} replace />;
   }
 
   return (

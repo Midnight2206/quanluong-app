@@ -11,8 +11,11 @@ import { quanLuongPageMeta } from "../../lib/quanLuongPageMeta.js";
 
 const landing = readFileSync(new URL("./MidnightLandingPage.jsx", import.meta.url), "utf8");
 const marketingLayout = readFileSync(new URL("../../layouts/MarketingLayout.jsx", import.meta.url), "utf8");
-const home = readFileSync(new URL("./HomePage.jsx", import.meta.url), "utf8");
 const publicOnly = readFileSync(new URL("../../hocs/PublicOnlyRoute.jsx", import.meta.url), "utf8");
+const superadminHome = readFileSync(
+  new URL("../../../../../apps/superadmin/app/(main)/page.jsx", import.meta.url),
+  "utf8",
+);
 const marketingPage = readFileSync(
   new URL("../../../../../apps/web/app/(marketing)/page.jsx", import.meta.url),
   "utf8",
@@ -39,8 +42,9 @@ test("landing is Midnight studio (services + tech + contact footer) with auth re
   assert.match(landing, /item\.contact\.title/);
   assert.doesNotMatch(landing, /Case study|CraftOrbit|quan-luong/);
   assert.doesNotMatch(landing, /có nhịp|chuẩn craft|không chỉ trên slide/);
-  assert.match(landing, /publicOnlyRedirectPath\(user, loc\)/);
-  assert.match(landing, /driveCallback \? `\/profile\?\$\{qs\}`/);
+  assert.match(landing, /searchParams\.has\("google"\)/);
+  assert.match(landing, /\/profile\?\$\{searchParams\.toString\(\)\}/);
+  assert.doesNotMatch(landing, /publicOnlyRedirectPath/);
   assert.doesNotMatch(landing, /window\.location\.replace/);
   assert.doesNotMatch(landing, /googleDriveFolderId|startGoogleDriveLink/);
 });
@@ -115,6 +119,7 @@ test("locale text reserves every language so controls do not resize", () => {
   assert.doesNotMatch(localeUi, /truncate|text-ellipsis|line-clamp/);
   assert.match(landing, /LocaleText/);
   assert.match(marketingLayout, /LocaleText/);
+  assert.match(marketingLayout, /data-control="header-enter"/);
   assert.match(marketingLayout, /data-control="header-login"/);
   assert.match(landing, /data-control="hero-samples"/);
   assert.match(landing, /data-control="footer-login"/);
@@ -139,11 +144,12 @@ test("marketing metadata and html lang follow the locale cookie", () => {
   assert.match(MIDNIGHT_LANG_INIT_SCRIPT, /pathname/);
 });
 
-test("workspace HomePage sends only superadmin to dashboard and does not bounce others", () => {
-  assert.match(home, /isSuperadminUser\(user\)/);
-  assert.match(home, /ClientRedirect href="\/dashboard"/);
-  assert.match(home, /Trang làm việc/);
-  assert.doesNotMatch(home, /if \(isAuthenticated\) \{\s*return <ClientRedirect href="\/dashboard"/);
+test("superadmin home is the main Midnight landing, not a second in-app home", () => {
+  assert.match(superadminHome, /getMainAppOrigin/);
+  assert.match(superadminHome, /window\.location\.replace/);
+  assert.match(superadminHome, /MidnightLandingPage/);
+  assert.doesNotMatch(superadminHome, /from "@\/pages\/home\/HomePage"/);
+  assert.doesNotMatch(superadminHome, /ClientRedirect href="\/dashboard"/);
 });
 
 test("PublicOnlyRoute sends signed-in users through publicOnlyRedirectPath not marketing home", () => {

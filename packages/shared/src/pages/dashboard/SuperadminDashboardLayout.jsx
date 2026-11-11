@@ -28,8 +28,7 @@ export function SuperadminDashboardLayout({ children }) {
   }
 
   if (!isSuperadminUser(user)) {
-    // Không `ClientRedirect` về `/`: HomePage của shell đang đăng nhập lại đẩy mọi
-    // user đã đăng nhập sang `/dashboard` → vòng lặp.
+    // Không `ClientRedirect` về `/`: trang chủ là landing Midnight, không đẩy ngược vào dashboard.
     return (
       <div className="mx-auto flex max-w-md flex-col gap-4 p-6 text-center">
         <h1 className="text-xl font-semibold text-foreground">Bảng điều khiển hệ thống</h1>

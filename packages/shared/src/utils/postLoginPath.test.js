@@ -144,35 +144,18 @@ test("superadmin redirect graph settles without a cross-host loop", () => {
 });
 
 test("workspace home and superadmin dashboard do not redirect to each other", () => {
-  const home = readFileSync(new URL("../pages/home/HomePage.jsx", import.meta.url), "utf8");
   const dash = readFileSync(
     new URL("../pages/dashboard/SuperadminDashboardLayout.jsx", import.meta.url),
     "utf8",
   );
-  assert.match(home, /isSuperadminUser\(user\)/);
-  assert.match(home, /Trang làm việc/);
+  const landing = readFileSync(new URL("../pages/home/MidnightLandingPage.jsx", import.meta.url), "utf8");
   assert.doesNotMatch(dash, /ClientRedirect href="\/"/);
   assert.match(dash, /isSuperadminUser\(user\)/);
+  assert.doesNotMatch(landing, /publicOnlyRedirectPath/);
   const superadmin = { type: { name: "superadmin" } };
-  const unit = { type: { name: "admin" } };
-  const steps = [];
-  let path = "/";
-  let user = superadmin;
-  for (let i = 0; i < 5; i += 1) {
-    steps.push(path);
-    if (path === "/") {
-      path = isSuperadminUser(user) ? "/dashboard" : "stay";
-      continue;
-    }
-    if (path === "/dashboard") {
-      path = isSuperadminUser(user) ? "stay" : "stay";
-      continue;
-    }
-    break;
-  }
-  assert.deepEqual(steps, ["/", "/dashboard", "stay"]);
-  user = unit;
-  assert.equal(isSuperadminUser(user) ? "/dashboard" : "stay", "stay");
+  const main = { hostname: "quanluong.tail.ts.net", port: "" };
+  assert.equal(publicOnlyRedirectPath(superadmin, main), "/chon-cong");
+  assert.equal(isSuperadminUser(superadmin), true);
 });
 
 test("main dashboard does not bounce superadmin to another origin", () => {
