@@ -63,11 +63,12 @@ export function quanLuongIcons() {
  * Metadata chuẩn cho một trang: segment `title` khớp template root `Quân lương - %s`;
  * OG/Twitter nhận title đầy đủ.
  *
- * @param {{ title: string; description: string; robots?: import("next").Metadata["robots"] }} opts
+ * @param {{ title: string; description: string; locale?: "vi" | "en"; robots?: import("next").Metadata["robots"] }} opts
  * @returns {import("next").Metadata}
  */
 export function quanLuongPageMeta(opts) {
   const docTitle = `${QUANLUONG_SITE_NAME} - ${opts.title}`;
+  const ogLocale = opts.locale === "en" ? "en_US" : "vi_VN";
   /** @type {import("next").Metadata} */
   const out = {
     title: opts.title,
@@ -75,7 +76,7 @@ export function quanLuongPageMeta(opts) {
     openGraph: {
       title: docTitle,
       description: opts.description,
-      locale: "vi_VN",
+      locale: ogLocale,
       type: "website",
     },
     twitter: {

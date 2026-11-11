@@ -8,12 +8,13 @@ export const viewport = {
 import { AppProviders } from "@/app/providers/AppProviders";
 import { LttpSupplierRedirect } from "@/hocs/LttpSupplierRedirect";
 import { QUANLUONG_MANIFEST_PATH, QUANLUONG_SITE_NAME, quanLuongIcons } from "@/lib/quanLuongPageMeta";
+import { getMidnightCopy } from "@/lib/midnightLandingCopy";
+import { MIDNIGHT_LANG_INIT_SCRIPT } from "@/lib/midnightLocale";
 import { THEME_INIT_SCRIPT } from "@/utils/theme";
 import { appFont, displayFont } from "@/lib/appFont";
 
 const siteName = QUANLUONG_SITE_NAME;
-const defaultDescription =
-  "Midnight — web app, website và firmware. Quân lương: quản lý quân nhu, LTTP, sổ sách và phân quyền trên production.";
+const defaultDescription = getMidnightCopy("vi").meta.description;
 const defaultOgTitle = `${siteName} - Midnight`;
 
 export function generateMetadata() {
@@ -56,6 +57,7 @@ export default function RootLayout({ children }) {
     <html lang="vi" className={`${appFont.variable} ${displayFont.variable}`} suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: MIDNIGHT_LANG_INIT_SCRIPT }} />
         <AppProviders>
           <LttpSupplierRedirect />
           {children}

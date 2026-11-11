@@ -13,7 +13,13 @@ import {
   getStoredTheme,
 } from "@/utils/theme";
 
-function ThemePanel() {
+function ThemePanel({ labels }) {
+  const modeLabel = labels?.mode ?? "Chế độ";
+  const lightLabel = labels?.light ?? "Sáng";
+  const darkLabel = labels?.dark ?? "Tối";
+  const accentLabel = labels?.accent ?? "Màu chủ đạo";
+  const contrastLabel = labels?.contrast ?? "Tương phản cao";
+  const accentName = (item) => labels?.accentNames?.[item.id] ?? item.label;
   // Defaults on first render (SSR-safe), then read storage after mount.
   const [theme, setTheme] = useState("light");
   const [accent, setAccent] = useState(ACCENTS[0].id);
@@ -27,10 +33,10 @@ function ThemePanel() {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="radiogroup" aria-label="Chế độ">
+      <div className="grid grid-cols-2 gap-1 rounded-lg border border-border p-1" role="radiogroup" aria-label={modeLabel}>
         {[
-          { id: "light", label: "Sáng", Icon: Sun },
-          { id: "dark", label: "Tối", Icon: MoonStar },
+          { id: "light", label: lightLabel, Icon: Sun },
+          { id: "dark", label: darkLabel, Icon: MoonStar },
         ].map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -52,15 +58,15 @@ function ThemePanel() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Màu chủ đạo">
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={accentLabel}>
         {ACCENTS.map((item) => (
           <button
             key={item.id}
             type="button"
             role="radio"
             aria-checked={accent === item.id}
-            aria-label={item.label}
-            title={item.label}
+            aria-label={accentName(item)}
+            title={accentName(item)}
             className={cn(
               "inline-flex size-8 items-center justify-center rounded-full border-2 text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               accent === item.id ? "border-foreground" : "border-transparent",
@@ -80,7 +86,7 @@ function ThemePanel() {
           checked={highContrast}
           onChange={(event) => setHighContrast(applyHighContrast(event.target.checked))}
         />
-        Tương phản cao
+        {contrastLabel}
       </label>
     </div>
   );
@@ -90,7 +96,7 @@ function ThemePanel() {
  * Single theme picker (light/dark, accent, high contrast), persisted in localStorage.
  * `variant="inline"` renders the panel directly; `variant="popover"` renders an icon trigger.
  */
-export function ThemePicker({ variant = "inline", className }) {
+export function ThemePicker({ variant = "inline", className, labels }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -113,18 +119,20 @@ export function ThemePicker({ variant = "inline", className }) {
   if (variant !== "popover") {
     return (
       <div className={className}>
-        <ThemePanel />
+        <ThemePanel labels={labels} />
       </div>
     );
   }
+
+  const triggerLabel = labels?.trigger ?? "Giao diện";
 
   return (
     <div className={cn("relative", className)} ref={ref}>
       <button
         type="button"
         className="inline-flex size-10 items-center justify-center rounded-lg border border-border bg-card text-foreground shadow-sm transition hover:bg-secondary"
-        title="Giao diện"
-        aria-label="Giao diện"
+        title={triggerLabel}
+        aria-label={triggerLabel}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
@@ -132,7 +140,7 @@ export function ThemePicker({ variant = "inline", className }) {
       </button>
       {open ? (
         <div className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-border bg-card p-3 shadow-float">
-          <ThemePanel />
+          <ThemePanel labels={labels} />
         </div>
       ) : null}
     </div>

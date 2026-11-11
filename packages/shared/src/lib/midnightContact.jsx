@@ -86,5 +86,4 @@ export const MIDNIGHT_CONTACT = {
   },
 };
 
-export const MIDNIGHT_ABOUT =
-  "Midnight là studio dựng web app, website và firmware — ưu tiên giao diện có nhịp, API rõ hợp đồng, và sản phẩm chạy ổn trên môi trường thật. Quân lương là một trong những hệ thống chúng tôi vận hành.";
+export { MIDNIGHT_ABOUT_VI as MIDNIGHT_ABOUT } from "./midnightLandingCopy.js";

@@ -4,56 +4,17 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
 import { useAuthInitialized, useIsAuthenticated } from "@/features/auth/model/authSlice";
-import { MIDNIGHT_ABOUT, MIDNIGHT_CONTACT } from "@/lib/midnightContact";
+import { MIDNIGHT_CONTACT } from "@/lib/midnightContact";
 import { QUANLUONG_BRAND_LOGO_MARK_SRC } from "@/lib/quanLuongPageMeta";
+import { useMidnightLocale } from "@/lib/midnightLocale.jsx";
 import { cn } from "@/utils/cn";
 import { ComponentMarquee } from "./landing/ComponentMarquee";
 import { Reveal } from "./landing/Reveal";
 
-const SERVICES = [
-  {
-    key: "webapp",
-    title: "Web app",
-    lead: "Hệ thống nghiệp vụ nhiều vai trò, offline-aware, phân quyền chặt.",
-    detail: "Từ sổ sách đơn vị đến cổng nhà cung cấp — một codebase, nhiều bề mặt.",
-  },
-  {
-    key: "website",
-    title: "Website",
-    lead: "Landing và cổng thông tin có nhịp chuyển động có chủ đích.",
-    detail: "Typography, màu brand và motion gắn với sản phẩm — không template generic.",
-  },
-  {
-    key: "firmware",
-    title: "Firmware",
-    lead: "Lớp phần mềm gần phần cứng, ổn định và đo được.",
-    detail: "Đồng bộ với cloud/app khi cần; ưu tiên độ tin cậy trên thiết bị thật.",
-  },
-];
-
-const TECH_STACK = [
-  {
-    key: "frontend",
-    title: "Frontend",
-    tags: ["React", "Next.js", "TypeScript", "Tailwind CSS", "TanStack Query", "Zustand"],
-    body: "Giao diện App Router rõ ranh giới server/client, theme và quyền đi cùng từng màn. React giữ nhịp tương tác; Next.js lo định tuyến, metadata và hiệu năng tải. TypeScript + Tailwind + lớp state/query giúp UI nhất quán, có thể offline khi nghiệp vụ đòi hỏi.",
-  },
-  {
-    key: "backend",
-    title: "Backend",
-    tags: ["Node.js", "Express", "NestJS", "Prisma", "MariaDB", "Redis", "Socket.io", "BullMQ"],
-    body: "API trên Node.js — Express khi cần mỏng và nhanh, NestJS khi hệ thống module hóa sâu. Prisma và MariaDB giữ hợp đồng dữ liệu; Redis cho session/cache; Socket.io cho realtime; BullMQ tách việc nền khỏi request để hệ thống chịu tải êm.",
-  },
-  {
-    key: "delivery",
-    title: "Vận hành & mở rộng",
-    tags: ["Docker", "Python", "PWA", "Firmware"],
-    body: "Đóng gói Docker để môi trường dev/prod khớp nhau. Python phục vụ xuất chứng từ và tài liệu nặng. PWA đưa web app sát thiết bị; firmware gắn phần cứng khi sản phẩm cần lớp gần máy — cùng kỷ luật đo lường và đồng bộ với cloud.",
-  },
-];
-
 const btnBase =
   "inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+const sectionWrap = "mx-auto w-full max-w-[90rem]";
 
 function MidnightSeal({ className }) {
   return (
@@ -97,10 +58,11 @@ export function MidnightLandingPage() {
   const isAuthenticated = useIsAuthenticated();
   const initialized = useAuthInitialized();
   const searchParams = useSearchParams();
+  const { copy } = useMidnightLocale();
 
   if (!initialized) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">Đang tải…</div>
+      <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">{copy.loading}</div>
     );
   }
 
@@ -118,7 +80,7 @@ export function MidnightLandingPage() {
       </div>
 
       <section className="relative flex min-h-[calc(100dvh-4.5rem)] flex-col items-center justify-center px-4 pb-10 pt-10 text-center sm:px-8 sm:pb-14">
-        <div className="ql-hero-stage flex max-w-3xl flex-col items-center gap-6">
+        <div className="ql-hero-stage flex w-full max-w-3xl flex-col items-center gap-6">
           <div className="ql-hero-item" style={{ "--ql-hero-i": 0 }}>
             <MidnightSeal />
           </div>
@@ -129,69 +91,68 @@ export function MidnightLandingPage() {
             <span className="ql-brand-text">Midnight</span>
           </h1>
           <p
-            className="ql-hero-item max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg"
+            className="ql-hero-item max-w-xl text-balance text-base leading-relaxed text-muted-foreground sm:text-lg"
             style={{ "--ql-hero-i": 2 }}
           >
-            Xây web app, website và firmware — phần mềm có nhịp, có độ tin cậy, và có bản sắc.
+            {copy.hero.lead}
           </p>
           <p
-            className="ql-hero-item max-w-2xl text-sm leading-relaxed text-muted-foreground/90 sm:text-[0.95rem]"
+            className="ql-hero-item max-w-2xl text-balance text-sm leading-relaxed text-muted-foreground/90 sm:text-[0.95rem]"
             style={{ "--ql-hero-i": 3 }}
           >
-            Studio thiết kế giao diện có chủ đích: component sống theo theme sáng/tối và accent, motion chỉ khi
-            giúp định hướng — không trang trí thừa.
+            {copy.hero.support}
           </p>
           <div className="ql-hero-item flex flex-wrap items-center justify-center gap-3" style={{ "--ql-hero-i": 4 }}>
             <Link
               href="/login"
               className={cn(btnBase, "border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90")}
             >
-              Đăng nhập
+              {copy.hero.login}
             </Link>
             <a
-              href="#craft-strip"
+              href="#mau-giao-dien"
               className={cn(
                 btnBase,
                 "border border-input bg-card text-foreground shadow-soft hover:border-primary/40 hover:bg-muted",
               )}
             >
-              Xem giao diện
+              {copy.hero.samples}
             </a>
           </div>
         </div>
       </section>
 
-      <div id="craft-strip" className="relative scroll-mt-20 border-y border-border bg-muted/25">
-        <div className="mx-auto max-w-5xl px-4 pb-2 pt-12 text-center sm:px-8 sm:pt-14">
+      <div id="mau-giao-dien" className="relative scroll-mt-20 border-y border-border bg-muted/25">
+        <div className={cn(sectionWrap, "px-4 pb-2 pt-12 text-center sm:px-6 sm:pt-14 lg:px-10")}>
           <Reveal>
             <h2 className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              Giao diện có nhịp
+              {copy.strip.title}
             </h2>
-          </Reveal>
-        </div>
-        <ComponentMarquee />
-      </div>
-
-      <section id="cong-nghe" className="relative scroll-mt-24 px-4 py-20 sm:px-8 sm:py-28">
-        <div className="mx-auto max-w-5xl">
-          <Reveal>
-            <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Công nghệ Midnight nắm vững
-            </h2>
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Chọn stack theo bài toán, không theo mốt. Frontend chịu trách nhiệm cảm giác và tốc độ; backend giữ hợp
-              đồng dữ liệu và độ tin cậy; vận hành để sản phẩm sống được trên máy thật — không chỉ trên slide.
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+              {copy.strip.intro}
             </p>
           </Reveal>
+        </div>
+        <ComponentMarquee copy={copy.marquee} />
+      </div>
+
+      <section id="cong-nghe" className="relative scroll-mt-24 px-4 py-16 sm:px-6 sm:py-20 lg:px-10 xl:px-14">
+        <div className={sectionWrap}>
+          <Reveal>
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              {copy.tech.title}
+            </h2>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">{copy.tech.intro}</p>
+          </Reveal>
           <div className="mt-14 space-y-12">
-            {TECH_STACK.map((block, i) => (
+            {copy.tech.blocks.map((block, i) => (
               <Reveal key={block.key} delayMs={i * 70}>
-                <article className="border-t border-border pt-8 md:grid md:grid-cols-12 md:gap-8">
-                  <div className="md:col-span-4">
+                <article className="border-t border-border pt-8 lg:grid lg:grid-cols-12 lg:gap-8">
+                  <div className="lg:col-span-4">
                     <h3 className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground sm:text-2xl">
                       {block.title}
                     </h3>
-                    <ul className="mt-4 flex flex-wrap gap-2" aria-label={`Công nghệ ${block.title}`}>
+                    <ul className="mt-4 flex flex-wrap gap-2" aria-label={`${copy.tech.listAria} ${block.title}`}>
                       {block.tags.map((tag) => (
                         <li
                           key={tag}
@@ -202,9 +163,50 @@ export function MidnightLandingPage() {
                       ))}
                     </ul>
                   </div>
-                  <p className="mt-4 text-sm leading-relaxed text-muted-foreground md:col-span-8 md:mt-0 md:text-[0.95rem] md:leading-7">
+                  <p className="mt-4 text-sm leading-relaxed text-muted-foreground lg:col-span-8 lg:mt-0 lg:text-[0.95rem] lg:leading-7">
                     {block.body}
                   </p>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+          <div className="mt-12 border-t border-border pt-8">
+            <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{copy.tech.studioLead}</p>
+            <ul className="mt-4 flex flex-wrap gap-2" aria-label={copy.tech.studioAria}>
+              {copy.tech.studioTags.map((tag) => (
+                <li
+                  key={tag}
+                  className="rounded-md border border-dashed border-border bg-card px-2.5 py-1 text-[11px] font-medium tracking-wide text-foreground/90 shadow-soft"
+                >
+                  {tag}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative px-4 py-16 sm:px-6 sm:py-20 lg:px-10 xl:px-14">
+        <div className={sectionWrap}>
+          <Reveal>
+            <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              {copy.services.title}
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">{copy.services.intro}</p>
+          </Reveal>
+          <div className="mt-12 grid gap-10 lg:grid-cols-12 lg:gap-6">
+            {copy.services.items.map((s, i) => (
+              <Reveal
+                key={s.key}
+                delayMs={i * 90}
+                className={cn(i === 0 ? "lg:col-span-5" : i === 1 ? "lg:col-span-4" : "lg:col-span-3")}
+              >
+                <article className="h-full border-t border-border pt-5">
+                  <p className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground sm:text-2xl">
+                    {s.title}
+                  </p>
+                  <p className="mt-3 text-sm font-medium text-foreground/90">{s.lead}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.detail}</p>
                 </article>
               </Reveal>
             ))}
@@ -212,69 +214,36 @@ export function MidnightLandingPage() {
         </div>
       </section>
 
-      <section className="relative mx-auto max-w-5xl px-4 py-20 sm:px-8 sm:py-28">
-        <Reveal>
-          <h2 className="font-[family-name:var(--font-display)] text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            Ba bề mặt, một chuẩn craft
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Mỗi bề mặt có ngôn ngữ riêng; cùng kỷ luật về hiệu năng, truy cập và trải nghiệm.
-          </p>
-        </Reveal>
-        <div className="mt-12 grid gap-10 md:grid-cols-12 md:gap-6">
-          {SERVICES.map((s, i) => (
-            <Reveal
-              key={s.key}
-              delayMs={i * 90}
-              className={cn(i === 0 ? "md:col-span-5" : i === 1 ? "md:col-span-4" : "md:col-span-3")}
-            >
-              <article className="border-t border-border pt-5">
-                <p className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground sm:text-2xl">
-                  {s.title}
-                </p>
-                <p className="mt-3 text-sm font-medium text-foreground/90">{s.lead}</p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.detail}</p>
-              </article>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      <footer
-        id="lien-he"
-        className="relative border-t border-border bg-card/70 px-4 py-14 sm:px-8 sm:py-16 lg:px-10"
-      >
-        <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-12 md:gap-8 lg:gap-12">
-          <div className="md:col-span-5 lg:col-span-5">
+      <footer id="lien-he" className="relative border-t border-border bg-card/70 px-4 py-14 sm:px-6 sm:py-16 lg:px-10 xl:px-14">
+        <div className={cn(sectionWrap, "grid gap-10 md:grid-cols-12 md:gap-8 lg:gap-12")}>
+          <div className="md:col-span-5">
             <p className="font-[family-name:var(--font-display)] text-lg font-semibold tracking-wide">
               <span className="ql-brand-text">Midnight</span>
             </p>
             <h2 className="mt-4 font-[family-name:var(--font-display)] text-xl font-semibold text-foreground">
-              Về chúng tôi
+              {copy.about.title}
             </h2>
-            <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">{MIDNIGHT_ABOUT}</p>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">{copy.about.body}</p>
             <div className="mt-6 flex flex-wrap gap-3 text-sm">
               <Link href="/login" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-                Đăng nhập
+                {copy.nav.login}
               </Link>
-              <Link
-                href="/register"
-                className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                Đăng ký
+              <Link href="/register" className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                {copy.nav.register}
               </Link>
             </div>
           </div>
 
-          <div className="md:col-span-7 lg:col-span-7">
-            <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground">Liên hệ</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Gửi tin qua kênh bạn tiện nhất.</p>
+          <div className="md:col-span-7">
+            <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold text-foreground">{copy.contact.title}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{copy.contact.hint}</p>
             <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-              {Object.values(MIDNIGHT_CONTACT).map((item) => {
+              {Object.entries(MIDNIGHT_CONTACT).map(([key, item]) => {
                 const Icon = item.Icon;
                 const external = item.href?.startsWith("http");
+                const label = copy.contact.labels[key];
                 return (
-                  <li key={item.label}>
+                  <li key={key}>
                     <a
                       href={item.href}
                       target={external ? "_blank" : undefined}
@@ -286,7 +255,7 @@ export function MidnightLandingPage() {
                       </span>
                       <span className="min-w-0 text-left">
                         <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                          {item.label}
+                          {label}
                         </span>
                         <span className="mt-0.5 block truncate text-sm font-medium text-foreground">{item.value}</span>
                       </span>
