@@ -4,7 +4,8 @@ import Link from "next/link";
 import { AppBrand } from "@/components/common/AppBrand";
 import { ThemePicker } from "@/components/common/ThemeToggle";
 import { UnifiedPageScrollRoot } from "@/hocs/withUnifiedPageScroll";
-import { MidnightLocaleProvider, useMidnightLocale } from "@/lib/midnightLocale.jsx";
+import { MIDNIGHT_LOCALES } from "@/lib/midnightLocale";
+import { LocaleText, MidnightLocaleProvider, useMidnightLocale } from "@/lib/midnightLocale.jsx";
 import { cn } from "@/utils/cn";
 
 const btnBase =
@@ -35,9 +36,20 @@ function LanguageSwitcher() {
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted",
             )}
+            data-control={`lang-${option.id}`}
             onClick={() => setLocale(option.id)}
           >
-            {option.short}
+            <span className="inline-grid" style={{ gridTemplateColumns: "minmax(0, max-content)" }}>
+              {MIDNIGHT_LOCALES.map((loc) => (
+                <span
+                  key={loc}
+                  className={cn("col-start-1 row-start-1", loc !== option.id && "invisible")}
+                  aria-hidden={loc === option.id ? undefined : true}
+                >
+                  {loc.toUpperCase()}
+                </span>
+              ))}
+            </span>
           </button>
         );
       })}
@@ -60,24 +72,26 @@ function MarketingShell({ children }) {
           aria-label={copy.nav.navAria}
         >
           <LanguageSwitcher />
-          <ThemePicker variant="popover" labels={copy.theme} />
+          <ThemePicker variant="popover" labels={copy.theme} controlId="theme" />
           <Link
             href="/login"
+            data-control="header-login"
             className={cn(
               btnBase,
-              "border border-input bg-card text-foreground shadow-soft hover:border-primary/40 hover:bg-muted",
+              "max-w-full border border-input bg-card text-foreground shadow-soft hover:border-primary/40 hover:bg-muted",
             )}
           >
-            {copy.nav.login}
+            <LocaleText pick={(item) => item.nav.login} />
           </Link>
           <Link
             href="/register"
+            data-control="header-register"
             className={cn(
               btnBase,
-              "border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90",
+              "max-w-full border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90",
             )}
           >
-            {copy.nav.register}
+            <LocaleText pick={(item) => item.nav.register} />
           </Link>
         </nav>
       </header>

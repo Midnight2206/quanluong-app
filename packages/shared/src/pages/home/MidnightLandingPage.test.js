@@ -18,6 +18,7 @@ const marketingPage = readFileSync(
   "utf8",
 );
 const rootLayout = readFileSync(new URL("../../../../../apps/web/app/layout.jsx", import.meta.url), "utf8");
+const localeUi = readFileSync(new URL("../../lib/midnightLocale.jsx", import.meta.url), "utf8");
 
 function leafPaths(value, prefix = "") {
   if (Array.isArray(value)) {
@@ -34,8 +35,8 @@ test("landing is Midnight studio (services + tech + contact footer) with auth re
   assert.match(landing, /useMidnightLocale/);
   assert.match(landing, /ComponentMarquee/);
   assert.match(landing, /MIDNIGHT_CONTACT/);
-  assert.match(landing, /copy\.about\.title/);
-  assert.match(landing, /copy\.contact\.title/);
+  assert.match(landing, /item\.about\.title/);
+  assert.match(landing, /item\.contact\.title/);
   assert.doesNotMatch(landing, /Case study|CraftOrbit|quan-luong/);
   assert.doesNotMatch(landing, /có nhịp|chuẩn craft|không chỉ trên slide/);
   assert.match(landing, /ClientRedirect href=\{driveCallback \? `\/profile\?\$\{qs\}` : "\/dashboard"\}/);
@@ -103,6 +104,18 @@ test("component marquee ships fifteen sample tiles and dual-row loop", () => {
   assert.match(marquee, /copy\.aria/);
   assert.equal((marquee.match(/\bid:\s*"/g) || []).length, 15);
   assert.doesNotMatch(marquee, /Passkey|Starter|craft/);
+});
+
+test("locale text reserves every language so controls do not resize", () => {
+  assert.match(localeUi, /export function LocaleText/);
+  assert.match(localeUi, /MIDNIGHT_LOCALES\.map/);
+  assert.match(localeUi, /invisible/);
+  assert.doesNotMatch(localeUi, /truncate|text-ellipsis|line-clamp/);
+  assert.match(landing, /LocaleText/);
+  assert.match(marketingLayout, /LocaleText/);
+  assert.match(marketingLayout, /data-control="header-login"/);
+  assert.match(landing, /data-control="hero-samples"/);
+  assert.match(landing, /data-control="footer-login"/);
 });
 
 test("marketing shell has a language switcher and no app chrome", () => {
