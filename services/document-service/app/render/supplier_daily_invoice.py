@@ -186,38 +186,77 @@ def render_supplier_daily_invoice(payload: dict) -> bytes:
     c.drawString(MARGIN_X + 210, y, "Đồng tiền: VND")
     y -= 18
 
-    # Table
-    col_x = [MARGIN_X, MARGIN_X + 26, MARGIN_X + 230, MARGIN_X + 275, MARGIN_X + 325, MARGIN_X + 400]
+    # Table — cạnh cột + lưới đầy đủ
+    xs = [
+        MARGIN_X,
+        MARGIN_X + 28,
+        MARGIN_X + 232,
+        MARGIN_X + 278,
+        MARGIN_X + 330,
+        MARGIN_X + 408,
+        PAGE_W - MARGIN_X,
+    ]
     headers = ["STT", "Tên hàng hoá, dịch vụ", "ĐVT", "Số lượng", "Đơn giá", "Thành tiền"]
-    c.setFillColor(HexColor("#eaf1ff"))
-    c.rect(MARGIN_X - 2, y - 4, PAGE_W - 2 * MARGIN_X + 4, 16, stroke=0, fill=1)
-    c.setFillColor(INK)
-    c.setFont(FONT_BOLD, 8)
-    for i, h in enumerate(headers):
-        if i >= 3:
-            c.drawRightString(col_x[i] + (70 if i == 5 else 48), y, h)
-        else:
-            c.drawString(col_x[i], y, h)
-    y -= 4
-    c.setStrokeColor(LINE)
-    c.line(MARGIN_X, y, PAGE_W - MARGIN_X, y)
-    y -= 13
+    header_h = 16
+    row_h = 14
+    pad_x = 3
+    table_w = xs[-1] - xs[0]
 
-    c.setFont(FONT_REGULAR, 8)
-    c.setFillColor(INK)
-    if not lines:
-        c.setFillColor(MUTED)
-        c.drawCentredString(PAGE_W / 2, y, "Không có dòng trong ngày này.")
-        y -= 16
-    else:
-        for idx, row in enumerate(lines, start=1):
-            if y < 168:
-                c.showPage()
-                _draw_border(c)
-                _draw_watermark(c)
-                y = PAGE_H - TOP
-                c.setFont(FONT_REGULAR, 8)
-                c.setFillColor(INK)
+    def draw_header_row(top: float) -> float:
+        c.setFillColor(HexColor("#eaf1ff"))
+        c.rect(xs[0], top - header_h, table_w, header_h, stroke=0, fill=1)
+        c.setFillColor(INK)
+        c.setFont(FONT_BOLD, 8)
+        text_y = top - header_h + 5
+        for i, h in enumerate(headers):
+            if i >= 3:
+                c.drawRightString(xs[i + 1] - pad_x, text_y, h)
+            else:
+                c.drawString(xs[i] + pad_x, text_y, h)
+        return top - header_h
+
+    def stroke_table_grid(top: float, bottom: float, band_ys: list[float]) -> None:
+        c.setStrokeColor(LINE)
+        c.setLineWidth(0.7)
+        c.rect(xs[0], bottom, table_w, top - bottom, stroke=1, fill=0)
+        for x in xs[1:-1]:
+            c.line(x, bottom, x, top)
+        for hy in band_ys:
+            c.line(xs[0], hy, xs[-1], hy)
+
+    def draw_body_row(top: float, vals: list[str]) -> float:
+        text_y = top - row_h + 4
+        c.setFont(FONT_REGULAR, 8)
+        c.setFillColor(INK)
+        c.drawString(xs[0] + pad_x, text_y, vals[0])
+        c.drawString(xs[1] + pad_x, text_y, vals[1][:46])
+        c.drawString(xs[2] + pad_x, text_y, vals[2][:8])
+        c.drawRightString(xs[4] - pad_x, text_y, vals[3])
+        c.drawRightString(xs[5] - pad_x, text_y, vals[4])
+        c.drawRightString(xs[6] - pad_x, text_y, vals[5])
+        return top - row_h
+
+    table_top = y
+    y = draw_header_row(y)
+    band_ys = [y]
+    body_rows = list(lines) if lines else [None]
+
+    for idx, row in enumerate(body_rows, start=1):
+        if y - row_h < 168:
+            stroke_table_grid(table_top, y, band_ys)
+            c.showPage()
+            _draw_border(c)
+            _draw_watermark(c)
+            y = PAGE_H - TOP
+            table_top = y
+            y = draw_header_row(y)
+            band_ys = [y]
+        if row is None:
+            c.setFont(FONT_REGULAR, 8)
+            c.setFillColor(MUTED)
+            c.drawCentredString((xs[0] + xs[-1]) / 2, y - row_h + 4, "Không có dòng trong ngày này.")
+            y -= row_h
+        else:
             vals = [
                 str(idx),
                 _text(row.get("name")),
@@ -226,17 +265,10 @@ def render_supplier_daily_invoice(payload: dict) -> bytes:
                 _money(row.get("unitPrice")),
                 _money(row.get("amount")),
             ]
-            c.drawString(col_x[0], y, vals[0])
-            c.drawString(col_x[1], y, vals[1][:46])
-            c.drawString(col_x[2], y, vals[2][:8])
-            c.drawRightString(col_x[3] + 48, y, vals[3])
-            c.drawRightString(col_x[4] + 48, y, vals[4])
-            c.drawRightString(PAGE_W - MARGIN_X, y, vals[5])
-            y -= 12
+            y = draw_body_row(y, vals)
+        band_ys.append(y)
 
-    y -= 4
-    c.setStrokeColor(LINE)
-    c.line(MARGIN_X, y, PAGE_W - MARGIN_X, y)
+    stroke_table_grid(table_top, y, band_ys)
     y -= 14
 
     c.setFillColor(INK)

@@ -455,7 +455,7 @@ export function SupplierOrderPage() {
             {downloadError ? <p className="w-full text-[11px] text-destructive">{downloadError}</p> : null}
           </div>
 
-          <Card className="overflow-visible">
+          <Card className="overflow-visible" data-lttp-ordering-card>
             <CardContent className="space-y-3 !p-2 sm:!p-3">
               <div ref={tableRef} className="space-y-3 bg-background">
                 <div className="space-y-1 px-1">
@@ -463,7 +463,13 @@ export function SupplierOrderPage() {
                   <p className="text-sm text-muted-foreground">{orderDate}</p>
                 </div>
 
-                <div className={TABLE_SCROLL} role="region" aria-label="Bảng đặt hàng — cuộn ngang" tabIndex={0}>
+                <div
+                  className={TABLE_SCROLL}
+                  data-lttp-ordering-table-scroll
+                  role="region"
+                  aria-label="Bảng đặt hàng — cuộn ngang"
+                  tabIndex={0}
+                >
                   <table className="w-max min-w-[48rem] border-separate border-spacing-0 text-sm">
                     <thead>
                       <tr>
