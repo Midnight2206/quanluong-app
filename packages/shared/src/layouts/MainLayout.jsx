@@ -6,7 +6,7 @@ import { usePrivateDomUiPersist } from "@/hooks/usePrivateDomUiPersist";
 import { useLocalUnsavedFieldMarks } from "@/hooks/useLocalUnsavedFieldMarks";
 import { TargetUnitScopeProvider } from "@/contexts/TargetUnitScopeContext";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
-import { mainNavItems, superadminNavItems } from "@/features/navigation/navConfig";
+import { mainNavItems, supplierNavItems, superadminNavItems } from "@/features/navigation/navConfig";
 import { AppHeader } from "@/layouts/components/AppHeader";
 import { AppSidebar } from "@/layouts/components/AppSidebar";
 import { ChatDockProvider } from "@/contexts/ChatDockContext";
@@ -14,6 +14,7 @@ import { EmailVerificationDock } from "@/layouts/components/EmailVerificationDoc
 import { MessengerChatDock } from "@/layouts/components/MessengerChatDock";
 import { WorkingUnitScopeBar } from "@/layouts/components/WorkingUnitScopeBar";
 import { UnifiedPageScrollRoot } from "@/hocs/withUnifiedPageScroll";
+import { isLttpSupplierUser } from "@/utils/postLoginPath";
 
 /**
  * @param {{
@@ -30,7 +31,11 @@ export function MainLayout({
   const router = useRouter();
   const user = useCurrentUser();
   const isSuperadmin = user?.type?.name === "superadmin";
-  const sidebarItems = navItemsProp ?? (isSuperadmin ? superadminNavItems : mainNavItems);
+  const isSupplier = isLttpSupplierUser(user);
+  const sidebarItems =
+    navItemsProp ??
+    (isSupplier ? supplierNavItems : isSuperadmin ? superadminNavItems : mainNavItems);
+  const showScope = showWorkingUnitScope && !isSupplier;
 
   usePrivateDomUiPersist();
   useLocalUnsavedFieldMarks();
@@ -80,7 +85,7 @@ export function MainLayout({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AppHeader />
           <TargetUnitScopeProvider>
-            {showWorkingUnitScope ? <WorkingUnitScopeBar /> : null}
+            {showScope ? <WorkingUnitScopeBar /> : null}
             <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               <AppSidebar items={sidebarItems} />
               <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-3 pt-3 pb-[max(0.75rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] print:h-auto print:min-h-0 print:overflow-visible sm:px-4 sm:pt-4 sm:pb-[max(1rem,calc(4.25rem+env(safe-area-inset-bottom,0px)))] lg:px-3 lg:py-2 lg:pb-2">

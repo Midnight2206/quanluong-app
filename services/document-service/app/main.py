@@ -38,6 +38,7 @@ from app.pagination import PaginationError, plan_pages
 from app.parse import parse_xlsx
 from app.render.kitchen_ledger_book import render_kitchen_ledger_book
 from app.render.pdf_renderer import render_pdf
+from app.render.supplier_daily_invoice import render_supplier_daily_invoice
 from app.render.signature_block import default_signature_block, parse_signature_block_config
 from app.templates.placeholder_data import generate_placeholder_data
 from app.templates.status import (
@@ -875,6 +876,16 @@ def render_kitchen_ledger_book_route(body: dict, _: None = Depends(require_servi
     """Vẽ sổ tháng từ trang Node đã cắt. Không đụng Postgres."""
     try:
         pdf = render_kitchen_ledger_book(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=value_error_detail(exc))
+    return Response(content=pdf, media_type="application/pdf")
+
+
+@app.post("/v1/render/supplier-daily-invoice")
+def render_supplier_daily_invoice_route(body: dict, _: None = Depends(require_service_key)):
+    """Hoá đơn hằng ngày NCC — payload JSON từ Node."""
+    try:
+        pdf = render_supplier_daily_invoice(body)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=value_error_detail(exc))
     return Response(content=pdf, media_type="application/pdf")

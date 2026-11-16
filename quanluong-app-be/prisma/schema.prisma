@@ -874,6 +874,8 @@ model LttpSupplier {
   address             String?  @db.VarChar(500)
   businessLicenseNo   String?  @db.VarChar(64)
   taxCode             String?  @db.VarChar(32)
+  phone               String?  @db.VarChar(32)
+  email               String?  @db.VarChar(255)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   unit                        Unit                        @relation(fields: [unitId], references: [id], onDelete: Cascade)

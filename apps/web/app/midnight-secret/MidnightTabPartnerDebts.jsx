@@ -2,41 +2,30 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { notifyNoWritePermission } from "@/features/permissions/permissionUi";
-
-function localYmd(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatVnd(n) {
-  if (n == null || !Number.isFinite(Number(n))) {
-    return "—";
-  }
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(n));
-}
+import {
+  btnPrimary,
+  btnSecondary,
+  fieldClass,
+  formatVnd,
+  labelClass,
+  localYmd,
+  tableWrapClass,
+  tdClass,
+  thClass,
+  toolbarClass,
+} from "./midnightUi";
 
 function Modal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/30 p-0 sm:items-center sm:p-4">
-      <button
-        type="button"
-        aria-label="Đóng"
-        className="absolute inset-0 cursor-default"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/25 p-0 sm:items-center sm:p-4">
+      <button type="button" aria-label="Đóng" className="absolute inset-0 cursor-default" onClick={onClose} />
       <section
         data-local-scroll="true"
-        className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-t-xl border border-slate-200 bg-white p-4 shadow-float sm:rounded-xl sm:p-5"
+        className="relative max-h-[90dvh] w-full max-w-2xl overflow-y-auto rounded-t-xl border border-border bg-card p-4 shadow-float sm:rounded-xl sm:p-5"
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-          >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <h2 className="text-sm font-semibold text-foreground sm:text-base">{title}</h2>
+          <button type="button" onClick={onClose} className={`${btnSecondary} h-8 px-2 text-xs`}>
             Đóng
           </button>
         </div>
@@ -46,7 +35,7 @@ function Modal({ title, children, onClose }) {
   );
 }
 
-export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, canWrite = false }) {
+export function MidnightTabPartnerDebts({ unitId = "", canWrite = false }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -73,9 +62,7 @@ export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, can
       const q = new URLSearchParams({ unitId });
       const r = await fetch(`/api/midnight-secret/partner-debts?${q}`, { credentials: "include" });
       const j = await r.json();
-      if (!r.ok) {
-        throw new Error(j?.error?.message || j?.message || "Không tải được công nợ");
-      }
+      if (!r.ok) throw new Error(j?.error?.message || j?.message || "Không tải được công nợ");
       setData(j.data ?? j);
     } catch (e) {
       setErr(e?.message || "Lỗi tải công nợ");
@@ -92,7 +79,7 @@ export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, can
   const totals = data?.totals ?? {};
 
   const selectedHistoryTitle = useMemo(
-    () => (historyPartner ? `Lịch sử thanh toán - ${historyPartner.name}` : ""),
+    () => (historyPartner ? `Lịch sử thanh toán · ${historyPartner.name}` : ""),
     [historyPartner],
   );
 
@@ -103,14 +90,11 @@ export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, can
     setHistoryLoading(true);
     try {
       const q = unitId ? `?unitId=${encodeURIComponent(unitId)}` : "";
-      const r = await fetch(
-        `/api/midnight-secret/partner-debts/${partner.lttpSupplierId}/payments${q}`,
-        { credentials: "include" },
-      );
+      const r = await fetch(`/api/midnight-secret/partner-debts/${partner.lttpSupplierId}/payments${q}`, {
+        credentials: "include",
+      });
       const j = await r.json();
-      if (!r.ok) {
-        throw new Error(j?.error?.message || j?.message || "Không tải được lịch sử thanh toán");
-      }
+      if (!r.ok) throw new Error(j?.error?.message || j?.message || "Không tải được lịch sử thanh toán");
       setHistoryData(j.data ?? j);
     } catch (e) {
       setHistoryErr(e?.message || "Lỗi tải lịch sử");
@@ -137,30 +121,23 @@ export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, can
       notifyNoWritePermission();
       return;
     }
-    if (!payPartner) {
-      return;
-    }
+    if (!payPartner) return;
     setPayErr("");
     setPaying(true);
     try {
-      const r = await fetch(
-        `/api/midnight-secret/partner-debts/${payPartner.lttpSupplierId}/payments`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            paymentDate,
-            amount: Number(amount),
-            note,
-            unitId: unitId ? Number(unitId) : undefined,
-          }),
-        },
-      );
+      const r = await fetch(`/api/midnight-secret/partner-debts/${payPartner.lttpSupplierId}/payments`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentDate,
+          amount: Number(amount),
+          note,
+          unitId: unitId ? Number(unitId) : undefined,
+        }),
+      });
       const j = await r.json();
-      if (!r.ok) {
-        throw new Error(j?.error?.message || j?.message || "Không ghi được thanh toán");
-      }
+      if (!r.ok) throw new Error(j?.error?.message || j?.message || "Không ghi được thanh toán");
       const refreshedPartnerId = payPartner.lttpSupplierId;
       setPayPartner(null);
       await load();
@@ -175,90 +152,81 @@ export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, can
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-600">
-        Công nợ được đọc từ bảng tổng hợp trong DB. Hệ thống cập nhật lại công nợ khi phiếu xuất hoặc bảng giá đối tác thay đổi; thanh toán được lưu thành từng bản ghi riêng.
-      </p>
-
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          Đơn vị kho
-          <select
-            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
-            value={unitId}
-            onChange={(e) => onUnitId?.(e.target.value)}
-          >
-            <option value="">Chọn đơn vị</option>
-            {(units || []).map((u) => (
-              <option key={u.id} value={String(u.id)}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-100"
-          disabled={loading || !unitId}
-        >
-          {loading ? "Đang tải..." : "Tải lại công nợ"}
+    <div className="space-y-2.5">
+      <div className={toolbarClass}>
+        <button type="button" onClick={() => void load()} className={btnSecondary} disabled={loading || !unitId}>
+          {loading ? "Đang tải…" : "Tải lại"}
         </button>
-        <div className="text-xs text-slate-600">
-          Tổng công nợ: <span className="font-semibold text-slate-900">{formatVnd(totals.totalDebtAmount)}</span>
-          {" · "}Đã thanh toán: <span className="font-semibold text-emerald-700">{formatVnd(totals.totalPaidAmount)}</span>
-          {" · "}Còn lại: <span className="font-semibold text-red-700">{formatVnd(totals.remainingAmount)}</span>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            Công nợ{" "}
+            <span className="font-semibold tabular-nums text-foreground">{formatVnd(totals.totalDebtAmount)}</span>
+          </span>
+          <span>
+            Đã trả{" "}
+            <span className="font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+              {formatVnd(totals.totalPaidAmount)}
+            </span>
+          </span>
+          <span>
+            Còn lại{" "}
+            <span className="font-semibold tabular-nums text-destructive">{formatVnd(totals.remainingAmount)}</span>
+          </span>
         </div>
       </div>
 
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      {err ? <p className="text-sm text-destructive">{err}</p> : null}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[44rem] border-collapse text-left text-sm text-slate-800">
+      <div className={tableWrapClass}>
+        <table className="w-full min-w-[36rem] border-collapse text-left">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-100 text-xs font-semibold uppercase text-slate-600">
-              <th className="px-3 py-2">Đối tác</th>
-              <th className="px-3 py-2 text-right">Tổng công nợ</th>
-              <th className="px-3 py-2 text-right">Đã thanh toán</th>
-              <th className="px-3 py-2 text-right">Còn lại</th>
-              <th className="px-3 py-2 text-right">Thao tác</th>
+            <tr className="border-b border-border bg-muted/50">
+              <th className={thClass}>Đối tác</th>
+              <th className={`${thClass} text-right`}>Công nợ</th>
+              <th className={`${thClass} text-right`}>Đã trả</th>
+              <th className={`${thClass} text-right`}>Còn lại</th>
+              <th className={`${thClass} text-right`}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {partners.length === 0 && !loading ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
-                  Chưa có đối tác hoặc chưa có dữ liệu công nợ.
+                <td colSpan={5} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  Chưa có dữ liệu công nợ.
                 </td>
               </tr>
             ) : null}
             {partners.map((p) => (
-              <tr key={p.lttpSupplierId} className="border-b border-slate-100">
-                <td className="px-3 py-2 font-medium">
+              <tr key={p.lttpSupplierId} className="border-b border-border/70 hover:bg-muted/30">
+                <td className={tdClass}>
                   <button
                     type="button"
                     onClick={() => void openHistory(p)}
-                    className="text-left text-slate-900 underline-offset-2 hover:underline"
+                    className="font-medium text-foreground underline-offset-2 hover:underline"
                   >
                     {p.name}
                   </button>
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">{formatVnd(p.totalDebtAmount)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-emerald-700">{formatVnd(p.totalPaidAmount)}</td>
-                <td className="px-3 py-2 text-right tabular-nums font-semibold text-red-700">{formatVnd(p.remainingAmount)}</td>
-                <td className="px-3 py-2 text-right">
-                  <div className="flex justify-end gap-2">
+                <td className={`${tdClass} text-right tabular-nums`}>{formatVnd(p.totalDebtAmount)}</td>
+                <td className={`${tdClass} text-right tabular-nums text-emerald-700 dark:text-emerald-400`}>
+                  {formatVnd(p.totalPaidAmount)}
+                </td>
+                <td className={`${tdClass} text-right font-semibold tabular-nums text-destructive`}>
+                  {formatVnd(p.remainingAmount)}
+                </td>
+                <td className={`${tdClass} text-right`}>
+                  <div className="flex justify-end gap-1.5">
                     <button
                       type="button"
                       onClick={() => void openHistory(p)}
-                      className="rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                      className={`${btnSecondary} h-8 px-2 text-xs max-lg:min-h-11`}
                     >
                       Chi tiết
                     </button>
                     <button
                       type="button"
                       onClick={() => openPayment(p)}
-                      className="rounded-md bg-slate-800 px-2 py-1 text-xs font-medium text-white hover:bg-slate-900"
+                      className={`${btnPrimary} h-8 px-2 text-xs max-lg:min-h-11`}
                     >
                       Thanh toán
                     </button>
@@ -269,12 +237,16 @@ export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, can
           </tbody>
           {partners.length ? (
             <tfoot>
-              <tr className="bg-slate-200/80 font-semibold text-slate-900">
-                <td className="px-3 py-2">Tổng</td>
-                <td className="px-3 py-2 text-right">{formatVnd(totals.totalDebtAmount)}</td>
-                <td className="px-3 py-2 text-right text-emerald-700">{formatVnd(totals.totalPaidAmount)}</td>
-                <td className="px-3 py-2 text-right text-red-700">{formatVnd(totals.remainingAmount)}</td>
-                <td className="px-3 py-2" />
+              <tr className="bg-muted/80 font-semibold text-foreground">
+                <td className="px-2.5 py-1.5 text-sm">Tổng</td>
+                <td className="px-2.5 py-1.5 text-right text-sm tabular-nums">{formatVnd(totals.totalDebtAmount)}</td>
+                <td className="px-2.5 py-1.5 text-right text-sm tabular-nums text-emerald-700 dark:text-emerald-400">
+                  {formatVnd(totals.totalPaidAmount)}
+                </td>
+                <td className="px-2.5 py-1.5 text-right text-sm tabular-nums text-destructive">
+                  {formatVnd(totals.remainingAmount)}
+                </td>
+                <td className="px-2.5 py-1.5" />
               </tr>
             </tfoot>
           ) : null}
@@ -283,35 +255,38 @@ export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, can
 
       {historyPartner ? (
         <Modal title={selectedHistoryTitle} onClose={() => setHistoryPartner(null)}>
-          {historyLoading ? <p className="text-sm text-slate-500">Đang tải lịch sử...</p> : null}
-          {historyErr ? <p className="text-sm text-red-600">{historyErr}</p> : null}
+          {historyLoading ? <p className="text-sm text-muted-foreground">Đang tải lịch sử…</p> : null}
+          {historyErr ? <p className="text-sm text-destructive">{historyErr}</p> : null}
           {historyData ? (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-600">
-                Tổng đã thanh toán: <span className="font-semibold text-emerald-700">{formatVnd(historyData.totalPaidAmount)}</span>
+            <div className="space-y-2.5">
+              <p className="text-sm text-muted-foreground">
+                Tổng đã thanh toán:{" "}
+                <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                  {formatVnd(historyData.totalPaidAmount)}
+                </span>
               </p>
-              <div className="overflow-x-auto rounded-lg border border-slate-200">
-                <table className="w-full min-w-[24rem] text-sm">
+              <div className={tableWrapClass}>
+                <table className="w-full min-w-[22rem] text-sm">
                   <thead>
-                    <tr className="border-b bg-slate-100 text-xs uppercase text-slate-600">
-                      <th className="px-3 py-2 text-left">Ngày thanh toán</th>
-                      <th className="px-3 py-2 text-right">Số tiền</th>
-                      <th className="px-3 py-2 text-left">Ghi chú</th>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className={thClass}>Ngày</th>
+                      <th className={`${thClass} text-right`}>Số tiền</th>
+                      <th className={thClass}>Ghi chú</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(historyData.items ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="px-3 py-5 text-center text-slate-500">
+                        <td colSpan={3} className="px-3 py-5 text-center text-muted-foreground">
                           Chưa có lần thanh toán nào.
                         </td>
                       </tr>
                     ) : null}
                     {(historyData.items ?? []).map((row) => (
-                      <tr key={row.id} className="border-b border-slate-100">
-                        <td className="px-3 py-2 font-mono text-xs">{row.paymentDate}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatVnd(row.amount)}</td>
-                        <td className="px-3 py-2 text-slate-600">{row.note || "—"}</td>
+                      <tr key={row.id} className="border-b border-border/70">
+                        <td className={`${tdClass} font-mono text-xs`}>{row.paymentDate}</td>
+                        <td className={`${tdClass} text-right tabular-nums`}>{formatVnd(row.amount)}</td>
+                        <td className={`${tdClass} text-muted-foreground`}>{row.note || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -323,53 +298,45 @@ export function MidnightTabPartnerDebts({ units = [], unitId = "", onUnitId, can
       ) : null}
 
       {payPartner ? (
-        <Modal title={`Ghi thanh toán - ${payPartner.name}`} onClose={() => setPayPartner(null)}>
+        <Modal title={`Ghi thanh toán · ${payPartner.name}`} onClose={() => setPayPartner(null)}>
           <form onSubmit={submitPayment} className="space-y-3">
-            <label className="block text-sm text-slate-600">
+            <label className={`block ${labelClass}`}>
               Ngày thanh toán
               <input
                 type="date"
-                className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                className={`${fieldClass} w-full`}
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
               />
             </label>
-            <label className="block text-sm text-slate-600">
-              Số tiền thanh toán
+            <label className={`block ${labelClass}`}>
+              Số tiền
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                className={`${fieldClass} w-full`}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
               />
             </label>
-            <label className="block text-sm text-slate-600">
+            <label className={`block ${labelClass}`}>
               Ghi chú
               <textarea
-                className="mt-1 block min-h-20 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                className="mt-0.5 block min-h-16 w-full rounded-md border border-input bg-background px-2.5 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 maxLength={500}
               />
             </label>
-            {payErr ? <p className="text-sm text-red-600">{payErr}</p> : null}
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setPayPartner(null)}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-              >
+            {payErr ? <p className="text-sm text-destructive">{payErr}</p> : null}
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={() => setPayPartner(null)} className={btnSecondary}>
                 Hủy
               </button>
-              <button
-                type="submit"
-                disabled={paying || !amount || Number(amount) <= 0}
-                className="rounded-md bg-slate-800 px-3 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
-              >
-                {paying ? "Đang lưu..." : "Ghi thanh toán"}
+              <button type="submit" disabled={paying || !amount || Number(amount) <= 0} className={btnPrimary}>
+                {paying ? "Đang lưu…" : "Ghi thanh toán"}
               </button>
             </div>
           </form>

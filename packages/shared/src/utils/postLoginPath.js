@@ -1,3 +1,9 @@
+import {
+  isSupplierAppPath,
+  SUPPLIER_DEFAULT_HOME,
+  supplierPath,
+} from "./supplierPortal.js";
+
 /**
  * Tránh open redirect sau đăng nhập (chỉ cho phép đường dẫn nội bộ).
  * @param {string | null | undefined} raw
@@ -13,7 +19,7 @@ export function safeInternalPath(raw) {
   if (!t.startsWith("/") || t.startsWith("//")) {
     return DEFAULT_APP_HOME;
   }
-  // Trang marketing `/` không còn là đích sau login.
+  // Trang marketing `/` không còn là đích sau login (user thường).
   if (t === "/") {
     return DEFAULT_APP_HOME;
   }
@@ -40,9 +46,6 @@ export function navigateAfterLogin(next, { assign, replace }) {
 
 /**
  * Host đang mở cổng superadmin (subdomain `admin-` hoặc cổng dev 3001/8081).
- * Cookie phiên là host-only trừ khi COOKIE_DOMAIN phủ cả hai host — Tailscale `*.ts.net`
- * là public suffix nên không share được. Đẩy superadmin sang host kia rồi bị đá về
- * sẽ thành vòng lặp.
  * @param {{ hostname?: string, port?: string } | null | undefined} loc
  */
 export function isSuperadminBrowserHost(loc) {
@@ -59,23 +62,25 @@ export function isSuperadminBrowserHost(loc) {
 
 /**
  * Đích khi user đã đăng nhập mà đang đứng trên trang public (login).
- * Superadmin trên app chính vào trang chọn, không vào `/dashboard` (app chính đá sang cổng kia).
- * Trên chính cổng superadmin thì `/dashboard` là đúng và cùng host.
- * @param {object | null | undefined} user
- * @param {{ hostname?: string, port?: string } | null | undefined} [loc]
+ * NCC về trang chủ gốc `/`.
  */
 export function publicOnlyRedirectPath(user, loc) {
   if (isSuperadminUser(user)) {
     return isSuperadminBrowserHost(loc) ? DEFAULT_APP_HOME : SUPERADMIN_PORTAL_CHOOSER_PATH;
   }
+  if (isLttpSupplierUser(user)) {
+    return SUPPLIER_DEFAULT_HOME;
+  }
   return DEFAULT_APP_HOME;
 }
 
-export function supplierChooserHandoff(user, supplierOrigin) {
+/**
+ * @param {object | null | undefined} user
+ * @param {string} [_supplierOrigin] legacy unused
+ */
+export function supplierChooserHandoff(user, _supplierOrigin) {
   if (isLttpSupplierUser(user)) {
-    return {
-      external: `${String(supplierOrigin).replace(/\/+$/, "")}/`,
-    };
+    return { internal: SUPPLIER_DEFAULT_HOME };
   }
   if (isSuperadminUser(user)) {
     return { stay: true };
@@ -84,16 +89,34 @@ export function supplierChooserHandoff(user, supplierOrigin) {
 }
 
 /**
- * Đích sau login mật khẩu (path nội bộ app chính).
- * Superadmin luôn vào trang chọn — bỏ qua `from`.
+ * Đích sau login mật khẩu.
+ * Superadmin → chọn cổng. NCC → `/` (hoặc `from` nếu là path NCC / profile).
  */
-export function resolvePostLoginPath(user, fromRaw, origins = {}) {
+export function resolvePostLoginPath(user, fromRaw, _origins = {}) {
   if (isSuperadminUser(user)) {
     return SUPERADMIN_PORTAL_CHOOSER_PATH;
   }
   if (isLttpSupplierUser(user)) {
-    const origin = String(origins.supplierOrigin || "http://localhost:3002").replace(/\/+$/, "");
-    return `${origin}/`;
+    const raw = typeof fromRaw === "string" ? fromRaw.trim() : "";
+    if (raw === "/" || raw === SUPPLIER_DEFAULT_HOME) {
+      return SUPPLIER_DEFAULT_HOME;
+    }
+    if (raw.startsWith("/") && !raw.startsWith("//")) {
+      // Legacy nested `/ncc/...` → path phẳng
+      if (raw === "/ncc" || raw.startsWith("/ncc/")) {
+        if (raw === "/ncc/dat-hang" || raw.startsWith("/ncc/dat-hang/")) {
+          return supplierPath("dat-hang");
+        }
+        if (raw === "/ncc/so-cong-no" || raw.startsWith("/ncc/so-cong-no/")) {
+          return supplierPath("so-cong-no");
+        }
+        return SUPPLIER_DEFAULT_HOME;
+      }
+      if (isSupplierAppPath(raw) || raw === "/profile" || raw.startsWith("/profile/")) {
+        return raw;
+      }
+    }
+    return SUPPLIER_DEFAULT_HOME;
   }
   return safeInternalPath(fromRaw);
 }

@@ -1,9 +1,14 @@
 import { prisma } from "../../infra/database/prisma/prisma.client.js";
 import { respondSuccess } from "../../shared/utils/responders.js";
 import { getDailyOrderSummary } from "../lttp/lttp.service.js";
+import { exportSupplierDailyInvoicePdf } from "./lttp-supplier.daily-invoice-pdf.service.js";
 import {
+  getLttpSupplierMe,
   listLttpSupplierCatalog,
   listLttpSupplierLinks,
+  patchLttpSupplierMe,
+  readLttpSupplierDailyInvoice,
+  readLttpSupplierDebt,
   readLttpSupplierLedger,
   readLttpSupplierOrders,
 } from "./lttp-supplier.service.js";
@@ -65,10 +70,65 @@ async function getLttpSupplierLedgerController(req, res) {
   });
 }
 
+async function getLttpSupplierMeController(req, res) {
+  const data = await getLttpSupplierMe({
+    userId: req.user.id,
+    supplierId: req.validatedQuery.supplierId,
+    db: prisma,
+  });
+  return respondSuccess(res, { message: "Hồ sơ nhà cung cấp", data });
+}
+
+async function patchLttpSupplierMeController(req, res) {
+  const data = await patchLttpSupplierMe({
+    userId: req.user.id,
+    supplierId: req.validatedQuery.supplierId,
+    payload: req.validatedBody,
+    db: prisma,
+  });
+  return respondSuccess(res, { message: "Đã cập nhật hồ sơ nhà cung cấp", data });
+}
+
+async function getLttpSupplierDailyInvoiceController(req, res) {
+  const data = await readLttpSupplierDailyInvoice({
+    userId: req.user.id,
+    supplierId: req.validatedQuery.supplierId,
+    date: req.validatedQuery.date,
+    db: prisma,
+  });
+  return respondSuccess(res, { message: "Hoá đơn hằng ngày", data });
+}
+
+async function printLttpSupplierDailyInvoiceController(req, res) {
+  const { buffer, fileName } = await exportSupplierDailyInvoicePdf({
+    userId: req.user.id,
+    supplierId: req.validatedQuery.supplierId,
+    date: req.validatedQuery.date,
+    db: prisma,
+  });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
+  return res.send(buffer);
+}
+
+async function getLttpSupplierDebtController(req, res) {
+  const data = await readLttpSupplierDebt({
+    userId: req.user.id,
+    supplierId: req.validatedQuery.supplierId,
+    db: prisma,
+  });
+  return respondSuccess(res, { message: "Công nợ và thanh toán", data });
+}
+
 export {
   getLttpSupplierCatalogController,
+  getLttpSupplierDailyInvoiceController,
+  getLttpSupplierDebtController,
   getLttpSupplierLinksController,
   getLttpSupplierLinksForUserController,
   getLttpSupplierLedgerController,
+  getLttpSupplierMeController,
   getLttpSupplierOrdersController,
+  patchLttpSupplierMeController,
+  printLttpSupplierDailyInvoiceController,
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/services/apiRequest";
 
 export function useLttpSupplierCatalogQuery(options = {}) {
@@ -20,6 +20,38 @@ export function useLttpSupplierLinksQuery(options = {}) {
     queryFn: () => apiRequest({ url: "/lttp-supplier/links", method: "get" }),
     enabled: skip !== true,
     ...rest,
+  });
+}
+
+export function useLttpSupplierMeQuery(supplierId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: ["lttp-supplier", "me", supplierId],
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp-supplier/me",
+        method: "get",
+        params: { supplierId },
+      }),
+    enabled: skip !== true && supplierId != null,
+    ...rest,
+  });
+}
+
+export function usePatchLttpSupplierMeMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ supplierId, body }) =>
+      apiRequest({
+        url: "/lttp-supplier/me",
+        method: "patch",
+        params: { supplierId },
+        data: body,
+      }),
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: ["lttp-supplier", "me", vars.supplierId] });
+      void qc.invalidateQueries({ queryKey: ["lttp-supplier", "links"] });
+    },
   });
 }
 
@@ -49,6 +81,36 @@ export function useLttpSupplierLedgerQuery({ from, to, supplierId }, options = {
         params: { from, to, supplierId },
       }),
     enabled: skip !== true && Boolean(from) && Boolean(to) && supplierId != null,
+    ...rest,
+  });
+}
+
+export function useLttpSupplierDailyInvoiceQuery({ date, supplierId }, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: ["lttp-supplier", "daily-invoice", date, supplierId],
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp-supplier/daily-invoice",
+        method: "get",
+        params: { date, supplierId },
+      }),
+    enabled: skip !== true && Boolean(date) && supplierId != null,
+    ...rest,
+  });
+}
+
+export function useLttpSupplierDebtQuery(supplierId, options = {}) {
+  const { skip, ...rest } = options;
+  return useQuery({
+    queryKey: ["lttp-supplier", "debt", supplierId],
+    queryFn: () =>
+      apiRequest({
+        url: "/lttp-supplier/debt",
+        method: "get",
+        params: { supplierId },
+      }),
+    enabled: skip !== true && supplierId != null,
     ...rest,
   });
 }

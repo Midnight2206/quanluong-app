@@ -2,22 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { notifyNoWritePermission } from "@/features/permissions/permissionUi";
+import {
+  btnPrimary,
+  btnSecondary,
+  fieldClass,
+  formatVnd,
+  labelClass,
+  localYmd,
+  tableWrapClass,
+  tdClass,
+  thClass,
+  toolbarClass,
+} from "./midnightUi";
 
-function localYmd(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatVnd(n) {
-  if (n == null || !Number.isFinite(Number(n))) {
-    return "—";
-  }
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(n));
-}
-
-export function MidnightTabPartnerPrices({ units, unitId, onUnitId, canWrite = false }) {
+export function MidnightTabPartnerPrices({ unitId, canWrite = false }) {
   const [asOf, setAsOf] = useState(localYmd);
   const [effSave, setEffSave] = useState(localYmd);
   const [data, setData] = useState(null);
@@ -28,9 +26,7 @@ export function MidnightTabPartnerPrices({ units, unitId, onUnitId, canWrite = f
   const [okMsg, setOkMsg] = useState("");
 
   const load = useCallback(async () => {
-    if (!unitId) {
-      return;
-    }
+    if (!unitId) return;
     setErr("");
     setOkMsg("");
     setLoading(true);
@@ -38,15 +34,12 @@ export function MidnightTabPartnerPrices({ units, unitId, onUnitId, canWrite = f
       const q = new URLSearchParams({ unitId, asOf });
       const r = await fetch(`/api/midnight-secret/partner-prices?${q}`, { credentials: "include" });
       const j = await r.json();
-      if (!r.ok) {
-        throw new Error(j?.error?.message || j?.message || "Không tải được bảng giá");
-      }
+      if (!r.ok) throw new Error(j?.error?.message || j?.message || "Không tải được bảng giá");
       const d = j.data ?? j;
       setData(d);
       const m = {};
       for (const it of d.items ?? []) {
-        const id = it.commodity.id;
-        m[id] = it.partnerUnitPrice;
+        m[it.commodity.id] = it.partnerUnitPrice;
       }
       setEdits(m);
     } catch (e) {
@@ -67,9 +60,7 @@ export function MidnightTabPartnerPrices({ units, unitId, onUnitId, canWrite = f
       notifyNoWritePermission();
       return;
     }
-    if (!unitId) {
-      return;
-    }
+    if (!unitId) return;
     setErr("");
     setOkMsg("");
     setSaving(true);
@@ -89,12 +80,8 @@ export function MidnightTabPartnerPrices({ units, unitId, onUnitId, canWrite = f
         }),
       });
       const j = await r.json();
-      if (!r.ok) {
-        throw new Error(j?.error?.message || j?.message || "Lưu thất bại");
-      }
-      setOkMsg(
-        `Đã lưu bảng giá đối tác (áp dụng ${effSave}, ${(j.data ?? j).rowCount ?? rows.length} mặt hàng).`,
-      );
+      if (!r.ok) throw new Error(j?.error?.message || j?.message || "Lưu thất bại");
+      setOkMsg(`Đã lưu · áp dụng ${effSave} · ${(j.data ?? j).rowCount ?? rows.length} mặt hàng`);
       void load();
     } catch (e) {
       setErr(e?.message || "Lỗi lưu");
@@ -104,90 +91,57 @@ export function MidnightTabPartnerPrices({ units, unitId, onUnitId, canWrite = f
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-600">
-        Bảng giá đối tác tách bảng giá LTTP công khai. Chọn ngày tham chiếu để xem giá hiệu lực; chọn
-        <span className="font-medium text-slate-800"> ngày áp dụng khi lưu</span> nếu cần tạo/ sửa phiên bản theo
-        ngày.
-      </p>
-
-      <form onSubmit={onSave} className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <label className="text-xs text-slate-600">
-          Đơn vị cấp của user
-          <select
-            className="mt-0.5 block min-w-[12rem] rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-sm text-slate-900"
-            value={unitId}
-            onChange={(e) => onUnitId(e.target.value)}
-            disabled
-          >
-            {units.length === 0 ? <option value="">—</option> : null}
-            {units.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
+    <div className="space-y-2.5">
+      <form onSubmit={onSave} className={toolbarClass}>
+        <label className={labelClass}>
+          Ngày xem
+          <input type="date" className={fieldClass} value={asOf} onChange={(e) => setAsOf(e.target.value)} />
         </label>
-        <label className="text-xs text-slate-600">
-          Ngày tham chiếu (xem bảng hiệu lực)
+        <label className={labelClass}>
+          Ngày lưu
           <input
             type="date"
-            className="mt-0.5 block rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
-            value={asOf}
-            onChange={(e) => {
-              setAsOf(e.target.value);
-            }}
-          />
-        </label>
-        <label className="text-xs text-slate-600">
-          Ngày áp dụng khi lưu
-          <input
-            type="date"
-            className="mt-0.5 block rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+            className={fieldClass}
             value={effSave}
             onChange={(e) => setEffSave(e.target.value)}
           />
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void load()}
-            className="rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-100"
+            className={btnSecondary}
             disabled={loading || !unitId}
           >
             {loading ? "Đang tải…" : "Tải lại"}
           </button>
-          <button
-            type="submit"
-            className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
-            disabled={saving || !unitId}
-          >
-            {saving ? "Đang lưu…" : "Lưu bảng giá đối tác"}
+          <button type="submit" className={btnPrimary} disabled={saving || !unitId}>
+            {saving ? "Đang lưu…" : "Lưu giá"}
           </button>
         </div>
+        {data?.appliedTable ? (
+          <p className="w-full text-[11px] text-muted-foreground sm:ml-auto sm:w-auto">
+            Hiệu lực từ <span className="font-medium text-foreground">{data.appliedTable.effectiveDate}</span>
+          </p>
+        ) : (
+          <p className="w-full text-[11px] text-amber-700 dark:text-amber-400 sm:ml-auto sm:w-auto">
+            Chưa có phiên bản — nhập giá rồi lưu
+          </p>
+        )}
       </form>
 
-      {data?.appliedTable ? (
-        <p className="text-xs text-slate-500">
-          Phiên bản đang thấy: hiệu lực từ <span className="font-medium text-slate-700">{data.appliedTable.effectiveDate}</span>
-        </p>
-      ) : (
-        <p className="text-xs text-amber-700">Chưa có bảng giá đối tác nào trước ngày tham chiếu — nhập giá và lưu (tạo phiên bản mới).</p>
-      )}
-
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
-      {okMsg ? <p className="text-sm text-emerald-700">{okMsg}</p> : null}
+      {err ? <p className="text-sm text-destructive">{err}</p> : null}
+      {okMsg ? <p className="text-sm text-emerald-700 dark:text-emerald-400">{okMsg}</p> : null}
 
       {data?.items?.length ? (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[36rem] border-collapse text-left text-sm text-slate-800">
+        <div className={tableWrapClass}>
+          <table className="w-full min-w-[28rem] border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-100 text-xs font-semibold uppercase text-slate-600">
-                <th className="px-3 py-2">Mã</th>
-                <th className="px-3 py-2">Tên</th>
-                <th className="px-3 py-2">DVT</th>
-                <th className="px-3 py-2 text-right">Giá đối tác (VND)</th>
-                <th className="px-3 py-2 text-right">Xem nhanh</th>
+              <tr className="border-b border-border bg-muted/50">
+                <th className={thClass}>Mã</th>
+                <th className={thClass}>Tên</th>
+                <th className={thClass}>ĐVT</th>
+                <th className={`${thClass} text-right`}>Giá đối tác</th>
               </tr>
             </thead>
             <tbody>
@@ -195,31 +149,34 @@ export function MidnightTabPartnerPrices({ units, unitId, onUnitId, canWrite = f
                 const id = it.commodity.id;
                 const v = edits[id];
                 return (
-                  <tr key={id} className="border-b border-slate-100">
-                    <td className="px-3 py-1.5 font-mono text-xs">{it.commodity.code}</td>
-                    <td className="px-3 py-1.5">{it.commodity.name}</td>
-                    <td className="px-3 py-1.5 text-slate-600">{it.commodity.measureUnit}</td>
-                    <td className="px-3 py-1.5 text-right">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        step="0.01"
-                        className="w-32 rounded border border-slate-300 px-2 py-1 text-right text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        value={v == null || Number.isNaN(v) ? "" : v}
-                        onChange={(e) => {
-                          const t = e.target.value;
-                          if (t === "") {
-                            setEdits((s) => ({ ...s, [id]: null }));
-                            return;
-                          }
-                          setEdits((s) => ({ ...s, [id]: Number(t) }));
-                        }}
-                        placeholder="0"
-                      />
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-slate-500 tabular-nums">
-                      {formatVnd(v)}
+                  <tr key={id} className="border-b border-border/70 hover:bg-muted/30">
+                    <td className={`${tdClass} font-mono text-xs text-muted-foreground`}>{it.commodity.code}</td>
+                    <td className={tdClass}>{it.commodity.name}</td>
+                    <td className={`${tdClass} text-muted-foreground`}>{it.commodity.measureUnit}</td>
+                    <td className={`${tdClass} text-right`}>
+                      <div className="inline-flex items-center justify-end gap-2">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step="0.01"
+                          className="h-8 w-28 rounded-md border border-input bg-background px-2 text-right text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          value={v == null || Number.isNaN(v) ? "" : v}
+                          onChange={(e) => {
+                            const t = e.target.value;
+                            if (t === "") {
+                              setEdits((s) => ({ ...s, [id]: null }));
+                              return;
+                            }
+                            setEdits((s) => ({ ...s, [id]: Number(t) }));
+                          }}
+                          placeholder="0"
+                          aria-label={`Giá ${it.commodity.name}`}
+                        />
+                        <span className="hidden w-24 text-right text-xs tabular-nums text-muted-foreground lg:inline">
+                          {formatVnd(v)}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );

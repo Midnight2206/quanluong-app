@@ -42,22 +42,30 @@ test("resolvePostLoginPath keeps safe from for others", () => {
   assert.equal(resolvePostLoginPath({ type: { name: "user" } }, null), "/dashboard");
 });
 
-test("resolvePostLoginPath sends supplier to the supplier app and ignores from", () => {
+test("resolvePostLoginPath sends supplier to shared home /", () => {
   assert.equal(isLttpSupplierUser({ type: { name: "lttp_supplier" } }), true);
   assert.equal(isLttpSupplierUser({ type: { name: "admin" } }), false);
   assert.equal(
-    resolvePostLoginPath(
-      { type: { name: "lttp_supplier" } },
-      "/dashboard",
-      { supplierOrigin: "http://localhost:8082" },
-    ),
-    "http://localhost:8082/",
+    resolvePostLoginPath({ type: { name: "lttp_supplier" } }, "/dashboard"),
+    "/",
+  );
+  assert.equal(
+    resolvePostLoginPath({ type: { name: "lttp_supplier" } }, "/"),
+    "/",
+  );
+  assert.equal(
+    resolvePostLoginPath({ type: { name: "lttp_supplier" } }, "/ncc-dathang"),
+    "/ncc-dathang",
+  );
+  assert.equal(
+    resolvePostLoginPath({ type: { name: "lttp_supplier" } }, "/ncc/dat-hang"),
+    "/ncc-dathang",
   );
 });
 
 test("navigateAfterLogin uses assign for absolute http urls", () => {
   const calls = [];
-  navigateAfterLogin("http://localhost:8082/dat-hang", {
+  navigateAfterLogin("https://example.com/x", {
     assign(value) {
       calls.push(["assign", value]);
     },
@@ -65,7 +73,7 @@ test("navigateAfterLogin uses assign for absolute http urls", () => {
       calls.push(["replace", value]);
     },
   });
-  assert.deepEqual(calls, [["assign", "http://localhost:8082/dat-hang"]]);
+  assert.deepEqual(calls, [["assign", "https://example.com/x"]]);
 });
 
 test("navigateAfterLogin uses replace for internal paths", () => {
@@ -81,17 +89,14 @@ test("navigateAfterLogin uses replace for internal paths", () => {
   assert.deepEqual(calls, [["replace", "/profile"]]);
 });
 
-test("supplierChooserHandoff sends supplier users to one external url", () => {
-  const result = supplierChooserHandoff(
-    { type: { name: "lttp_supplier" } },
-    "http://localhost:8082",
-  );
-  assert.deepEqual(result, { external: "http://localhost:8082/" });
-  assert.equal("internal" in result, false);
+test("supplierChooserHandoff sends supplier users to shared home", () => {
+  const result = supplierChooserHandoff({ type: { name: "lttp_supplier" } });
+  assert.deepEqual(result, { internal: "/" });
+  assert.equal("external" in result, false);
 });
 
 test("supplierChooserHandoff sends admin users home with no external url", () => {
-  const result = supplierChooserHandoff({ type: { name: "admin" } }, "http://localhost:8082");
+  const result = supplierChooserHandoff({ type: { name: "admin" } });
   assert.deepEqual(result, { internal: "/dashboard" });
   assert.equal("external" in result, false);
 });
@@ -166,8 +171,12 @@ test("main dashboard does not bounce superadmin to another origin", () => {
 });
 
 test("supplierChooserHandoff keeps superadmin on the chooser", () => {
-  assert.deepEqual(
-    supplierChooserHandoff({ type: { name: "superadmin" } }, "http://localhost:8082"),
-    { stay: true },
+  assert.deepEqual(supplierChooserHandoff({ type: { name: "superadmin" } }), { stay: true });
+});
+
+test("publicOnlyRedirectPath sends supplier to shared home /", () => {
+  assert.equal(
+    publicOnlyRedirectPath({ type: { name: "lttp_supplier" } }, { hostname: "localhost", port: "8080" }),
+    "/",
   );
 });

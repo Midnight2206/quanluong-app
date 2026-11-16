@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { softDeleteActorError, superadminTypeAssignError } from "./user-type-assign.js";
+import {
+  shouldAutoVerifyEmailOnCreate,
+  softDeleteActorError,
+  superadminTypeAssignError,
+} from "./user-type-assign.js";
 
 test("unit admin cannot assign the superadmin type", () => {
   assert.equal(
@@ -33,5 +37,24 @@ test("superadmin scope may soft-delete another superadmin", () => {
   assert.equal(
     softDeleteActorError({ actorId: 1, targetId: 2, targetTypeName: "superadmin", scopeMode: "all" }),
     null,
+  );
+});
+
+test("superadmin-created accounts auto-verify email", () => {
+  assert.equal(
+    shouldAutoVerifyEmailOnCreate({ actorTypeName: "superadmin", createdTypeName: "admin" }),
+    true,
+  );
+  assert.equal(
+    shouldAutoVerifyEmailOnCreate({ actorTypeName: "superadmin", createdTypeName: "lttp_supplier" }),
+    true,
+  );
+  assert.equal(
+    shouldAutoVerifyEmailOnCreate({ actorTypeName: "admin", createdTypeName: "admin" }),
+    false,
+  );
+  assert.equal(
+    shouldAutoVerifyEmailOnCreate({ actorTypeName: "admin", createdTypeName: "superadmin" }),
+    true,
   );
 });

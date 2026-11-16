@@ -8,7 +8,8 @@ import { useAuthInitialized, useCurrentUser, useIsAuthenticated } from "@/featur
 import { UnifiedPageScrollRoot } from "@/hocs/withUnifiedPageScroll";
 import { MIDNIGHT_LOCALES } from "@/lib/midnightLocale";
 import { LocaleText, MidnightLocaleProvider, useMidnightLocale } from "@/lib/midnightLocale.jsx";
-import { publicOnlyRedirectPath } from "@/utils/postLoginPath";
+import { isLttpSupplierUser, publicOnlyRedirectPath } from "@/utils/postLoginPath";
+import { SUPPLIER_ORDER_PATH } from "@/utils/supplierPortal";
 import { resolveMediaUrl } from "@/utils/runtimeEnv";
 import { cn } from "@/utils/cn";
 
@@ -67,10 +68,13 @@ function MarketingShell({ children }) {
   const isAuthenticated = useIsAuthenticated();
   const initialized = useAuthInitialized();
   const signedIn = initialized && isAuthenticated;
-  const enterHref = publicOnlyRedirectPath(
-    user,
-    typeof window !== "undefined" ? window.location : null,
-  );
+  // NCC: trang chủ là `/`; nút «Vào ứng dụng» mở nghiệp vụ đặt hàng (có sidebar).
+  const enterHref = isLttpSupplierUser(user)
+    ? SUPPLIER_ORDER_PATH
+    : publicOnlyRedirectPath(
+        user,
+        typeof window !== "undefined" ? window.location : null,
+      );
   const rawAvatar = user?.profile?.avatarUrl ? resolveMediaUrl(user.profile.avatarUrl) : "";
   const avatarUrl = /^(https?:\/\/|\/)[^\s"'()\\]+$/.test(String(rawAvatar || "")) ? String(rawAvatar) : "";
   return (

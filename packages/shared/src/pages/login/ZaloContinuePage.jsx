@@ -13,7 +13,6 @@ import { notifyError } from "@/services/notify";
 import { clearTargetUnitId } from "@/services/targetUnitScope";
 import { getApiBaseUrl } from "@/utils/runtimeEnv";
 import { navigateAfterLogin, resolvePostLoginPath } from "@/utils/postLoginPath";
-import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 
 const PENDING_MESSAGE = "Tài khoản đang chờ duyệt. Liên hệ quản trị đơn vị của bạn.";
 
@@ -161,9 +160,7 @@ export function ZaloContinuePage() {
       });
       queryClient.invalidateQueries({ queryKey: qk.auth.root });
     }
-    const next = resolvePostLoginPath(user, searchParams.get("from"), {
-      supplierOrigin: getSupplierAppOrigin(),
-    });
+    const next = resolvePostLoginPath(user, searchParams.get("from"));
     navigateAfterLogin(next, {
       assign: window.location.assign.bind(window.location),
       replace: router.replace.bind(router),

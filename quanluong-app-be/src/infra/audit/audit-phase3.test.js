@@ -69,15 +69,21 @@ test("usageActionMiddleware: chỉ ghi request ghi thành công của user", asy
   writer.__setAuditWriterForTest({});
 });
 
-test("usageSourceOf: nhận diện app nhà cung cấp qua Origin/Referer", async () => {
+test("usageSourceOf: nhận diện NCC qua /ncc-* trên Referer (cùng origin) hoặc origin legacy", async () => {
   const { usageSourceOf } = await import("./usage-audit.js");
   const so = "https://ncc.example";
+  const main = "https://quanluong.example";
   const req = (h) => ({ get: (k) => h[k.toLowerCase()] });
   assert.equal(usageSourceOf(req({}), so), "web");
   assert.equal(usageSourceOf(req({ origin: "https://khac.example" }), so), "web");
   assert.equal(usageSourceOf(req({ origin: so }), so), "supplier");
   assert.equal(usageSourceOf(req({ referer: `${so}/don-hang` }), so), "supplier");
   assert.equal(usageSourceOf(req({ referer: `${so}.evil.com/x` }), so), "web");
+  assert.equal(usageSourceOf(req({ referer: `${main}/ncc` }), so), "supplier");
+  assert.equal(usageSourceOf(req({ referer: `${main}/ncc/dat-hang` }), so), "supplier");
+  assert.equal(usageSourceOf(req({ referer: `${main}/ncc-dathang` }), so), "supplier");
+  assert.equal(usageSourceOf(req({ referer: `${main}/ncc-congno` }), so), "supplier");
+  assert.equal(usageSourceOf(req({ referer: `${main}/dashboard` }), so), "web");
 });
 
 test("resolveUsageUnitId: NCC không có unitId lấy đơn vị của NCC liên kết", async () => {

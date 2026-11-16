@@ -200,6 +200,23 @@ async function renderKitchenLedgerBook(book) {
   }
 }
 
+async function renderSupplierDailyInvoice(payload) {
+  const response = await requestDocument("/v1/render/supplier-daily-invoice", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  try {
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    throw new AppError({
+      message: "Document service trả về dữ liệu không hợp lệ",
+      statusCode: 502,
+      code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+    });
+  }
+}
+
 async function renderDocumentPdf(templateId, body = {}) {
   const {
     fields = {},
@@ -385,6 +402,7 @@ export {
   publishTemplate,
   renderDocumentPdf,
   renderKitchenLedgerBook,
+  renderSupplierDailyInvoice,
   renderStoredDocumentPdf,
   renderToDocumentFolder,
   retireTemplate,

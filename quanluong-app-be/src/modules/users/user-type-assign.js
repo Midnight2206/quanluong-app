@@ -16,4 +16,9 @@ function softDeleteActorError({ actorId, targetId, targetTypeName, scopeMode }) 
   return null;
 }
 
-export { softDeleteActorError, superadminTypeAssignError };
+/** Superadmin tạo user → coi email đã xác minh; tài khoản loại superadmin cũng luôn verified. */
+function shouldAutoVerifyEmailOnCreate({ actorTypeName, createdTypeName }) {
+  return actorTypeName === "superadmin" || createdTypeName === "superadmin";
+}
+
+export { shouldAutoVerifyEmailOnCreate, softDeleteActorError, superadminTypeAssignError };

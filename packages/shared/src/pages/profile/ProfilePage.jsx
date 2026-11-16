@@ -40,11 +40,12 @@ import { cn } from "@/utils/cn";
 import { BaTokenManager } from "@/features/ba-profiles/components/BaTokenManager";
 import { GoogleDriveLinkCard } from "@/features/auth/components/GoogleDriveLinkCard";
 import { getApiBaseUrl, resolveMediaUrl } from "@/utils/runtimeEnv";
-import { getSupplierAppOrigin } from "@/utils/supplierPortal";
+import { resolveZaloPortal } from "@/utils/supplierPortal";
 import {
   precheckSignatureFile,
   readImageDimensions,
 } from "@/features/auth/lib/signatureUploadRules";
+import { SupplierPartnerProfileCard } from "@/pages/lttp-supplier/SupplierPartnerProfileCard";
 
 const cardBody = "space-y-2 !p-3 sm:!p-4";
 
@@ -113,6 +114,7 @@ export function ProfilePage() {
   const signatureDisplaySrc = signatureUrl ? resolveMediaUrl(signatureUrl) : null;
   const displayEmail = user?.email ?? "";
   const isSuperadmin = user?.type?.name === "superadmin";
+  const isSupplier = user?.type?.name === "lttp_supplier";
   const showPhoneField = Boolean(user) && !isSuperadmin;
   const showZaloLink = Boolean(user) && !isSuperadmin && user.zaloLinked !== true;
   const [isZaloLinkBusy, setIsZaloLinkBusy] = useState(false);
@@ -333,8 +335,12 @@ export function ProfilePage() {
   async function handleLinkZalo() {
     setIsZaloLinkBusy(true);
     try {
-      const portal = window.location.origin === getSupplierAppOrigin() ? "supplier" : "main";
-      const params = new URLSearchParams({ portal, mode: "link", from: "/profile" });
+      const fromPath = "/profile";
+      const portal =
+        user?.type?.name === "lttp_supplier"
+          ? "supplier"
+          : resolveZaloPortal({ pathname: window.location.pathname, from: fromPath });
+      const params = new URLSearchParams({ portal, mode: "link", from: fromPath });
       const res = await fetch(`${getApiBaseUrl()}/auth/zalo/login/authorize-url?${params}`, {
         credentials: "include",
         headers: { Accept: "application/json" },
@@ -480,7 +486,8 @@ export function ProfilePage() {
       </header>
 
       <div className="grid gap-5 lg:grid-cols-12 lg:items-start">
-        <div className="lg:col-span-4">
+        <div className="space-y-5 lg:col-span-4">
+          {isSupplier ? <SupplierPartnerProfileCard /> : null}
           <Card className="border-border/80 shadow-soft">
             <CardContent className={cn(cardBody, "pt-5")}>
               <SectionHeader icon={UserRound} title="Ảnh đại diện" />

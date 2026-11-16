@@ -1,0 +1,3 @@
+ALTER TABLE `LttpSupplier`
+  ADD COLUMN `phone` VARCHAR(32) NULL,
+  ADD COLUMN `email` VARCHAR(255) NULL;

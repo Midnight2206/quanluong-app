@@ -234,6 +234,8 @@ export function AdminLttpPanel({
   const [newSupAddr, setNewSupAddr] = useState("");
   const [newSupGpkd, setNewSupGpkd] = useState("");
   const [newSupTax, setNewSupTax] = useState("");
+  const [newSupPhone, setNewSupPhone] = useState("");
+  const [newSupEmail, setNewSupEmail] = useState("");
 
   const [supEditId, setSupEditId] = useState(null);
   const [editSupName, setEditSupName] = useState("");
@@ -241,6 +243,8 @@ export function AdminLttpPanel({
   const [editSupAddr, setEditSupAddr] = useState("");
   const [editSupGpkd, setEditSupGpkd] = useState("");
   const [editSupTax, setEditSupTax] = useState("");
+  const [editSupPhone, setEditSupPhone] = useState("");
+  const [editSupEmail, setEditSupEmail] = useState("");
 
   const editingSupplier = useMemo(
     () => suppliers.find((s) => s.id === supEditId) ?? null,
@@ -643,6 +647,8 @@ export function AdminLttpPanel({
     setEditSupAddr(s.address ?? "");
     setEditSupGpkd(s.businessLicenseNo ?? "");
     setEditSupTax(s.taxCode ?? "");
+    setEditSupPhone(s.phone ?? "");
+    setEditSupEmail(s.email ?? "");
   }
 
   async function onAddSupplier(e) {
@@ -659,6 +665,8 @@ export function AdminLttpPanel({
         address: toOptNull(newSupAddr),
         businessLicenseNo: toOptNull(newSupGpkd),
         taxCode: toOptNull(newSupTax),
+        phone: toOptNull(newSupPhone),
+        email: toOptNull(newSupEmail),
       }).unwrap();
       notifySuccess("Đã thêm đối tác.");
       setNewSupName("");
@@ -666,6 +674,8 @@ export function AdminLttpPanel({
       setNewSupAddr("");
       setNewSupGpkd("");
       setNewSupTax("");
+      setNewSupPhone("");
+      setNewSupEmail("");
     } catch (err) {
       notifyError(err?.data?.message || "Không tạo được.");
     }
@@ -687,6 +697,8 @@ export function AdminLttpPanel({
           address: toOptNull(editSupAddr),
           businessLicenseNo: toOptNull(editSupGpkd),
           taxCode: toOptNull(editSupTax),
+          phone: toOptNull(editSupPhone),
+          email: toOptNull(editSupEmail),
         },
       }).unwrap();
       notifySuccess("Đã cập nhật đối tác.");
@@ -1258,6 +1270,22 @@ export function AdminLttpPanel({
                           onChange={(e) => setNewSupTax(e.target.value)}
                         />
                       </label>
+                      <label className="w-28 sm:w-32">
+                        <span className="text-[10px] text-muted-foreground">Điện thoại</span>
+                        <input
+                          className={inputClass}
+                          value={newSupPhone}
+                          onChange={(e) => setNewSupPhone(e.target.value)}
+                        />
+                      </label>
+                      <label className="min-w-[9rem] flex-1">
+                        <span className="text-[10px] text-muted-foreground">Email</span>
+                        <input
+                          className={inputClass}
+                          value={newSupEmail}
+                          onChange={(e) => setNewSupEmail(e.target.value)}
+                        />
+                      </label>
                       <Button type="submit" className="h-8 gap-1 text-xs">
                         <Plus className="size-3.5" aria-hidden />
                         Thêm
@@ -1275,6 +1303,8 @@ export function AdminLttpPanel({
                           <th className="px-2 py-1.5">Địa chỉ</th>
                           <th className="px-2 py-1.5">GPKD</th>
                           <th className="px-2 py-1.5">MST</th>
+                          <th className="px-2 py-1.5">Điện thoại</th>
+                          <th className="px-2 py-1.5">Email</th>
                           <th className="px-2 py-1.5 text-right">Thao tác</th>
                         </tr>
                       </thead>
@@ -1287,6 +1317,8 @@ export function AdminLttpPanel({
                             <td className="px-2 py-1 text-muted-foreground">{s.address || "—"}</td>
                             <td className="px-2 py-1 text-muted-foreground">{s.businessLicenseNo || "—"}</td>
                             <td className="px-2 py-1 text-muted-foreground">{s.taxCode || "—"}</td>
+                            <td className="px-2 py-1 text-muted-foreground">{s.phone || "—"}</td>
+                            <td className="px-2 py-1 text-muted-foreground">{s.email || "—"}</td>
                             <td className="px-2 py-1 text-right">
                               {canCWrite ? (
                                 <div className="flex justify-end gap-1">
@@ -1719,6 +1751,14 @@ export function AdminLttpPanel({
                         <label>
                           <span className="text-[10px] text-muted-foreground">Mã số thuế</span>
                           <input className={inputClass} value={editSupTax} onChange={(e) => setEditSupTax(e.target.value)} />
+                        </label>
+                        <label>
+                          <span className="text-[10px] text-muted-foreground">Điện thoại</span>
+                          <input className={inputClass} value={editSupPhone} onChange={(e) => setEditSupPhone(e.target.value)} />
+                        </label>
+                        <label>
+                          <span className="text-[10px] text-muted-foreground">Email</span>
+                          <input className={inputClass} value={editSupEmail} onChange={(e) => setEditSupEmail(e.target.value)} />
                         </label>
                       </div>
                       <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-3">

@@ -2,7 +2,6 @@
 
 import { Building2, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   useIsAuthenticated,
@@ -11,16 +10,7 @@ import {
 } from "@/features/auth/model/authSlice";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
 import { supplierChooserHandoff } from "@/utils/postLoginPath";
-import { getSupplierAppOrigin } from "@/utils/supplierPortal";
 import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
-
-function ExternalRedirect({ href }) {
-  useEffect(() => {
-    window.location.replace(href);
-  }, [href]);
-
-  return null;
-}
 
 export function PortalChooserPage() {
   const router = useRouter();
@@ -34,10 +24,7 @@ export function PortalChooserPage() {
   if (!isAuthenticated) {
     return <ClientRedirect href="/login?from=%2Fchon-cong" replace />;
   }
-  const handoff = supplierChooserHandoff(user, getSupplierAppOrigin());
-  if (handoff.external) {
-    return <ExternalRedirect href={handoff.external} />;
-  }
+  const handoff = supplierChooserHandoff(user);
   if (handoff.internal) {
     return <ClientRedirect href={handoff.internal} replace />;
   }

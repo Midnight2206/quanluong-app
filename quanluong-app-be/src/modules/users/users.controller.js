@@ -28,7 +28,9 @@ async function getUserDetailController(req, res) {
 }
 
 async function createUserController(req, res) {
-  const user = await createUser(req.validatedBody, req.unitScope, req.effectiveUnitIds);
+  const user = await createUser(req.validatedBody, req.unitScope, req.effectiveUnitIds, {
+    typeName: req.user?.type?.name ?? null,
+  });
 
   return respondCreated(res, {
     message: "Created user successfully",

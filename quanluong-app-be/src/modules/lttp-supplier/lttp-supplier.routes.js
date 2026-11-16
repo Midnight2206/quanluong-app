@@ -5,13 +5,25 @@ import { validateRequest } from "../../middlewares/validate-request.middleware.j
 import { asyncHandler } from "../../shared/utils/async-handler.js";
 import {
   getLttpSupplierCatalogController,
+  getLttpSupplierDailyInvoiceController,
+  getLttpSupplierDebtController,
   getLttpSupplierLinksController,
   getLttpSupplierLinksForUserController,
   getLttpSupplierLedgerController,
+  getLttpSupplierMeController,
   getLttpSupplierOrdersController,
+  patchLttpSupplierMeController,
+  printLttpSupplierDailyInvoiceController,
 } from "./lttp-supplier.controller.js";
 import { lttpSupplierMiddleware } from "./lttp-supplier.middleware.js";
-import { ledgerQuerySchema, ordersQuerySchema, userLinksParamsSchema } from "./lttp-supplier.validator.js";
+import {
+  dailyInvoiceQuerySchema,
+  ledgerQuerySchema,
+  meQuerySchema,
+  ordersQuerySchema,
+  patchMeBodySchema,
+  userLinksParamsSchema,
+} from "./lttp-supplier.validator.js";
 
 const lttpSupplierRouter = express.Router();
 
@@ -38,6 +50,22 @@ lttpSupplierRouter.get(
 );
 
 lttpSupplierRouter.get(
+  "/me",
+  authMiddleware,
+  lttpSupplierMiddleware,
+  validateRequest({ query: meQuerySchema }),
+  asyncHandler(getLttpSupplierMeController),
+);
+
+lttpSupplierRouter.patch(
+  "/me",
+  authMiddleware,
+  lttpSupplierMiddleware,
+  validateRequest({ query: meQuerySchema, body: patchMeBodySchema }),
+  asyncHandler(patchLttpSupplierMeController),
+);
+
+lttpSupplierRouter.get(
   "/ledger",
   authMiddleware,
   lttpSupplierMiddleware,
@@ -51,6 +79,30 @@ lttpSupplierRouter.get(
   lttpSupplierMiddleware,
   validateRequest({ query: ordersQuerySchema }),
   asyncHandler(getLttpSupplierOrdersController),
+);
+
+lttpSupplierRouter.get(
+  "/daily-invoice",
+  authMiddleware,
+  lttpSupplierMiddleware,
+  validateRequest({ query: dailyInvoiceQuerySchema }),
+  asyncHandler(getLttpSupplierDailyInvoiceController),
+);
+
+lttpSupplierRouter.get(
+  "/daily-invoice/print-pdf",
+  authMiddleware,
+  lttpSupplierMiddleware,
+  validateRequest({ query: dailyInvoiceQuerySchema }),
+  asyncHandler(printLttpSupplierDailyInvoiceController),
+);
+
+lttpSupplierRouter.get(
+  "/debt",
+  authMiddleware,
+  lttpSupplierMiddleware,
+  validateRequest({ query: meQuerySchema }),
+  asyncHandler(getLttpSupplierDebtController),
 );
 
 export { lttpSupplierRouter };

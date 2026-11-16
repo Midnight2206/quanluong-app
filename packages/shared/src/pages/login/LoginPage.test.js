@@ -16,7 +16,8 @@ test("LoginPage offers Zalo except on the superadmin origin", () => {
   assert.match(src, /Đăng nhập bằng Zalo/);
   assert.match(src, /getSuperadminAppOrigin/);
   assert.match(src, /window\.location\.origin !== getSuperadminAppOrigin\(\)/);
-  assert.match(src, /origin === getSupplierAppOrigin\(\) \? "supplier" : "main"/);
+  assert.match(src, /resolveZaloPortal/);
+  assert.doesNotMatch(src, /origin === getSupplierAppOrigin\(\)/);
 });
 
 test("ZaloContinuePage polls the attempt and skips the API when OAuth is pending", () => {

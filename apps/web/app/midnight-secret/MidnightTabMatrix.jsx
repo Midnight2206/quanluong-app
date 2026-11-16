@@ -1,40 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { currentMonthYmd, monthBoundsYmd } from "@/utils/monthBoundsYmd";
+import {
+  btnPrimary,
+  fieldClass,
+  firstDayOfMonthYmd,
+  formatVnd,
+  formatVndBlankZero,
+  labelClass,
+  localYmd,
+  tableWrapClass,
+  toolbarClass,
+} from "./midnightUi";
 
-function localYmd(d = new Date()) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function firstDayOfMonthYmd() {
-  const d = new Date();
-  d.setDate(1);
-  return localYmd(d);
-}
-
-function formatVnd(n) {
-  if (n == null || !Number.isFinite(Number(n))) {
-    return "—";
-  }
-  if (Number(n) === 0) {
-    return "—";
-  }
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(n));
-}
-
-function formatVnd0(n) {
-  if (n == null || !Number.isFinite(Number(n))) {
-    return "—";
-  }
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(Number(n));
-}
-
-export function MidnightTabMatrix({ units, unitId, onUnitId }) {
-  const [from, setFrom] = useState(firstDayOfMonthYmd);
-  const [to, setTo] = useState(localYmd);
+export function MidnightTabMatrix({ unitId }) {
+  const initialMonth = currentMonthYmd();
+  const initialBounds = monthBoundsYmd(initialMonth);
+  const [periodMode, setPeriodMode] = useState("month");
+  const [month, setMonth] = useState(initialMonth);
+  const [from, setFrom] = useState(initialBounds.from);
+  const [to, setTo] = useState(localYmd());
   const [partners, setPartners] = useState([]);
   const [lttpSupplierId, setLttpSupplierId] = useState("");
   const [data, setData] = useState(null);
@@ -43,11 +29,20 @@ export function MidnightTabMatrix({ units, unitId, onUnitId }) {
   const [loadPartnersErr, setLoadPartnersErr] = useState("");
 
   useEffect(() => {
+    if (periodMode !== "month") return;
+    try {
+      const bounds = monthBoundsYmd(month);
+      setFrom(bounds.from);
+      setTo(bounds.to);
+    } catch {
+      /* ignore */
+    }
+  }, [periodMode, month]);
+
+  useEffect(() => {
     let c = false;
     (async () => {
-      if (!unitId) {
-        return;
-      }
+      if (!unitId) return;
       setLoadPartnersErr("");
       try {
         const r = await fetch(
@@ -55,16 +50,10 @@ export function MidnightTabMatrix({ units, unitId, onUnitId }) {
           { credentials: "include" },
         );
         const j = await r.json();
-        if (!r.ok) {
-          throw new Error(j?.error?.message || "Không tải đối tác");
-        }
-        if (!c) {
-          setPartners(j.data ?? []);
-        }
+        if (!r.ok) throw new Error(j?.error?.message || "Không tải đối tác");
+        if (!c) setPartners(j.data ?? []);
       } catch (e) {
-        if (!c) {
-          setLoadPartnersErr(e?.message || "");
-        }
+        if (!c) setLoadPartnersErr(e?.message || "");
       }
     })();
     return () => {
@@ -82,16 +71,12 @@ export function MidnightTabMatrix({ units, unitId, onUnitId }) {
     setData(null);
     try {
       const q = new URLSearchParams({ unitId, from, to });
-      if (lttpSupplierId) {
-        q.set("lttpSupplierId", lttpSupplierId);
-      }
+      if (lttpSupplierId) q.set("lttpSupplierId", lttpSupplierId);
       const r = await fetch(`/api/midnight-secret/lttp-partner-money-matrix?${q.toString()}`, {
         credentials: "include",
       });
       const j = await r.json();
-      if (!r.ok) {
-        throw new Error(j?.error?.message || j?.message || "Không tải báo cáo");
-      }
+      if (!r.ok) throw new Error(j?.error?.message || j?.message || "Không tải báo cáo");
       setData(j.data ?? j);
     } catch (e) {
       setErr(e?.message || "Lỗi");
@@ -106,59 +91,60 @@ export function MidnightTabMatrix({ units, unitId, onUnitId }) {
   const grand = data?.grandTotal;
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-600">
-        Thành tiền = số lượng dòng × giá từ <span className="font-medium text-slate-800">bảng giá đối tác</span> tại
-        ngày phiếu, gom theo <span className="font-medium text-slate-800">ngày</span> và{" "}
-        <span className="font-medium text-slate-800">đơn vị nhận LTTP</span> (cột). Có tổng theo cả dòng
-        (ngày) và từng cột (đơn vị), ô góc = tổng toàn bộ.
-      </p>
-
+    <div className="space-y-2.5">
       <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+        className={toolbarClass}
         onSubmit={(e) => {
           e.preventDefault();
           void load();
         }}
       >
-        <label className="text-xs text-slate-600">
-          Đơn vị cấp của user
-          <select
-            className="mt-0.5 block min-w-[12rem] rounded border border-slate-300 bg-slate-50 px-2 py-1.5 text-sm text-slate-900"
-            value={unitId}
-            onChange={(e) => onUnitId(e.target.value)}
-            disabled
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            className={periodMode === "month" ? btnPrimary : `${fieldClass} px-3`}
+            onClick={() => setPeriodMode("month")}
           >
-            {units.length === 0 ? <option value="">—</option> : null}
-            {units.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs text-slate-600">
-          Từ
-          <input
-            type="date"
-            className="mt-0.5 block rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </label>
-        <label className="text-xs text-slate-600">
-          Đến
-          <input
-            type="date"
-            className="mt-0.5 block rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
-        </label>
-        <label className="text-xs text-slate-600">
+            Theo tháng
+          </button>
+          <button
+            type="button"
+            className={periodMode === "range" ? btnPrimary : `${fieldClass} px-3`}
+            onClick={() => {
+              setPeriodMode("range");
+              setFrom(firstDayOfMonthYmd());
+              setTo(localYmd());
+            }}
+          >
+            Khoảng ngày
+          </button>
+        </div>
+        {periodMode === "month" ? (
+          <label className={labelClass}>
+            Tháng
+            <input
+              type="month"
+              className={fieldClass}
+              value={month}
+              onChange={(e) => setMonth(e.target.value || currentMonthYmd())}
+            />
+          </label>
+        ) : (
+          <>
+            <label className={labelClass}>
+              Từ
+              <input type="date" className={fieldClass} value={from} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label className={labelClass}>
+              Đến
+              <input type="date" className={fieldClass} value={to} onChange={(e) => setTo(e.target.value)} />
+            </label>
+          </>
+        )}
+        <label className={labelClass}>
           Đối tác
           <select
-            className="mt-0.5 block min-w-[10rem] rounded border border-slate-300 bg-white px-2 py-1.5 text-sm"
+            className={`${fieldClass} min-w-[10rem]`}
             value={lttpSupplierId}
             onChange={(e) => setLttpSupplierId(e.target.value)}
           >
@@ -170,73 +156,76 @@ export function MidnightTabMatrix({ units, unitId, onUnitId }) {
             ))}
           </select>
         </label>
-        <button
-          type="submit"
-          className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-50"
-          disabled={loading || !unitId}
-        >
+        <button type="submit" className={btnPrimary} disabled={loading || !unitId}>
           {loading ? "Đang tải…" : "Tải báo cáo"}
         </button>
+        {data ? (
+          <p className="w-full text-[11px] text-muted-foreground sm:ml-auto sm:w-auto">
+            {data.lttpSupplierLabel} · {data.from} → {data.to}
+          </p>
+        ) : null}
       </form>
 
-      {loadPartnersErr ? <p className="text-xs text-amber-700">{loadPartnersErr}</p> : null}
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
-
-      {data ? (
-        <p className="text-sm text-slate-700">
-          {data.lttpSupplierLabel} · Kho: {data.unit?.name} · {data.from} → {data.to}
-        </p>
-      ) : null}
+      {loadPartnersErr ? <p className="text-xs text-amber-700 dark:text-amber-400">{loadPartnersErr}</p> : null}
+      {err ? <p className="text-sm text-destructive">{err}</p> : null}
 
       {data && !cols.length && !loading ? (
-        <p className="text-sm text-slate-500">Chưa có dữ liệu theo bộ lọc (dòng đối tác tương ứng trong giai đoạn).</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">Không có dữ liệu theo bộ lọc.</p>
       ) : null}
 
       {data && cols.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[40rem] border-collapse text-left text-xs text-slate-800 sm:text-sm">
+        <div className={tableWrapClass}>
+          <table className="w-full min-w-[36rem] border-collapse text-left text-xs sm:text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600">
-                <th className="sticky left-0 z-20 min-w-[7rem] border-r border-slate-200 bg-slate-100 px-2 py-2">
+              <tr className="border-b border-border bg-muted/50">
+                <th className="sticky left-0 z-20 min-w-[6.5rem] border-r border-border bg-muted/50 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Ngày
                 </th>
                 {cols.map((c) => (
-                  <th key={String(c.id)} className="min-w-[7rem] px-2 py-2 text-right">
+                  <th
+                    key={String(c.id)}
+                    className="min-w-[6.5rem] px-2 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
                     {c.name}
                   </th>
                 ))}
-                <th className="min-w-[7rem] border-l border-slate-200 bg-slate-200/60 px-2 py-2 text-right">Tổng ngày</th>
+                <th className="min-w-[6.5rem] border-l border-border bg-muted px-2 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Tổng ngày
+                </th>
               </tr>
             </thead>
             <tbody>
               {days.map((d) => (
-                <tr key={d.date} className="border-b border-slate-100">
-                  <td className="sticky left-0 z-10 border-r border-slate-100 bg-white px-2 py-1.5 font-mono text-slate-700">
+                <tr key={d.date} className="border-b border-border/70 hover:bg-muted/20">
+                  <td className="sticky left-0 z-10 border-r border-border/70 bg-card px-2 py-1 font-mono text-muted-foreground">
                     {d.date}
                   </td>
                   {cols.map((c) => (
-                    <td key={`${d.date}-${c.id}`} className="px-2 py-1.5 text-right tabular-nums text-slate-800">
-                      {formatVnd(d.byRecipient?.[String(c.id)])}
+                    <td key={`${d.date}-${c.id}`} className="px-2 py-1 text-right tabular-nums">
+                      {formatVndBlankZero(d.byRecipient?.[String(c.id)])}
                     </td>
                   ))}
-                  <td className="border-l border-slate-100 bg-slate-50/80 px-2 py-1.5 text-right font-medium tabular-nums">
-                    {formatVnd0(d.rowTotal)}
+                  <td className="border-l border-border/70 bg-muted/30 px-2 py-1 text-right font-medium tabular-nums">
+                    {formatVnd(d.rowTotal)}
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="bg-slate-200/80 text-slate-900">
-                <td className="sticky left-0 z-10 border-r border-slate-200 border-t border-slate-300 bg-slate-200 px-2 py-2 font-semibold">
+              <tr className="bg-muted/80 text-foreground">
+                <td className="sticky left-0 z-10 border-r border-border border-t border-border bg-muted px-2 py-1.5 font-semibold">
                   Tổng ĐV
                 </td>
                 {cols.map((c) => (
-                  <td key={`t-${c.id}`} className="border-t border-slate-300 px-2 py-2 text-right font-semibold tabular-nums">
-                    {formatVnd0(colTotals[String(c.id)] ?? 0)}
+                  <td
+                    key={`t-${c.id}`}
+                    className="border-t border-border px-2 py-1.5 text-right font-semibold tabular-nums"
+                  >
+                    {formatVnd(colTotals[String(c.id)] ?? 0)}
                   </td>
                 ))}
-                <td className="border-t border-slate-300 border-l border-slate-200 px-2 py-2 text-right text-base font-bold tabular-nums text-slate-900">
-                  {formatVnd0(grand)}
+                <td className="border-l border-border border-t border-border px-2 py-1.5 text-right text-sm font-bold tabular-nums">
+                  {formatVnd(grand)}
                 </td>
               </tr>
             </tfoot>

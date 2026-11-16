@@ -709,8 +709,9 @@ function ensureZaloConfigured() {
   }
 }
 
-function zaloPortalOrigin(portal) {
-  const raw = portal === "supplier" ? config.zalo.supplierOrigin : config.zalo.mainOrigin;
+/** Cổng NCC gộp vào app chính (`/` + `/ncc-*`) — cùng origin với main. */
+function zaloPortalOrigin(_portal) {
+  const raw = config.zalo.mainOrigin || config.zalo.supplierOrigin;
   return String(raw || "").replace(/\/+$/, "");
 }
 

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { commodityBlocks, recipientBlocks } from "./supplierLedgerView.js";
+import {
+  commodityBlocks,
+  commodityColumns,
+  commodityColumnTotals,
+  dayByCommodity,
+  recipientBlocks,
+} from "./supplierLedgerView.js";
 
 const lines = [
   {
@@ -45,4 +51,15 @@ test("commodity lines join recipient quantities and recipient lines join items",
   assert.equal(bepA.name, "Bếp A");
   assert.deepEqual(bepA.items, ["Cải: 1 kg × 12.000", "Hành: 2 kg × 8.000"]);
   assert.equal(bepA.amount, 28000);
+});
+
+test("commodity table columns aggregate day amounts", () => {
+  const days = [{ date: "2026-11-01", lines, total: 52000 }];
+  const cols = commodityColumns(days);
+  assert.deepEqual(
+    cols.map((c) => c.id),
+    ["1", "2"],
+  );
+  assert.deepEqual(dayByCommodity(days[0]), { "1": 36000, "2": 16000 });
+  assert.deepEqual(commodityColumnTotals(days, cols), { "1": 36000, "2": 16000 });
 });

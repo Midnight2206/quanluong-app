@@ -292,6 +292,8 @@ function mapLttpSupplier(row) {
     address: row.address,
     businessLicenseNo: row.businessLicenseNo,
     taxCode: row.taxCode,
+    phone: row.phone ?? null,
+    email: row.email ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -346,6 +348,8 @@ async function createLttpSupplier(payload, scope, effectiveUnitIds, dataScope) {
       address: cleanOptionalString(payload.address, 500),
       businessLicenseNo: cleanOptionalString(payload.businessLicenseNo, 64),
       taxCode: cleanOptionalString(payload.taxCode, 32),
+      phone: cleanOptionalString(payload.phone, 32),
+      email: cleanOptionalString(payload.email, 255),
     },
   });
   return mapLttpSupplier(row);
@@ -395,6 +399,12 @@ async function patchLttpSupplier(id, payload, scope, effectiveUnitIds, dataScope
   }
   if (payload.taxCode !== undefined) {
     data.taxCode = cleanOptionalString(payload.taxCode, 32);
+  }
+  if (payload.phone !== undefined) {
+    data.phone = cleanOptionalString(payload.phone, 32);
+  }
+  if (payload.email !== undefined) {
+    data.email = cleanOptionalString(payload.email, 255);
   }
   if (!Object.keys(data).length) {
     return getLttpSupplierById(id, scope, effectiveUnitIds, dataScope);

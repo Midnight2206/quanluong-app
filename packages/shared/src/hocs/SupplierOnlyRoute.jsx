@@ -1,37 +1,23 @@
 "use client";
 
-import { useEffect } from "react";
+import { ClientRedirect } from "@/hocs/ClientRedirect";
 import { useAuthInitialized, useCurrentUser, useIsAuthenticated } from "@/features/auth/model/authSlice";
-import { getMainAppOrigin } from "@/utils/superadminPortal";
 
 export function SupplierOnlyRoute({ children }) {
   const initialized = useAuthInitialized();
   const isAuthenticated = useIsAuthenticated();
   const user = useCurrentUser();
 
-  useEffect(() => {
-    if (!initialized) {
-      return;
-    }
-    if (!isAuthenticated) {
-      window.location.replace("/login");
-      return;
-    }
-    if (user?.type?.name !== "lttp_supplier") {
-      window.location.replace(`${getMainAppOrigin()}/`);
-    }
-  }, [initialized, isAuthenticated, user]);
-
   if (!initialized) {
     return null;
   }
 
   if (!isAuthenticated) {
-    return <p className="text-sm text-muted-foreground">Chuyển tới trang đăng nhập…</p>;
+    return <ClientRedirect href="/login?from=%2Fncc-dathang" replace />;
   }
 
   if (user?.type?.name !== "lttp_supplier") {
-    return <p className="text-sm text-muted-foreground">Chuyển về ứng dụng chính…</p>;
+    return <ClientRedirect href="/dashboard" replace />;
   }
 
   return children;

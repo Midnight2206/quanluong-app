@@ -21,7 +21,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file quanlu
 |---|---|
 | Web app | http://localhost:8080 |
 | Superadmin | http://localhost:8081 |
-| Supplier | http://localhost:8082 |
+| Supplier (NCC) | http://localhost:8080/ncc-dathang (home `/`) |
 | API | http://localhost:3000 |
 | Socket.io | http://localhost:3030 |
 | MariaDB | localhost:3307 |

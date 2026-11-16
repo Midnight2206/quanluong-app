@@ -44,7 +44,8 @@ test("landing is Midnight studio (services + tech + contact footer) with auth re
   assert.doesNotMatch(landing, /có nhịp|chuẩn craft|không chỉ trên slide/);
   assert.match(landing, /searchParams\.has\("google"\)/);
   assert.match(landing, /\/profile\?\$\{searchParams\.toString\(\)\}/);
-  assert.doesNotMatch(landing, /publicOnlyRedirectPath/);
+  assert.match(landing, /publicOnlyRedirectPath/);
+  assert.match(landing, /data-control="hero-enter"/);
   assert.doesNotMatch(landing, /window\.location\.replace/);
   assert.doesNotMatch(landing, /googleDriveFolderId|startGoogleDriveLink/);
 });
@@ -122,6 +123,9 @@ test("locale text reserves every language so controls do not resize", () => {
   assert.match(marketingLayout, /data-control="header-enter"/);
   assert.match(marketingLayout, /data-control="header-login"/);
   assert.match(landing, /data-control="hero-samples"/);
+  assert.match(landing, /data-control="hero-login"/);
+  assert.match(landing, /data-control="hero-enter"/);
+  assert.match(landing, /item\.nav\.enterApp/);
   assert.match(landing, /data-control="footer-login"/);
 });
 

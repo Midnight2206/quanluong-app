@@ -53,14 +53,29 @@ test("supplier router wires superadmin and supplier guards on GET routes", async
   const userLinksRoute = getGetRoute(lttpSupplierRouter, "/users/:userId/links");
   const linksRoute = getGetRoute(lttpSupplierRouter, "/links");
   const ordersRoute = getGetRoute(lttpSupplierRouter, "/orders");
+  const meRoute = getGetRoute(lttpSupplierRouter, "/me");
+  const ledgerRoute = getGetRoute(lttpSupplierRouter, "/ledger");
+  const invoiceRoute = getGetRoute(lttpSupplierRouter, "/daily-invoice");
+  const invoicePdfRoute = getGetRoute(lttpSupplierRouter, "/daily-invoice/print-pdf");
+  const debtRoute = getGetRoute(lttpSupplierRouter, "/debt");
 
   assert.ok(catalogRoute);
   assert.ok(userLinksRoute);
   assert.ok(linksRoute);
   assert.ok(ordersRoute);
+  assert.ok(meRoute);
+  assert.ok(ledgerRoute);
+  assert.ok(invoiceRoute);
+  assert.ok(invoicePdfRoute);
+  assert.ok(debtRoute);
 
   assert.equal(getRouteHandles(catalogRoute).includes(superadminMiddleware), true);
   assert.equal(getRouteHandles(userLinksRoute).includes(superadminMiddleware), true);
   assert.equal(getRouteHandles(linksRoute).includes(routeSupplierMiddleware), true);
   assert.equal(getRouteHandles(ordersRoute).includes(routeSupplierMiddleware), true);
+  assert.equal(getRouteHandles(meRoute).includes(routeSupplierMiddleware), true);
+  assert.equal(getRouteHandles(ledgerRoute).includes(routeSupplierMiddleware), true);
+  assert.equal(getRouteHandles(invoiceRoute).includes(routeSupplierMiddleware), true);
+  assert.equal(getRouteHandles(invoicePdfRoute).includes(routeSupplierMiddleware), true);
+  assert.equal(getRouteHandles(debtRoute).includes(routeSupplierMiddleware), true);
 });

@@ -5,11 +5,24 @@ const SUPPLIER_TYPE = "lttp_supplier";
 const UNIT_CACHE_MS = 5 * 60 * 1000;
 const unitCache = new Map();
 
-/** Ứng dụng nguồn theo Origin/Referer của request (không tin dữ liệu client gửi). */
+/** Ứng dụng nguồn theo Referer path `/ncc-*` (hoặc legacy `/ncc`) hoặc origin legacy. */
 function usageSourceOf(req, supplierOrigin = config.zalo?.supplierOrigin) {
   const origin = req?.get?.("origin") || "";
   const referer = req?.get?.("referer") || "";
-  if (supplierOrigin && (origin === supplierOrigin || referer.startsWith(`${supplierOrigin}/`))) return "supplier";
+  try {
+    const path = new URL(referer).pathname || "";
+    if (
+      path === "/ncc"
+      || path.startsWith("/ncc/")
+      || path.startsWith("/ncc-")
+    ) {
+      return "supplier";
+    }
+  } catch {
+    /* ignore bad referer */
+  }
+  if (supplierOrigin && origin === supplierOrigin) return "supplier";
+  if (supplierOrigin && referer.startsWith(`${supplierOrigin}/`)) return "supplier";
   return "web";
 }
 

@@ -1,6 +1,23 @@
-import { BookOpen, FileText, Home, LayoutDashboard, Lock, Users, Warehouse } from "lucide-react";
+import {
+  BookOpen,
+  ClipboardList,
+  FileText,
+  Home,
+  LayoutDashboard,
+  Lock,
+  Receipt,
+  ScrollText,
+  Users,
+  Warehouse,
+} from "lucide-react";
 import { DASHBOARD_SUPERADMIN_TAB_META } from "@/pages/dashboard/superadminDashboardTabMeta";
 import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
+import {
+  SUPPLIER_DEFAULT_HOME,
+  SUPPLIER_INVOICE_PATH,
+  SUPPLIER_LEDGER_PATH,
+  SUPPLIER_ORDER_PATH,
+} from "@/utils/supplierPortal";
 
 /**
  * Sidebar cho user nghiệp vụ / admin đơn vị.
@@ -50,6 +67,31 @@ export const mainNavItems = [
     icon: Lock,
     requiresAuth: true,
     routeAccessKey: "nav-midnight-report",
+  },
+];
+
+/**
+ * Sidebar NCC — trang chủ gốc `/`; nghiệp vụ path phẳng `/ncc-*`.
+ */
+export const supplierNavItems = [
+  { to: SUPPLIER_DEFAULT_HOME, label: "Trang chủ", icon: Home },
+  {
+    to: SUPPLIER_ORDER_PATH,
+    label: "Đặt hàng",
+    icon: ClipboardList,
+    requiresAuth: true,
+  },
+  {
+    to: SUPPLIER_LEDGER_PATH,
+    label: "Sổ công nợ",
+    icon: ScrollText,
+    requiresAuth: true,
+  },
+  {
+    to: SUPPLIER_INVOICE_PATH,
+    label: "Hoá đơn hằng ngày",
+    icon: Receipt,
+    requiresAuth: true,
   },
 ];
 

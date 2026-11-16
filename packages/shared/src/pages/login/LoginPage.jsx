@@ -17,7 +17,7 @@ import { useLoginMutation } from "@/features/auth/api/authApi";
 import { loginSchema } from "@/features/auth/schemas/authSchemas";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { getApiBaseUrl } from "@/utils/runtimeEnv";
-import { getSupplierAppOrigin } from "@/utils/supplierPortal";
+import { resolveZaloPortal } from "@/utils/supplierPortal";
 import { getSuperadminAppOrigin } from "@/utils/superadminPortal";
 
 const GOOGLE_LOGIN_ERROR_MESSAGES = {
@@ -139,9 +139,7 @@ export function LoginPage() {
     try {
       const user = await login(values).unwrap();
       notifySuccess("Đăng nhập thành công");
-      const next = resolvePostLoginPath(user, searchParams.get("from"), {
-        supplierOrigin: getSupplierAppOrigin(),
-      });
+      const next = resolvePostLoginPath(user, searchParams.get("from"));
       navigateAfterLogin(next, {
         assign: window.location.assign.bind(window.location),
         replace: router.replace.bind(router),
@@ -180,8 +178,8 @@ export function LoginPage() {
   async function handleZaloLogin() {
     setIsZaloBusy(true);
     try {
-      const portal = window.location.origin === getSupplierAppOrigin() ? "supplier" : "main";
       const from = safeInternalPath(searchParams.get("from"));
+      const portal = resolveZaloPortal({ pathname: window.location.pathname, from });
       const params = new URLSearchParams({ portal, mode: "login", from });
       const res = await fetch(`${apiBase}/auth/zalo/login/authorize-url?${params}`, {
         credentials: "include",

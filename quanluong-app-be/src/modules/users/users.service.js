@@ -12,7 +12,11 @@ import {
   LTTP_SUPPLIER_TYPE_NAME,
   syncLttpSupplierAssignment,
 } from "../lttp-supplier/lttp-supplier.links.js";
-import { softDeleteActorError, superadminTypeAssignError } from "./user-type-assign.js";
+import {
+  shouldAutoVerifyEmailOnCreate,
+  softDeleteActorError,
+  superadminTypeAssignError,
+} from "./user-type-assign.js";
 
 const USER_INCLUDE = {
   type: true,
@@ -295,7 +299,7 @@ async function getUserById(userId, scope, effectiveUnitIds) {
   return user;
 }
 
-async function createUser(payload, scope, effectiveUnitIds) {
+async function createUser(payload, scope, effectiveUnitIds, actor = {}) {
   const relations = await ensureRelationsExist(
     {
       typeId: payload.typeId,
@@ -368,7 +372,12 @@ async function createUser(payload, scope, effectiveUnitIds) {
         assignedUnitId: cleared.assignedUnitId,
         jobTitleId: cleared.jobTitleId,
         registrationStatus: "APPROVED",
-        emailVerifiedAt: relations.type?.name === SUPERADMIN_TYPE_NAME ? new Date() : null,
+        emailVerifiedAt: shouldAutoVerifyEmailOnCreate({
+          actorTypeName: actor?.typeName ?? null,
+          createdTypeName: relations.type?.name ?? null,
+        })
+          ? new Date()
+          : null,
         profile: {
           create: payload.profile,
         },

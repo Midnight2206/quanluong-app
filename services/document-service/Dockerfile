@@ -4,6 +4,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY fonts ./fonts
+COPY assets ./assets
 COPY alembic.ini .
 COPY alembic ./alembic
 ENV PYTHONUNBUFFERED=1

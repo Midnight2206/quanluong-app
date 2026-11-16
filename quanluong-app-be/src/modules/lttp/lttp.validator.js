@@ -426,6 +426,8 @@ const createLttpSupplierBodySchema = z.object({
   address: z.string().max(500).optional().nullable(),
   businessLicenseNo: z.string().max(64).optional().nullable(),
   taxCode: z.string().max(32).optional().nullable(),
+  phone: z.string().max(32).optional().nullable(),
+  email: z.string().max(255).optional().nullable(),
 });
 
 const patchLttpSupplierBodySchema = z.object({
@@ -434,6 +436,8 @@ const patchLttpSupplierBodySchema = z.object({
   address: z.string().max(500).optional().nullable(),
   businessLicenseNo: z.string().max(64).optional().nullable(),
   taxCode: z.string().max(32).optional().nullable(),
+  phone: z.string().max(32).optional().nullable(),
+  email: z.string().max(255).optional().nullable(),
 });
 
 export {

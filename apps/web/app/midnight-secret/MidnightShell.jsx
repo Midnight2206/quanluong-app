@@ -10,27 +10,24 @@ export function MidnightShell({ grants }) {
   }
 
   return (
-    <div
-      data-page-scroll-owner="true"
-      className="h-dvh overflow-y-auto bg-slate-100 text-slate-900"
-    >
+    <div data-page-scroll-owner="true" className="h-dvh overflow-y-auto bg-background text-foreground">
       <UnifiedPageScrollRoot>
-        <header data-sticky-level="0" className="border-b border-slate-200 bg-white">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-3 py-3 sm:px-6 lg:max-w-none lg:px-4">
-            <div>
-              <h1 className="text-sm font-semibold text-slate-800">Báo cáo giá đối tác (nội bộ)</h1>
-              <p className="text-xs text-slate-500">Đường dẫn: /midnight-secret</p>
-            </div>
+        <header
+          data-sticky-level="0"
+          className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur-md"
+        >
+          <div className="mx-auto flex h-12 max-w-[100rem] items-center justify-between gap-3 px-3 sm:px-4 lg:px-5">
+            <h1 className="truncate text-sm font-semibold tracking-tight">Báo cáo nội bộ</h1>
             <button
               type="button"
               onClick={() => void onExit()}
-              className="text-sm text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+              className="shrink-0 rounded-md border border-input bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Rời trang
             </button>
           </div>
         </header>
-        <div className="mx-auto max-w-6xl pb-12 lg:max-w-none lg:px-4">
+        <div className="mx-auto max-w-[100rem] px-3 pb-8 pt-3 sm:px-4 lg:px-5">
           <MidnightMainPanel grants={grants} />
         </div>
       </UnifiedPageScrollRoot>

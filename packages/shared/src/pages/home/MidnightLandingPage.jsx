@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ClientRedirect } from "@/hocs/ClientRedirect";
-import { useAuthInitialized } from "@/features/auth/model/authSlice";
+import {
+  useAuthInitialized,
+  useCurrentUser,
+  useIsAuthenticated,
+} from "@/features/auth/model/authSlice";
 import { MIDNIGHT_CONTACT } from "@/lib/midnightContact";
 import { QUANLUONG_BRAND_LOGO_MARK_SRC } from "@/lib/quanLuongPageMeta";
 import { LocaleText, useMidnightLocale } from "@/lib/midnightLocale.jsx";
+import { isLttpSupplierUser, publicOnlyRedirectPath } from "@/utils/postLoginPath";
+import { SUPPLIER_ORDER_PATH } from "@/utils/supplierPortal";
 import { cn } from "@/utils/cn";
 import { ComponentMarquee } from "./landing/ComponentMarquee";
 import { Reveal } from "./landing/Reveal";
@@ -56,8 +62,17 @@ function MidnightSeal({ className }) {
 
 export function MidnightLandingPage() {
   const initialized = useAuthInitialized();
+  const isAuthenticated = useIsAuthenticated();
+  const user = useCurrentUser();
   const searchParams = useSearchParams();
   const { copy } = useMidnightLocale();
+  const signedIn = initialized && isAuthenticated;
+  const enterHref = isLttpSupplierUser(user)
+    ? SUPPLIER_ORDER_PATH
+    : publicOnlyRedirectPath(
+        user,
+        typeof window !== "undefined" ? window.location : null,
+      );
 
   if (!initialized) {
     return (
@@ -102,13 +117,23 @@ export function MidnightLandingPage() {
             <LocaleText block pick={(item) => item.hero.support} />
           </p>
           <div className="ql-hero-item flex w-full flex-wrap items-center justify-center gap-3" style={{ "--ql-hero-i": 4 }}>
-            <Link
-              href="/login"
-              data-control="hero-login"
-              className={cn(btnBase, "max-w-full border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90")}
-            >
-              <LocaleText pick={(item) => item.hero.login} />
-            </Link>
+            {signedIn ? (
+              <Link
+                href={enterHref}
+                data-control="hero-enter"
+                className={cn(btnBase, "max-w-full border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90")}
+              >
+                <LocaleText pick={(item) => item.nav.enterApp} />
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                data-control="hero-login"
+                className={cn(btnBase, "max-w-full border border-primary bg-primary font-semibold text-primary-foreground shadow-soft hover:bg-primary/90")}
+              >
+                <LocaleText pick={(item) => item.hero.login} />
+              </Link>
+            )}
             <a
               href="#mau-giao-dien"
               data-control="hero-samples"

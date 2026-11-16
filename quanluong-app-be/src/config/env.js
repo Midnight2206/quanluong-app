@@ -100,8 +100,6 @@ const env = {
       "http://localhost:5174",
       "http://localhost:8080",
       "http://localhost:8081",
-      "http://localhost:8082",
-      "http://localhost:3002",
     ];
     const base =
       process.env.NODE_ENV === "production"
@@ -149,7 +147,12 @@ const env = {
   /** Số phiên bản Testing trên Zalo. Có giá trị thì mã QR mở bản đó để nhập phiếu. */
   zaloMiniAppTestingVersion: (process.env.ZALO_MINI_APP_TESTING_VERSION || "").trim(),
   uiMainOrigin: (process.env.UI_MAIN_ORIGIN || "http://localhost:8080").replace(/\/+$/, ""),
-  uiSupplierOrigin: (process.env.UI_SUPPLIER_ORIGIN || "http://localhost:8082").replace(/\/+$/, ""),
+  /** Legacy alias — cổng NCC trên app chính (`/ncc-*`); mặc định trùng UI_MAIN_ORIGIN. */
+  uiSupplierOrigin: (
+    process.env.UI_SUPPLIER_ORIGIN ||
+    process.env.UI_MAIN_ORIGIN ||
+    "http://localhost:8080"
+  ).replace(/\/+$/, ""),
   /**
    * Refresh token của tài khoản Google chứa mẫu chứng từ quyết toán (thường trùng superadmin hoặc GMAIL_SENDER).
    * OAuth cần có quyền đọc/ghi vùng mẫu (vd. `drive` hoặc `drive.metadata.readonly` + khả năng tạo file) và `spreadsheets.readonly`.

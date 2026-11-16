@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   listLttpSupplierCatalog,
   listLttpSupplierLinks,
+  readLttpSupplierDebt,
   readLttpSupplierOrders,
 } from "./lttp-supplier.service.js";
 import { ordersQuerySchema } from "./lttp-supplier.validator.js";
@@ -87,4 +88,55 @@ test("orders summarize one linked supplier storage unit", async () => {
     },
   });
   assert.deepEqual(data, { slipColumns: [], grandTotals: [] });
+});
+
+test("debt summary remainingAmount = debt - paid with payment rows", async () => {
+  const db = {
+    userLttpSupplier: {
+      async findFirst() {
+        return {
+          lttpSupplier: {
+            id: 8,
+            name: "NCC A",
+            representativeName: "A",
+            address: null,
+            businessLicenseNo: null,
+            taxCode: null,
+            phone: null,
+            email: null,
+            unitId: 10,
+            unit: { id: 10, name: "Kho 1" },
+          },
+        };
+      },
+    },
+    lttpPartnerDebt: {
+      async findUnique() {
+        return { totalDebtAmount: "150000", lastRecalculatedAt: null };
+      },
+    },
+    lttpPartnerPaymentTotal: {
+      async findUnique() {
+        return { totalPaidAmount: "50000" };
+      },
+    },
+    lttpPartnerPayment: {
+      async findMany() {
+        return [
+          {
+            id: 1,
+            paymentDate: new Date("2026-11-01T00:00:00.000Z"),
+            amount: "50000",
+            note: "Đợt 1",
+            createdAt: new Date("2026-11-01T01:00:00.000Z"),
+          },
+        ];
+      },
+    },
+  };
+  const data = await readLttpSupplierDebt({ userId: 4, supplierId: 8, db });
+  assert.equal(data.remainingAmount, 100000);
+  assert.equal(data.totalPaidAmount, 50000);
+  assert.equal(data.payments.length, 1);
+  assert.equal(data.payments[0].paymentDate, "2026-11-01");
 });

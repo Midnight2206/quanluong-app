@@ -55,6 +55,11 @@ const nextConfig = {
         destination: "/lttp-nhap-xuat",
         permanent: true,
       },
+      { source: "/ncc", destination: "/", permanent: false },
+      { source: "/ncc/dat-hang", destination: "/ncc-dathang", permanent: false },
+      { source: "/ncc/so-cong-no", destination: "/ncc-congno", permanent: false },
+      { source: "/ncc/profile", destination: "/profile", permanent: false },
+      { source: "/ncc/settings", destination: "/profile", permanent: false },
     ];
   },
   async rewrites() {
