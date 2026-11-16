@@ -628,14 +628,14 @@ export function SupplierOrderPage() {
                 </div>
               </div>
               <div
-                className="min-h-0 flex-1 overflow-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+                className="flex min-h-0 flex-1 items-center justify-center overflow-hidden"
                 data-local-scroll="true"
               >
                 {previewUrl ? (
                   <img
                     src={previewUrl}
                     alt="Ảnh bảng đặt hàng"
-                    className="mx-auto h-auto max-w-none rounded-lg bg-white"
+                    className="max-h-full max-w-full rounded-lg bg-white object-contain"
                   />
                 ) : (
                   <p className="py-10 text-center text-sm text-white/80">Không có ảnh xem trước.</p>

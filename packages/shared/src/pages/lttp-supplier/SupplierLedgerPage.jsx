@@ -656,11 +656,12 @@ export function SupplierLedgerPage() {
           tabIndex={0}
         >
           <table className="w-max min-w-full border-separate border-spacing-0 text-sm">
-            <thead data-sticky-level="1" className={cn("unified-sticky-surface", stickyOpaque)}>
+            {/* ponytail: no data-sticky-level inside overflow-x — local scrollport + toolbar top offset pushes header over row 1 */}
+            <thead className={stickyOpaque}>
               <tr>
                 <th
                   className={cn(
-                    "sticky left-0 z-[2] min-w-[5.5rem] border-b border-r border-border px-2.5 py-1.5 text-left text-xs font-semibold",
+                    "sticky left-0 z-[3] min-w-[5.5rem] border-b border-r border-border px-2.5 py-1.5 text-left text-xs font-semibold",
                     stickyCellOpaque,
                   )}
                 >
@@ -700,7 +701,7 @@ export function SupplierLedgerPage() {
                   >
                     <td
                       className={cn(
-                        "sticky left-0 z-[2] border-r border-t border-border px-2.5 py-1.5 font-medium transition-colors",
+                        "sticky left-0 z-[1] border-r border-t border-border px-2.5 py-1.5 font-medium transition-colors",
                         stickyCellOpaque,
                         active
                           ? "bg-primary/15 text-foreground"
@@ -740,7 +741,7 @@ export function SupplierLedgerPage() {
               <tr>
                 <td
                   className={cn(
-                    "sticky left-0 z-[2] border-r border-t border-border px-2.5 py-1.5 font-semibold",
+                    "sticky left-0 z-[1] border-r border-t border-border px-2.5 py-1.5 font-semibold",
                     stickyCellOpaque,
                   )}
                 >
