@@ -6,6 +6,7 @@ import {
   pairLabel,
   nextRecipientSelection,
   recipientKeys,
+  toggleAllRecipientKeys,
 } from "./supplierOrderView.js";
 
 test("saved recipient picks stay when the units are still on the day", () => {
@@ -21,6 +22,12 @@ test("one link is selected and two links wait", () => {
   assert.equal(initialSupplierId(one), 3);
   assert.equal(initialSupplierId([...one, { supplierId: 4 }]), null);
   assert.equal(pairLabel(one[0]), "Kho — A");
+});
+
+test("toggleAllRecipientKeys selects all then clears", () => {
+  assert.deepEqual(toggleAllRecipientKeys(["10", "11"], []), ["10", "11"]);
+  assert.deepEqual(toggleAllRecipientKeys(["10", "11"], ["10", "11"]), []);
+  assert.deepEqual(toggleAllRecipientKeys(["10", "11"], ["10"]), ["10", "11"]);
 });
 
 test("recipient filter drops a column and rebuilds the total", () => {

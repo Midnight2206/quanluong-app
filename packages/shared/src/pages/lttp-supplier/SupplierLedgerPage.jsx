@@ -649,13 +649,18 @@ export function SupplierLedgerPage() {
       ) : null}
 
       {days.length > 0 ? (
-        <div className="overflow-visible rounded-lg border border-border">
-          <table className="w-full border-separate border-spacing-0 text-sm">
+        <div
+          className="min-w-0 overflow-x-auto overscroll-x-contain rounded-lg border border-border [-webkit-overflow-scrolling:touch] [touch-action:pan-x_pan-y]"
+          role="region"
+          aria-label="Sổ công nợ — cuộn ngang"
+          tabIndex={0}
+        >
+          <table className="w-max min-w-full border-separate border-spacing-0 text-sm">
             <thead data-sticky-level="1" className={cn("unified-sticky-surface", stickyOpaque)}>
               <tr>
                 <th
                   className={cn(
-                    "sticky left-0 z-[1] border-b border-r border-border px-2.5 py-1.5 text-left text-xs font-semibold",
+                    "sticky left-0 z-[2] min-w-[5.5rem] border-b border-r border-border px-2.5 py-1.5 text-left text-xs font-semibold",
                     stickyCellOpaque,
                   )}
                 >
@@ -665,7 +670,7 @@ export function SupplierLedgerPage() {
                   <th
                     key={col.id}
                     className={cn(
-                      "hidden border-b border-r border-border px-2.5 py-1.5 text-center text-xs font-semibold md:table-cell",
+                      "min-w-[6.5rem] border-b border-r border-border px-2.5 py-1.5 text-center text-xs font-semibold",
                       COLUMN_TINTS[index % COLUMN_TINTS.length],
                     )}
                   >
@@ -674,7 +679,7 @@ export function SupplierLedgerPage() {
                 ))}
                 <th
                   className={cn(
-                    "hidden border-b border-border px-2.5 py-1.5 text-center text-xs font-semibold md:table-cell",
+                    "min-w-[6rem] border-b border-border px-2.5 py-1.5 text-center text-xs font-semibold",
                     stickyMutedOpaque,
                   )}
                 >
@@ -695,7 +700,7 @@ export function SupplierLedgerPage() {
                   >
                     <td
                       className={cn(
-                        "sticky left-0 z-[1] border-r border-t border-border px-2.5 py-1.5 font-medium transition-colors",
+                        "sticky left-0 z-[2] border-r border-t border-border px-2.5 py-1.5 font-medium transition-colors",
                         stickyCellOpaque,
                         active
                           ? "bg-primary/15 text-foreground"
@@ -708,7 +713,7 @@ export function SupplierLedgerPage() {
                       <td
                         key={col.id}
                         className={cn(
-                          "hidden border-r border-t border-border px-2.5 py-1.5 text-center tabular-nums transition-colors md:table-cell",
+                          "border-r border-t border-border px-2.5 py-1.5 text-center tabular-nums transition-colors",
                           COLUMN_TINTS[index % COLUMN_TINTS.length],
                           active
                             ? "bg-primary/15"
@@ -720,7 +725,7 @@ export function SupplierLedgerPage() {
                     ))}
                     <td
                       className={cn(
-                        "hidden border-t border-border px-2.5 py-1.5 text-center font-semibold tabular-nums transition-colors md:table-cell",
+                        "border-t border-border px-2.5 py-1.5 text-center font-semibold tabular-nums transition-colors",
                         stickyMutedOpaque,
                         active
                           ? "bg-primary/15"
@@ -732,10 +737,10 @@ export function SupplierLedgerPage() {
                   </tr>
                 );
               })}
-              <tr className="hidden md:table-row">
+              <tr>
                 <td
                   className={cn(
-                    "sticky left-0 z-[1] border-r border-t border-border px-2.5 py-1.5 font-semibold",
+                    "sticky left-0 z-[2] border-r border-t border-border px-2.5 py-1.5 font-semibold",
                     stickyCellOpaque,
                   )}
                 >

@@ -42,6 +42,14 @@ export function recipientKeys(summary) {
   return keys;
 }
 
+/** Toggle chọn tất cả / bỏ chọn tất cả đơn vị nhận. */
+export function toggleAllRecipientKeys(availableKeys, selectedKeys) {
+  const available = (availableKeys ?? []).map((key) => String(key));
+  const selected = new Set((selectedKeys ?? []).map((key) => String(key)));
+  const allOn = available.length > 0 && available.every((key) => selected.has(key));
+  return allOn ? [] : available;
+}
+
 export function filterOrderSummaryByRecipientUnits(summary, selectedKeys) {
   const allowed = new Set((selectedKeys ?? []).map((key) => String(key)));
   const slipColumns = (summary?.slipColumns ?? []).filter((col) => allowed.has(String(col?.recipientUnitId ?? "none")));
