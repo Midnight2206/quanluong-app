@@ -1,0 +1,19 @@
+---
+description: Use Chrome Modern Web Guidance for frontend HTML, CSS, and client-side JS. Skip backend, Docker, and infra.
+globs: "{apps/web,apps/superadmin,apps/supplier,packages/shared}/**/*.{html,css,scss,js,jsx,ts,tsx}"
+alwaysApply: false
+---
+
+# Modern Web Guidance
+
+For HTML, CSS, and client-side JavaScript in `apps/web`, `apps/superadmin`, `apps/supplier`, and `packages/shared`, read and follow `.agents/skills/modern-web-guidance/SKILL.md` (linked at `.cursor/skills/modern-web-guidance`) before writing UI, layout, animation, forms, or browser API code. Search with `npx modern-web-guidance@latest search "<query>"`, then `retrieve` the matching guide.
+
+Do not use this skill for `quanluong-app-be`, Docker, Python services, CI, or other backend and infra work.
+
+This does not replace project skills that already govern the same files:
+
+- `mobile-first` still owns narrow-screen layout (changes only at `max-width: 1023px`; desktop from `lg` stays pixel-stable).
+- `impeccable` still owns design, craft, and visual direction when that skill applies.
+- `unified-page-scroll` still owns page scroll owners and sticky layers.
+
+Browser support stays Baseline Widely available unless the task states a different target. Do not enable origin trials or volatile features.
