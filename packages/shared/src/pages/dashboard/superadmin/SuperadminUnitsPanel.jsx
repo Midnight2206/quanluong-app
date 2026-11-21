@@ -24,12 +24,13 @@ import {
   usePatchUnitMutation,
 } from "@/features/units/api/unitsApi";
 import { cn } from "@/utils/cn";
+import { toSortedCopy } from "@/utils/toSortedCopy";
 import { StickyResponsiveTable } from "@/components/common/StickyHorizontalTable";
 import { notifyError, notifySuccess, notifySuccessWithUndo } from "@/services/notify";
 import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 function sortUnitsByPath(units) {
-  return [...units].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units, (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 function isInvalidParentChoice(editUnit, candidate) {

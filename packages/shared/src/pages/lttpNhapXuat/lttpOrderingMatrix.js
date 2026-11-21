@@ -1,3 +1,5 @@
+import { toSortedCopy } from "../../utils/toSortedCopy.js";
+
 const SLIP_COLUMN_STYLE_COUNT = 8;
 
 /** Tránh nhầm khi copy: tên không chứa `:` hay `;` hay xuống dòng. */
@@ -90,7 +92,7 @@ export function buildOrderingMatrix(summary) {
     styleIdx: i % SLIP_COLUMN_STYLE_COUNT,
   }));
 
-  const rows = [...(summary.grandTotals || [])].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  const rows = toSortedCopy(summary.grandTotals || [], (a, b) => a.name.localeCompare(b.name, "vi"));
 
   /** @type {Map<string, Map<number, { quantityFormatted: string; lineNote: string | null }>>} */
   const qtyBySlip = new Map();

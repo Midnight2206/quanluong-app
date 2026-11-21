@@ -17,6 +17,7 @@ import { formatVnd } from "@/utils/formatVnd";
 import { conversionNote } from "./applyIssueSlipAiPreview.js";
 import { clearUserAsk, userAskQuestions, withUserAsk } from "./lttpIssueSlipAskQueue.js";
 import { fieldClassSm as inputClass } from "@/utils/fieldClass";
+import { imeEnterAction } from "@/utils/imeEnterSubmit";
 
 function normalizePreview(data) {
   if (!data) {
@@ -838,10 +839,10 @@ export function LttpIssueSlipAiSuggestDialog({
                   placeholder={preview ? "Ví dụ: 10 quả = 1 vỉ" : "Ví dụ: trứng vịt: 15 quả"}
                   disabled={busy}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (!sending) void (preview ? handleChat() : handleSuggest());
-                    }
+                    const action = imeEnterAction(e, { shiftInsertsNewline: true });
+                    if (action === "ignore") return;
+                    e.preventDefault();
+                    if (action === "submit" && !sending) void (preview ? handleChat() : handleSuggest());
                   }}
                 />
                 <button

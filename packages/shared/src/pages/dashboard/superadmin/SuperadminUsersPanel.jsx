@@ -24,6 +24,7 @@ import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { notifyNoDeletePermission } from "@/features/permissions/permissionUi";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { cn } from "@/utils/cn";
+import { toSortedCopy } from "@/utils/toSortedCopy";
 import { notifyError, notifySuccess } from "@/services/notify";
 import {
   supplierCreateBlockReason,
@@ -35,7 +36,7 @@ import {
 import { fieldClassSm as inputClass } from "@/utils/fieldClass";
 
 function sortUnitsByPath(units) {
-  return [...units].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units, (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 function toggleSupplierId(list, supplierId) {

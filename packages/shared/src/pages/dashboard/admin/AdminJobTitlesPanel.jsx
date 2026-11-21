@@ -15,6 +15,7 @@ import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { useGetUsersQuery, usePatchUserMutation } from "@/features/users/api/usersApi";
 import { useGetPermissionsCatalogQuery } from "@/features/permissions/api/permissionsApi";
 import { cn } from "@/utils/cn";
+import { toSortedCopy } from "@/utils/toSortedCopy";
 import { useConfirm } from "@/contexts/ConfirmProvider";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
 import { notifyError, notifySuccess, notifySuccessWithUndo } from "@/services/notify";
@@ -48,7 +49,7 @@ const P = {
 };
 
 function sortUnitsByPath(units) {
-  return [...units].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units, (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 function pathPrefix(p) {
@@ -76,7 +77,7 @@ function jobTitleUnitAppliesToUserUnit(titleUnit, userUnit) {
 
 function samePermissionSet(draftSet, ids) {
   const a = [...draftSet].sort((x, y) => x - y);
-  const b = [...(ids ?? [])].sort((x, y) => x - y);
+  const b = toSortedCopy(ids ?? [], (x, y) => x - y);
   if (a.length !== b.length) {
     return false;
   }

@@ -1,8 +1,10 @@
+import { toSortedCopy } from "../../utils/toSortedCopy.js";
+
 /** Tên đơn vị kho cấp phát LTTP mẫu dev — khớp seed `SAMPLE_CHILD_UNIT_NAME`. */
 export const LTTP_STORAGE_UNIT_NAME = "Đơn vị mẫu cấp 2";
 
 export function sortUnitsByPath(units) {
-  return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units || [], (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 function normalizePathPrefix(path) {

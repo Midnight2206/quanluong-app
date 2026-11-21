@@ -42,8 +42,10 @@ export function MidnightGateForm() {
             <label className="block text-sm text-muted-foreground">
               Mật khẩu
               <input
+                id="midnight-gate-password"
+                name="password"
                 type="password"
-                autoComplete="off"
+                autoComplete="current-password"
                 className={`${fieldClass} w-full`}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

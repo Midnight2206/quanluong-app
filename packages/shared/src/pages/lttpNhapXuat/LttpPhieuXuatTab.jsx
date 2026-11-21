@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/utils/cn";
+import { imeEnterAction } from "@/utils/imeEnterSubmit";
 import { useCurrentUser } from "@/features/auth/model/authSlice";
 import {
   useCreateLttpIssueSlipMutation,
@@ -2228,13 +2229,14 @@ export function LttpPhieuXuatTab({
                     resolveByCode(r.key, r.codeDraft, { silent: true })
                   }
                   onCodeKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void resolveByCode(r.key, r.codeDraft, {
-                        silent: true,
-                        focusQuantity: true,
-                      });
-                    }
+                    const action = imeEnterAction(e);
+                    if (action === "ignore") return;
+                    e.preventDefault();
+                    if (action !== "submit") return;
+                    void resolveByCode(r.key, r.codeDraft, {
+                      silent: true,
+                      focusQuantity: true,
+                    });
                   }}
                   onQuantityChange={(e) => {
                     const cleaned = e.target.value.replace(/[^\d.,]/g, "");
@@ -2438,13 +2440,14 @@ export function LttpPhieuXuatTab({
                             resolveByCode(r.key, r.codeDraft, { silent: true })
                           }
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              void resolveByCode(r.key, r.codeDraft, {
-                                silent: true,
-                                focusQuantity: true,
-                              });
-                            }
+                            const action = imeEnterAction(e);
+                            if (action === "ignore") return;
+                            e.preventDefault();
+                            if (action !== "submit") return;
+                            void resolveByCode(r.key, r.codeDraft, {
+                              silent: true,
+                              focusQuantity: true,
+                            });
                           }}
                           placeholder="Mã"
                           disabled={!canWrite}

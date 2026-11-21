@@ -12,6 +12,7 @@ import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { TabPanel } from "@/components/common/TabPanel";
 import { useSyncPersistedNavTabFromRoute, writePersistedNavTab } from "@/hooks/usePersistedNavTab";
 import { cn } from "@/utils/cn";
+import { toSortedCopy } from "@/utils/toSortedCopy";
 import { LttpPhieuXuatTab } from "./LttpPhieuXuatTab";
 import { LttpLichSuXuatTab } from "./LttpLichSuXuatTab";
 import { LttpOrderingTab } from "./LttpOrderingTab";
@@ -28,7 +29,7 @@ const LTTP_ORDER_TAB_ID = "ordering-lttp";
 const LTTP_ORDERING_ROUTE_PATH = "/lttp-nhap-xuat/ordering-lttp";
 
 function sortUnitsByPath(units) {
-  return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units || [], (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 /** Khớp `getSubtreeUnitIds` BE: gốc + mọi đơn vị có `path` bắt đầu bằng prefix của path gốc */

@@ -17,6 +17,7 @@ import { useCurrentUser } from "@/features/auth/model/authSlice";
 import { chatThreadKey, parseChatThreadKey } from "@/features/chat/chatThreadKeys";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/utils/cn";
+import { imeEnterAction } from "@/utils/imeEnterSubmit";
 import { sameChatUserId } from "@/features/chat/chatUserIds";
 import { resolveAvatarUrl } from "@/utils/avatarUrl";
 import { resolveMediaUrl } from "@/utils/runtimeEnv";
@@ -659,10 +660,10 @@ function ChatWindowFrame({
               onTypingInput?.();
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
+              const action = imeEnterAction(e, { shiftInsertsNewline: true });
+              if (action === "ignore") return;
+              e.preventDefault();
+              if (action === "submit") handleSend();
             }}
           />
           <Button type="button" size="sm" className="h-8 shrink-0 px-2" onClick={handleSend} aria-label="Gửi">

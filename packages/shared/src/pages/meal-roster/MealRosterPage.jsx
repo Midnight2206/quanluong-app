@@ -6,6 +6,7 @@ import { useCurrentUser, useHasPermission } from "@/features/auth/model/authSlic
 import { PERMISSIONS } from "@/features/permissions/constants/permissions";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
+import { toSortedCopy } from "@/utils/toSortedCopy";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { MealRosterGuarantyTab } from "./MealRosterGuarantyTab.jsx";
 import { MealRosterLedgerTab } from "./MealRosterLedgerTab.jsx";
@@ -17,7 +18,7 @@ function localYearMonth(d = new Date()) {
 }
 
 function sortUnitsByPath(units) {
-  return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units || [], (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 export function MealRosterPage() {

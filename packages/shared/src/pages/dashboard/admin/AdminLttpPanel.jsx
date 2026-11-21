@@ -48,6 +48,7 @@ import { useTargetUnitScope } from "@/contexts/TargetUnitScopeContext";
 import httpClient from "@/services/httpClient";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { cn } from "@/utils/cn";
+import { toSortedCopy } from "@/utils/toSortedCopy";
 import { formatVnd } from "@/utils/formatVnd";
 import { LttpAiAutoAcceptCard } from "./LttpAiAutoAcceptCard";
 import { LttpWarehouseBuyerCard } from "./LttpWarehouseBuyerCard";
@@ -83,7 +84,7 @@ function isPtRowNewPricesBlank(old) {
 }
 
 function sortUnitsByPath(units) {
-  return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units || [], (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 function localYmd(d = new Date()) {

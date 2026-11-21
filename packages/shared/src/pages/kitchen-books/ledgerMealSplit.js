@@ -1,3 +1,5 @@
+import { toSortedCopy } from "../../utils/toSortedCopy.js";
+
 /** Khớp kitchen-ledger-meal-rates.js — phần dư lớn nhất, tổng = mức tiền ăn. */
 const KEYS = ["sang", "trua", "chieu"];
 
@@ -8,7 +10,7 @@ export function percentsToAmounts(mucTienAn, percents) {
     return { key, amount: Math.floor(share), frac: share - Math.floor(share) };
   });
   let remain = total - floors.reduce((sum, row) => sum + row.amount, 0);
-  const order = [...floors].sort((a, b) => b.frac - a.frac || KEYS.indexOf(a.key) - KEYS.indexOf(b.key));
+  const order = toSortedCopy(floors, (a, b) => b.frac - a.frac || KEYS.indexOf(a.key) - KEYS.indexOf(b.key));
   for (let i = 0; i < remain; i += 1) order[i % order.length].amount += 1;
   return Object.fromEntries(floors.map((row) => [row.key, row.amount]));
 }

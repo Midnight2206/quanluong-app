@@ -17,6 +17,7 @@ import { IssueSlipCommoditySearch } from "@/components/lttp/IssueSlipCommoditySe
 import { StickyHorizontalTable } from "@/components/common/StickyHorizontalTable";
 import { useDraftPersist } from "@/hooks/useDraftPersist";
 import { cn } from "@/utils/cn";
+import { imeEnterAction } from "@/utils/imeEnterSubmit";
 import {
   useGetKitchenReceiptSlipByDayQuery,
   useGetKitchenReceiptSlipSerialQuery,
@@ -710,13 +711,14 @@ export function KitchenReceiptSlipWorkspace({
                           void resolveByCode(r.key, r.codeDraft, { forcedKind })
                         }
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void resolveByCode(r.key, r.codeDraft, {
-                              focusQuantity: true,
-                              forcedKind,
-                            });
-                          }
+                          const action = imeEnterAction(e);
+                          if (action === "ignore") return;
+                          e.preventDefault();
+                          if (action !== "submit") return;
+                          void resolveByCode(r.key, r.codeDraft, {
+                            focusQuantity: true,
+                            forcedKind,
+                          });
                         }}
                         placeholder="Mã"
                       />

@@ -1,6 +1,8 @@
+import { toSortedCopy } from "./toSortedCopy.js";
+
 /** Sắp xếp đơn vị theo materialized path (cây phẳng đúng thứ tự cấp). */
 export function sortUnitsByMaterializedPath(units) {
-  return [...(units || [])].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units || [], (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 /** Nhãn select: thụt theo `depth` (0 = gốc trong phạm vi). */

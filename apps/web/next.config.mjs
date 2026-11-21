@@ -33,6 +33,7 @@ function resolveHtmlToImagePackageDir() {
     throw new Error(
       `[apps/web/next.config.mjs] Không resolve được html-to-image (${firstErr?.message}). ` +
         `Chạy \`npm install\` tại thư mục gốc repo, kiểm tra lockfile có gói, rồi \`docker compose build ui --no-cache\`.`,
+      { cause: firstErr },
     );
   }
 }

@@ -10,11 +10,12 @@ import {
 } from "@/features/unit-level-permission-caps/api/unitLevelPermissionCapsApi";
 import { useGetUnitsQuery } from "@/features/units/api/unitsApi";
 import { cn } from "@/utils/cn";
+import { toSortedCopy } from "@/utils/toSortedCopy";
 import { notifyError, notifySuccess } from "@/services/notify";
 import { formatPermissionModuleLabel } from "@/features/permissions/constants/permissionModuleLabels.vi";
 
 function sortUnitsByPath(units) {
-  return [...units].sort((a, b) => (a.path || "").localeCompare(b.path || ""));
+  return toSortedCopy(units, (a, b) => (a.path || "").localeCompare(b.path || ""));
 }
 
 function isUnitRowVisible(unit, byId, expandedIds) {

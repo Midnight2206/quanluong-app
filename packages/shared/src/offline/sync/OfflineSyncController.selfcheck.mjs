@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { createOfflineSyncController } from "./OfflineSyncController.js";
 
 let calls = 0;
-let release;
-const gate = new Promise((r) => {
-  release = r;
-});
+const { promise: gate, resolve: release } = Promise.withResolvers();
 
 const fakeDb = {};
 const controller = createOfflineSyncController({

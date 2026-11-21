@@ -1,3 +1,5 @@
+import { toSortedCopy } from "../../utils/toSortedCopy.js";
+
 export function formatMealAmountOnly(mucTienAn) {
   const n = Number(mucTienAn);
   if (!Number.isFinite(n)) {
@@ -136,7 +138,7 @@ export function periodAmountsForCalendarDay(rate, yearMonth, dayOfMonth) {
   const ymd = `${ym}-${String(d).padStart(2, "0")}`;
   const versions = rate?.periodSplitVersions;
   if (Array.isArray(versions) && versions.length > 0) {
-    const sorted = [...versions].sort((a, b) => String(a.validFrom).localeCompare(String(b.validFrom)));
+    const sorted = toSortedCopy(versions, (a, b) => String(a.validFrom).localeCompare(String(b.validFrom)));
     let chosen = null;
     for (const v of sorted) {
       if (String(v.validFrom) <= ymd) {
